@@ -497,4 +497,110 @@ final class JournaledStepTests: XCTestCase {
         XCTAssertEqual(removed, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: running.path), "the dead note's tidy removed another swap's staged file")
     }
+
+    // MARK: - Tests: a write after a link's move (U4b3)
+
+    /// A class page that is a symbolic link to a file elsewhere in the
+    /// course, its link moved to a new name in the same folder, made by
+    /// `moveLink` as Rename folder makes a link's move.
+    func linkedDay3(in made: (course: URL, day1: URL, day2: URL, list: URL), target relative: String) throws -> (link: URL, newName: URL, target: URL) {
+        let elsewhere: URL = made.course.appendingPathComponent("elsewhere", isDirectory: true)
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        let target: URL = elsewhere.appendingPathComponent("Unit 1, Day 3.md")
+        try "---\ntitle: Unit 1, Day 3\npublish: false\n---\nThree.\n".write(to: target, atomically: true, encoding: .utf8)
+        let link: URL = made.day1.deletingLastPathComponent().appendingPathComponent("Unit 1, Day 3.md")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: relative)
+        let newName: URL = link.deletingLastPathComponent().appendingPathComponent("Unit 1, Day 4.md")
+        return (link: link, newName: newName, target: target)
+    }
+
+    /// A write planned at a link move's `to`, within its folder, is planned
+    /// at the file the link leads to: the step names that file and nothing
+    /// inside the link's new place, the link arrives at its new name holding
+    /// its target as written, and the file is written in place, the only
+    /// copy. MUST FAIL without the one-place resolution in
+    /// `placeALinkLeadsTo` (the write is planned at the link's new place).
+    func testAWriteAtALinkMovesNewPlaceIsPlannedAtTheFileItLeadsTo() throws {
+        let made = try course(inAWorkingFolder: true)
+        let relative: String = "../../elsewhere/Unit 1, Day 3.md"
+        let linked = try linkedDay3(in: made, target: relative)
+        let step: JournaledStep = step(for: made.course)
+        let sha: String = try XCTUnwrap(UndoTreeReading.linkSha(at: linked.link))
+        step.moveLink(linked.link, to: linked.newName, linkSha: sha)
+        let retitled: String = "---\ntitle: Unit 1, Day 4\npublish: false\n---\nThree.\n"
+        step.write(retitled, to: linked.newName)
+
+        var plannedPaths: [String] = []
+        for key in step.plannedOrder {
+            plannedPaths.append(key)
+        }
+        XCTAssertEqual(plannedPaths, [JournaledStep.key(of: linked.target)], "the write was not planned at the file the link leads to")
+        XCTAssertNil(step.refusedBeforeMaking)
+        try step.make()
+
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: linked.newName.path), relative)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: linked.link.path))
+        XCTAssertNil(try? FileManager.default.destinationOfSymbolicLink(atPath: linked.link.path), "the link is still at its old name")
+        XCTAssertEqual(try String(contentsOf: linked.target, encoding: .utf8), retitled)
+        XCTAssertEqual(stagedNames(under: made.course), [])
+    }
+
+    /// A link moved to ANOTHER folder and then written through: no writer
+    /// does it, and a relative target could lead elsewhere from there, so
+    /// the step is refused "cannot tell now" when planned, before anything
+    /// changes. MUST FAIL with the refusal for another folder removed.
+    func testAWriteThroughALinkMovedToAnotherFolderIsRefusedBeforeAnythingChanges() throws {
+        let made = try course(inAWorkingFolder: true)
+        let relative: String = "../../elsewhere/Unit 1, Day 3.md"
+        let linked = try linkedDay3(in: made, target: relative)
+        let otherFolder: URL = made.course.appendingPathComponent("section1/Other", isDirectory: true)
+        try FileManager.default.createDirectory(at: otherFolder, withIntermediateDirectories: true)
+        let moved: URL = otherFolder.appendingPathComponent("Unit 1, Day 4.md")
+        let targetText: String = try String(contentsOf: linked.target, encoding: .utf8)
+        let step: JournaledStep = step(for: made.course)
+        step.moveLink(linked.link, to: moved, linkSha: try XCTUnwrap(UndoTreeReading.linkSha(at: linked.link)))
+        step.write("---\ntitle: Unit 1, Day 4\n---\n", to: moved)
+        // Refused when planned, never left to the door to find unnamable
+        // (which would make a "could not record" trail line first).
+        XCTAssertNotNil(step.refusedBeforeMaking, "the write through a link moved to another folder was planned")
+
+        XCTAssertThrowsError(try step.make()) { error in
+            guard case JournaledStepError.refused(.cannotTellNow, _) = error else {
+                return XCTFail("not refused as cannot tell now: \(error)")
+            }
+        }
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: linked.link.path), relative)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: moved.path))
+        XCTAssertEqual(try String(contentsOf: linked.target, encoding: .utf8), targetText)
+    }
+
+    /// A write planned at the place a link's move LEAVES (Insert Class's
+    /// next lower class, renamed into the linked class's old name): the
+    /// door does not yet judge a place a move leaves as free (its `writeFile`
+    /// is judged against the link still there), so the step is refused
+    /// "cannot tell now" before anything changes, and never written through
+    /// the leaving link into the file it leads to. MUST FAIL with the
+    /// refusal at a link move's `from` removed (the write follows the link
+    /// and lands in the linked file).
+    func testAWriteAtThePlaceALinkMoveLeavesIsRefusedBeforeAnythingChanges() throws {
+        let made = try course(inAWorkingFolder: true)
+        let relative: String = "../../elsewhere/Unit 1, Day 3.md"
+        let linked = try linkedDay3(in: made, target: relative)
+        let targetText: String = try String(contentsOf: linked.target, encoding: .utf8)
+        let day2Text: String = try String(contentsOf: made.day2, encoding: .utf8)
+        let step: JournaledStep = step(for: made.course)
+        step.moveLink(linked.link, to: linked.newName, linkSha: try XCTUnwrap(UndoTreeReading.linkSha(at: linked.link)))
+        step.write("---\ntitle: Unit 1, Day 3\npublish: false\n---\nTwo.\n", to: linked.link)
+        step.remove(made.day2)
+
+        XCTAssertThrowsError(try step.make()) { error in
+            guard case JournaledStepError.refused(.cannotTellNow, _) = error else {
+                return XCTFail("not refused as cannot tell now: \(error)")
+            }
+        }
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: linked.link.path), relative)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: linked.newName.path))
+        XCTAssertEqual(try String(contentsOf: linked.target, encoding: .utf8), targetText)
+        XCTAssertEqual(try String(contentsOf: made.day2, encoding: .utf8), day2Text)
+    }
 }

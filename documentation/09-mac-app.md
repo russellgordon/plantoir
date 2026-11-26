@@ -23596,6 +23596,26 @@ links. `undo.rule.shadow` no longer promises that pieces 14 and 15 settle a
 linked PAGE: they move a link only for Rename folder's folder, and Insert
 Class on the Mac still refuses renaming a later class that is a link. Review 1: the listing's `link` line takes its hash from the same `linkSha(at:)`; two `stackCases` rows (call `renameAPerSectionFolderThatIsALink`) run Rename folder's own plan on a linked section folder, held on Windows for W8; and a dangling link is skipped, as before U4b, while a link to another place of the same rename is moved as a link.
 
+### U4b3: linked-class-page-moves-its-link
+
+Insert Class on the Mac still refuses, "cannot tell now" before anything
+changes, to rename a later class that is a symbolic link: this piece stopped
+at its first half (#899, 2026-11-26). The door cannot yet make the step the
+rename needs. Insert Class renames highest day first, so the place the
+linked class's link LEAVES is filled in the same step by the class below it
+(or by the new class), and the door judges a `writeFile` at that place
+against what is there now (the link), never as freed by the step's own move;
+backward, the move back is judged against the page the step wrote there.
+What landed is the step's half: a write planned exactly at a link move's
+`to`, within the same folder, is planned at the file the link at its `from`
+leads to (`JournaledStep.placeALinkLeadsTo`, the one place), so the title and
+date go into the linked file and nothing is planned inside the link's new
+place; a write at a link move's `from`, or through a link moved to another
+folder, is refused "cannot tell now" before anything changes
+(`refusedBeforeMaking`). No writer reaches either today; `ClassInsertionPlanner`
+is unchanged. The door's rule for a place a move leaves is parked for the
+director.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

@@ -205,6 +205,14 @@ nonisolated final class JournaledStep {
     /// instead (`moveLink`), and carries no edit.
     private(set) var plannedFolderMoves: [(from: URL, to: URL, listingSha: String?, linkSha: String?)] = []
 
+    /// A write planned at a place no step can judge yet, refusing the step
+    /// "cannot tell now" when it is made, before anything changes (#899
+    /// U4b3): a write at a planned link move's `from` (the place the link
+    /// leaves, which the door does not yet judge as free), or at its `to`
+    /// when the link moved to another folder (a relative target could lead
+    /// somewhere else from there). The first such place; nil otherwise.
+    private(set) var refusedBeforeMaking: UndoRefusal? = nil
+
     // MARK: - Computed properties
 
     /// The mode the step is made in.
@@ -397,6 +405,9 @@ nonisolated final class JournaledStep {
     /// changed after that read refuses the step instead of being written
     /// over.
     func write(_ data: Data, to url: URL, plannedFrom read: Data) {
+        if refusesAWrite(at: url) {
+            return
+        }
         let place: URL = placeALinkLeadsTo(url)
         let key: String = JournaledStep.key(of: place)
         if plannedURL[key] == nil {
@@ -632,6 +643,9 @@ nonisolated final class JournaledStep {
     /// the list can take it), then every planned file staged and swapped in
     /// together. Throws, having written nothing, when the door refuses.
     func make() throws {
+        if let refusal = refusedBeforeMaking {
+            throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+        }
         if isMixed {
             try makeAsOps()
             return
@@ -1059,6 +1073,9 @@ nonisolated final class JournaledStep {
     /// leads to (`throughALink`, the default), unless its own place is
     /// already planned in this step.
     private func plan(_ data: Data?, at url: URL, throughALink: Bool = true) {
+        if refusesAWrite(at: url) {
+            return
+        }
         var place: URL = url
         if throughALink && plannedURL[JournaledStep.key(of: url)] == nil {
             place = placeALinkLeadsTo(url)
@@ -1079,10 +1096,67 @@ nonisolated final class JournaledStep {
     /// it is not a link. A place carried by a planned folder move is named
     /// as the caller named it: the move decides where it is.
     func placeALinkLeadsTo(_ url: URL) -> URL {
+        // The one place a write after a link's move is resolved (U4b3): a
+        // place that is exactly a planned link move's `to`, within the
+        // same folder, is the file the link at its `from` leads to now,
+        // the same file before and after the move. Never the link's new
+        // place itself, which would be an edit inside a link's `to`.
+        if let linkMove = plannedLinkMove(endingAt: url), JournaledStep.staysInItsFolder(linkMove) {
+            return CourseConfiguration.fileALinkLeadsTo(linkMove.from)
+        }
         if placeOnDiskNow(url) != url {
             return url
         }
         return CourseConfiguration.fileALinkLeadsTo(url)
+    }
+
+    /// The planned move of a symbolic link (`moveLink`) whose `to` is
+    /// exactly `url`, or nil.
+    func plannedLinkMove(endingAt url: URL) -> (from: URL, to: URL)? {
+        let key: String = JournaledStep.key(of: url)
+        for move in plannedFolderMoves where move.linkSha != nil {
+            if JournaledStep.key(of: move.to) == key {
+                return (from: move.from, to: move.to)
+            }
+        }
+        return nil
+    }
+
+    /// The planned move of a symbolic link whose `from` is exactly `url`,
+    /// or nil.
+    func plannedLinkMove(startingAt url: URL) -> (from: URL, to: URL)? {
+        let key: String = JournaledStep.key(of: url)
+        for move in plannedFolderMoves where move.linkSha != nil {
+            if JournaledStep.key(of: move.from) == key {
+                return (from: move.from, to: move.to)
+            }
+        }
+        return nil
+    }
+
+    /// Whether a link's move keeps it in the folder it was in, so a
+    /// relative target leads to the same file from either name.
+    static func staysInItsFolder(_ move: (from: URL, to: URL)) -> Bool {
+        let fromFolder: String = JournaledStep.key(of: move.from.deletingLastPathComponent())
+        let toFolder: String = JournaledStep.key(of: move.to.deletingLastPathComponent())
+        return fromFolder == toFolder
+    }
+
+    /// Whether a write at `url` is one no step can judge yet (U4b3), noting
+    /// the first such place in `refusedBeforeMaking`: at a planned link
+    /// move's `from`, or at the `to` of a link moved to another folder.
+    private func refusesAWrite(at url: URL) -> Bool {
+        var refused: Bool = false
+        if plannedLinkMove(startingAt: url) != nil {
+            refused = true
+        }
+        if let linkMove = plannedLinkMove(endingAt: url), !JournaledStep.staysInItsFolder(linkMove) {
+            refused = true
+        }
+        if refused && refusedBeforeMaking == nil {
+            refusedBeforeMaking = .cannotTellNow(path: url.path)
+        }
+        return refused
     }
 
     /// The key a read finds a planned file by: `url`'s own when it is
