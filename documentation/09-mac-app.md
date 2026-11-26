@@ -23600,8 +23600,9 @@ Class on the Mac still refuses renaming a later class that is a link. Review 1: 
 
 Insert Class on the Mac still refuses, "cannot tell now" before anything
 changes, to rename a later class that is a symbolic link: this piece stopped
-at its first half (#899, 2026-11-26). The door cannot yet make the step the
-rename needs. Insert Class renames highest day first, so the place the
+at its first half (#899, 2026-11-26). The door could not then make the step
+the rename needs; the U4b3 door pieces (next section) build that, and Insert
+Class keeps refusing until U4b3's part 2. Insert Class renames highest day first, so the place the
 linked class's link LEAVES is filled in the same step by the class below it
 (or by the new class), and the door judges a `writeFile` at that place
 against what is there now (the link), never as freed by the step's own move;
@@ -23613,8 +23614,49 @@ date go into the linked file and nothing is planned inside the link's new
 place; a write at a link move's `from`, or through a link moved to another
 folder, is refused "cannot tell now" before anything changes
 (`refusedBeforeMaking`). No writer reaches either today; `ClassInsertionPlanner`
-is unchanged. The door's rule for a place a move leaves is parked for the
-director.
+is unchanged. The door's rule for a place a move leaves was parked for the
+director, who chose the general rule of a handed-over place (next section).
+
+### U4b3 door: a place handed over within a step
+
+`undoJournal.opKinds.wholeOps` has a second exception (#899, 2026-11-26):
+a place HANDED OVER within one step. An earlier op leaves it (a file's or
+a link's `move` away, or a removal) and a later op fills it (a move in, or
+a new file), at least one of the two a move, the exact place by the one
+comparison. A folder's move, a capitalisation-only move, a `moveApart` and a
+`setAside` never hand a place over. One rule finds the pairs,
+`UndoCheck.handovers(in:)`, and the reader, the plan and recovery all use it.
+Insert Class needs the rule because it renames the highest day first: a
+linked class's link moves up a day and leaves its place to the class below
+it or to the new class. The director widened the rule from "a place a move
+leaves" to every handed-over place, so that two links in a row, and a link
+below a plain class, are built once and never refused as an interim state.
+Door-1, going forward: the filler is judged against the place free when the
+leaver is a change of the same plan, and a step with a handed-over place is
+swapped in its ops' order. A file change at a place a link leaves or fills
+is judged, at the plan and before staging, on the folders above it only,
+because the link standing there is moving and is never written through.
+Just before the change itself the place is judged whole, so a file put
+there since is refused `changedSince`. Door-2, going back: the filler is
+taken back first and the leaver is then judged with the place free, in the
+ops' reverse order. A page edited by hand at the place is refused, naming
+the place, before anything changes. Door-3, recovery: each op of the pair
+is judged as the other leaves the place, so a step stopped before, between
+or after their swaps is whole before, part way or whole after. A move that
+hands a place over is judged under its two places (`from → to`). Door-4,
+readable: `UndoStep.wholeOpsStandAlone` accepts exactly such pairs, each
+place handed over once, named by those two ops only, in a step that carries
+no edit (U4b's first exception). A filler before its leaver, a third op at,
+inside or above the place, a place handed over twice, or a handover in a
+step that carries an edit is still `unknown.unreadableStep`, a barrier.
+Before door-4 no readable step could hold a handed-over place, so doors 1
+to 3 were inert. Seven `stackCases` rows ("U4b3 door, …", calls
+`handAPlaceOverAfterALinksMove`, `handAPlaceOverBeforeALinksMove`,
+`editTheHandedOverPageByHand`, `stepFillingAPlaceBeforeItIsLeft`,
+`stepHandingOverAFoldersPlace`, key `handedOver`) pin it on the Mac and in
+the Python model (`make_undo_traces.handovers`, `plan`, `swap_groups`). They
+are held for Windows under `Reason899W8HandedOverPlace` until its door piece
+lands. Recovery's contract rows are door-5's.
 
 ### #1004-a: the journal's own files are judged by what was read
 

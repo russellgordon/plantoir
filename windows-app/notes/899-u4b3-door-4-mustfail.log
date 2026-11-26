@@ -1,0 +1,19 @@
+#899 U4b3 door-4 must-fail log (2026-11-26). Mac runs: UndoHandedOverPlaceTests + UndoJournalContractTests, through xlock.sh.
+Each sabotage built and run, then restored from a saved copy of the file; no sabotage line left (grep -c sabotage = 0).
+
+M1 wholeOpsStandAlone back to door-3's rule (the red run, .dd/run-door4-red.log): 54 tests, 5 failures.
+   testStackCases: rows 1-5 ("U4b3 door, a place handed over after a link's move: ...", x2; "... before and after a link's move: ...", x2;
+   "... the page at a handed-over place edited by hand since ...") - "the last call came to nothingToUndo/nothingToRedo", "offered [], not [1]".
+   testShapesAAndBAndCAreReadable (3 asserts), testAHandedOverStepIsReadBackReadable.  RED.
+M2 a link's move may share its exact place with any op, any order (.dd/run-door4-m2.log):
+   testStackCases: "U4b3 door, a place filled before it is left: a step this version cannot read, a barrier";
+   testAFillerBeforeItsLeaverIsUnreadable; testAThirdOpAtTheHandedOverPlaceIsUnreadable.  RED.
+M3 a folder's move (listingSha) may share its exact place (.dd/run-door4-m3.log):
+   testStackCases: "U4b3 door, a folder's move whose place is then written: a step this version cannot read, a barrier";
+   testAPlaceInsideAMovedFoldersFromIsUnreadable.  RED.
+M4 Python readable_step without the handover rule (handed = []): test_stack_cases fails rows 1-5 (5 subtests).  RED.
+M5 Python swap_groups back to today's order: HandedOverOrderTests.test_shape_b_goes_in_the_steps_order_and_back_reversed fails.  RED.
+   (The stack rows never reach swap_groups, used only by stopped_part_way, door-5's. Also run: plan's in-order changes
+   reverted to whole-then-files: rows 3 and 4 fail, "places handed over before and after a link's move: ...".)
+
+RED 5 of 5.

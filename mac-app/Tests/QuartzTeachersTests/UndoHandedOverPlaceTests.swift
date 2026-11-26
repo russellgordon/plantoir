@@ -403,7 +403,108 @@ final class UndoHandedOverPlaceTests: XCTestCase {
         ])
     }
 
+    // MARK: - Readable by shape (door-4)
+
+    func testShapesAAndBAndCAreReadable() {
+        XCTAssertTrue(UndoStep.wholeOpsStandAlone(shapeAOps()))
+        XCTAssertTrue(UndoStep.wholeOpsStandAlone([
+            UndoOp.writeFile(path: day(4), beforeSha: nil, afterSha: fakeSha("3")),
+            UndoOp.writeFile(path: day(3), beforeSha: fakeSha("3"), afterSha: nil),
+            UndoOp.moveLink(from: day(2), to: day(3), linkSha: fakeSha("l")),
+            UndoOp.writeFile(path: day(2), beforeSha: nil, afterSha: fakeSha("n")),
+        ]))
+        XCTAssertTrue(UndoStep.wholeOpsStandAlone([
+            UndoOp.moveLink(from: day(3), to: day(4), linkSha: fakeSha("l")),
+            UndoOp.moveLink(from: day(2), to: day(3), linkSha: fakeSha("m")),
+            UndoOp.writeFile(path: day(2), beforeSha: nil, afterSha: fakeSha("n")),
+        ]))
+    }
+
+    func testAFillerBeforeItsLeaverIsUnreadable() {
+        XCTAssertFalse(UndoStep.wholeOpsStandAlone([
+            UndoOp.writeFile(path: day(3), beforeSha: nil, afterSha: fakeSha("n")),
+            UndoOp.moveLink(from: day(3), to: day(4), linkSha: fakeSha("l")),
+        ]))
+    }
+
+    func testAThirdOpAtTheHandedOverPlaceIsUnreadable() {
+        var ops: [UndoOp] = shapeAOps()
+        ops.append(UndoOp.replaceText(path: day(3), before: "New", after: "Newer", contextBefore: "", contextAfter: ".\n"))
+        XCTAssertFalse(UndoStep.wholeOpsStandAlone(ops))
+    }
+
+    func testAPlaceInsideAMovedFoldersFromIsUnreadable() {
+        let folder: String = section + "media"
+        XCTAssertFalse(UndoStep.wholeOpsStandAlone([
+            UndoOp.moveFolder(from: folder, to: section + "renamed", listingSha: fakeSha("f")),
+            UndoOp.writeFile(path: folder + "/a.md", beforeSha: nil, afterSha: fakeSha("n")),
+        ]))
+        XCTAssertFalse(UndoStep.wholeOpsStandAlone([
+            UndoOp.moveFolder(from: folder, to: section + "renamed", listingSha: fakeSha("f")),
+            UndoOp.writeFile(path: folder, beforeSha: nil, afterSha: fakeSha("n")),
+        ]))
+    }
+
+    func testACaseOnlyMoveNeverHandsAPlaceOver() {
+        XCTAssertFalse(UndoStep.wholeOpsStandAlone([
+            UndoOp.moveFile(from: day(3), to: section + "Unit 1, day 3.md", sha: fakeSha("p")),
+            UndoOp.writeFile(path: day(3), beforeSha: nil, afterSha: fakeSha("n")),
+        ]))
+    }
+
+    func testAMoveApartNeverHandsAPlaceOver() {
+        XCTAssertFalse(UndoStep.wholeOpsStandAlone([
+            UndoOp.moveFileApart(from: day(3), to: day(4), sha: fakeSha("p")),
+            UndoOp.writeFile(path: day(3), beforeSha: nil, afterSha: fakeSha("n")),
+        ]))
+    }
+
+    func testAHandoverInAStepThatCarriesAnEditIsUnreadable() {
+        var ops: [UndoOp] = shapeAOps()
+        ops.append(UndoOp.moveFile(from: section + "a.md", to: section + "b.md", sha: fakeSha("a")))
+        ops.append(UndoOp.replaceText(path: section + "b.md", before: "old", after: "new", contextBefore: "", contextAfter: ".\n"))
+        XCTAssertFalse(UndoStep.wholeOpsStandAlone(ops))
+        // Without the handover, the same carried edit is readable (U4b).
+        XCTAssertTrue(UndoStep.wholeOpsStandAlone([ops[2], ops[3]]))
+    }
+
+    func testAPlaceHandedOverTwiceIsUnreadable() {
+        var ops: [UndoOp] = shapeAOps()
+        ops.append(UndoOp.writeFile(path: day(3), beforeSha: fakeSha("n"), afterSha: nil))
+        ops.append(UndoOp.moveLink(from: day(2), to: day(3), linkSha: fakeSha("m")))
+        XCTAssertEqual(UndoCheck.handovers(in: ops).count, 2)
+        XCTAssertFalse(UndoStep.wholeOpsStandAlone(ops))
+    }
+
+    /// The step as a reader reads it back from the journal: readable.
+    func testAHandedOverStepIsReadBackReadable() throws {
+        let made: UndoStep = UndoStep(
+            seq: 1, madeAt: "2026-11-26T12:00:00Z",
+            action: UndoAction(key: "insertClass", arguments: [:]),
+            madeBy: "menu", workingFolder: UndoWorkingFolder(id: "00000000-0000-0000-0000-000000000000", pathAtTheTime: parent.path),
+            course: "TST1O", section: 1, actionClass: "A", holds: "section", ops: shapeAOps()
+        )
+        let readBack: UndoStep = try JSONDecoder().decode(UndoStep.self, from: JSONEncoder().encode(made))
+        XCTAssertTrue(readBack.isReadable)
+    }
+
     // MARK: - Functions
+
+    func day(_ number: Int) -> String {
+        return section + "Unit 1, Day \(number).md"
+    }
+
+    /// A well-formed hash, one per name, for a step judged by shape only.
+    func fakeSha(_ name: String) -> String {
+        return UndoHash.sha256(of: Data(name.utf8))
+    }
+
+    func shapeAOps() -> [UndoOp] {
+        return [
+            UndoOp.moveLink(from: day(3), to: day(4), linkSha: fakeSha("l")),
+            UndoOp.writeFile(path: day(3), beforeSha: nil, afterSha: fakeSha("n")),
+        ]
+    }
 
     /// An in-memory step holding these ops.
     func step(_ ops: [UndoOp]) -> UndoStep {

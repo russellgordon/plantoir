@@ -1083,6 +1083,20 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
     # is before the move and made after it; backward it is taken back first,
     # and the move is judged as if it were.
     carriers = carried_edits(ops)
+    # U4b3 (opKinds.wholeOps' second exception): a place handed over. The
+    # second of the pair in this plan's order is judged against the place
+    # free when the first is a change of this plan, and the step's changes
+    # go in this plan's order.
+    handed = handovers(ops)
+    position = {}
+    for index, op in enumerate(ordered):
+        position[id(op)] = index
+    second_of = {}
+    for leaver, filler in handed:
+        first, second = (filler, leaver) if backward else (leaver, filler)
+        second_of[id(ops[second])] = ops[first]
+    changed = set()
+    in_order = []
     moving_now = set()
     group_stays_apart = leaves_apart and any(
         op["kind"] == "moveApart" and whole_state(op, pages_by_path) == "neither" for op in ordered
@@ -1124,6 +1138,12 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                             seen.pop(path, None)
                         else:
                             seen[path] = working[path]
+            first = second_of.get(id(op))
+            if first is not None and id(first) in changed:
+                # The place this move fills (forward, its `to`) or left
+                # (backward, its `from`) is free.
+                seen = dict(seen)
+                seen.pop(op["from"] if backward else op["to"], None)
             state = whole_state(op, seen)
             place = op.get("path") or op.get("from") or op.get("target")
             if group_stays_apart and kind == "moveApart" and state in ("neither", wanted_from):
@@ -1145,10 +1165,20 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                 return ("contentMissing", place)
             if carries and not backward:
                 moving_now.add(op["to"])
-            whole_changes.update(whole_moved(op, backward, seen))
+            moved_now = whole_moved(op, backward, seen)
+            whole_changes.update(moved_now)
+            changed.add(id(op))
+            in_order.append(moved_now)
             continue
         path = op["path"]
-        if path not in original:
+        first = second_of.get(id(op))
+        if first is not None and id(first) in changed:
+            # A new file (forward) or a removal taken back (backward) at a
+            # handed-over place starts from the place free, never read
+            # through what is leaving it.
+            original.setdefault(path, pages_by_path.get(path))
+            working[path] = None
+        elif path not in original:
             read_path = path
             carrier = carriers.get(path)
             if carrier is not None and carrier["to"] in moving_now:
@@ -1162,6 +1192,7 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             continue
         if state != wanted_from:
             continue
+        changed.add(id(op))
         if op["kind"] == "writeFile":
             target = op["beforeText"] if backward else op["afterText"]
             if content_missing and target is not None:
@@ -1189,8 +1220,16 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             source = op["after"] if backward else op["before"]
             target = op["before"] if backward else op["after"]
             working[path] = moving(op, source, target, working[path])
+        in_order.append({path: working[path]})
     if in_the_way:
         return ("changedSince", in_the_way[0], len(in_the_way) - 1)
+    if handed:
+        # Each change in this plan's order: what each place holds once the
+        # last op naming it is made.
+        changes = {}
+        for made in in_order:
+            changes.update(made)
+        return ("ready", changes, left_apart)
     file_changes = {}
     for path in original:
         if original[path] != working[path]:
@@ -1207,6 +1246,52 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
 
 
 EDIT_KINDS = ("writeFile", "editLine", "replaceText", "editJSON")
+
+
+def handovers(ops):
+    """UndoCheck.handovers (U4b3 door-1, opKinds.wholeOps' second
+    exception): each handed-over place of a step, as (leaver index, filler
+    index), in the step's order. A leaver is a file's or a link's move (its
+    `from`) or a removal; a filler such a move (its `to`) or a new file; the
+    filler later, the exact place by part_inside, at least one a move. Each
+    leaver hands its place to the first filler after it."""
+    found = []
+    for leaver_index, leaver in enumerate(ops):
+        place = place_left(leaver)
+        if place is None:
+            continue
+        for filler_index in range(leaver_index + 1, len(ops)):
+            filler = ops[filler_index]
+            filled = place_filled(filler)
+            if filled is not None and part_inside(place, filled) == "" and (
+                    hands_over_as_a_move(leaver) or hands_over_as_a_move(filler)):
+                found.append((leaver_index, filler_index))
+                break
+    return found
+
+
+def hands_over_as_a_move(op):
+    """UndoCheck.handsOverAsAMove: a file's or a link's `move`, never a
+    folder's, a capitalisation-only one, a moveApart or a setAside."""
+    if op.get("kind") != "move" or "listingSha" in op or is_case_only_move(op):
+        return False
+    return "sha" in op or "linkSha" in op
+
+
+def place_left(op):
+    if hands_over_as_a_move(op):
+        return op["from"]
+    if op.get("kind") == "writeFile" and op.get("afterSha") is None and op.get("beforeSha") is not None:
+        return op["path"]
+    return None
+
+
+def place_filled(op):
+    if hands_over_as_a_move(op):
+        return op["to"]
+    if op.get("kind") == "writeFile" and op.get("beforeSha") is None and op.get("afterSha") is not None:
+        return op["path"]
+    return None
 
 
 def place_as_found(op, backward):
@@ -1303,8 +1388,25 @@ def swap_groups(ops, backward):
     one group of ops per target: forward, each move that carries edits
     first, then each file in the order the ops first name it, then every
     other whole op; backward, each file in the reversed ops' order, then
-    every whole op, reversed (U4b, opKinds.wholeOps' order)."""
+    every whole op, reversed (U4b, opKinds.wholeOps' order). A step with a
+    handed-over place goes in the step's order instead (U4b3)."""
     ordered = list(reversed(ops)) if backward else list(ops)
+    if handovers(ops):
+        # U4b3 (opKinds.wholeOps' second exception): a step that hands a
+        # place over goes in the step's order, reversed going back; a file
+        # at the first op naming it.
+        groups, by_path = [], {}
+        for op in ordered:
+            if op["kind"] == "recompute":
+                continue
+            if op["kind"] in WHOLE_KINDS:
+                groups.append([op])
+                continue
+            if op["path"] not in by_path:
+                by_path[op["path"]] = []
+                groups.append(by_path[op["path"]])
+            by_path[op["path"]].append(op)
+        return groups
     carriers = carried_edits(ops)
     carrying = [op for op in ordered if any(carrier is op for carrier in carriers.values())]
     leading = [] if backward else [[op] for op in carrying]

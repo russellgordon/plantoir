@@ -803,7 +803,7 @@ nonisolated enum UndoContractReplay {
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
         "movedFolder", "caseOnlyFolder", "refusalNamed", "keptWhatItReplacedSays", "madeFolder", "foldersInside",
-        "linkedFolder",
+        "linkedFolder", "handedOver",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1442,6 +1442,9 @@ nonisolated enum UndoContractReplay {
             }
             if let wanted = string(testCase["linkedFolder"]), UndoContractKinds.linkedFolder(in: root) != wanted {
                 failures.append("stackCases '\(name)': the moved link is \(UndoContractKinds.linkedFolder(in: root)), not \(wanted)")
+            }
+            if let wanted = string(testCase["handedOver"]), UndoContractKinds.handedOver(in: root) != wanted {
+                failures.append("stackCases '\(name)': the handed-over class pages are \(UndoContractKinds.handedOver(in: root)), not \(wanted)")
             }
             if let wanted = int(testCase["keptWhatItReplacedLines"]), keptWhatItReplacedLines != wanted {
                 failures.append("stackCases '\(name)': \(keptWhatItReplacedLines) 'undo kept what it replaced' lines, not \(wanted)")

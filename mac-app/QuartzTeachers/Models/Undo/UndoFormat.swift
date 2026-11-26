@@ -366,7 +366,33 @@ nonisolated struct UndoStep: Codable, Equatable, Sendable {
     /// never against what an earlier op of the same step would leave, so a
     /// step where two ops share a place is one this version cannot read: it
     /// is a barrier, never undone in a guessed order.
+    ///
+    /// Two exceptions (opKinds.wholeOps). U4b: an edit a move carries, named
+    /// at its new place after it. U4b3: a place HANDED OVER, left by an
+    /// earlier op and filled by a later one (`UndoCheck.handovers`, the one
+    /// rule the plan and recovery use too): the pair may share exactly that
+    /// place, and nothing else may. A step with a handed-over place must
+    /// hand each place over once and carry no edit; a filler before its
+    /// leaver, or a third op at, inside or above the place, still overlaps a
+    /// whole op and is refused here.
     static func wholeOpsStandAlone(_ ops: [UndoOp]) -> Bool {
+        let handovers: [UndoHandover] = UndoCheck.handovers(in: ops)
+        if !handovers.isEmpty {
+            if !UndoCheck.carriers(in: ops).isEmpty {
+                return false
+            }
+            var first: Int = 0
+            while first < handovers.count {
+                var second: Int = first + 1
+                while second < handovers.count {
+                    if UndoOp.partInside(handovers[first].place, of: handovers[second].place) == "" {
+                        return false
+                    }
+                    second += 1
+                }
+                first += 1
+            }
+        }
         var index: Int = 0
         while index < ops.count {
             let op: UndoOp = ops[index]
@@ -387,7 +413,9 @@ nonisolated struct UndoStep: Codable, Equatable, Sendable {
                         }
                         for mine in op.pathsNamed {
                             for theirs in second.pathsNamed where UndoOp.placesOverlap(mine, theirs) {
-                                return false
+                                if !UndoStep.isHandedOver(mine, theirs, between: index, other, in: handovers) {
+                                    return false
+                                }
                             }
                         }
                     }
@@ -397,6 +425,20 @@ nonisolated struct UndoStep: Codable, Equatable, Sendable {
             index += 1
         }
         return true
+    }
+
+    /// U4b3: whether two places two ops of a step name are the one place a
+    /// handover between exactly those two ops hands over (the exact place,
+    /// never one inside it).
+    static func isHandedOver(_ mine: String, _ theirs: String, between first: Int, _ second: Int, in handovers: [UndoHandover]) -> Bool {
+        for handover in handovers {
+            let samePair: Bool = (handover.leaverIndex == first && handover.fillerIndex == second)
+                || (handover.leaverIndex == second && handover.fillerIndex == first)
+            if samePair && UndoOp.partInside(handover.place, of: mine) == "" && UndoOp.partInside(handover.place, of: theirs) == "" {
+                return true
+            }
+        }
+        return false
     }
 
     func encode(to encoder: Encoder) throws {
