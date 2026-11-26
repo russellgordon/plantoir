@@ -22393,7 +22393,7 @@ the switch stays off. Rename folder through the door is NOT in this part
 Part four put the check and the swap off the main actor, and two things that had been impossible became possible part way through a rename (part six's review): a quit, and another window's act on the same course. The invariant: a rename under way is ONE piece of work the whole app knows about; nothing else in the app can change that course meanwhile, and the app does not quit out from under it. With `undoJournalIsLive` off the teacher meets nothing different from before U4b except that the window stays responsive.
 
 - **The claim is the course's, not the window's** (M2). `CourseActivity.beginFolderRename` records the rename by working folder and course code (`FolderRenameRecord`), as copies, publishes and plan work are recorded, and refuses a second one of the same course from any window: so a second rename can neither overwrite nor clear the first's interrupted-rename record (`courses/.internal/renames/<code>.json`, one file per course). `Course.isRenamingAFolder` now reads it, so every window's copy of the course, and a copy remade by File ▸ Reload Courses, knows. While it is held: another window's Save is disabled and says "Available once the folder rename has finished" beside it (a press that reaches `save()` anyway is refused with the click sentence); that window's rename sheet shows the click sentence "A folder in {course} is being renamed right now. Try again once the rename has finished." with Rename disabled; Rename Course, Add Section… and restoring a backup are greyed through `structuralHoldReason` with the menu reason and refused at the click through `structuralRefusal` with the click sentence (the `whenBusy` sentences name a preview or a deploy and would be false); removing a course or a section is refused with it (`ScheduledDeployCleanup`); Replace reference course is refused with it (`ReferenceReplacer.Problem.folderBeingRenamed`, key `replaceWhileAFolderIsRenamed`, Mac only; no contract case at this part, since Windows has no off-thread rename yet: U4b2-6 made it a `referenceCourses.replacing.sequence` case, see "U4b2: rename-sentences-in-contract"); Preview and Deploy are greyed and refused the way a copy being zipped greys them (the section window's buttons, `verbMayRunNow`, the press, the in-app and outside assistant's deploy and rebuild, which say the click sentence). A rename is refused while the course is being copied (#351), so the archive before a removal or restore never zips a course half renamed. **Rejected:** putting the rename into `busyDescription`, which would have reached every reader at once, because a dozen of its readers answer with a sentence about a preview or a deploy.
-- **The quit waits for it** (M1), as it waits for a tools copy (#476): `applicationShouldTerminate` answers `.terminateLater` while `CourseActivity.anyFolderRenameIsUnderWay` (`AppDelegate.quitWaitsForWorkUnderWay`), awaits `CourseActivity.waitForAllFolderRenames()` (a continuation resumed when the last claim ends, an event, not a time), then finishes terminating. No question: the tools copy's pattern asks none, the rename is bounded by itself, and its sheet keeps its spinner. Once its swap has begun, closing the window does not end it either: the rename runs in an unstructured task started by the sheet's button, which a closed window does not cancel. (Sixth part: while it only plans, Cancel or the sheet going halts it and gives the course back at once, so the quit never waits for a plan.)
+- **The quit waits for it** (M1), as it waits for a tools copy (#476): `applicationShouldTerminate` answers `.terminateLater` while a rename's swap is under way (`AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans`), awaits `CourseActivity.waitForEveryFolderRenameSwap()` (a continuation resumed when the last swapping claim ends, an event, not a time), then finishes terminating. No question: the tools copy's pattern asks none, the rename is bounded by itself, and its sheet keeps its spinner. Once its swap has begun, closing the window does not end it either: the rename runs in an unstructured task started by the sheet's button, which a closed window does not cancel. (Sixth part: while it only plans, Cancel or the sheet going halts it and gives the course back at once. U4b2-7: a quit halts it the same way and waits only for a rename whose swap has begun, `CourseActivity.anyFolderRenameSwapIsUnderWay` and `waitForEveryFolderRenameSwap()`; see "U4b2: planning-rename-holds-nothing".)
 - **Cancel halts a rename that is only planning** (L3). The sheet keeps the rename's task; Cancel cancels it and closes the sheet. `renameFolder` asks `Task.isCancelled` on the main actor after the plan (which writes nothing) and in the same turn marks the swap begun (`folderRenameSwapBegins`), so a Cancel lands either before (nothing is made, no record) or after, when the button is disabled (`renameCanNoLongerBeHalted`) and a press that lands as it greys is ignored. (Part seven's review found the plan itself was not halted: see the sixth part.)
 - **The part-way sentence** (L1, L2): `foldersLeftAtTheirNewName` counts a folder left renamed when something is at its new name (by `lstat`, nothing read or hashed on the main actor), whatever is at its old one: the likeliest reason a move back fails is that something appeared at the old name.
 - Tests: `UndoRenameFolderStepTests.testWhileARenameRunsAnotherWindowsCopyOfTheCourseIsHeldToo`, `testAQuitDuringARenameWaitsForItToFinish`, `testARenameCancelledWhileItPlansChangesNothing`, `testAMoveBackBlockedAtTheOldNameStillSaysWhichFolderIsRenamed`; must-fail logs in the notes.
@@ -22712,6 +22712,103 @@ place, or one that could not be read, the sheet says the new
 the folder … only in part", never "was not renamed", which could not be
 checked (HIG, Writing: be clear, say what is known). One function,
 `SpecialFolderRenamer.partWayEnding`, chooses the line and the sentence.
+
+### U4b2: planning-rename-holds-nothing
+
+Until a rename's swap begins it has written nothing, so nothing waits for
+it: Cancel, the sheet going away and Command-Q each end a rename that is only
+planning at once and give the course back; only a rename whose swap has
+begun is waited for by a quit. The sheet's task and the one rule for halting
+it moved out of `StringListEditorView`'s `@State` into a small `@Observable`
+model, `FolderRenameRun` (`start`, `haltIfStillPlanning`, `canBeHalted`), so
+the chain from the sheet to the plan can be driven in a unit test (a view's
+`@State` cannot); the view keeps only the calls. Every run whose task has
+not ended is listed in `FolderRenameRun.runsUnderWay`, and a quit going
+ahead calls `AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans`, which halts
+each through the same `haltIfStillPlanning` Cancel uses
+(`haltEveryRunStillPlanning`) and then waits only while
+`CourseActivity.anyFolderRenameSwapIsUnderWay`. Nothing is asked either way
+(HIG, Feedback: no warning where nothing is lost; Progress indicators: let
+people halt processing when it has no negative side effects). The halting
+happens only once the quit is going ahead, after the work-under-way question,
+so a quit called off leaves the rename running. A claim that is still
+planning when a quit decides not to wait cannot reach its swap: its task is
+cancelled, and the swap is marked begun in the same main-actor turn as the
+cancellation check. The closure the sheet is handed is the named
+`CourseSettingsView.renameFromTheSheet(scope:)`, awaited inline, so
+`UndoRenameFolderStepTests.testTheSheetsCancelReachesAHeldPlan` runs the very
+chain the sheet runs and fails if the halt stops cancelling, or if
+`onRename` is awaited in a fresh `Task` in either place;
+`testAQuitWhileARenameOnlyPlansHaltsItAndDoesNotWait` holds the plan open on
+an event as a dead volume would and proves the quit does not wait and
+nothing is written. No `contracts/` change: `quitConfirmation` asks nothing
+about a rename, before or after.
+
+Review 1 (M1) found the hole a wait leaves: during a `.terminateLater` wait
+the windows stay live, so a rename pressed then (or a plan the halt did not
+reach) could pass to its swap after the quit had decided not to count it, and
+the process could end inside it. The cure is structural, not a re-check: one
+observable latch, `FolderRenameRun.quitIsGoingAhead`, set by
+`quitWaitsAfterHaltingWhatOnlyPlans` in the turn the quit decides. From then
+`FolderRenameRun.canStart` is false, so `start` refuses at once and every
+rename sheet's Rename is disabled in the standard way (L1: a sheet the quit
+halted cannot be pressed again; no new wording, HIG "Sheets", and there is no
+HIG page on quitting beyond "The menu bar"), and `FolderRenameRun.swapBegins`,
+the one place a rename passes from planning to swapping, refuses in the same
+main-actor turn as the rename's cancellation check, with nothing written and
+no record. A swap already begun is still waited for. Nothing clears the
+latch: it is set only once the quit is going ahead (after the work-under-way
+question), and no path calls such a quit off afterwards. Tests:
+`testARenamePressedWhileAQuitWaitsDoesNotStart`,
+`testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap`, and
+`testTheRenameSheetCallsItsRunForEveryWayOut`, which reads the view's own
+calls into the run off the source (L2). Left as on `dev` (L3): a rename that
+is planned again after a `changedSince` refusal keeps its claim marked
+swapping, so a quit waits for that re-plan and Cancel stays grey; it has
+written nothing, and once a quit is going ahead its next pass to the swap is
+refused.
+
+### U4b2: plan-read-off-the-pool
+
+A rename's planning walk runs on a Foundation `Thread` of its own, started per
+plan (`SpecialFolderRenamer.planHaltingAtCancel`), never in a `Task.detached`.
+Swift's shared pool has as many threads as the Mac has cores (12 on the Mac16,8
+this was measured on), and a read that blocks inside the system (an evicted
+iCloud page, a network volume gone away) cannot be interrupted: on the pool,
+Rename then Cancel repeated on a dead volume took one thread a round, and
+with all twelve held no other async job in the app could run. Measured with
+`testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree` (rounds = cores
++ 4 = 16, each plan held at its first page on an event): with the walk
+detached, round 13's plan never started; on its own thread, all 16 start, an
+unrelated `Task.detached` runs at once, and the process went from 7 threads
+to 23 while the 16 were held, and back to 7 when they were let go. A stuck walk
+now costs its own thread's stack (512 KB reserved, not committed) and nothing
+the app needs. Cancel is forwarded as before (`withTaskCancellationHandler`
+now cancels the thread), and `plan` asks one function,
+`stopIfThePlanIsHalted`, between folders and before and after each page:
+the task's cancellation (for `rename`'s callers) or the thread's. The caller
+still returns at Cancel without waiting, and a late result is still dropped.
+Riding lows from U4b2-7 review 2: the rename sheet is now hosted off screen
+and its own Rename and Cancel pressed through accessibility
+(`testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet`,
+`testTheRealSettingsPageShrunkOrScrolledKeepsARenameAndLeavingItHalts`),
+which found that the sheet's `.onDisappear` is not called when the list that
+presents it leaves the window (the sheet closes, the plan went on). The halt
+for that case is NOT on the list (review 1, M1): Course Settings draws its
+lists in a lazily drawn grouped `Form`, where a row leaving the visible area
+is not the teacher leaving the rename. The page owns its two renames
+(`CourseSettingsRenames`, one `FolderRenameRun` per folder list, handed to
+each list) and its own `.onDisappear` (Settings left for Planning, the course
+closed or switched, the window closed) halts those still planning through
+`haltIfStillPlanning`. The real page, grouped `Form` and all, is hosted: made
+220 points tall, and scrolled to its top and bottom, the row is out of view
+and the rename goes on; leaving the page halts it. And AppKit can ask again during
+a `.terminateLater` wait (Apple's `terminateLater` documentation: the run loop
+runs in `NSModalPanelRunLoopMode` until the reply, the mode in which a sheet
+takes input), so `applicationShouldTerminate` first asks
+`AppDelegate.answerWhileAQuitGoesAhead`: while the latch is set, a second
+request is answered `.terminateLater` at once, asking nothing and refusing
+nothing, and the first quit's reply ends the process.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

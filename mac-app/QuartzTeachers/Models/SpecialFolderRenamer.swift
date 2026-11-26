@@ -157,9 +157,9 @@ enum SpecialFolderRenamer {
     /// seven's review, M1). Nil in the app.
     nonisolated(unsafe) static var planReadsAPage: (@Sendable (URL) -> Void)?
 
-    /// Tests only: called once the plan's detached walk has ended, however
-    /// it ended, so a test can tell a cancelled plan has stopped. Nil in the
-    /// app.
+    /// Tests only: called once the plan's walk, on its own thread, has
+    /// ended, however it ended, so a test can tell a cancelled plan has
+    /// stopped. Nil in the app.
     nonisolated(unsafe) static var planHasEnded: (@Sendable () -> Void)?
 
     // MARK: - Functions
@@ -617,7 +617,7 @@ enum SpecialFolderRenamer {
             // A Cancel stops the walk between folders and between pages
             // (part seven's review, M1): the plan writes nothing, so it can
             // stop anywhere.
-            try Task.checkCancellation()
+            try stopIfThePlanIsHalted()
             var isDirectory: ObjCBool = false
             if !fileManager.fileExists(atPath: location.path, isDirectory: &isDirectory) {
                 continue
@@ -653,9 +653,9 @@ enum SpecialFolderRenamer {
 
         var pages: [FolderRenamePlan.Page] = []
         for pageURL in markdownPages(in: courseDirectory, fileManager: fileManager) {
-            try Task.checkCancellation()
+            try stopIfThePlanIsHalted()
             planReadsAPage?(pageURL)
-            try Task.checkCancellation()
+            try stopIfThePlanIsHalted()
             guard let read = try? Data(contentsOf: pageURL), let text = String(data: read, encoding: .utf8) else {
                 continue
             }
@@ -673,21 +673,39 @@ enum SpecialFolderRenamer {
         return FolderRenamePlan(moves: moves, pages: pages)
     }
 
+    /// Throws `CancellationError` once the plan has been halted, however it
+    /// runs: in a task that was cancelled (`rename`'s callers), or on the
+    /// walk's own thread once `planHaltingAtCancel` has cancelled that
+    /// thread. The one test of "was this plan halted?", asked between
+    /// folders and before and after each page is read.
+    nonisolated static func stopIfThePlanIsHalted() throws {
+        try Task.checkCancellation()
+        if Thread.current.isCancelled {
+            throw CancellationError()
+        }
+    }
+
     /// Plans a rename OFF the main actor, and gives up waiting the moment the
     /// caller is cancelled (U4b part seven's review, M1): Cancel gives the
     /// course back at once.
     ///
-    /// The walk runs in a detached task, because it must not hold the main
-    /// actor, and a detached task does not inherit cancellation; so the
-    /// caller's cancellation is forwarded to it (`withTaskCancellationHandler`)
-    /// and `plan` stops at its next page (`Task.checkCancellation`). A read
-    /// that blocks inside the system (an evicted iCloud page, a network
-    /// volume gone away) cannot be interrupted, so the caller does not wait
-    /// for the walk to stop: the result comes through a stream, whose
-    /// `next()` returns nil as soon as the waiting task is cancelled. The
-    /// walk then ends on its own, writes nothing, and whatever it finds is
-    /// never read by anyone: the stream it would be delivered through has
-    /// already been given up.
+    /// The walk runs on a THREAD OF ITS OWN (U4b2-8, part eight's L2), never
+    /// on Swift's shared pool of threads: the pool has only as many threads
+    /// as the Mac has cores, and a read that blocks inside the system (an
+    /// evicted iCloud page, a network volume gone away) cannot be
+    /// interrupted, so a walk stuck there would hold one of them until the
+    /// system gave up. Rename then Cancel, again and again on a dead volume,
+    /// would take them one by one, and every other piece of async work in
+    /// the app would wait behind them. A stuck walk on its own thread costs
+    /// that thread's stack and nothing the app needs.
+    ///
+    /// Cancellation is forwarded (`withTaskCancellationHandler`): the thread
+    /// is cancelled, and `plan` stops at its next folder or page
+    /// (`stopIfThePlanIsHalted`). The caller does not wait for the walk to
+    /// stop: the result comes through a stream, whose `next()` returns nil as
+    /// soon as the waiting task is cancelled. The walk then ends on its own,
+    /// writes nothing, and whatever it finds is never read by anyone: the
+    /// stream it would be delivered through has already been given up.
     nonisolated static func planHaltingAtCancel(
         _ oldName: String,
         to newName: String,
@@ -696,7 +714,7 @@ enum SpecialFolderRenamer {
         sectionNumbers: [Int]
     ) async throws -> FolderRenamePlan {
         let (results, delivery) = AsyncThrowingStream<FolderRenamePlan, Error>.makeStream()
-        let walk: Task<Void, Never> = Task.detached(priority: .userInitiated) {
+        let walk: Thread = Thread {
             do {
                 let planned: FolderRenamePlan = try plan(
                     oldName, to: newName, scope: scope,
@@ -709,6 +727,9 @@ enum SpecialFolderRenamer {
             }
             planHasEnded?()
         }
+        walk.name = "Plantoir: planning a folder rename"
+        walk.qualityOfService = .userInitiated
+        walk.start()
         return try await withTaskCancellationHandler {
             var waiting: AsyncThrowingStream<FolderRenamePlan, Error>.Iterator = results.makeAsyncIterator()
             if let planned = try await waiting.next() {

@@ -144,9 +144,13 @@ struct StringListEditorView: View {
     @State var pendingRename: PendingRename? = nil
     @State var proposedName: String = ""
     @State var renameFailure: String? = nil
-    @State var isRenaming: Bool = false
-    /// The rename under way, so Cancel can halt it while it only plans.
-    @State var renameTask: Task<Void, Never>? = nil
+    /// The rename under way and the one rule for halting it (#899
+    /// U4b2-7): Cancel, the sheet going away and a quit all halt it there.
+    /// Course Settings hands in the run its page owns
+    /// (`CourseSettingsRenames`, U4b2-8), so that the page going away halts
+    /// it: this list's own appearance never does, since a lazily drawn row
+    /// leaving the visible area is not the rename being left.
+    @State var renameRun: FolderRenameRun = FolderRenameRun()
     @State var notice: String? = nil
     @State var selectedRowID: String? = nil
     @State var isAddingItem: Bool = false
@@ -264,7 +268,7 @@ struct StringListEditorView: View {
 
             // **Said in place, deliberately NOT in an alert.** This used to be
             // a second `.alert` on this same view, and it crashed the app: a
-            // SwiftUI view presents one thing at a time, and `performRename`
+            // SwiftUI view presents one thing at a time, and `reportRename`
             // dismissed the rename SHEET and raised the alert in the same
             // breath — `AppKitDialogBridge.updateExistingAlert` reconciling an
             // alert while `NSSheetMoveHelper closeSheet` was still animating,
@@ -468,8 +472,9 @@ struct StringListEditorView: View {
         ) == .orderedSame
         // Not asked while this sheet's own rename runs: that rename is the
         // one a problem would otherwise name as under way.
+        let isRenaming: Bool = renameRun.isRenaming
         let problem: String? = isRenaming ? nil : renameProblem?(item, proposedName, finishing)
-        let cancelIsDisabled: Bool = isRenaming && (renameCanNoLongerBeHalted?() ?? true)
+        let cancelIsDisabled: Bool = !renameRun.canBeHalted
         VStack(alignment: .leading, spacing: 12) {
             TextField("New name", text: $proposedName)
                 .borderedTextField()
@@ -515,7 +520,9 @@ struct StringListEditorView: View {
                 Button("Rename") {
                     startRename(of: item, finishing: finishing)
                 }
-                .defaultButton(isEnabled: problem == nil && !isRenaming)
+                // Disabled too once a quit is going ahead (review 1, L1):
+                // a rename the quit halted cannot be pressed again.
+                .defaultButton(isEnabled: problem == nil && renameRun.canStart)
             }
         }
         .padding([.horizontal, .bottom], 20)
@@ -684,13 +691,26 @@ struct StringListEditorView: View {
         notice = noticeAfterChange?(name, .removed)
     }
 
-    /// Starts the rename, kept so Cancel can halt it while it plans.
+    /// Starts the rename in its run, so Cancel can halt it while it plans.
+    ///
+    /// The list itself is NOT edited here. The caller renames the folder on
+    /// disk and rewrites the configuration in one step, and this view's
+    /// `items` binding reads that configuration — so editing the array here
+    /// too would put the rename in twice, and would put it in even when the
+    /// filesystem refused.
     func startRename(of item: String, finishing: Bool) {
-        if isRenaming {
+        guard let onRename, renameRun.canStart else {
             return
         }
-        renameTask = Task { @MainActor in
-            await performRename(of: item, finishing: finishing)
+        if renameProblem?(item, proposedName, finishing) != nil {
+            return
+        }
+        let newName: String = proposedName.trimmingCharacters(in: .whitespaces)
+        renameRun.start(
+            renaming: item, to: newName, using: onRename,
+            canNoLongerBeHalted: renameCanNoLongerBeHalted
+        ) { result in
+            reportRename(result)
         }
     }
 
@@ -698,47 +718,20 @@ struct StringListEditorView: View {
     /// whose swap has begun is never halted (the button is disabled then;
     /// this is the same rule for a press that lands as it greys).
     func cancelRename() {
-        if isRenaming && (renameCanNoLongerBeHalted?() ?? true) {
-            return
+        if renameRun.haltIfStillPlanning() {
+            pendingRename = nil
         }
-        haltARenameStillPlanning()
-        pendingRename = nil
     }
 
     /// Cancels the rename if it is still only planning: its plan stops, and
     /// the course is given back at once (U4b part seven's review, M1). Never
     /// once its check and swap have begun.
     func haltARenameStillPlanning() {
-        if isRenaming && (renameCanNoLongerBeHalted?() ?? true) {
-            return
-        }
-        renameTask?.cancel()
-        renameTask = nil
+        renameRun.haltIfStillPlanning()
     }
 
-    /// Hands the rename to the caller and reports what came back.
-    ///
-    /// The list itself is NOT edited here. The caller renames the folder on
-    /// disk and rewrites the configuration in one step, and this view's
-    /// `items` binding reads that configuration — so editing the array here
-    /// too would put the rename in twice, and would put it in even when the
-    /// filesystem refused.
-    func performRename(of item: String, finishing: Bool) async {
-        guard let onRename, !isRenaming else {
-            return
-        }
-        if renameProblem?(item, proposedName, finishing) != nil {
-            return
-        }
-        let newName: String = proposedName.trimmingCharacters(in: .whitespaces)
-        isRenaming = true
-        defer { isRenaming = false }
-        let result: RenameResult = await onRename(item, newName)
-        if Task.isCancelled {
-            // Halted at Cancel while planning: the sheet is gone, and
-            // nothing was changed.
-            return
-        }
+    /// Says what a rename that was not halted came back with.
+    func reportRename(_ result: RenameResult) {
         switch result {
         case .renamed(let sentence):
             pendingRename = nil

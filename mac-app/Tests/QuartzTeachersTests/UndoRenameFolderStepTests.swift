@@ -1,4 +1,6 @@
 import XCTest
+import AppKit
+import SwiftUI
 @testable import QuartzTeachers
 
 /// U4b of #899: Rename folder (Course Settings) is ONE step through the
@@ -62,6 +64,8 @@ final class UndoRenameFolderStepTests: XCTestCase {
         UndoKillPoints.beforeTheRename = nil
         SpecialFolderRenamer.planReadsAPage = nil
         SpecialFolderRenamer.planHasEnded = nil
+        FolderRenameRun.runsUnderWay = []
+        FolderRenameRun.quitIsGoingAhead = false
         // The trail put back is the one from before this test, never one
         // this class made: that folder is removed, and every later line
         // would make it again. MUST FAIL with a test that starts over by
@@ -722,30 +726,45 @@ final class UndoRenameFolderStepTests: XCTestCase {
 
     /// ⌘Q during a rename waits for it (U4b part six's review, M1), as it
     /// waits for a tools copy (#476): the quit's wait resumes only once the
-    /// step is made and the rename's claim has ended. MUST FAIL with the
-    /// rename left out of the quit's wait (`AppDelegate.waitForWorkUnderWay`,
-    /// which `applicationShouldTerminate` awaits; part seven's review, L6).
+    /// step is made and the rename's claim has ended. The rename runs from
+    /// a sheet's `FolderRenameRun`, so the quit's halting of what only plans
+    /// (U4b2-7) is proved to leave a swap that has begun alone. MUST FAIL
+    /// with the rename left out of the quit's wait
+    /// (`AppDelegate.waitForWorkUnderWay`, which `applicationShouldTerminate`
+    /// awaits; part seven's review, L6).
     func testAQuitDuringARenameWaitsForItToFinish() async throws {
         let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
         let reached: XCTestExpectation = XCTestExpectation(description: "the swap reached its first page")
         let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
         UndoKillPoints.beforeTheRename = { @Sendable (index: Int, place: URL) in
             gate.arrive()
         }
-        let first: Task<RenameResult, Never> = Task { @MainActor in
-            return await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        let run: FolderRenameRun = FolderRenameRun()
+        let finished: XCTestExpectation = XCTestExpectation(description: "the rename told its sheet")
+        var told: RenameResult? = nil
+        run.start(
+            renaming: "Tasks", to: "Assessments", using: view.renameFromTheSheet(scope: .perSection),
+            canNoLongerBeHalted: view.renameSwapHasBegun
+        ) { result in
+            told = result
+            finished.fulfill()
         }
-        await fulfillment(of: [reached])
+        await fulfillment(of: [reached], timeout: 30)
 
-        XCTAssertTrue(AppDelegate.quitWaitsForWorkUnderWay(
-            toolchainCopying: false, renamingAFolder: CourseActivity.anyFolderRenameIsUnderWay
-        ), "the quit does not wait for the rename")
+        XCTAssertTrue(
+            AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans(), "the quit does not wait for the rename"
+        )
+        XCTAssertTrue(run.isRenaming, "the quit halted a rename whose swap had begun")
         let quit: Task<(Bool, Int), Never> = Task { @MainActor in
             // The quit's own wait, as `applicationShouldTerminate` runs it
             // (part seven's review, L6).
             await AppDelegate.waitForWorkUnderWay()
             let steps: Int = (try? self.journal().read().records.count) ?? -1
-            return (CourseActivity.anyFolderRenameIsUnderWay, steps)
+            return (CourseActivity.anyFolderRenameSwapIsUnderWay, steps)
         }
         // Until the quit's wait is registered: a bound on turns, not a time.
         var turns: Int = 0
@@ -756,11 +775,550 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertEqual(CourseActivity.store.folderRenameWaiters.count, 1, "the quit is not waiting for the rename")
         gate.open()
         let (stillUnderWay, steps): (Bool, Int) = await quit.value
-        let result: RenameResult = await first.value
+        await fulfillment(of: [finished], timeout: 30)
 
         XCTAssertFalse(stillUnderWay, "the quit went on while the rename ran")
         XCTAssertEqual(steps, 1, "the quit went on before the step was made")
+        let result: RenameResult = try XCTUnwrap(told)
         XCTAssertNotNil(renamed(result), "\(result)")
+    }
+
+    /// ⌘Q while a rename only plans (U4b part eight's review, L3; U4b2-7):
+    /// the plan is held open at its first page on an event, as a dead
+    /// volume would hold it. The quit halts the rename the way its sheet's
+    /// Cancel does and does not wait at all; the rename then returns
+    /// without the held read, its claim ended and nothing written: the
+    /// course's folders, pages and settings as before, no step, no record.
+    /// MUST FAIL with the quit counting a claim that is not yet swapping
+    /// (it waits, as before), and with the quit not halting the run.
+    func testAQuitWhileARenameOnlyPlansHaltsItAndDoesNotWait() async throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let foldersBefore: [String] = listed(course.directoryURL)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
+        let sheetRename: (String, String) async -> RenameResult = view.renameFromTheSheet(scope: .perSection)
+        let run: FolderRenameRun = FolderRenameRun()
+        var told: Bool = false
+        run.start(
+            renaming: "Tasks", to: "Assessments",
+            using: { oldName, newName in
+                let result: RenameResult = await sheetRename(oldName, newName)
+                returned.fulfill()
+                return result
+            },
+            canNoLongerBeHalted: view.renameSwapHasBegun
+        ) { result in
+            told = true
+        }
+        await fulfillment(of: [reached], timeout: 30)
+        XCTAssertTrue(course.isRenamingAFolder, "the claim is held while the plan walks")
+
+        // The quit's own decision, as `applicationShouldTerminate` runs it.
+        let waits: Bool = AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans()
+
+        XCTAssertFalse(waits, "the quit waits for a rename that only plans")
+        // The rename returning is the event; the bound only turns a halt
+        // that did not reach the plan into a failure rather than a hang
+        // (the hold is opened first, so the run ends either way).
+        let waited: XCTWaiter.Result = await XCTWaiter().fulfillment(of: [returned], timeout: 30)
+        if waited != .completed {
+            gate.open()
+            XCTFail("the quit did not halt the rename while it planned")
+            await fulfillment(of: [returned], timeout: 30)
+            return
+        }
+        let quit: XCTestExpectation = XCTestExpectation(description: "the quit's wait returned")
+        Task { @MainActor in
+            await AppDelegate.waitForWorkUnderWay()
+            quit.fulfill()
+        }
+        await fulfillment(of: [quit], timeout: 30)
+        // Its task ends on the main actor after the rename returns.
+        var turns: Int = 0
+        while run.isRenaming && turns < 10_000 {
+            await Task.yield()
+            turns += 1
+        }
+
+        XCTAssertFalse(run.isRenaming)
+        XCTAssertFalse(told, "a halted rename told its sheet")
+        XCTAssertFalse(course.isRenamingAFolder, "the claim was not ended")
+        XCTAssertTrue(CourseActivity.store.activeFolderRenames.isEmpty)
+        XCTAssertEqual(listed(course.directoryURL), foldersBefore)
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
+    }
+
+    /// A rename pressed while a quit waits (U4b2-7 review 1, M1 and L1):
+    /// once the quit has gone ahead, no rename may start. The run refuses at
+    /// once, claims nothing and writes nothing, and the sheet's Rename is
+    /// disabled by the same `canStart`. MUST FAIL with `start` not asking
+    /// whether a quit is going ahead.
+    func testARenamePressedWhileAQuitWaitsDoesNotStart() async throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let foldersBefore: [String] = listed(course.directoryURL)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let run: FolderRenameRun = FolderRenameRun()
+        XCTAssertTrue(run.canStart)
+
+        // The quit's own decision; nothing is under way, so it would not
+        // wait, but it is going ahead all the same.
+        _ = AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans()
+
+        XCTAssertFalse(run.canStart, "Rename stays enabled while a quit is going ahead")
+        var told: Bool = false
+        run.start(
+            renaming: "Tasks", to: "Assessments", using: view.renameFromTheSheet(scope: .perSection),
+            canNoLongerBeHalted: view.renameSwapHasBegun
+        ) { result in
+            told = true
+        }
+        let started: Bool = run.isRenaming
+        // A run that did start is let finish, so the test ends on its own.
+        if started {
+            var turns: Int = 0
+            while run.isRenaming && turns < 100_000 {
+                await Task.yield()
+                turns += 1
+            }
+        }
+
+        XCTAssertFalse(started, "a rename started while a quit was going ahead")
+        XCTAssertFalse(told)
+        XCTAssertTrue(FolderRenameRun.runsUnderWay.isEmpty)
+        XCTAssertEqual(listed(course.directoryURL), foldersBefore)
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+    }
+
+    /// A plan that finishes while a quit waits (U4b2-7 review 1, M1): a
+    /// rename the quit's halt did not reach (here one started outside any
+    /// sheet's run, as a run registered after the decision would be) is
+    /// held at its first page while the quit goes ahead, then let go. Its
+    /// swap is refused at the one place it would begin, with nothing
+    /// written and no record, so the quit, which waits only for swaps
+    /// already begun, can never end the process inside one. MUST FAIL with
+    /// `FolderRenameRun.swapBegins` not asking whether a quit is going
+    /// ahead (the folders are renamed).
+    func testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap() async throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let foldersBefore: [String] = listed(course.directoryURL)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let renaming: Task<RenameResult, Never> = Task { @MainActor in
+            return await view.renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        }
+        await fulfillment(of: [reached], timeout: 30)
+
+        XCTAssertFalse(
+            AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans(), "the quit waits for a rename that only plans"
+        )
+        gate.open()
+        let result: RenameResult = await renaming.value
+
+        XCTAssertNotNil(failed(result), "a swap began while a quit was going ahead: \(result)")
+        XCTAssertFalse(CourseActivity.anyFolderRenameSwapIsUnderWay)
+        XCTAssertFalse(course.isRenamingAFolder, "the claim was not ended")
+        XCTAssertEqual(listed(course.directoryURL), foldersBefore)
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
+    }
+
+    /// The sheet's three calls into `FolderRenameRun` (U4b2-7 review 1, L2),
+    /// read off the source because a view's `@State` cannot be driven from a
+    /// unit test: Cancel halts through the run, the sheet going away halts
+    /// through the run, Rename starts the run with the closure it was
+    /// handed, and Rename is enabled by the run's `canStart`. MUST FAIL with
+    /// any one of those calls taken out of the view. Backed since U4b2-8 by
+    /// the real sheet, hosted and pressed
+    /// (`testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet`,
+    /// `testTheRealSheetGoingAwayHaltsAHeldPlan`), which catch a halt
+    /// commented out or moved into a fresh `Task`.
+    func testTheRenameSheetCallsItsRunForEveryWayOut() throws {
+        let sourceURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QuartzTeachersTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // mac-app
+            .appendingPathComponent("QuartzTeachers/Views/CourseSettings/StringListEditorView.swift")
+        let source: String = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        let cancel: String = UndoRenameFolderStepTests.body(of: "func cancelRename()", in: source)
+        XCTAssertTrue(cancel.contains("if renameRun.haltIfStillPlanning() {"), "Cancel does not halt through the run")
+        XCTAssertTrue(cancel.contains("pendingRename = nil"), "Cancel does not close the sheet")
+        let halt: String = UndoRenameFolderStepTests.body(of: "func haltARenameStillPlanning()", in: source)
+        XCTAssertTrue(halt.contains("renameRun.haltIfStillPlanning()"), "the sheet going away does not halt through the run")
+        XCTAssertTrue(
+            source.contains(".onDisappear {\n                    haltARenameStillPlanning()\n                }"),
+            "the rename sheet going away does not halt its rename"
+        )
+        let start: String = UndoRenameFolderStepTests.body(of: "func startRename(of item: String, finishing: Bool)", in: source)
+        XCTAssertTrue(start.contains("guard let onRename, renameRun.canStart else {"), "Rename starts without asking the run")
+        XCTAssertTrue(start.contains("renameRun.start("), "Rename does not start the run")
+        XCTAssertTrue(start.contains("using: onRename,"), "Rename hands the run something other than its closure")
+        XCTAssertTrue(
+            source.contains(".defaultButton(isEnabled: problem == nil && renameRun.canStart)"),
+            "Rename is not disabled by the run's canStart"
+        )
+        XCTAssertTrue(source.contains(".disabled(cancelIsDisabled)"))
+        XCTAssertTrue(source.contains("let cancelIsDisabled: Bool = !renameRun.canBeHalted"))
+    }
+
+    /// The real rename sheet, hosted off screen (U4b2-8, U4b2-7 review 2's
+    /// LOW-a): its own Rename button, pressed through accessibility as
+    /// VoiceOver presses it, starts the run with the closure the sheet was
+    /// handed, the plan is held at its first page, and its own Cancel button
+    /// halts the rename at once and closes the sheet, with nothing written.
+    /// Runs the view's real chain, so a halt commented out, moved into a
+    /// fresh `Task`, or put on the wrong button fails here where a reading
+    /// of the source would pass. MUST FAIL with Cancel not halting through
+    /// the run.
+    func testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet() throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let gate: RenameHold = holdThePlanAtItsFirstPage()
+        let reached: XCTestExpectation = gate.reached
+        let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
+        let run: FolderRenameRun = FolderRenameRun()
+        let host: TableHost = hostTheRenameSheet(of: view, run: run, returned: returned)
+        defer {
+            host.close()
+        }
+        XCTAssertNotNil(host.window.attachedSheet, "the rename sheet did not open")
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(host.window)
+
+        XCTAssertTrue(RenameSheetButtons.press("Rename", inWindowTitled: host.window.title), "the sheet has no Rename button to press")
+        wait(for: [reached], timeout: 30)
+        XCTAssertTrue(run.isRenaming, "the sheet's Rename did not start its run")
+        XCTAssertTrue(course.isRenamingAFolder, "the claim is held while the plan walks")
+
+        XCTAssertTrue(RenameSheetButtons.press("Cancel", inWindowTitled: host.window.title), "the sheet has no Cancel button to press")
+        // The halt is in the button's own turn: the run's task is cancelled
+        // before the press returns.
+        XCTAssertNil(run.renameTask, "Cancel did not halt the rename in its own turn")
+        let waited: XCTWaiter.Result = XCTWaiter().wait(for: [returned], timeout: 30)
+        if waited != .completed {
+            gate.open()
+            XCTFail("the sheet's Cancel did not reach the held plan")
+            return
+        }
+        host.pump(0.3)
+
+        XCTAssertFalse(run.isRenaming)
+        XCTAssertNil(host.window.attachedSheet, "Cancel did not close the sheet")
+        XCTAssertFalse(course.isRenamingAFolder, "the course is still held after Cancel")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+    }
+
+    /// The real Course Settings page, its grouped `Form` and all, hosted off
+    /// screen (U4b2-8 review 1, M1): its per-section folders row's rename
+    /// pencil, the sheet's field and its Rename are used through
+    /// accessibility, and the plan is held at its first page. Making the
+    /// window much shorter, and scrolling the form to its top and its
+    /// bottom, takes the row out of view, and the rename goes on: a lazily
+    /// drawn row leaving the visible area is not the teacher leaving the
+    /// rename. Leaving the page then halts it, with nothing written. MUST
+    /// FAIL with the page's `.onDisappear` not halting, and with a list
+    /// not handed the page's run. (A list's own `.onDisappear`, as the
+    /// first round of this piece had it, did not fire here when the row
+    /// left the visible area, measured 2026-11-26; the halt lives on the
+    /// page so that it cannot, whatever a later macOS draws lazily.)
+    func testTheRealSettingsPageShrunkOrScrolledKeepsARenameAndLeavingItHalts() throws {
+        let course: Course = try course()
+        let before: [String: Data] = pages(of: course)
+        let gate: RenameHold = holdThePlanAtItsFirstPage()
+        let shown: RenameSheetShown = RenameSheetShown()
+        let size: NSSize = NSSize(width: 900, height: 1100)
+        let window: NSWindow = OffScreenWindow(
+            contentRect: NSRect(origin: TableHost.offScreenOrigin(for: size), size: size),
+            styleMask: [.titled, .resizable], backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.animationBehavior = .none
+        window.title = "settings-page-\(UUID().uuidString)"
+        SheetsHungOffScreenStayThere.install()
+        window.contentView = NSHostingView(rootView: ShownWhile(shown: shown) {
+            CourseSettingsView(course: course)
+        })
+        window.setFrameOrigin(TableHost.offScreenOrigin(for: size))
+        window.orderFrontRegardless()
+        defer {
+            window.orderOut(nil)
+            window.close()
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(window)
+
+        XCTAssertTrue(
+            RenameSheetButtons.press(identifiedAs: "rename-Tasks", inWindowTitled: window.title),
+            "the per-section Tasks row has no one rename pencil to press"
+        )
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        XCTAssertNotNil(window.attachedSheet, "the rename sheet did not open")
+        XCTAssertTrue(RenameSheetButtons.type("Assessments", intoFieldIdentifiedAs: "renameField", inWindowTitled: window.title))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        XCTAssertTrue(RenameSheetButtons.press("Rename", inWindowTitled: window.title), "the sheet has no Rename button to press")
+        wait(for: [gate.reached], timeout: 30)
+        XCTAssertTrue(course.isRenamingAFolder, "the claim is held while the plan walks")
+
+        // Much shorter: the Content Structure rows leave the visible area.
+        window.setContentSize(NSSize(width: 900, height: 220))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        XCTAssertFalse(RenameSheetButtons.isInView("rename-Tasks", of: window), "the row is still in view in the shorter window")
+        XCTAssertTrue(course.isRenamingAFolder, "making the window shorter halted the rename")
+        XCTAssertNotNil(window.attachedSheet, "making the window shorter closed the sheet")
+        // Scrolled to the top and to the bottom of the form.
+        let scrolled: Int = RenameSheetButtons.scrollEveryScrollView(in: window, toTop: true)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        _ = RenameSheetButtons.scrollEveryScrollView(in: window, toTop: false)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        XCTAssertGreaterThan(scrolled, 0, "the page has no scroll view to scroll")
+        XCTAssertFalse(RenameSheetButtons.isInView("rename-Tasks", of: window), "the row is still in view after scrolling")
+        XCTAssertTrue(course.isRenamingAFolder, "scrolling the form halted the rename")
+
+        // Leaving the page (as choosing Planning, or another course, does).
+        shown.isShown = false
+        let given: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate { (object: Any?, bindings: [String: Any]?) -> Bool in
+                return MainActor.assumeIsolated {
+                    return !course.isRenamingAFolder
+                }
+            }, object: nil
+        )
+        let waited: XCTWaiter.Result = XCTWaiter().wait(for: [given], timeout: 30)
+        XCTAssertEqual(waited, .completed, "leaving the page did not halt the rename while it planned")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        XCTAssertEqual(gate.arrivedCount, 1)
+    }
+
+    /// Holds the plan at its first page until the test ends, and at the
+    /// end lets it go and waits for its walk to end before `tearDown`
+    /// clears the hooks the walk reads (U4b2-8 review 1, L5).
+    func holdThePlanAtItsFirstPage() -> RenameHold {
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        let ended: XCTestExpectation = XCTestExpectation(description: "the held plan's walk ended")
+        ended.assertForOverFulfill = false
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        SpecialFolderRenamer.planHasEnded = { @Sendable in
+            ended.fulfill()
+        }
+        addTeardownBlock { @MainActor in
+            gate.open()
+            if gate.arrivedCount > 0 {
+                await self.fulfillment(of: [ended], timeout: 30)
+            }
+        }
+        return gate
+    }
+
+    /// The per-section folders list as Course Settings builds it, with its
+    /// rename sheet already open on Tasks and Assessments typed, hosted off
+    /// screen. Its rename is the sheet's own closure, wrapped only to say
+    /// when it returned.
+    func hostTheRenameSheet(of view: CourseSettingsView, run: FolderRenameRun, returned: XCTestExpectation) -> TableHost {
+        let configuration: CourseConfiguration = view.course.configuration
+        let sheetRename: (String, String) async -> RenameResult = view.renameFromTheSheet(scope: .perSection)
+        let editor: StringListEditorView = StringListEditorView(
+            title: "Per-section folders",
+            removalTrail: view.removalTrail(for: .perSectionFolders),
+            items: Binding(
+                get: { return configuration.perSectionFolders },
+                set: { newValue in configuration.perSectionFolders = newValue }
+            ),
+            onRename: { oldName, newName in
+                let result: RenameResult = await sheetRename(oldName, newName)
+                returned.fulfill()
+                return result
+            },
+            renameCanNoLongerBeHalted: view.renameSwapHasBegun,
+            pendingRename: PendingRename(item: "Tasks", interruptedRenameTarget: nil),
+            proposedName: "Assessments",
+            renameRun: run
+        )
+        SheetsHungOffScreenStayThere.install()
+        let host: TableHost = TableHost(editor)
+        host.window.title = "rename-sheet-\(UUID().uuidString)"
+        host.pump(0.6)
+        return host
+    }
+
+    /// A second quit request while a quit is going ahead (U4b2-8, U4b2-7
+    /// review 2's LOW-b). AppKit can ask again during a `.terminateLater`
+    /// wait (it runs the run loop in the modal panel mode, which takes a
+    /// second ⌘Q or a log out), so the request is answered `.terminateLater`
+    /// before anything is asked: never the work-under-way question again,
+    /// and never `.terminateCancel` with the latch set. Before any quit has
+    /// gone ahead, a request is answered as always. The delegate asks this
+    /// first, before the question (its first statement, comments aside).
+    /// MUST FAIL with the answer ignoring the latch, and with the delegate
+    /// not asking it first.
+    func testASecondQuitRequestWhileAQuitGoesAheadAsksNothingAndRefusesNothing() throws {
+        XCTAssertNil(AppDelegate.answerWhileAQuitGoesAhead(), "a first quit request is answered early")
+
+        _ = AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans()
+
+        XCTAssertEqual(
+            AppDelegate.answerWhileAQuitGoesAhead(), .terminateLater,
+            "a second quit request while a quit goes ahead would be asked again, and could be refused"
+        )
+        let sourceURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QuartzTeachersTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // mac-app
+            .appendingPathComponent("QuartzTeachers/App/AppDelegate.swift")
+        let source: String = try String(contentsOf: sourceURL, encoding: .utf8)
+        let statements: [String] = UndoRenameFolderStepTests.codeLines(
+            after: "func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {", in: source
+        )
+        XCTAssertGreaterThan(statements.count, 2)
+        if statements.count > 2 {
+            XCTAssertEqual(statements[0], "return MainActor.assumeIsolated {")
+            XCTAssertEqual(
+                statements[1], "if let answer = AppDelegate.answerWhileAQuitGoesAhead() {",
+                "the delegate does not ask about a quit already going ahead first"
+            )
+            XCTAssertEqual(statements[2], "return answer")
+        }
+    }
+
+    /// The lines of code after `signature`, trimmed, with blank lines and
+    /// comment lines left out, so a line commented out does not count.
+    static func codeLines(after signature: String, in source: String) -> [String] {
+        guard let start = source.range(of: signature) else {
+            XCTFail("no \(signature) in the source")
+            return []
+        }
+        var lines: [String] = []
+        for line in source[start.upperBound...].split(separator: "\n") {
+            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("//") {
+                continue
+            }
+            lines.append(trimmed)
+            if lines.count == 10 {
+                break
+            }
+        }
+        return lines
+    }
+
+    /// The text of a function, from its signature to the next function or
+    /// section in the same type.
+    static func body(of signature: String, in source: String) -> String {
+        guard let start = source.range(of: signature) else {
+            XCTFail("no \(signature) in the source")
+            return ""
+        }
+        let rest: Substring = source[start.upperBound...]
+        var end: String.Index = rest.endIndex
+        for marker in ["\n    func ", "\n    // MARK: -", "\n    @ViewBuilder"] {
+            if let found = rest.range(of: marker), found.lowerBound < end {
+                end = found.lowerBound
+            }
+        }
+        return String(rest[..<end])
+    }
+
+    /// The sheet's Cancel reaches the plan (U4b part eight's review, L1;
+    /// U4b2-7): driven from the sheet's own run and the very closure the
+    /// sheet is handed (`renameFromTheSheet`), with the plan held open at
+    /// its first page. Cancel (`haltIfStillPlanning`, which the sheet's
+    /// Cancel, its going away and a quit all call) gives the course back
+    /// at once, says nothing to the sheet, and writes nothing. MUST FAIL
+    /// with the halt not cancelling the run's task, and with `onRename`
+    /// awaited in a fresh `Task` (in the run or in `renameFromTheSheet`).
+    func testTheSheetsCancelReachesAHeldPlan() async throws {
+        let course: Course = try course()
+        // An edit not yet saved, so Save has something to be enabled for.
+        course.configuration.courseName = "Computer Science"
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
+        let sheetRename: (String, String) async -> RenameResult = view.renameFromTheSheet(scope: .perSection)
+        let run: FolderRenameRun = FolderRenameRun()
+        var told: Bool = false
+        run.start(
+            renaming: "Tasks", to: "Assessments",
+            using: { oldName, newName in
+                let result: RenameResult = await sheetRename(oldName, newName)
+                returned.fulfill()
+                return result
+            },
+            canNoLongerBeHalted: view.renameSwapHasBegun
+        ) { result in
+            told = true
+        }
+        await fulfillment(of: [reached], timeout: 30)
+        XCTAssertTrue(course.isRenamingAFolder, "the claim is held while the plan walks")
+        XCTAssertTrue(run.canBeHalted, "Cancel is disabled while the rename only plans")
+
+        XCTAssertTrue(run.haltIfStillPlanning(), "Cancel refused to halt a rename that only plans")
+        let waited: XCTWaiter.Result = await XCTWaiter().fulfillment(of: [returned], timeout: 30)
+        if waited != .completed {
+            gate.open()
+            XCTFail("the sheet's Cancel did not reach the held plan")
+            await fulfillment(of: [returned], timeout: 30)
+            return
+        }
+        var turns: Int = 0
+        while run.isRenaming && turns < 10_000 {
+            await Task.yield()
+            turns += 1
+        }
+
+        XCTAssertFalse(run.isRenaming)
+        XCTAssertFalse(told, "a halted rename told its sheet")
+        XCTAssertFalse(course.isRenamingAFolder, "the course is still held after Cancel")
+        XCTAssertTrue(view.saveIsEnabled, "Save is not enabled after Cancel")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
     }
 
     /// A rename halted at Cancel while it is only planning (the plan writes
@@ -846,7 +1404,7 @@ final class UndoRenameFolderStepTests: XCTestCase {
 
         XCTAssertNotNil(failed(result), "\(result)")
         XCTAssertFalse(course.isRenamingAFolder, "the course is still held after Cancel")
-        XCTAssertFalse(CourseActivity.anyFolderRenameIsUnderWay, "a quit would wait for a cancelled plan")
+        XCTAssertTrue(CourseActivity.store.activeFolderRenames.isEmpty, "the cancelled plan's claim is still held")
         XCTAssertTrue(view.saveIsEnabled, "Save is not enabled after Cancel")
         XCTAssertNil(view.folderRenameProblem("Concepts", to: "Ideas", scope: .shared))
         XCTAssertEqual(pages(of: course), before)
@@ -866,6 +1424,86 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertFalse(course.isRenamingAFolder)
     }
 
+    /// Rename-then-Cancel, again and again, on a dead volume (U4b2-8, part
+    /// eight's L2): each round's plan is held at its first page on an event,
+    /// as a read stuck inside the system would hold it, and is cancelled
+    /// there. There are four more rounds than this Mac has cores, so more
+    /// than the threads Swift's shared pool has. Each round's plan still
+    /// starts, and with every one of them stuck an unrelated `Task` still
+    /// runs at once: the stuck reads hold none of the pool. MUST FAIL with
+    /// the walk run in a detached task.
+    ///
+    /// Synchronous on purpose: its waits spin the main run loop and need no
+    /// thread of the pool, so a starved pool fails the test on its bounds
+    /// rather than hanging it (measured 2026-11-26: written `async`, with
+    /// the walk detached, the run hung in XCTest's async wait with all
+    /// twelve of the pool's threads held in the plans).
+    func testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree() throws {
+        let course: Course = try course()
+        let before: [String: Data] = pages(of: course)
+        let cores: Int = ProcessInfo.processInfo.activeProcessorCount
+        let rounds: Int = cores + 4
+        let gate: EveryPlanHold = EveryPlanHold()
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let ended: XCTestExpectation = XCTestExpectation(description: "every held plan stopped once let go")
+        ended.expectedFulfillmentCount = rounds
+        SpecialFolderRenamer.planHasEnded = { @Sendable in
+            ended.fulfill()
+        }
+        let threadsBefore: Int = ThreadCount.inThisProcess()
+
+        var roundsHeld: Int = 0
+        while roundsHeld < rounds {
+            let round: Int = roundsHeld + 1
+            let reached: XCTestExpectation = XCTestExpectation(description: "round \(round)'s plan reached its first page")
+            gate.nextArrival(fulfils: reached)
+            let returned: XCTestExpectation = XCTestExpectation(description: "round \(round)'s rename returned")
+            let renaming: Task<Void, Never> = Task { @MainActor in
+                let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+                XCTAssertNotNil(self.failed(result), "\(result)")
+                returned.fulfill()
+            }
+            // The event is the plan reaching its first page; the bound only
+            // turns a plan that never started into a failure, not a hang.
+            let started: XCTWaiter.Result = XCTWaiter().wait(for: [reached], timeout: 30)
+            renaming.cancel()
+            let came: XCTWaiter.Result = XCTWaiter().wait(for: [returned], timeout: 30)
+            XCTAssertEqual(came, .completed, "round \(round)'s rename did not return after Cancel")
+            XCTAssertFalse(course.isRenamingAFolder, "round \(round) still holds the course after Cancel")
+            if started != .completed {
+                XCTFail("round \(round)'s plan never started, with \(roundsHeld) held on a Mac of \(cores) cores: the stuck reads hold the shared threads")
+                break
+            }
+            roundsHeld += 1
+        }
+        let threadsHeld: Int = ThreadCount.inThisProcess()
+
+        let unrelated: XCTestExpectation = XCTestExpectation(description: "an unrelated task ran")
+        Task.detached {
+            unrelated.fulfill()
+        }
+        // A free pool runs it at once; the bound turns a starved pool into a
+        // failure rather than a hang.
+        let ran: XCTWaiter.Result = XCTWaiter().wait(for: [unrelated], timeout: 10)
+        XCTAssertEqual(ran, .completed, "an unrelated task did not run while \(roundsHeld) plans were held")
+
+        gate.open()
+        if roundsHeld == rounds {
+            wait(for: [ended], timeout: 30)
+            XCTAssertEqual(gate.arrivals, rounds, "a cancelled plan went on reading pages")
+        }
+        let threadsAfter: Int = ThreadCount.inThisProcess()
+        print("U4b2-8 threads: cores \(cores), rounds \(rounds), before \(threadsBefore), with \(roundsHeld) plans held \(threadsHeld), after they were let go \(threadsAfter)")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        XCTAssertTrue(CourseActivity.store.activeFolderRenames.isEmpty)
+    }
+
     /// An ended claim is never taken up again (part seven's review, M1):
     /// the swap refuses a rename whose claim has been given back, so a plan
     /// whose rename was cancelled can never reach it. MUST FAIL with
@@ -878,7 +1516,7 @@ final class UndoRenameFolderStepTests: XCTestCase {
         CourseActivity.endFolderRename(claim)
 
         XCTAssertFalse(CourseActivity.folderRenameSwapBegins(claim), "an ended claim began its swap")
-        XCTAssertFalse(CourseActivity.anyFolderRenameIsUnderWay)
+        XCTAssertTrue(CourseActivity.store.activeFolderRenames.isEmpty)
         XCTAssertFalse(CourseActivity.folderRenameIsSwapping(folderPath: root.path, courseCode: "ICS3U"))
     }
 
@@ -1308,6 +1946,18 @@ final class RenameHold: @unchecked Sendable {
 
     var wasOnTheMainThread: Bool? = nil
 
+    var arrivals: Int = 0
+
+    // MARK: - Computed properties
+
+    /// How many pages the plan has begun to read, held or not.
+    var arrivedCount: Int {
+        condition.lock()
+        let counted: Int = arrivals
+        condition.unlock()
+        return counted
+    }
+
     // MARK: - Initializer
 
     init(reached: XCTestExpectation) {
@@ -1318,6 +1968,7 @@ final class RenameHold: @unchecked Sendable {
 
     func arrive() {
         condition.lock()
+        arrivals += 1
         if hasArrived {
             condition.unlock()
             return
@@ -1342,6 +1993,237 @@ final class RenameHold: @unchecked Sendable {
         isOpen = true
         condition.broadcast()
         condition.unlock()
+    }
+}
+
+/// Whether the hosted page, and so its rename sheet, is in the window.
+@MainActor
+@Observable
+final class RenameSheetShown {
+
+    // MARK: - Stored properties
+
+    var isShown: Bool = true
+}
+
+/// The hosted page while `shown` says so, and nothing after (U4b2-8).
+struct ShownWhile<Content: View>: View {
+
+    // MARK: - Stored properties
+
+    var shown: RenameSheetShown
+    @ViewBuilder let content: () -> Content
+
+    // MARK: - Body
+
+    var body: some View {
+        if shown.isShown {
+            content()
+        } else {
+            Color.clear
+        }
+    }
+}
+
+/// Finds a button in a window by the name VoiceOver reads, and presses it
+/// the way VoiceOver does (U4b2-8): through the accessibility API an
+/// assistive app uses (`AccessibilityTree`), which is also what makes
+/// SwiftUI build the tree at all (asked in process, it has no children).
+@MainActor
+enum RenameSheetButtons {
+
+    // MARK: - Functions
+
+    /// Presses the one button named `name` in the window titled
+    /// `windowTitle`, sheet included. False when there is none.
+    static func press(_ name: String, inWindowTitled windowTitle: String) -> Bool {
+        var matching: [AXUIElement] = []
+        for window in windows(titled: windowTitle) {
+            collectButtons(named: name, under: window, into: &matching, depth: 0)
+        }
+        if matching.count != 1 {
+            return false
+        }
+        return AXUIElementPerformAction(matching[0], kAXPressAction as CFString) == .success
+    }
+
+    /// Sets the text of the field identified as `identifier`, as an
+    /// assistive app types into it.
+    static func type(_ text: String, intoFieldIdentifiedAs identifier: String, inWindowTitled windowTitle: String) -> Bool {
+        let matching: [AXUIElement] = elements(identifiedAs: identifier, inWindowTitled: windowTitle)
+        if matching.count != 1 {
+            return false
+        }
+        return AXUIElementSetAttributeValue(matching[0], kAXValueAttribute as CFString, text as CFString) == .success
+    }
+
+    /// Presses the one element identified as `identifier`.
+    static func press(identifiedAs identifier: String, inWindowTitled windowTitle: String) -> Bool {
+        let matching: [AXUIElement] = elements(identifiedAs: identifier, inWindowTitled: windowTitle)
+        if matching.count != 1 {
+            return false
+        }
+        return AXUIElementPerformAction(matching[0], kAXPressAction as CFString) == .success
+    }
+
+    static func elements(identifiedAs identifier: String, inWindowTitled windowTitle: String) -> [AXUIElement] {
+        var matching: [AXUIElement] = []
+        for window in windows(titled: windowTitle) {
+            AccessibilityTree.collectElements(identifiedAs: identifier, under: window, into: &matching, depth: 0)
+        }
+        return matching
+    }
+
+    /// The windows whose title starts with `windowTitle`: a page may add a
+    /// subtitle to its window's title (Course Settings names the course).
+    static func windows(titled windowTitle: String) -> [AXUIElement] {
+        let application: AXUIElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        var found: [AXUIElement] = []
+        for window in AccessibilityTree.elementList(of: application, attribute: kAXWindowsAttribute) {
+            if AccessibilityTree.text(of: window, attribute: kAXTitleAttribute).hasPrefix(windowTitle) {
+                found.append(window)
+            }
+        }
+        return found
+    }
+
+    /// Whether the element identified as `identifier` is drawn inside the
+    /// window's frame: false when it has been scrolled or shrunk out of
+    /// view, or is not in the tree at all. Accessibility frames are in
+    /// screen points from the top of the main display.
+    static func isInView(_ identifier: String, of window: NSWindow) -> Bool {
+        let mainDisplayHeight: CGFloat = NSScreen.screens.first?.frame.height ?? 0
+        let windowFrame: CGRect = CGRect(
+            x: window.frame.minX, y: mainDisplayHeight - window.frame.maxY,
+            width: window.frame.width, height: window.frame.height
+        )
+        for element in elements(identifiedAs: identifier, inWindowTitled: window.title) {
+            if AccessibilityTree.frame(of: element).intersects(windowFrame) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Scrolls every scroll view in the window to its top or its bottom,
+    /// and says how many there were.
+    static func scrollEveryScrollView(in window: NSWindow, toTop: Bool) -> Int {
+        var scrollViews: [NSScrollView] = []
+        if let content = window.contentView {
+            collectScrollViews(in: content, into: &scrollViews)
+        }
+        for scrollView in scrollViews {
+            guard let document = scrollView.documentView else {
+                continue
+            }
+            let visibleHeight: CGFloat = scrollView.contentView.bounds.height
+            var y: CGFloat = 0
+            let bottom: CGFloat = max(0, document.frame.height - visibleHeight)
+            if document.isFlipped == toTop {
+                y = 0
+            } else {
+                y = bottom
+            }
+            scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
+        return scrollViews.count
+    }
+
+    static func collectScrollViews(in view: NSView, into found: inout [NSScrollView]) {
+        if let scrollView = view as? NSScrollView {
+            found.append(scrollView)
+        }
+        for subview in view.subviews {
+            collectScrollViews(in: subview, into: &found)
+        }
+    }
+
+    static func collectButtons(named name: String, under node: AXUIElement, into found: inout [AXUIElement], depth: Int) {
+        if depth > 60 {
+            return
+        }
+        if AccessibilityTree.text(of: node, attribute: kAXRoleAttribute) == kAXButtonRole {
+            let title: String = AccessibilityTree.text(of: node, attribute: kAXTitleAttribute)
+            let description: String = AccessibilityTree.text(of: node, attribute: kAXDescriptionAttribute)
+            if title == name || description == name {
+                found.append(node)
+            }
+        }
+        for child in AccessibilityTree.elementList(of: node, attribute: kAXChildrenAttribute) {
+            collectButtons(named: name, under: child, into: &found, depth: depth + 1)
+        }
+    }
+}
+
+/// Holds EVERY plan at its first page until the test opens it, as reads
+/// stuck on a dead volume would hold them (U4b2-8). Each arrival fulfils
+/// the expectation the test named for it, and is counted.
+final class EveryPlanHold: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    let condition: NSCondition = NSCondition()
+
+    var waitingFor: XCTestExpectation? = nil
+
+    var arrived: Int = 0
+
+    var isOpen: Bool = false
+
+    // MARK: - Computed properties
+
+    var arrivals: Int {
+        condition.lock()
+        let counted: Int = arrived
+        condition.unlock()
+        return counted
+    }
+
+    // MARK: - Functions
+
+    /// The expectation the next plan to arrive fulfils.
+    func nextArrival(fulfils expectation: XCTestExpectation) {
+        condition.lock()
+        waitingFor = expectation
+        condition.unlock()
+    }
+
+    func arrive() {
+        condition.lock()
+        arrived += 1
+        let reached: XCTestExpectation? = waitingFor
+        waitingFor = nil
+        condition.unlock()
+        reached?.fulfill()
+        condition.lock()
+        while !isOpen {
+            condition.wait()
+        }
+        condition.unlock()
+    }
+
+    func open() {
+        condition.lock()
+        isOpen = true
+        condition.broadcast()
+        condition.unlock()
+    }
+}
+
+/// How many threads this process has now, as the system counts them.
+enum ThreadCount {
+
+    // MARK: - Functions
+
+    static func inThisProcess() -> Int {
+        var info: proc_taskinfo = proc_taskinfo()
+        let size: Int32 = Int32(MemoryLayout<proc_taskinfo>.size)
+        let filled: Int32 = proc_pidinfo(getpid(), PROC_PIDTASKINFO, 0, &info, size)
+        if filled != size {
+            return -1
+        }
+        return Int(info.pti_threadnum)
     }
 }
 

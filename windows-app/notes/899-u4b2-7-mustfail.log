@@ -1,0 +1,75 @@
+row 1: quit counts every claim again
+  sabotage: QuartzTeachers/Models/CourseActivity.swift: 'return folderRenameSwapsUnderWay() > 0' -> 'return !store.activeFolderRenames.isEmpty'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:826: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAQuitWhileARenameOnlyPlansHaltsItAndDoesNotWait] : XCTAssertFalse failed - the quit waits for a rename that only plans
+  Executed 1 test, with 1 failure (0 unexpected) in 0.127 (0.128) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.127 (0.128) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.127 (0.128) seconds
+row 2: quit does not halt the run
+  sabotage: QuartzTeachers/App/AppDelegate.swift: '        FolderRenameRun.haltEveryRunStillPlanning()\n        return quitWaitsForWorkUnderWay(' -> '        return quitWaitsForWorkUnderWay('
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:833: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAQuitWhileARenameOnlyPlansHaltsItAndDoesNotWait] : failed - the quit did not halt the rename while it planned
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+row 3: Cancel (haltIfStillPlanning) does not cancel renameTask
+  sabotage: QuartzTeachers/Models/FolderRenameRun.swift: '        renameTask?.cancel()\n        renameTask = nil\n        return true' -> '        renameTask = nil\n        return true'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:908: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheSheetsCancelReachesAHeldPlan] : failed - the sheet's Cancel did not reach the held plan
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+row 4: onRename awaited in a fresh Task in the run
+  sabotage: QuartzTeachers/Models/FolderRenameRun.swift: 'let result: RenameResult = await onRename(oldName, newName)' -> 'let result: RenameResult = await Task { @MainActor in await onRename(oldName, newName) }.value'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:908: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheSheetsCancelReachesAHeldPlan] : failed - the sheet's Cancel did not reach the held plan
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+row 5: renameFromTheSheet wraps renameFolder in a fresh Task
+  sabotage: QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift: 'return await renameFolder(oldName, to: newName, scope: scope)' -> 'return await Task { @MainActor in await renameFolder(oldName, to: newName, scope: scope) }.value'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:908: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheSheetsCancelReachesAHeldPlan] : failed - the sheet's Cancel did not reach the held plan
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+restored: git status of mac-app/QuartzTeachers after all rows: ''
+row 6: review 1: start ignores a quit going ahead
+  sabotage: QuartzTeachers/Models/FolderRenameRun.swift: 'return !isRenaming && !FolderRenameRun.quitIsGoingAhead' -> 'return !isRenaming'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:881: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testARenamePressedWhileAQuitWaitsDoesNotStart] : XCTAssertFalse failed - Rename stays enabled while a quit is going ahead
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:899: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testARenamePressedWhileAQuitWaitsDoesNotStart] : XCTAssertFalse failed - a rename started while a quit was going ahead
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:900: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testARenamePressedWhileAQuitWaitsDoesNotStart] : XCTAssertFalse failed
+  Executed 1 test, with 3 failures (0 unexpected) in 0.125 (0.125) seconds
+row 7: review 1: swapBegins ignores a quit going ahead
+  sabotage: QuartzTeachers/Models/FolderRenameRun.swift: '        if quitIsGoingAhead {\n            return false\n        }\n        return CourseActivity' -> '        return CourseActivity'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:942: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap] : XCTAssertNotNil failed - a swap began while a quit was going ahead: renamed("“Tasks” is now “Assessments”. 2 pages had links pointing into it, and they now point at the new name.")
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:946: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap] : XCTAssertEqual failed: ("["Concepts/Arrays.md": 24 bytes, "section1/Assessments/Quiz 1.md": 28 bytes, "section2/Assessments/Quiz 2.md": 10 bytes, "section1/index.md": 35 bytes]") is not equal to ("["section2/Tasks/Quiz 2.md": 10 bytes, "Concepts/Arrays.md": 24 bytes, "section1/Tasks/Quiz 1.md": 22 bytes, "section1/index.md": 29 bytes]")
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:947: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap] : XCTAssertEqual failed: ("368 bytes") is not equal to ("384 bytes")
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:948: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap] : XCTAssertEqual failed: ("1") is not equal to ("0")
+row 8: review 1: the quit does not set the latch
+  sabotage: QuartzTeachers/App/AppDelegate.swift: '        FolderRenameRun.quitIsGoingAhead = true\n' -> ''
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:942: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap] : XCTAssertNotNil failed - a swap began while a quit was going ahead: renamed("“Tasks” is now “Assessments”. 2 pages had links pointing into it, and they now point at the new name.")
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:946: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap] : XCTAssertEqual failed: ("["section1/index.md": 35 bytes, "section1/Assessments/Quiz 1.md": 28 bytes, "Concepts/Arrays.md": 24 bytes, "section2/Assessments/Quiz 2.md": 10 bytes]") is not equal to ("["section1/Tasks/Quiz 1.md": 22 bytes, "section2/Tasks/Quiz 2.md": 10 bytes, "Concepts/Arrays.md": 24 bytes, "section1/index.md": 29 bytes]")
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:947: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap] : XCTAssertEqual failed: ("368 bytes") is not equal to ("384 bytes")
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:948: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap] : XCTAssertEqual failed: ("1") is not equal to ("0")
+row 9: review 1: cancelRename closes without halting through the run
+  sabotage: QuartzTeachers/Views/CourseSettings/StringListEditorView.swift: '        if renameRun.haltIfStillPlanning() {\n            pendingRename = nil\n        }' -> '        pendingRename = nil'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:968: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRenameSheetCallsItsRunForEveryWayOut] : XCTAssertTrue failed - Cancel does not halt through the run
+  Executed 1 test, with 1 failure (0 unexpected) in 0.098 (0.099) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.098 (0.099) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.098 (0.100) seconds
+row 10: review 1: onDisappear no longer halts
+  sabotage: QuartzTeachers/Views/CourseSettings/StringListEditorView.swift: '                .onDisappear {\n                    haltARenameStillPlanning()\n                }' -> '                .onDisappear {\n                }'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:972: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRenameSheetCallsItsRunForEveryWayOut] : XCTAssertTrue failed - the rename sheet going away does not halt its rename
+  Executed 1 test, with 1 failure (0 unexpected) in 0.116 (0.116) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.116 (0.116) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.116 (0.117) seconds
+row 11: review 1: Rename button not greyed by canStart
+  sabotage: QuartzTeachers/Views/CourseSettings/StringListEditorView.swift: '.defaultButton(isEnabled: problem == nil && renameRun.canStart)' -> '.defaultButton(isEnabled: problem == nil && !isRenaming)'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:980: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRenameSheetCallsItsRunForEveryWayOut] : XCTAssertTrue failed - Rename is not disabled by the run's canStart
+  Executed 1 test, with 1 failure (0 unexpected) in 0.098 (0.099) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.098 (0.099) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.098 (0.099) seconds
+restored: git status of mac-app/QuartzTeachers after all rows: ''

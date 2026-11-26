@@ -24,6 +24,10 @@ struct CourseSettingsView: View {
     @State var ownSession: CourseSettingsSession = CourseSettingsSession()
 
     @State var isShowingFoldersHelp: Bool = false
+
+    /// The renames this page owns, one per folder list that renames
+    /// (#899 U4b2-8): halted while they only plan when the page goes away.
+    @State var renames: CourseSettingsRenames = CourseSettingsRenames()
     @State var isRenamingUnitWord: Bool = false
 
     /// Counts the times this window has become key, so the page is drawn
@@ -225,17 +229,12 @@ struct CourseSettingsView: View {
                                 sectionNumbers: course.configuration.sectionNumbers
                             )
                         },
-                        onRename: { oldName, newName in
-                            return await renameFolder(oldName, to: newName, scope: .shared)
-                        },
-                        renameCanNoLongerBeHalted: {
-                            return CourseActivity.folderRenameIsSwapping(
-                                folderPath: course.workingFolderPath, courseCode: course.code
-                            )
-                        },
+                        onRename: renameFromTheSheet(scope: .shared),
+                        renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
-                        }
+                        },
+                        renameRun: renames.sharedFolders
                     )
                     // Which of those hold curriculum expectations, each with a
                     // coverage map of its own (#128) — offered, never decided
@@ -291,17 +290,12 @@ struct CourseSettingsView: View {
                                 sectionNumbers: course.configuration.sectionNumbers
                             )
                         },
-                        onRename: { oldName, newName in
-                            return await renameFolder(oldName, to: newName, scope: .perSection)
-                        },
-                        renameCanNoLongerBeHalted: {
-                            return CourseActivity.folderRenameIsSwapping(
-                                folderPath: course.workingFolderPath, courseCode: course.code
-                            )
-                        },
+                        onRename: renameFromTheSheet(scope: .perSection),
+                        renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .perSection)
-                        }
+                        },
+                        renameRun: renames.perSectionFolders
                     )
                     StringListEditorView(
                         title: "Per-section files",
@@ -476,6 +470,13 @@ struct CourseSettingsView: View {
         // Open in Obsidian is in the course page's toolbar
         // (`CourseDetailView`), so it is there on both tabs (#708).
         .navigationSubtitle(course.configuration.courseName)
+        // The page going away (Settings left for Planning, the course
+        // closed or switched, the window closed) halts a rename that only
+        // plans (#899 U4b2-8, review 1's M1). Here, on the page, which is
+        // not drawn lazily, never on a list inside the grouped form.
+        .onDisappear {
+            renames.pageIsGoingAway()
+        }
         .onAppear {
             // The file may have moved on since this window read it: a build
             // adds folders it discovers, and another window on the same
@@ -1125,6 +1126,25 @@ struct CourseSettingsView: View {
         )
     }
 
+    /// What a rename sheet's Rename runs (#899 U4b2-7): `renameFolder`,
+    /// awaited inline, never in a fresh task, so that the sheet's Cancel,
+    /// its going away and a quit reach the plan through `FolderRenameRun`.
+    /// Named, so the sheet-chain test runs the very closure the sheet is
+    /// handed.
+    func renameFromTheSheet(scope: FolderScope) -> (_ oldName: String, _ newName: String) async -> RenameResult {
+        return { oldName, newName in
+            return await renameFolder(oldName, to: newName, scope: scope)
+        }
+    }
+
+    /// Whether this course's rename has begun its check and swap, after
+    /// which it can no longer be halted (#899 U4b).
+    func renameSwapHasBegun() -> Bool {
+        return CourseActivity.folderRenameIsSwapping(
+            folderPath: course.workingFolderPath, courseCode: course.code
+        )
+    }
+
     /// Renames the folder on disk, relinks the pages that named it and
     /// rewrites the configuration keys that named it, as ONE step through
     /// the door (#899 U4b, key `renameFolder`): every folder's move, every
@@ -1223,8 +1243,9 @@ struct CourseSettingsView: View {
             // same turn as the swap is marked begun, so a Cancel lands either
             // before this (and halts it) or after (and is disabled). The swap
             // also refuses a claim no longer held: an ended claim is never
-            // taken up again.
-            if Task.isCancelled || !CourseActivity.folderRenameSwapBegins(claim) {
+            // taken up again; and it refuses once a quit is going ahead, so
+            // the quit's wait never misses a swap (U4b2-7 review 1, M1).
+            if Task.isCancelled || !FolderRenameRun.swapBegins(claim) {
                 return .failed(SpecialFolderRenamer.nothingWasChanged(
                     renaming: oldName, said: CancellationError().localizedDescription
                 ))
