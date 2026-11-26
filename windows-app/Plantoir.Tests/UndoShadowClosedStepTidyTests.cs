@@ -88,13 +88,13 @@ public sealed class UndoShadowClosedStepTidyTests
     }
 
     /// <summary>
-    /// Part three, review 1, LOW 4: a closed shadow step that holds an op other
-    /// than a file changed in place (here a <c>move</c>) is left alone by the
-    /// shadow tidy: its staged files stay where the dead process left them
-    /// (the mac's <c>onlyStepsOfFiles</c>).
+    /// The mac's U4b part four, L3 (#899 W8-7): a closed shadow step of files
+    /// and moves (Rename folder's kind) is tidied too: a move sets nothing
+    /// aside, so all the tidy removes is the step's own staged files beside its
+    /// pages (<c>changesOnlyFilesAndMoves</c>).
     /// </summary>
     [Fact]
-    public void AShadowStepWithAMoveIsLeftAloneByTheTidy()
+    public void AShadowStepWithAMoveIsTidied()
     {
         using var scribe = new UndoScribe();
         scribe.WritePage("A", First, Old(First));
@@ -108,7 +108,37 @@ public sealed class UndoShadowClosedStepTidyTests
         scribe.Door(mode: UndoMode.Shadow).Recover();
 
         Assert.False(scribe.Fold().Steps[seq].IsInFlight);
-        Assert.True(File.Exists(staged), "the shadow tidy removed a staged file of a step that is not only files");
+        Assert.False(File.Exists(staged), "the shadow tidy left a staged file of a step of files and moves");
+        Assert.Equal(Old(First), scribe.Page("A", First));
+    }
+
+    /// <summary>
+    /// Part three, review 1, LOW 4, as it stands since W8-7: a closed shadow
+    /// step that takes out a folder (a <c>removeTree</c>) is left alone by the
+    /// shadow tidy: its staged files stay where the dead process left them,
+    /// for a live recovery (the mac's <c>onlyStepsOfFiles</c>).
+    /// </summary>
+    [Fact]
+    public void AShadowStepWithATreeIsLeftAloneByTheTidy()
+    {
+        using var scribe = new UndoScribe();
+        scribe.WritePage("A", First, Old(First));
+        foreach ((string path, string text) in UndoKindsForTheCases.ExtraFiles)
+            scribe.WritePage("A", UndoKindsForTheCases.ExtraFolder + "/" + path, System.Text.Encoding.UTF8.GetBytes(text));
+        var tree = (UndoTreeReading.Tree)UndoTreeReading.Read(scribe.FullPath("A", UndoKindsForTheCases.ExtraFolder), keepingContents: true);
+        (JsonObject treeOp, List<byte[]> treeBlobs) = UndoKindsForTheCases.Tree("removeTree", UndoKindsForTheCases.ExtraFolder, tree.Listing, tree.Contents.Values);
+        foreach (byte[] blob in treeBlobs) scribe.PutBlob(blob);
+        long seq = scribe.Fold().NextSeq;
+        JsonArray ops = scribe.OpsFor(First, Old(First), New(First));
+        ops.Add(treeOp);
+        scribe.Append(scribe.BeginLine(seq, ops, "A", pid: UndoScribe.AProcessThatIsGone));
+        string staged = UndoSwap.BesidePath(scribe.FullPath("A", First), $"{seq}-apply", "new");
+        File.WriteAllBytes(staged, New(First));
+
+        scribe.Door(mode: UndoMode.Shadow).Recover();
+
+        Assert.False(scribe.Fold().Steps[seq].IsInFlight);
+        Assert.True(File.Exists(staged), "the shadow tidy removed a staged file of a step that takes out a folder");
         Assert.Equal(Old(First), scribe.Page("A", First));
     }
 }
