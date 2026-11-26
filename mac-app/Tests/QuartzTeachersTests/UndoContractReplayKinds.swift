@@ -809,7 +809,8 @@ nonisolated enum UndoContractKinds {
     /// (the replay hops there for it).
     @MainActor
     static func makeRoomWithALaterClassThatIsALink(
-        root: URL, journal: UndoJournal, places: UndoMemoryPlaces, linkedToDay1: Bool = false, broken: Bool = false
+        root: URL, journal: UndoJournal, places: UndoMemoryPlaces, linkedToDay1: Bool = false, broken: Bool = false,
+        day4LinkedToDay3: Bool = false, day3Plain: Bool = false
     ) throws -> String {
         // U4b3 part 2: Unit 1, Day 1 to Day 3 in section 1, Day 3 a link
         // to a file elsewhere in the course; room for one class at Day
@@ -821,13 +822,25 @@ nonisolated enum UndoContractKinds {
         let course: URL = root.appendingPathComponent("courses/TST1O")
         let made: Course = try laidLinkedPageCourse(root: root)
         if linkedToDay1 {
-            // Review B of U4b3, MEDIUM 1 (`makeRoomWithALaterClassLinkedToAnEarlierClass`):
-            // Day 3 a link to Day 1's own page, another class page of the
-            // same section, which Insert Class refuses before anything
-            // changes, as it did before U4b3 part 2.
+            // `makeRoomWithALaterClassLinkedToAnEarlierClass` (relink-5):
+            // Day 3 a link to Day 1's own page, a class page the plan
+            // leaves: renamed with its text kept, nothing written through
+            // it.
             let day3: URL = root.appendingPathComponent(linkedPageDay(3))
             try FileManager.default.removeItem(at: day3)
             try layALink(linkedPageDay(3), leadingTo: "Unit 1, Day 1.md", root: root)
+        }
+        if day3Plain && !somethingIsAt(linkedPageDay(4), in: root) {
+            // `makeRoomWithALaterClassLinkedToAClassItRenames` (review B's
+            // probe): Day 3 a plain page again.
+            let day3: URL = root.appendingPathComponent(linkedPageDay(3))
+            try FileManager.default.removeItem(at: day3)
+            try UndoContractReplay.write(linkedPageText(day: 3, date: linkedPageDates[2]), to: linkedPageDay(3), in: root)
+        }
+        if day4LinkedToDay3 && !somethingIsAt(linkedPageDay(4), in: root) {
+            // Relink-5: Day 4 a link holding `Unit 1, Day 3.md`, a class page
+            // the plan renames: renamed AND re-pointed at its new name.
+            try layALink(linkedPageDay(4), leadingTo: "Unit 1, Day 3.md", root: root)
         }
         if broken {
             // `makeRoomWithALaterClassThatIsABrokenLink`: the file the link
@@ -950,6 +963,35 @@ nonisolated enum UndoContractKinds {
             file = "gone"
         }
         return place + ", " + target + ", " + file
+    }
+
+    /// Relink-5's `laterLinks`: Unit 1, Day 1, Day 3, Day 4 and Day 5 in
+    /// turn, each `Day <n>: ` then `link <the text it holds>`, `page <its
+    /// last line> <the date of its created line>` (`none` for no such
+    /// line), or `nothing`, joined by a semicolon and a space.
+    static func laterLinks(in root: URL) -> String {
+        var parts: [String] = []
+        for day in [1, 3, 4, 5] {
+            let place: URL = root.appendingPathComponent(linkedPageDay(day))
+            var what: String = "nothing"
+            if let bytes = UndoTreeReading.linkTarget(at: place), let written = UndoText.decode(bytes) {
+                what = "link " + written
+            } else if let held = text(at: linkedPageDay(day), in: root) {
+                var lastLine: String = ""
+                var created: String = "none"
+                for line in held.components(separatedBy: "\n") {
+                    if !line.isEmpty {
+                        lastLine = line
+                    }
+                    if line.hasPrefix("created: ") && created == "none" {
+                        created = String(line.dropFirst("created: ".count).prefix(10))
+                    }
+                }
+                what = "page " + lastLine + " " + created
+            }
+            parts.append("Day \(day): " + what)
+        }
+        return parts.joined(separator: "; ")
     }
 
     /// U4b2-14's `linkedFolder`: which place holds the link (renamed, media,

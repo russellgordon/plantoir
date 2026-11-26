@@ -23620,18 +23620,28 @@ so two links in a row and a link below a plain class are one step too.
 `ClassInsertionPlanner.apply` decides "a link to a file" by `lstat` and the
 target's `stat` (`isALinkToAFile`); a link to a folder, or one whose target
 cannot be read, is not renamed, as before. A later class whose link leads,
-at any of its hops, to another class page of the same section is refused
-before anything changes with the refusal given before this piece ("cannot
-tell now", said as the file that could not be saved; the review round's fix
-2). Each hop is judged by the device and inode `lstat` gives of the place it
-names, a link or a file, against every class page as it stands
-(`firstLinkThatCannotBeMoved`, `leadsToAClassPage`), so Day 4 holding
-`Unit 1, Day 3.md` is caught when Day 3 is itself a link elsewhere (review C,
-MEDIUM 1; comparing only the file at the end of the chain let it through, and
-Day 5 then led to the old Day 2's lesson). Russell's ruling is that such a
-link is renamed and its text changed to the page's new name; the door cannot
-change a link's text within a step (a link is moved, never written from a
-blob), so this one arrangement stays refused until a door piece adds that.
+at any of its hops, to another class page of the same section is never
+refused for it (relink-5; Russell, 2026-11-26). Each hop is judged by the
+device and inode `lstat` gives of the place it names, a link or a file,
+against every class page as it stands, and the first class page reached
+decides (`reachOfALinkedClass`; review C, MEDIUM 1: comparing only the file
+at the end of the chain let Day 4 holding `Unit 1, Day 3.md` through when Day
+3 was itself a link, and Day 5 then led to the old Day 2's lesson). A link
+whose own text names a page the plan renames is renamed and its text changed
+to that page's new name in one relinking move (`JournaledStep.relinkLink`,
+`textAfterTheMove`: only the last path part changes, since the page and the
+link are each renamed within their own folder); a link reaching such a page
+only through a link OUTSIDE the working folder is re-pointed straight at the
+page's new name, the link outside untouched; a link reaching a class page the
+plan leaves is moved as itself, its text kept. Nothing is written through any
+of them, no title and no date (writing this class's date through the link is
+what gave Day 3 the wrong date in review B's probe). Two arrangements still
+refuse before anything changes, as before U4b3 ("cannot tell now";
+`firstLinkThatCannotBeMoved`), because each needs a link's text changed where
+it stands, which the door cannot do yet: a link reaching a renamed page only
+through a link INSIDE the working folder that is not a class page (Russell's
+ruling: that link is re-pointed where it stands), and a class the plan only
+re-dates whose link reaches a renamed page.
 A later class whose link leads NOWHERE is never refused (Russell, 2026-11-26:
 "Why would it refuse? Why does it care where a later class links to?", then
 "Never refuse"; this reverses the review round's fix 3): the link is moved as
@@ -23816,6 +23826,26 @@ at `from` for an Undo; `UndoRecovery.removeTheLinksJustMade`), re-read with
 that side's text, so the op stands where its swap began and is then judged
 as any other; a plan never does this, since a link at the other name may be
 the teacher's (seven `recoveryCases` rows, key `withARelink`).
+
+### U4b3 relink-5: Insert Class re-points a linked class
+
+Insert Class is the relinking move's first caller (`ClassInsertionPlanner.apply`,
+the four cases in "U4b3: linked-class-page-moves-its-link" above). It walks
+each later class that is a link once, on the disk as it stands, before
+anything is planned (`classPagePlaces`, `reachOfALinkedClass`), and the same
+answer decides the rename (relink, plain link move, or the page's own write
+and remove), the date (none for a link to a class page) and the one refusal
+left. The page below a re-pointed link fills the place the link leaves with a
+write and a removal, the shape relink-4 proved (a write at a relinked link's
+old name is a new file, never through the link). Six `stackCases` rows
+("U4b3 relink-5, …", calls `makeRoomWithALaterClassLinkedToAClassItRenames`
+and `makeRoomWithALaterClassLinkedToALinkedClass`, the call
+`makeRoomWithALaterClassLinkedToAnEarlierClass` turned round from a refusal,
+key `laterLinks`) replace the refusal row, held for Windows under
+`Reason899W8bLinkedClassPage`. Known limits, not built: an EARLIER class's
+link to a page Insert Class renames keeps its text and then leads to the page
+now at that name; a renamed page's rename that cannot be done (its new name
+taken) leaves a link re-pointed at that new name.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

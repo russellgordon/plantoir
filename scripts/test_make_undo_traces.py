@@ -839,7 +839,7 @@ class ContractCaseTests(unittest.TestCase):
                   "keptWhatItReplacedSays",
                   # Review 1 of U4b2-10: empty folders, which the model does
                   # not hold (folder_of_pages); the Swift replay checks it.
-                  "foldersInside", "linkedFolder", "linkedPage"}
+                  "foldersInside", "linkedFolder", "linkedPage", "laterLinks"}
 
     # U4b2-4: the two pages wholeFileStepOnTwoPagesNamedIndex writes.
     TWO_PAGES_NAMED_INDEX = ("courses/TST1O/Section 1/Classes/index.md", "courses/TST1O/Section 2/Classes/index.md")
@@ -1125,10 +1125,49 @@ class ContractCaseTests(unittest.TestCase):
                 + traces.ops_for_change(self.linked_day(3), None, self.linked_text(3, 3, body=2))
                 + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
         if call == "makeRoomWithALaterClassLinkedToAnEarlierClass":
-            # Review B of U4b3, MEDIUM 1: Day 3 a link to Day 1's own page,
-            # another class page of the section: Insert Class refuses
-            # before anything changes (undo.rule.shadow), nothing begun.
-            return ("cannotTellNow",)
+            # Relink-5: Day 3 a link to Day 1's own page, a class page the
+            # plan leaves: the link moved as itself to Day 4, its text kept,
+            # nothing written through it; Day 2's page renamed into the place
+            # it left, the new class at Day 2.
+            earlier = "Unit 1, Day 1.md"
+            if pages.get(self.linked_day(3)) is None and pages.get(self.linked_day(4)) is None:
+                for number in (1, 2):
+                    pages[self.linked_day(number)] = self.linked_text(number, number)
+                pages[self.LINKED_FILE] = self.linked_text(3, 3)
+                pages[self.linked_day(3)] = ("link", earlier)
+            two = pages.get(self.linked_day(2))
+            return self.vetted_ops_step(model,
+                [{"kind": "move", "from": self.linked_day(3), "to": self.linked_day(4), "linkSha": traces.sha(earlier)}]
+                + traces.ops_for_change(self.linked_day(3), None, self.linked_text(3, 3, body=2))
+                + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
+        if call in ("makeRoomWithALaterClassLinkedToAClassItRenames", "makeRoomWithALaterClassLinkedToALinkedClass"):
+            # Relink-5 (review B's probe; review C's with Day 3 a link to the
+            # file elsewhere): Day 4 a link holding `Unit 1, Day 3.md`, a
+            # class page the plan renames: renamed to Day 5 and re-pointed at
+            # `Unit 1, Day 4.md` in one relinking move, nothing written
+            # through it.
+            old, new = "Unit 1, Day 3.md", "Unit 1, Day 4.md"
+            plain = call == "makeRoomWithALaterClassLinkedToAClassItRenames"
+            if pages.get(self.linked_day(3)) is None and pages.get(self.linked_day(4)) is None:
+                for number in (1, 2):
+                    pages[self.linked_day(number)] = self.linked_text(number, number)
+                pages[self.LINKED_FILE] = self.linked_text(3, 3)
+                pages[self.linked_day(3)] = self.linked_text(3, 3) if plain else ("link", self.LINKED_TARGET)
+                pages[self.linked_day(4)] = ("link", old)
+            two, three = pages.get(self.linked_day(2)), pages.get(self.linked_day(3))
+            ops = [{"kind": "move", "from": self.linked_day(4), "to": self.linked_day(5),
+                    "linkShaBefore": traces.sha(old), "linkShaAfter": traces.sha(new),
+                    "blobs": [traces.sha(old), traces.sha(new)],
+                    "linkTexts": {traces.sha(old): old, traces.sha(new): new}}]
+            if plain:
+                ops += traces.ops_for_change(self.linked_day(4), None, self.linked_text(4, 4, body=3))
+                ops += traces.ops_for_change(self.linked_day(3), three, self.linked_text(3, 3, body=2))
+            else:
+                ops.append({"kind": "move", "from": self.linked_day(3), "to": self.linked_day(4),
+                            "linkSha": traces.sha(self.LINKED_TARGET)})
+                ops += traces.ops_for_change(self.LINKED_FILE, pages[self.LINKED_FILE], self.linked_redated())
+                ops += traces.ops_for_change(self.linked_day(3), None, self.linked_text(3, 3, body=2))
+            return self.vetted_ops_step(model, ops + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
         if call == "handAPlaceOverAfterALinksMove":
             # U4b3 door-4, shape A: the link leaves Day 3, a new page fills it.
             if pages.get(self.day(3)) is None and pages.get(self.day(4)) is None:
@@ -1251,6 +1290,27 @@ class ContractCaseTests(unittest.TestCase):
             file = "redatedForThisSection"
         return place + ", " + target + ", " + file
 
+    def later_links(self, model):
+        """Relink-5's laterLinks: Day 1, 3, 4 and 5 of the linked course,
+        each a link's text, a page's last line and created date, or
+        nothing."""
+        parts = []
+        for number in (1, 3, 4, 5):
+            held = model.pages.get(self.linked_day(number))
+            what = "nothing"
+            if isinstance(held, tuple) and held[0] == "link":
+                what = "link " + held[1]
+            elif isinstance(held, str):
+                lines = [line for line in held.split("\n") if line]
+                created = "none"
+                for line in held.split("\n"):
+                    if line.startswith("created: "):
+                        created = line[len("created: "):][:10]
+                        break
+                what = "page %s %s" % (lines[-1] if lines else "", created)
+            parts.append("Day %d: %s" % (number, what))
+        return "; ".join(parts)
+
     def handed_over(self, model):
         """U4b3 door-4's handedOver: what Day 2, Day 3 and Day 4 hold, then
         whether the pages the links lead to are as the calls laid them."""
@@ -1355,7 +1415,8 @@ class ContractCaseTests(unittest.TestCase):
                   "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
                   "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
                   "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass",
-                  "makeRoomWithALaterClassThatIsABrokenLink")
+                  "makeRoomWithALaterClassThatIsABrokenLink", "makeRoomWithALaterClassLinkedToAClassItRenames",
+                  "makeRoomWithALaterClassLinkedToALinkedClass")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -1645,6 +1706,8 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(self.handed_over(model), case["handedOver"])
                 if "linkedPage" in case:
                     self.assertEqual(self.linked_page(model), case["linkedPage"])
+                if "laterLinks" in case:
+                    self.assertEqual(self.later_links(model), case["laterLinks"])
                 if "caseOnlyFolder" in case:
                     self.assertEqual(self.case_only_folder(model), case["caseOnlyFolder"])
                 if "folderKept" in case:

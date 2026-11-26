@@ -470,53 +470,221 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: outside.path), "still nothing made where the link points")
     }
 
-    /// Day 4 a link to Day 3's page, in the same run; room at Day 2: refused
-    /// before anything changes, naming Day 4 (review B of U4b3, MEDIUM 1).
-    /// MUST FAIL with Day 3 given the old Day 2's lesson and Day 5's date.
-    func testALaterClassLinkedToAnotherClassOfTheRunIsRefused() throws {
-        let made = try makeCourse()
-        try replaceWithALink("Unit 1, Day 4", holding: "Unit 1, Day 3.md", in: made)
+    // MARK: - Tests: a later class linked to another class page (relink-5)
 
-        try checkRefused(atDay: 2, naming: "Unit 1, Day 4", in: made)
+    /// Review B of U4b3's probe: Day 4 a link holding `Unit 1, Day 3.md`, a
+    /// class page the plan renames; room at Day 2. Russell, 2026-11-26: the
+    /// link is renamed AND kept leading to the same lesson, its text changed
+    /// to that page's new name, and nothing is written through it, no title
+    /// and no date. MUST FAIL with the refusal put back, with the link moved
+    /// as itself (Day 5 leading to the old Day 2's lesson), or with Day 5's
+    /// date written through it onto Day 4's page.
+    func testALaterClassLinkedToAnotherClassOfTheRunIsRePointed() throws {
+        try checkReviewBsProbe(holding: "Unit 1, Day 3.md", expecting: "Unit 1, Day 4.md")
+    }
+
+    /// The same with the text in another form (`./`): only its last path
+    /// part changes, the form kept.
+    func testARePointedLinkKeepsTheFormOfItsText() throws {
+        try checkReviewBsProbe(holding: "./Unit 1, Day 3.md", expecting: "./Unit 1, Day 4.md")
+    }
+
+    func checkReviewBsProbe(holding laid: String, expecting expected: String) throws {
+        let made = try makeCourse()
+        try replaceWithALink("Unit 1, Day 4", holding: laid, in: made)
+        let before: [String: String] = everything(under: made)
+
+        let result = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(result.steps, 1, "one step")
+        XCTAssertEqual(result.couldNotRecord, [])
+        XCTAssertEqual(linkTarget("Unit 1, Day 5", in: made), expected, "re-pointed at the page's new name")
+        XCTAssertNil(linkTarget("Unit 1, Day 4", in: made), "the old Day 3 at Day 4 is a plain page")
+        let day4: String = try text("Unit 1, Day 4", in: made)
+        XCTAssertTrue(day4.contains("Three.") && day4.contains("title: Unit 1, Day 4"), day4)
+        XCTAssertTrue(day4.contains("created: 2026-09-16T07:00:00.000-0400"), "its own move's date, never Day 5's: \(day4)")
+        XCTAssertEqual(try text("Unit 1, Day 5", in: made), day4, "Day 5 still leads to the same lesson")
+        let day3: String = try text("Unit 1, Day 3", in: made)
+        XCTAssertTrue(day3.contains("Two.") && day3.contains("title: Unit 1, Day 3"), day3)
+        XCTAssertTrue(try text("Unit 1, Day 2", in: made).contains("publish: false"), "the new blank class")
+        XCTAssertEqual(everything(under: made).count, before.count + 1, "one new page, nothing else")
+        try checkUndoAndRedoAreExact(made, before: before)
     }
 
     /// Day 3 a link to Day 1's page, an earlier class the plan leaves; room
-    /// at Day 2: refused, naming Day 3. MUST FAIL with Day 1 retitled
-    /// "Unit 1, Day 4" and re-dated.
-    func testALaterClassLinkedToAnEarlierClassIsRefused() throws {
+    /// at Day 2: the link is renamed with its text kept, and nothing is
+    /// written through it: Day 1 byte for byte, the same file. MUST FAIL
+    /// with the refusal put back, or with Day 1 re-dated through the link.
+    func testALaterClassLinkedToAnEarlierClassKeepsItsText() throws {
         let made = try makeCourse()
         try replaceWithALink("Unit 1, Day 3", holding: "Unit 1, Day 1.md", in: made)
+        let day1Before: String = try text("Unit 1, Day 1", in: made)
+        let reachedBefore: ResolvedFile? = ResolvedFile.throughLinks(at: made.classes.appendingPathComponent("Unit 1, Day 3.md"))
+        let before: [String: String] = everything(under: made)
 
-        try checkRefused(atDay: 2, naming: "Unit 1, Day 3", in: made)
+        let result = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(result.steps, 1)
+        XCTAssertEqual(linkTarget("Unit 1, Day 4", in: made), "Unit 1, Day 1.md", "its text kept")
+        XCTAssertEqual(
+            ResolvedFile.throughLinks(at: made.classes.appendingPathComponent("Unit 1, Day 4.md")), reachedBefore,
+            "the same file, the same lesson"
+        )
+        XCTAssertEqual(try text("Unit 1, Day 1", in: made), day1Before, "nothing written through it")
+        XCTAssertTrue(try text("Unit 1, Day 3", in: made).contains("Two."))
+        try checkUndoAndRedoAreExact(made, before: before)
     }
 
-    /// The same through a link to a link: Day 3 leads to a file elsewhere
-    /// that is itself a link to Day 1's page. Judged by the file reached,
-    /// never by the name or path written in the link: refused.
-    func testALaterClassLinkedToAClassThroughAnotherLinkIsRefused() throws {
+    /// The same through a link inside the working folder that is not a
+    /// class page: Day 3 leads to `elsewhere/hop.md`, a link to Day 1's
+    /// page. The plan leaves Day 1, so Day 3 keeps its text, and nothing is
+    /// written through either link.
+    func testALaterClassLinkedToAnEarlierClassThroughAnotherLinkKeepsItsText() throws {
         let made = try makeCourse()
         let hop: URL = made.course.directoryURL.appendingPathComponent("elsewhere/hop.md")
         try FileManager.default.createSymbolicLink(atPath: hop.path, withDestinationPath: "../section1/All Classes/Unit 1, Day 1.md")
         try replaceWithALink("Unit 1, Day 3", holding: "../../elsewhere/hop.md", in: made)
+        let day1Before: String = try text("Unit 1, Day 1", in: made)
+        let before: [String: String] = everything(under: made)
 
-        try checkRefused(atDay: 2, naming: "Unit 1, Day 3", in: made)
+        _ = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(linkTarget("Unit 1, Day 4", in: made), "../../elsewhere/hop.md")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: hop.path), "../section1/All Classes/Unit 1, Day 1.md")
+        XCTAssertEqual(try text("Unit 1, Day 1", in: made), day1Before)
+        try checkUndoAndRedoAreExact(made, before: before)
     }
 
     /// Review C of U4b3, MEDIUM 1: Day 3 is itself a link to a file
     /// elsewhere, and Day 4 is a link holding `Unit 1, Day 3.md`. Each hop
-    /// is judged by its own identity, not only the file at the end: Day 4's
-    /// first hop names Day 3's place, a class page of this section, so it is
-    /// refused before anything changes, naming Day 4. MUST FAIL with only
-    /// the end of the chain compared (Insert Class goes ahead, Day 5 then
-    /// leads to the old Day 2's lesson and the file elsewhere is dated
-    /// twice).
-    func testALaterClassLinkedToAClassPageThatIsItselfALinkIsRefused() throws {
+    /// is judged by its own identity: Day 4's own text names Day 3's place,
+    /// a class page the plan renames, so Day 4 is re-pointed at
+    /// `Unit 1, Day 4.md`; Day 3 is moved as itself and its date written
+    /// into the file elsewhere, once. MUST FAIL with only the end of the
+    /// chain compared (Day 5 re-pointed at nothing, or not at all, and the
+    /// file elsewhere dated twice).
+    func testALaterClassLinkedToAClassPageThatIsItselfALinkIsRePointed() throws {
         let made = try makeCourse()
-        try makeALink("Unit 1, Day 3", holding: "../../elsewhere/L.md", in: made)
+        let file: URL = try makeALink("Unit 1, Day 3", holding: "../../elsewhere/L.md", in: made)
         try replaceWithALink("Unit 1, Day 4", holding: "Unit 1, Day 3.md", in: made)
+        let before: [String: String] = everything(under: made)
+
+        let result = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(result.steps, 1)
+        XCTAssertEqual(linkTarget("Unit 1, Day 5", in: made), "Unit 1, Day 4.md", "re-pointed")
+        XCTAssertEqual(linkTarget("Unit 1, Day 4", in: made), "../../elsewhere/L.md", "moved as itself")
+        let linked: String = try String(contentsOf: file, encoding: .utf8)
+        XCTAssertTrue(linked.contains("title: Unit 1, Day 3"), "never a title through a link")
+        XCTAssertTrue(linked.contains("createdSection1: 2026-09-16T07:00:00.000-0400"), linked)
+        XCTAssertEqual(linked.components(separatedBy: "createdSection1:").count, 2, "dated once: \(linked)")
+        XCTAssertEqual(try text("Unit 1, Day 5", in: made), linked, "Day 5 still leads to the same lesson")
+        try checkUndoAndRedoAreExact(made, before: before)
+    }
+
+    /// Two later classes whose links name each other (Day 3 holds Day 4's
+    /// name, Day 4 holds Day 3's): each is re-pointed at the other's new
+    /// name, nothing written through either.
+    func testTwoLinksNamingEachOtherAreEachRePointed() throws {
+        let made = try makeCourse()
+        try replaceWithALink("Unit 1, Day 4", holding: "Unit 1, Day 3.md", in: made)
+        try replaceWithALink("Unit 1, Day 3", holding: "Unit 1, Day 4.md", in: made)
+        let before: [String: String] = everything(under: made)
+
+        let result = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(result.steps, 1)
+        XCTAssertEqual(linkTarget("Unit 1, Day 5", in: made), "Unit 1, Day 4.md")
+        XCTAssertEqual(linkTarget("Unit 1, Day 4", in: made), "Unit 1, Day 5.md")
+        XCTAssertTrue(try text("Unit 1, Day 3", in: made).contains("Two."))
+        XCTAssertEqual(everything(under: made).count, before.count + 1)
+        try checkUndoAndRedoAreExact(made, before: before)
+    }
+
+    /// Russell, 2026-11-26, with the director's reading: Day 4 reaches Day
+    /// 3's page only through a link OUTSIDE the working folder, where
+    /// Plantoir never writes. Day 4's own link is re-pointed straight at
+    /// Day 3's page's new name, so it still leads to the same lesson; the
+    /// link outside is left byte for byte.
+    func testALinkReachingARenamedPageThroughALinkOutsideIsRePointedStraightAtIt() throws {
+        let made = try makeCourse()
+        let outside: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("make-room-hop-\(UUID().uuidString)", isDirectory: true)
+        folders.append(outside)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let hop: URL = outside.appendingPathComponent("hop.md")
+        let hopText: String = made.classes.appendingPathComponent("Unit 1, Day 3.md").path
+        try FileManager.default.createSymbolicLink(atPath: hop.path, withDestinationPath: hopText)
+        try replaceWithALink("Unit 1, Day 4", holding: hop.path, in: made)
+        let before: [String: String] = everything(under: made)
+
+        let result = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(result.steps, 1)
+        XCTAssertEqual(result.couldNotRecord, [], "nothing is written outside")
+        XCTAssertEqual(linkTarget("Unit 1, Day 5", in: made), "Unit 1, Day 4.md", "straight at the page's new name")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: hop.path), hopText, "the link outside untouched")
+        XCTAssertEqual(try text("Unit 1, Day 5", in: made), try text("Unit 1, Day 4", in: made))
+        XCTAssertTrue(try text("Unit 1, Day 4", in: made).contains("Three."))
+        try checkUndoAndRedoAreExact(made, before: before)
+    }
+
+    /// Day 4 reaches Day 3's page only through `elsewhere/hop.md`, a link
+    /// INSIDE the working folder. Russell's ruling (2026-11-26) re-points
+    /// that link where it stands, which the door cannot do yet (left for
+    /// the next piece): refused before anything changes, naming Day 4, as
+    /// before this piece.
+    func testALinkReachingARenamedPageThroughALinkInsideIsStillRefused() throws {
+        let made = try makeCourse()
+        let hop: URL = made.course.directoryURL.appendingPathComponent("elsewhere/hop.md")
+        try FileManager.default.createSymbolicLink(atPath: hop.path, withDestinationPath: "../section1/All Classes/Unit 1, Day 3.md")
+        try replaceWithALink("Unit 1, Day 4", holding: "../../elsewhere/hop.md", in: made)
 
         try checkRefused(atDay: 2, naming: "Unit 1, Day 4", in: made)
     }
+
+    /// A case-1 link beside a link leading OUT of the working folder (review
+    /// C's shape, Day 3's file outside): the step goes ahead with one "could
+    /// not record" line; outside, only the one date line is written.
+    func testARePointedLinkBesideALinkLeadingOutWritesOnlyTheOneDateOutside() throws {
+        let made = try makeCourse()
+        let outside: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("make-room-out-\(UUID().uuidString)", isDirectory: true)
+        folders.append(outside)
+        let target: String = outside.appendingPathComponent("L.md").path
+        let file: URL = try makeALink("Unit 1, Day 3", holding: target, in: made)
+        let laid: String = try String(contentsOf: file, encoding: .utf8)
+        try replaceWithALink("Unit 1, Day 4", holding: "Unit 1, Day 3.md", in: made)
+
+        let result = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(result.couldNotRecord, [.wentAhead])
+        XCTAssertEqual(linkTarget("Unit 1, Day 5", in: made), "Unit 1, Day 4.md")
+        XCTAssertEqual(linkTarget("Unit 1, Day 4", in: made), target)
+        let expected: String = "---\ncreatedSection1: 2026-09-16T07:00:00.000-0400\n" + String(laid.dropFirst("---\n".count))
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), expected, "the one date line, nothing else")
+        let outsideFiles: [String] = try FileManager.default.contentsOfDirectory(atPath: outside.path)
+        XCTAssertEqual(outsideFiles, ["L.md"], "nothing else made outside")
+    }
+
+    /// Undo puts the folder back exactly as `before` (every name, link text
+    /// and date line), then Redo makes the step again exactly.
+    func checkUndoAndRedoAreExact(_ made: (root: URL, course: Course, classes: URL), before: [String: String]) throws {
+        let after: [String: String] = everything(under: made)
+        let journal: UndoJournal = try UndoJournalLocation.standardJournal()
+        let root: URL = made.root
+        let undone: UndoOutcome = journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+        guard case .undone = undone else {
+            return XCTFail("Undo came to \(undone)")
+        }
+        XCTAssertEqual(everything(under: made), before, "Undo exact")
+        let redone: UndoOutcome = journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+        guard case .redone = redone else {
+            return XCTFail("Redo came to \(redone)")
+        }
+        XCTAssertEqual(everything(under: made), after, "Redo exact")
+    }
+    // MARK: - Tests: a link to a folder
 
     /// A later class that is a link to a FOLDER: not a link to a file, so
     /// it is read as before, through `readText`, which cannot read it: its
@@ -618,5 +786,62 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
             index += 1
         }
         XCTAssertGreaterThanOrEqual(index, 3, "the link's move, the page renamed and the new class: at least three swaps")
+    }
+
+    /// Review B's probe (Day 4 a link holding `Unit 1, Day 3.md`, room at
+    /// Day 2) killed at every swap and at both moments inside the relinking
+    /// move's swap, in turn: once recovery has run, the folder is whole
+    /// before or whole after, the link at exactly one of its two names with
+    /// exactly one of its two texts.
+    func testReviewBsProbeKilledAtEverySwapAndRelinkMomentIsWholeAfterRecovery() async throws {
+        let finished = try makeCourse()
+        try replaceWithALink("Unit 1, Day 4", holding: "Unit 1, Day 3.md", in: finished)
+        let untouched: [String: String] = everything(under: finished)
+        _ = try makeRoom(atDay: 2, in: finished)
+        let whole: [String: String] = everything(under: finished)
+        XCTAssertNotEqual(untouched, whole)
+
+        var reachedRelinkMoments: Int = 0
+        var index: Int = 0
+        var swapReached: Bool = true
+        while swapReached {
+            let points: [UndoKillPoint] = [.beforeSwap(index), .relinkStaged(index), .relinkRenamedIn(index)]
+            for point in points {
+                let made = try makeCourse()
+                try replaceWithALink("Unit 1, Day 4", holding: "Unit 1, Day 3.md", in: made)
+                let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+                    unit: 1, atDay: 2, count: 1, forSection: 1, in: made.course
+                )
+                var reachedIt: Bool = false
+                UndoKillPoints.hook = { reached in
+                    if reached == point {
+                        reachedIt = true
+                        return true
+                    }
+                    return false
+                }
+                _ = try? ClassInsertionPlanner.apply(plan, in: made.course)
+                UndoKillPoints.hook = nil
+                if !reachedIt {
+                    if point == .beforeSwap(index) {
+                        swapReached = false
+                    }
+                    continue
+                }
+                if point != .beforeSwap(index) {
+                    reachedRelinkMoments += 1
+                }
+                let list: URL = made.root.appendingPathComponent("list", isDirectory: true)
+                let workingRoot: URL = made.root
+                await UndoRecovery.recoverAndRederive(
+                    UndoJournal(folderURL: list, processIsAlive: { _ in false }), resolveRoot: { _ in workingRoot }
+                )
+                let now: [String: String] = everything(under: made)
+                XCTAssertTrue(now == untouched || now == whole, "not whole before or whole after at \(point): \(now)")
+            }
+            index += 1
+        }
+        XCTAssertGreaterThanOrEqual(index, 4, "the relink, two pages renamed and the new class")
+        XCTAssertEqual(reachedRelinkMoments, 2, "both moments inside the relink's swap")
     }
 }
