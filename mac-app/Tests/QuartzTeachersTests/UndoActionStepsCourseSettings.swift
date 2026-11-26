@@ -102,10 +102,12 @@ extension UndoActionStepsTests {
     }
 
     /// The two rename steps' ops are, in order, the folder move(s), then the
-    /// pages relinked (each page a move carries named at the folder's NEW
-    /// place, in the order the plan's walk found them: the contract asks no
-    /// order among them), then one `editJSON` per changed member
-    /// (`opKinds.wholeOps`); the settings file is the last file named.
+    /// pages relinked in the order of their paths (each page a move carries
+    /// named at the folder's NEW place; `ClassPages.isInPathOrder`, review 1
+    /// of U4b2-11, M1: never the disk's directory order), then one
+    /// `editJSON` per changed member (`opKinds.wholeOps`); the settings file
+    /// is the last file named. MUST FAIL on the unsorted walk: on APFS it
+    /// finds `section1/index.md` before `Ideas/Arrays.md`.
     static func assertTheRenameSteps(_ recorded: [Recorded]) {
         let expected: [String: (moves: [String], pages: [String], members: [String])] = [
             "renameFolder": (
@@ -138,7 +140,7 @@ extension UndoActionStepsTests {
                     pagePaths.append(file.path)
                 }
             }
-            XCTAssertEqual(pagePaths.sorted(), wanted.pages, "\(step.name): the pages, each carried one at the NEW place")
+            XCTAssertEqual(pagePaths, wanted.pages, "\(step.name): the pages in path order, each carried one at the NEW place")
             XCTAssertEqual(step.files.last?.path, settingsPath, "\(step.name): the settings file last")
             var memberNames: [String] = []
             for member in step.members {

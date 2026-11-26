@@ -670,7 +670,7 @@ enum SpecialFolderRenamer {
                 url: placeAfter(moves, of: pageURL), read: read, rewritten: Data(rewritten.utf8)
             ))
         }
-        return FolderRenamePlan(moves: moves, pages: pages)
+        return FolderRenamePlan(moves: moves, pages: inPathOrder(pages))
     }
 
     /// Plans a rename OFF the main actor, and gives up waiting the moment the
@@ -1154,6 +1154,27 @@ enum SpecialFolderRenamer {
             }
         }
         return url
+    }
+
+    /// A rename's pages in the one order of paths (`ClassPages.isInPathOrder`),
+    /// each by its place after the move, never the order the disk listed
+    /// them (hashed on APFS, sorted on HFS+ and NTFS): review 1 of U4b2-11,
+    /// M1. Each place is compared canonical (`UndoFolderPlaces`), read once:
+    /// a carried page's place is built from the course's own spelling
+    /// (`/var/...`) and a page outside from the walk's (`/private/var/...`).
+    nonisolated static func inPathOrder(_ pages: [FolderRenamePlan.Page]) -> [FolderRenamePlan.Page] {
+        var keyed: [(place: URL, page: FolderRenamePlan.Page)] = []
+        for page in pages {
+            keyed.append((place: URL(fileURLWithPath: UndoFolderPlaces.canonicalPath(of: page.url)), page: page))
+        }
+        keyed.sort { first, second in
+            return ClassPages.isInPathOrder(first.place, second.place)
+        }
+        var ordered: [FolderRenamePlan.Page] = []
+        for entry in keyed {
+            ordered.append(entry.page)
+        }
+        return ordered
     }
 
     /// Every Markdown page under a course, skipping generated and private trees.

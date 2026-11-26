@@ -273,9 +273,7 @@ enum ClassPages {
                 pages.append(entry)
             }
         }
-        pages.sort { first, second in
-            return first.path.lowercased() < second.path.lowercased()
-        }
+        pages.sort(by: ClassPages.isInPathOrder)
         return pages
     }
 
@@ -299,6 +297,16 @@ enum ClassPages {
         return listed
     }
 
+    /// The one order of pages by their paths: compared as the lowercased
+    /// path, so `Ideas/Arrays.md` comes before `section1/index.md` on every
+    /// volume (a folder lister's own order is the disk's: hashed on APFS,
+    /// sorted on HFS+ and NTFS). A section's pages, the door's listing of a
+    /// folder's pages (`JournaledStep.markdownFiles`) and a rename's relinked
+    /// pages (`SpecialFolderRenamer.plan`, U4b2-11) are all put in it.
+    nonisolated static func isInPathOrder(_ first: URL, _ second: URL) -> Bool {
+        return first.path.lowercased() < second.path.lowercased()
+    }
+
     /// Every markdown page under a folder, recursively. `nonisolated` because
     /// the unit-word rename walks class folders off the main actor.
     nonisolated static func markdownPages(under root: URL) -> [URL] {
@@ -318,9 +326,7 @@ enum ClassPages {
                 pages.append(entry)
             }
         }
-        pages.sort { first, second in
-            return first.path.lowercased() < second.path.lowercased()
-        }
+        pages.sort(by: ClassPages.isInPathOrder)
         return pages
     }
 

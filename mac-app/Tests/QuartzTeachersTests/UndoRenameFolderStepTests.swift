@@ -244,6 +244,41 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left")
     }
 
+    /// The plan's pages are in the order of their paths after the move
+    /// (`ClassPages.isInPathOrder`), never the order the disk lists them
+    /// (review 1 of U4b2-11, M1): on this course APFS lists `section1` before
+    /// `Concepts`, so the unsorted walk finds `section1/index.md` first.
+    /// MUST FAIL with the plan's pages left in walk order.
+    func testARenamePlansItsPagesInPathOrderNotTheDisksOrder() throws {
+        let course: Course = try course()
+        try "Start with [[Concepts/Arrays]].\n".write(
+            to: course.directoryURL.appendingPathComponent("section1/index.md"), atomically: true, encoding: .utf8
+        )
+        var walked: [String] = []
+        for page in SpecialFolderRenamer.markdownPages(in: course.directoryURL) {
+            walked.append(page.lastPathComponent)
+        }
+        let indexFound: Int = walked.firstIndex(of: "index.md") ?? -1
+        let arraysFound: Int = walked.firstIndex(of: "Arrays.md") ?? -1
+        XCTAssertTrue(
+            indexFound >= 0 && arraysFound > indexFound,
+            "the fixture no longer shows the disk's order differing from path order: \(walked)"
+        )
+
+        let planned: FolderRenamePlan = try SpecialFolderRenamer.plan(
+            "Concepts", to: "Ideas", scope: .shared,
+            courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
+        )
+
+        var placed: [String] = []
+        for page in planned.pages {
+            let path: String = UndoFolderPlaces.canonicalPath(of: page.url)
+            let prefix: String = UndoFolderPlaces.canonicalPath(of: course.directoryURL) + "/"
+            placed.append(String(path.dropFirst(prefix.count)))
+        }
+        XCTAssertEqual(placed, ["Ideas/Arrays.md", "section1/index.md"])
+    }
+
     /// A teacher's file put inside the renamed folder after the rename: the
     /// Undo is refused, names that folder, and moves nothing (ruling 4).
     func testUndoWithATeachersFileInsideTheRenamedFolderIsRefusedAndNamesIt() async throws {

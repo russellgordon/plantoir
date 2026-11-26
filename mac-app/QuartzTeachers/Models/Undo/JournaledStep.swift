@@ -577,9 +577,7 @@ nonisolated final class JournaledStep {
             }
             result.append(url)
         }
-        result.sort { first, second in
-            return first.path.lowercased() < second.path.lowercased()
-        }
+        result.sort(by: ClassPages.isInPathOrder)
         return result
     }
 

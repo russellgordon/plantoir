@@ -258,6 +258,9 @@ class ActionTraceTests(unittest.TestCase):
     def test_the_rename_steps_are_recorded_and_left_without_traces_by_name(self):
         # U4b2-11: recorded with folderMoves, left out of actionTraces by
         # name until piece 12 makes their traces; nothing else is left out.
+        # Exactly these two (review 1 of U4b2-11, L1): a third name added by
+        # mistake would drop its traces silently.
+        self.assertEqual(traces.STEPS_WITHOUT_TRACES_YET, ("renameFolder", "renameFolderPerSection"))
         recorded = traces.read_action_steps()
         names = [step["name"] for step in recorded]
         for name in traces.STEPS_WITHOUT_TRACES_YET:
@@ -265,8 +268,7 @@ class ActionTraceTests(unittest.TestCase):
         kept = [step["name"] for step in traces.steps_with_traces(recorded)]
         self.assertEqual(len(kept), len(recorded) - len(traces.STEPS_WITHOUT_TRACES_YET))
         for step in recorded:
-            if "folderMoves" in step:
-                self.assertIn(step["name"], traces.STEPS_WITHOUT_TRACES_YET)
+            self.assertEqual("folderMoves" in step, step["name"] in traces.STEPS_WITHOUT_TRACES_YET, step["name"])
         for trace in committed()["actionTraces"]:
             self.assertNotIn(trace["step"], traces.STEPS_WITHOUT_TRACES_YET)
 
