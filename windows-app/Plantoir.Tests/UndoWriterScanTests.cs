@@ -89,7 +89,6 @@ public sealed class UndoWriterScanTests
         ["Plantoir.Core/Assist/AppUpdates.cs"] = (5, "notAStep: the installer's log and its markers in the app's state folder"),
         ["Plantoir.Core/Assist/AssistModelStore.cs"] = (1, "notAStep: the assistant's model removed (class D, plan 7)"),
         ["Plantoir.Core/Assist/AssistWorkspace.MenuDuplicate.cs"] = (4, W7 + " (Classes ▸ Add Class…'s copy of a class as the next class, #927: one created file, the mac's U3a step; no entry on the old list meanwhile, NamedGapLedger.MenuCopyUndoEntries)"),
-        ["Plantoir.Core/Assist/AssistWorkspace.StartOfYear.cs"] = (1, W7 + " (the start of the year's pages put back when it stops part way, the mac's StartOfYearPlanner)"),
         ["Plantoir.Core/Assist/AssistWorkspace.cs"] = (4, W7 + " (the page writes still made file by file: Make Room's renames and its class folder, a page saved by Save for Re-date and its front page, Make Room and Duplicate Class, W7b2; and the rollover's site marker kept aside, undone with it, W7c. Publish, hide, Add Classes, curriculum mentions and Bring Pages into Date go through the door: W7a, W7b1)"),
         ["Plantoir.Core/Assist/ClaudeCodeLauncher.cs"] = (2, "notAStep: an outside assistant's launch files, outside every course"),
         ["Plantoir.Core/Assist/LaterClassesKept.cs"] = (3, W7 + " (the record of classes dated later that were kept, the mac's ClassesDatedLater)"),

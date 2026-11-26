@@ -256,7 +256,10 @@ public sealed class UndoHowITeachStepTests : IDisposable
 
         var refusal = Assert.Throws<AssistRefusal>(() => Open(unwritable).WriteHowITeach("ICS3U", "Words.", ""));
 
-        Assert.StartsWith("Nothing was saved: ", refusal.Message);
+        // The whole sentence, its reason included (review 3, LOW): a wrong
+        // reason after the right opening would pass a StartsWith.
+        Assert.Equal($"Nothing was saved: nothing could be written beside “{HowITeachPage.FileName}” (the disk may be full, or Plantoir may not have permission to write there).",
+            refusal.Message);
         Assert.NotEqual(AssistWording.HowITeachChangedSincePlanned("ICS3U"), refusal.Message);
         Assert.Equal(HowITeachSettingsRow.CreatedBytes, File.ReadAllText(PagePath));
     }
