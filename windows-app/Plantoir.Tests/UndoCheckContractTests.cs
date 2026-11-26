@@ -156,12 +156,12 @@ public sealed class UndoCheckContractTests : IDisposable
         if (current.TryGetProperty("text", out JsonElement text)) File.WriteAllBytes(full, Encoding.UTF8.GetBytes(text.GetString()!));
         else if (current.TryGetProperty("bytesHex", out JsonElement hex)) File.WriteAllBytes(full, Convert.FromHexString(hex.GetString()!));
         else if (current.TryGetProperty("folder", out _)) Directory.CreateDirectory(full);
-        else if (current.TryGetProperty("link", out JsonElement link))
+        else if (current.TryGetProperty("link", out JsonElement laidLink))
         {
             // A link's move is judged by the target it holds, so its link is
             // made with THE CASE'S target, as written (W8-6); any other case's
             // link is only "something else".
-            if (withItsTarget) Directory.CreateSymbolicLink(full, link.GetString()!);
+            if (withItsTarget) Directory.CreateSymbolicLink(full, laidLink.GetString()!);
             else UndoKindsForTheCases.MakeALink(full, _folder);
         }
         else if (current.TryGetProperty("tree", out JsonElement tree))
