@@ -386,6 +386,25 @@ public sealed class UndoCarryingMoveTests
         Assert.Empty(scribe.StagedLeftovers("A"));
     }
 
+    /// <summary>LOW 2: a Redo whose carried page's own swap is refused (the page changed by hand after the folder moved) lets go of the page's staged file inside the folder, so the folder moves back whole, nothing left part way and nothing staged left.</summary>
+    [Fact]
+    public void ARedoRefusedAtItsCarriedPageLetsGoOfItsStagedFileAndMovesTheFolderBack()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        Assert.Equal("undone", scribe.Undo().Name);
+        byte[] hand = Encoding.UTF8.GetBytes("Hand.\n");
+        var seams = new UndoSeams { BeforeEachSwap = (index, _) => { if (index == 1) scribe.WritePage("A", To + "/a.md", hand); } };
+
+        UndoOutcome redo = scribe.Door(seams).Redo();
+
+        Assert.Equal(UndoOutcomeKind.Refused, redo.Kind);
+        Assert.False(redo.LeftPartWay);
+        Assert.False(Directory.Exists(scribe.FullPath("A", To)));
+        Assert.Equal(hand, scribe.Page("A", From + "/a.md"));
+        Assert.Empty(scribe.StagedLeftovers("A"));
+    }
+
     /// <summary>LOW 1: the folder's rename refused (a file inside it held open by another program, readable, so the last look can still judge the folder) names the place it leaves, as the mac's moveHere names it, never a destination that does not exist yet.</summary>
     [Fact]
     public void AFolderRenameThatFailsNamesThePlaceItLeaves()
