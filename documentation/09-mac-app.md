@@ -22392,7 +22392,7 @@ the switch stays off. Rename folder through the door is NOT in this part
 
 Part four put the check and the swap off the main actor, and two things that had been impossible became possible part way through a rename (part six's review): a quit, and another window's act on the same course. The invariant: a rename under way is ONE piece of work the whole app knows about; nothing else in the app can change that course meanwhile, and the app does not quit out from under it. With `undoJournalIsLive` off the teacher meets nothing different from before U4b except that the window stays responsive.
 
-- **The claim is the course's, not the window's** (M2). `CourseActivity.beginFolderRename` records the rename by working folder and course code (`FolderRenameRecord`), as copies, publishes and plan work are recorded, and refuses a second one of the same course from any window: so a second rename can neither overwrite nor clear the first's interrupted-rename record (`courses/.internal/renames/<code>.json`, one file per course). `Course.isRenamingAFolder` now reads it, so every window's copy of the course, and a copy remade by File ▸ Reload Courses, knows. While it is held: another window's Save is disabled and says "Available once the folder rename has finished" beside it (a press that reaches `save()` anyway is refused with the click sentence); that window's rename sheet shows the click sentence "A folder in {course} is being renamed right now. Try again once the rename has finished." with Rename disabled; Rename Course, Add Section… and restoring a backup are greyed through `structuralHoldReason` with the menu reason and refused at the click through `structuralRefusal` with the click sentence (the `whenBusy` sentences name a preview or a deploy and would be false); removing a course or a section is refused with it (`ScheduledDeployCleanup`); Replace reference course is refused with it (`ReferenceReplacer.Problem.folderBeingRenamed`, key `replaceWhileAFolderIsRenamed`, Mac only: no contract case, since Windows has no off-thread rename yet); Preview and Deploy are greyed and refused the way a copy being zipped greys them (the section window's buttons, `verbMayRunNow`, the press, the in-app and outside assistant's deploy and rebuild, which say the click sentence). A rename is refused while the course is being copied (#351), so the archive before a removal or restore never zips a course half renamed. **Rejected:** putting the rename into `busyDescription`, which would have reached every reader at once, because a dozen of its readers answer with a sentence about a preview or a deploy.
+- **The claim is the course's, not the window's** (M2). `CourseActivity.beginFolderRename` records the rename by working folder and course code (`FolderRenameRecord`), as copies, publishes and plan work are recorded, and refuses a second one of the same course from any window: so a second rename can neither overwrite nor clear the first's interrupted-rename record (`courses/.internal/renames/<code>.json`, one file per course). `Course.isRenamingAFolder` now reads it, so every window's copy of the course, and a copy remade by File ▸ Reload Courses, knows. While it is held: another window's Save is disabled and says "Available once the folder rename has finished" beside it (a press that reaches `save()` anyway is refused with the click sentence); that window's rename sheet shows the click sentence "A folder in {course} is being renamed right now. Try again once the rename has finished." with Rename disabled; Rename Course, Add Section… and restoring a backup are greyed through `structuralHoldReason` with the menu reason and refused at the click through `structuralRefusal` with the click sentence (the `whenBusy` sentences name a preview or a deploy and would be false); removing a course or a section is refused with it (`ScheduledDeployCleanup`); Replace reference course is refused with it (`ReferenceReplacer.Problem.folderBeingRenamed`, key `replaceWhileAFolderIsRenamed`, Mac only; no contract case at this part, since Windows has no off-thread rename yet: U4b2-6 made it a `referenceCourses.replacing.sequence` case, see "U4b2: rename-sentences-in-contract"); Preview and Deploy are greyed and refused the way a copy being zipped greys them (the section window's buttons, `verbMayRunNow`, the press, the in-app and outside assistant's deploy and rebuild, which say the click sentence). A rename is refused while the course is being copied (#351), so the archive before a removal or restore never zips a course half renamed. **Rejected:** putting the rename into `busyDescription`, which would have reached every reader at once, because a dozen of its readers answer with a sentence about a preview or a deploy.
 - **The quit waits for it** (M1), as it waits for a tools copy (#476): `applicationShouldTerminate` answers `.terminateLater` while `CourseActivity.anyFolderRenameIsUnderWay` (`AppDelegate.quitWaitsForWorkUnderWay`), awaits `CourseActivity.waitForAllFolderRenames()` (a continuation resumed when the last claim ends, an event, not a time), then finishes terminating. No question: the tools copy's pattern asks none, the rename is bounded by itself, and its sheet keeps its spinner. Once its swap has begun, closing the window does not end it either: the rename runs in an unstructured task started by the sheet's button, which a closed window does not cancel. (Sixth part: while it only plans, Cancel or the sheet going halts it and gives the course back at once, so the quit never waits for a plan.)
 - **Cancel halts a rename that is only planning** (L3). The sheet keeps the rename's task; Cancel cancels it and closes the sheet. `renameFolder` asks `Task.isCancelled` on the main actor after the plan (which writes nothing) and in the same turn marks the swap begun (`folderRenameSwapBegins`), so a Cancel lands either before (nothing is made, no record) or after, when the button is disabled (`renameCanNoLongerBeHalted`) and a press that lands as it greys is ignored. (Part seven's review found the plan itself was not halted: see the sixth part.)
 - **The part-way sentence** (L1, L2): `foldersLeftAtTheirNewName` counts a folder left renamed when something is at its new name (by `lstat`, nothing read or hashed on the main actor), whatever is at its old one: the likeliest reason a move back fails is that something appeared at the old name.
@@ -22656,7 +22656,8 @@ review, L1). It is replaced by one function,
 `folderLocations(named: newName…)` by `lstat` (a capitalisation-only rename
 counts a folder only when its directory lists the new spelling), so both runs
 choose between `renameFolderRenamedOnlyInPart` and `renameFolderStoppedPartWay`
-by the same reading; no sentence changed. `activityTrail.mustRecord` →
+by the same reading; no sentence changed (U4b2-6, below, adds a third,
+`renameFolderMayBeRenamedInPart`). `activityTrail.mustRecord` →
 `folder renamed` → `carries` and `contracts/README.md` now say the two
 part-way states are the Mac's and name Windows' one part-way line until W8
 (folders moved, settings not written); README's 2026-09 clause that the event
@@ -22670,18 +22671,19 @@ only in part … still called Assessments: section2/Assessments" after a step
 moved wholly back. The rule now: a place is named only if it belongs to this
 rename AND the disk shows it at the new name. Belongs means a destination of
 this run's planned moves, or a place the record of the rename it finishes
-names: the record gains `moved`, one string with a place per line (so every
-reader's map of strings still reads it), written with this run's moves and the
-earlier record's places when that record is of the same rename. A record
-without `moved` (Windows', or one written before this) falls back to the
-reading `looksLikeAnInterruptedRename` already trusts: a new-name place whose
-old name is absent beside it. The disk then decides: `lstat`, never followed;
+names: the record gains `moved`, written with this run's moves and the
+earlier record's places when that record is of the same rename (at this
+review one string with a place per line; an array of strings since U4b2-6,
+below). A record without `moved` (Windows', or one written before this) fell
+back at this review to the reading `looksLikeAnInterruptedRename` already
+trusts, a new-name place whose old name is absent beside it; since U4b2-6 it
+names no folder (below). The disk then decides: `lstat`, never followed;
 a folder counts; a link only where this run moved a link (`Move.isALink`, L3);
 a capitalisation-only rename asks the listing for the new spelling. Only "no
 such file" reads as absent: any other refusal, or a listing that fails, is
 returned as unreadable and told on the trail ("could not tell whether these
 are at the new name: …", L2), while the sheet's sentence is chosen by what
-could be read (no new sentence). Rejected: recording places only in a finish
+could be read (no new sentence at this piece). Rejected: recording places only in a finish
 run (a start run after a killed one then forgets the earlier run's section).
 
 ### U4b2: rename-sentences-in-contract

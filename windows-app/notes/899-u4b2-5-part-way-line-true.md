@@ -4,26 +4,13 @@ Branch `issue/899-u4b2-5-part-way-line-true`, from `origin/dev` bf14823ac. `orig
 
 ## Review 1 round (M1, L1 to L4), 2026-11-26
 
-- M1: a part-way line names a folder only if it belongs to this rename (a destination of this run's planned moves, or a place the record of the rename it finishes names) AND the disk shows it at the new name. One function, `SpecialFolderRenamer.foldersAtTheirNewName(…, planned:, earlierRecord:)`, returning `LeftAtTheNewName` (places, unreadable). The record gains `moved` (one string, a place per line, inside the course, new spelling), written by `RenameRecordClaim.renameIsStarting(moving:)` with this run's moves plus the earlier record's places when it is the same rename. A record without `moved` (Windows', older) falls back to: a new-name place whose old name is absent beside it.
+- M1: a part-way line names a folder only if it belongs to this rename (a destination of this run's planned moves, or a place the record of the rename it finishes names) AND the disk shows it at the new name. One function, `SpecialFolderRenamer.foldersAtTheirNewName(…, planned:, earlierRecord:)`, returning `LeftAtTheNewName` (places, unreadable). The record gains `moved` (one string, a place per line, inside the course, new spelling), written by `RenameRecordClaim.renameIsStarting(moving:)` with this run's moves plus the earlier record's places when it is the same rename. A record without `moved` (Windows', older) falls back to: a new-name place whose old name is absent beside it. (Since U4b2-6: `moved` is an array of strings, and a record without it names no place; see that piece's notes.)
 - L1: tests added for the review's scenario (per-section start run, hand-made `section2/Assessments`, every folder back: says `stoppedPartWay`, never names it), a per-section finish run (both sections, in order), a start run after a killed one (both runs' sections, and the record keeps both), a capitalisation-only finish (function test).
 - L2: only ENOENT/ENOTDIR read as absent; any other `lstat` refusal or a failed listing is `unreadable`, added to the trail line as "; could not tell whether these are at the new name: <place> (<what the system said>)"; the sheet's sentence is chosen by what could be read (no new sentence). Pinned by a function test (a section folder with no permissions).
 - L3: a link at the new name counts only where this run moved a link there (`FolderRenamePlan.Move.isALink`, read by `lstat` at planning). An earlier run's recorded place counts only as a real folder.
 - L4: confirmed in `windows-app/Plantoir.Core/Models/SpecialFolderRenamer.cs:270-277` and `Plantoir/Views/CourseSettingsView.xaml.cs:479-481` that Windows' "Plantoir renamed m of n copies" stop returns its message with no trail line; `carries` and README now say so. Prose only, no held row.
 - `SpecialFolderRenamer.somethingIsThere` removed (its one caller is gone; `presence(at:spelledExactly:)` is the one reading).
 - Merges: origin/dev da7474047 merged as 89cdebe53 (Windows notes and tests, `contracts/class-planning.json`, documentation 12; nothing under `mac-app/`), then the 11 classes re-run green: 239 tests, 0 failures (run-r1-merged).
-
-## For PROGRESS
-
-- Mac: a Rename folder that stops part way (a refused step that could not all be put back) now names the folders at the new name as read from the disk, whether this run moved them or an earlier, interrupted run did. A run finishing an interrupted rename used to say "did not rename the folder Concepts to Ideas" while every folder was at "Ideas". `foldersLeftAtTheirNewName(planned.moves, …)` is replaced by one function, `SpecialFolderRenamer.foldersAtTheirNewName(renaming:to:scope:courseDirectory:sectionNumbers:planned:earlierRecord:)` (U4b2-6 then chose the sentence and line through `partWayEnding`). No sentence's wording changed.
-- `contracts/shared-rules.json` → `activityTrail.mustRecord` → `folder renamed` → `carries` reworded (no new key, no new event, count unchanged); `contracts/README.md` two passages.
-
-## For documentation 12
-
-- (Review 1; superseded by U4b2-6, see `899-u4b2-6-rename-sentences-in-contract.md`) The rename record carries `moved`, now an ARRAY of strings, and `mayHaveMoved`, with its whole format in `contracts/file-formats.json` → `folderRenameRecord`. A part-way line names a place only when it is in `moved` or a move of this run AND the disk shows a folder there by a no-follow check (a link only when this run moved a link). A record without `moved` names no place; its possible places are told as ones it cannot tell are this rename's. A no-follow check that fails for any reason but "no such file", or a listing that fails, is told on the trail as "could not tell whether these are at the new name: <place> (<reason>)", never read as absent.
-
-- (Superseded by review 1 and U4b2-6; kept short so W8 does not build the earlier reading.) Windows' part-way ending, once W8 brings the one-step rename, follows the U4b2-6 notes: belongs (a move of this run, or in the earlier record's `moved`) AND shows (a folder by a no-follow check; a link only where this run moved a link; for a capitalisation-only rename only when the parent LISTS the new spelling). It never counts a place by the disk alone.
-- Until W8, Windows' one part-way `folder renamed` line is "renamed the folder … but could not write it to this course's settings" (`CourseSettingsView.xaml.cs` about line 497), and `carries` now says so.
-- No ledger row: no case was added, and no Windows test reads this `carries` (grep of `windows-app/Plantoir.Tests` for "folder renamed": only `SpecialFolderRenamerTests.cs:355`, which checks the event key, not `carries`).
 
 ## Must-fail lines
 
@@ -40,7 +27,7 @@ Branch `issue/899-u4b2-5-part-way-line-true`, from `origin/dev` bf14823ac. `orig
 ## Left for the next piece
 
 - Piece 4 review 2 low: the replay does not check that the two removed blobs sit in different prefix folders. It is in `UndoContractReplay*.swift`, which this piece does not touch.
-- Piece 4 review 2 low: the documentation 12 note does not say the Mac treats the two Unicode forms of a name as the same. Documentation 12 is not in this piece's files (writers do not edit it; the director folds notes).
+- Piece 4 review 2 low: the documentation 12 note does not say the Mac treats the two Unicode forms of a name as the same. Documentation 12 is not in this piece's files (writers do not edit it; the director folds notes). (Settled since: U4b2-6 wrote it, folded into documentation 12, "What W4c and W8 owe from U4b2-6".)
 - (Was an accepted edge in the first round; fixed as review 1's M1.)
 - Not done: the wording for "no folder of the course at either name" in a finish run. A finish run is offered only when the new name is on disk (`looksLikeAnInterruptedRename`), so that branch takes the existing `stoppedPartWay` sentence.
 
