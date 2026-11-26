@@ -17,11 +17,13 @@ In the W7b2-9 section ("The words read the contract … The two Windows words ar
 
 ## Must-fail lines
 
-Tests first: the contract and the four Windows test sites were changed and committed (the first commit) before the code; run against the old `KeptGoneSentence`, see "Runs".
+Tests first: the contract and the Windows tests were changed and committed (a9ecca0a9) before the code. Against the old `KeptGoneSentence` on VM B: `TodaysClassContractTests.TheSentencesAreTheContracts`, `UndoTodaysClassStepTests.AKeptFileGoneByThePressIsSaidAndNothingIsOpened` and `.OnlyOpenFolderOpensAndAGoneFileShowsTheGoneAlert` failed (3 of 19). `TheGoneAlertSaysItsSentenceWithOkAlone` passes its sentence through and could not fail on the sentence; `NoKeptAlertSentenceSaysATechnicalWord` passes both the old and the new sentence, as it should (neither says a ruled-out word).
 
 ## Runs
 
-See the hand-back; filled in below.
+- Mac (main Mac, through `xlock.sh`, `.dd` in the worktree): build and `TodaysClassOnTheFrontPageTests`, `UndoKeptCopiesTests`, `UndoActionStepsTests` (the class that replays the action traces; no class reads `contracts/README.md`'s counts): 54 tests, 0 failures.
+- Windows (VM `Windows 11 B`, lock `VM-B.lock`), head 422746306: app build (x64 Debug) succeeded; `TodaysClassContractTests` (the plain-words test `NoKeptAlertSentenceSaysATechnicalWord` included), `UndoTodaysClassStepTests`, `DialogTitleScanTests`, `UndoTraceContractTests`: 49 passed of 49.
+- Merges of `origin/dev`: before proving and before hand-back, both "Already up to date" (`dev` still 0e12bc8ac), so no merge commit was made.
 
 ## Left for the next piece
 
