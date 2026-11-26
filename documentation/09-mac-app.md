@@ -23611,9 +23611,10 @@ What landed is the step's half: a write planned exactly at a link move's
 `to`, within the same folder, is planned at the file the link at its `from`
 leads to (`JournaledStep.placeALinkLeadsTo`, the one place), so the title and
 date go into the linked file and nothing is planned inside the link's new
-place; a write at a link move's `from`, or through a link moved to another
-folder, is refused "cannot tell now" before anything changes
-(`refusedBeforeMaking`). No writer reaches either today; `ClassInsertionPlanner`
+place; a write through a link moved to another folder is refused "cannot
+tell now" before anything changes (`refusedBeforeMaking`). A write at a link
+move's `from` was refused the same way until door-6 (next section), which
+plans it as a new file at the place the link leaves. No writer reaches either today; `ClassInsertionPlanner`
 is unchanged. The door's rule for a place a move leaves was parked for the
 director, who chose the general rule of a handed-over place (next section).
 
@@ -23668,6 +23669,17 @@ together). A teacher and the trail are shown a handed-over move under its
 own plain place, as every other move is named, each path once; the
 `from → to` key is recovery's judgement only. They are held for Windows
 under the same reason.
+Door-6, the step: `JournaledStep` reads the place a planned link move
+leaves as free (no file, no text, not listed) until something is planned
+there, plans a write there as a new file (before absent, named from the
+folder above, never followed through the leaving link), reads and plans the
+link's new place as the file it leads to even where the step removes the
+page the link moves over, and makes its ops, recorded or not, in one order
+where every handed-over place is left before it is filled
+(`JournaledStep.inHandingOverOrder`, built on the door's own
+`UndoCheck.placeLeft`, `placeFilled` and `handsOverAsAMove`); a step with no
+such pair keeps its order exactly (`JournaledStepTests`, "a place a link's
+move leaves").
 
 ### #1004-a: the journal's own files are judged by what was read
 

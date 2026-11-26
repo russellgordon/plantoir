@@ -574,33 +574,264 @@ final class JournaledStepTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: linked.target, encoding: .utf8), targetText)
     }
 
-    /// A write planned at the place a link's move LEAVES (Insert Class's
-    /// next lower class, renamed into the linked class's old name): the
-    /// door does not yet judge a place a move leaves as free (its `writeFile`
-    /// is judged against the link still there), so the step is refused
-    /// "cannot tell now" before anything changes, and never written through
-    /// the leaving link into the file it leads to. MUST FAIL with the
-    /// refusal at a link move's `from` removed (the write follows the link
-    /// and lands in the linked file).
-    func testAWriteAtThePlaceALinkMoveLeavesIsRefusedBeforeAnythingChanges() throws {
+    // MARK: - Tests: a place a link's move leaves (U4b3 door-6)
+
+    /// A class page that is a symbolic link at `name` in the class folder,
+    /// leading to `destination` as written (relative, or a whole path).
+    func linkedPage(named name: String, in made: (course: URL, day1: URL, day2: URL, list: URL), leadingTo destination: String) throws -> URL {
+        let link: URL = made.day1.deletingLastPathComponent().appendingPathComponent(name)
+        try? FileManager.default.removeItem(at: link)
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: destination)
+        return link
+    }
+
+    /// A page the link leads to, in a folder of the course called
+    /// `elsewhere`, or outside the working folder when `outside` is true.
+    func linkedFile(named name: String, in made: (course: URL, day1: URL, day2: URL, list: URL), outside: Bool = false) throws -> URL {
+        var folder: URL = made.course.appendingPathComponent("elsewhere", isDirectory: true)
+        if outside {
+            folder = FileManager.default.temporaryDirectory
+                .appendingPathComponent("journaled-step-outside-\(UUID().uuidString)", isDirectory: true)
+            folders.append(folder)
+        }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file: URL = folder.appendingPathComponent(name)
+        try "---\ntitle: Linked\npublish: false\n---\nLinked.\n".write(to: file, atomically: true, encoding: .utf8)
+        return file
+    }
+
+    /// The ops of the newest step in the list.
+    func newestOps() throws -> [UndoOp] {
+        let fold: UndoFold = try UndoJournalLocation.standardJournal().read()
+        var newest: UndoStepRecord? = nil
+        for (_, record) in fold.records {
+            if newest == nil || record.step.seq > (newest?.step.seq ?? 0) {
+                newest = record
+            }
+        }
+        return try XCTUnwrap(newest).step.ops
+    }
+
+    /// Every "could not record" trail line while `body` runs.
+    func couldNotRecordLines(while body: () throws -> Void) rethrows -> [UndoUnrecordedChange] {
+        var lines: [UndoUnrecordedChange] = []
+        let before = UndoTrailHook.couldNotRecordLine
+        UndoTrailHook.couldNotRecordLine = { _, _, _, change, _ in
+            lines.append(change)
+        }
+        defer {
+            UndoTrailHook.couldNotRecordLine = before
+        }
+        try body()
+        return lines
+    }
+
+    func isALink(_ url: URL) -> Bool {
+        return (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
+    }
+
+    /// Shape A: the link moves on (Day 3 to Day 4) and a new page is
+    /// planned at the place it leaves. Through the plan the place reads
+    /// free until the write; the step is recorded as the link's move then a
+    /// new file at Day 3, never followed through the leaving link. MUST FAIL
+    /// with `fileExists` following the leaving link (true), or with the
+    /// write's before read from the disk there (the link: not recorded).
+    func testAWriteAtThePlaceALinkMoveLeavesIsRecordedAsANewFile() throws {
         let made = try course(inAWorkingFolder: true)
         let relative: String = "../../elsewhere/Unit 1, Day 3.md"
         let linked = try linkedDay3(in: made, target: relative)
         let targetText: String = try String(contentsOf: linked.target, encoding: .utf8)
-        let day2Text: String = try String(contentsOf: made.day2, encoding: .utf8)
         let step: JournaledStep = step(for: made.course)
         step.moveLink(linked.link, to: linked.newName, linkSha: try XCTUnwrap(UndoTreeReading.linkSha(at: linked.link)))
-        step.write("---\ntitle: Unit 1, Day 3\npublish: false\n---\nTwo.\n", to: linked.link)
-        step.remove(made.day2)
+
+        XCTAssertFalse(step.fileExists(linked.link), "the place the link leaves reads as taken")
+        XCTAssertNil(step.readText(linked.link))
+        XCTAssertNil(step.readData(linked.link))
+        XCTAssertThrowsError(try step.readTextOrThrow(linked.link))
+        let onDisk: [URL] = [made.day1, made.day2, linked.link]
+        var listed: [String] = []
+        for url in step.markdownFiles(under: made.course, onDisk: onDisk) {
+            listed.append(url.lastPathComponent)
+        }
+        XCTAssertEqual(listed, ["Unit 1, Day 1.md", "Unit 1, Day 2.md", "Unit 1, Day 4.md"])
+
+        step.write("New.\n", to: linked.link)
+        XCTAssertTrue(step.fileExists(linked.link))
+        XCTAssertEqual(step.readText(linked.link), "New.\n")
+        XCTAssertNil(step.refusedBeforeMaking)
+        listed = []
+        for url in step.markdownFiles(under: made.course, onDisk: onDisk) {
+            listed.append(url.lastPathComponent)
+        }
+        XCTAssertEqual(listed, ["Unit 1, Day 1.md", "Unit 1, Day 2.md", "Unit 1, Day 3.md", "Unit 1, Day 4.md"])
+
+        let lines: [UndoUnrecordedChange] = try couldNotRecordLines {
+            try step.make()
+        }
+        XCTAssertEqual(lines, [], "the step was not recorded")
+        let ops: [UndoOp] = try newestOps()
+        XCTAssertEqual(ops.count, 2)
+        if ops.count == 2 {
+            XCTAssertNotNil(ops[0].linkSha, "the link's move is not first")
+            XCTAssertEqual(ops[1].knownKind, .writeFile)
+            XCTAssertEqual(ops[1].path?.hasSuffix("section1/All Classes/Unit 1, Day 3.md"), true, "\(ops[1].path ?? "nil")")
+            XCTAssertNil(ops[1].beforeSha)
+        }
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: linked.newName.path), relative)
+        XCTAssertFalse(isALink(linked.link), "Day 3 is still a link")
+        XCTAssertEqual(try String(contentsOf: linked.link, encoding: .utf8), "New.\n")
+        XCTAssertEqual(try String(contentsOf: linked.target, encoding: .utf8), targetText)
+        XCTAssertEqual(stagedNames(under: made.course), [])
+    }
+
+    /// Shape A with the retitle U4b3 part 2 makes: the link's new name read
+    /// through the plan (the file it leads to) and written back retitled,
+    /// planned at that file; still one step.
+    func testARetitleThroughTheMovedLinkIsPlannedAtTheFileItLeadsTo() throws {
+        let made = try course(inAWorkingFolder: true)
+        let relative: String = "../../elsewhere/Unit 1, Day 3.md"
+        let linked = try linkedDay3(in: made, target: relative)
+        let step: JournaledStep = step(for: made.course)
+        step.moveLink(linked.link, to: linked.newName, linkSha: try XCTUnwrap(UndoTreeReading.linkSha(at: linked.link)))
+        step.write("New.\n", to: linked.link)
+        let read: String = try XCTUnwrap(step.readText(linked.newName))
+        let retitled: String = read.replacingOccurrences(of: "title: Unit 1, Day 3", with: "title: Unit 1, Day 4")
+        XCTAssertNotEqual(read, retitled)
+        step.write(retitled, to: linked.newName)
+
+        XCTAssertEqual(step.plannedOrder, [JournaledStep.key(of: linked.link), JournaledStep.key(of: linked.target)])
+        let lines: [UndoUnrecordedChange] = try couldNotRecordLines {
+            try step.make()
+        }
+        XCTAssertEqual(lines, [])
+        XCTAssertEqual(try UndoJournalLocation.standardJournal().read().records.count, 1)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: linked.newName.path), relative)
+        XCTAssertEqual(try String(contentsOf: linked.target, encoding: .utf8), retitled)
+        XCTAssertEqual(try String(contentsOf: linked.link, encoding: .utf8), "New.\n")
+    }
+
+    /// Shape B: Day 3 (a plain page) is copied to Day 4 and removed, the
+    /// link at Day 2 moves into Day 3, and a new page is made at Day 2, as
+    /// Insert Class plans a link below a plain class. Recorded, each place
+    /// is left before it is filled (the door-4 rule), so the door takes it
+    /// as one step. MUST FAIL with today's op order (the move before the
+    /// removal it fills).
+    func testARemovalALinkMovesIntoIsRecordedBeforeTheMove() throws {
+        let made = try course(inAWorkingFolder: true)
+        let target: URL = try linkedFile(named: "Unit 1, Day 2.md", in: made)
+        let relative: String = "../../elsewhere/Unit 1, Day 2.md"
+        let day2: URL = try linkedPage(named: "Unit 1, Day 2.md", in: made, leadingTo: relative)
+        let classes: URL = made.day1.deletingLastPathComponent()
+        let day3: URL = classes.appendingPathComponent("Unit 1, Day 3.md")
+        let day4: URL = classes.appendingPathComponent("Unit 1, Day 4.md")
+        try "---\ntitle: Unit 1, Day 3\n---\nThree.\n".write(to: day3, atomically: true, encoding: .utf8)
+        let targetText: String = try String(contentsOf: target, encoding: .utf8)
+        let step: JournaledStep = step(for: made.course)
+        step.write("---\ntitle: Unit 1, Day 4\n---\nThree.\n", to: day4)
+        step.remove(day3)
+        step.moveLink(day2, to: day3, linkSha: try XCTUnwrap(UndoTreeReading.linkSha(at: day2)))
+        XCTAssertFalse(step.fileExists(day2))
+        XCTAssertEqual(step.readText(day3), targetText, "the link's new place does not read as the file it leads to")
+        step.write("New.\n", to: day2)
+
+        let lines: [UndoUnrecordedChange] = try couldNotRecordLines {
+            try step.make()
+        }
+        XCTAssertEqual(lines, [])
+        let ops: [UndoOp] = try newestOps()
+        XCTAssertEqual(ops.count, 4)
+        XCTAssertEqual(UndoCheck.handovers(in: ops).count, 2, "a place is not left before it is filled")
+        XCTAssertTrue(UndoStep.wholeOpsStandAlone(ops))
+        XCTAssertEqual(try String(contentsOf: day4, encoding: .utf8), "---\ntitle: Unit 1, Day 4\n---\nThree.\n")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day3.path), relative)
+        XCTAssertFalse(isALink(day2))
+        XCTAssertEqual(try String(contentsOf: day2, encoding: .utf8), "New.\n")
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), targetText)
+        XCTAssertEqual(stagedNames(under: made.course), [])
+    }
+
+    /// Shape C: two links in a row (Day 2 and Day 3) each move up one, and a
+    /// new page is made at Day 2. Planned lowest first here, so the order
+    /// must put the move that leaves Day 3 before the one that fills it:
+    /// one step. MUST FAIL with today's op order.
+    func testTwoLinksInARowMoveUpAsOneStep() throws {
+        let made = try course(inAWorkingFolder: true)
+        _ = try linkedFile(named: "Unit 1, Day 2.md", in: made)
+        _ = try linkedFile(named: "Unit 1, Day 3.md", in: made)
+        let relative2: String = "../../elsewhere/Unit 1, Day 2.md"
+        let relative3: String = "../../elsewhere/Unit 1, Day 3.md"
+        let day2: URL = try linkedPage(named: "Unit 1, Day 2.md", in: made, leadingTo: relative2)
+        let day3: URL = try linkedPage(named: "Unit 1, Day 3.md", in: made, leadingTo: relative3)
+        let day4: URL = day3.deletingLastPathComponent().appendingPathComponent("Unit 1, Day 4.md")
+        let step: JournaledStep = step(for: made.course)
+        step.moveLink(day2, to: day3, linkSha: try XCTUnwrap(UndoTreeReading.linkSha(at: day2)))
+        step.moveLink(day3, to: day4, linkSha: try XCTUnwrap(UndoTreeReading.linkSha(at: day3)))
+        step.write("New.\n", to: day2)
+
+        let lines: [UndoUnrecordedChange] = try couldNotRecordLines {
+            try step.make()
+        }
+        XCTAssertEqual(lines, [])
+        let ops: [UndoOp] = try newestOps()
+        XCTAssertEqual(ops.count, 3)
+        XCTAssertEqual(UndoCheck.handovers(in: ops).count, 2)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day4.path), relative3)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day3.path), relative2)
+        XCTAssertEqual(try String(contentsOf: day2, encoding: .utf8), "New.\n")
+    }
+
+    /// Shape B with the link leading OUT of the working folder and a retitle
+    /// planned through it: the step cannot be named, so it leaves one "could
+    /// not record" line saying it went ahead, and is made unrecorded in the
+    /// handing-over order, whole. MUST FAIL with today's order (the move is
+    /// refused at Day 3, which the removal has not yet left).
+    func testAnUnrecordedHandoverIsMadeInTheHandingOverOrder() throws {
+        let made = try course(inAWorkingFolder: true)
+        let target: URL = try linkedFile(named: "Unit 1, Day 2.md", in: made, outside: true)
+        let day2: URL = try linkedPage(named: "Unit 1, Day 2.md", in: made, leadingTo: target.path)
+        let classes: URL = made.day1.deletingLastPathComponent()
+        let day3: URL = classes.appendingPathComponent("Unit 1, Day 3.md")
+        let day4: URL = classes.appendingPathComponent("Unit 1, Day 4.md")
+        try "---\ntitle: Unit 1, Day 3\n---\nThree.\n".write(to: day3, atomically: true, encoding: .utf8)
+        let step: JournaledStep = step(for: made.course)
+        step.write("---\ntitle: Unit 1, Day 4\n---\nThree.\n", to: day4)
+        step.remove(day3)
+        step.moveLink(day2, to: day3, linkSha: try XCTUnwrap(UndoTreeReading.linkSha(at: day2)))
+        step.write("New.\n", to: day2)
+        let read: String = try XCTUnwrap(step.readText(day3))
+        step.write(read.replacingOccurrences(of: "title: Linked", with: "title: Unit 1, Day 3"), to: day3)
+
+        let lines: [UndoUnrecordedChange] = try couldNotRecordLines {
+            try step.make()
+        }
+        XCTAssertEqual(lines, [.wentAhead])
+        XCTAssertEqual(try UndoJournalLocation.standardJournal().read().records.count, 0)
+        XCTAssertEqual(try String(contentsOf: day4, encoding: .utf8), "---\ntitle: Unit 1, Day 4\n---\nThree.\n")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day3.path), target.path)
+        XCTAssertEqual(try String(contentsOf: day2, encoding: .utf8), "New.\n")
+        XCTAssertFalse(isALink(day2))
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "---\ntitle: Unit 1, Day 3\npublish: false\n---\nLinked.\n")
+        XCTAssertEqual(stagedNames(under: made.course), [])
+    }
+
+    /// A link moved onto a page the step does not remove: nothing hands the
+    /// place over, and no caller checks it, so the door refuses the step
+    /// `changedSince` (its move never replaces) and nothing changes.
+    func testALinkMovedOntoAPageTheStepKeepsIsRefusedAndNothingChanges() throws {
+        let made = try course(inAWorkingFolder: true)
+        let relative: String = "../../elsewhere/Unit 1, Day 3.md"
+        let linked = try linkedDay3(in: made, target: relative)
+        let day2Text: String = try String(contentsOf: made.day2, encoding: .utf8)
+        let step: JournaledStep = step(for: made.course)
+        step.moveLink(linked.link, to: made.day2, linkSha: try XCTUnwrap(UndoTreeReading.linkSha(at: linked.link)))
 
         XCTAssertThrowsError(try step.make()) { error in
-            guard case JournaledStepError.refused(.cannotTellNow, _) = error else {
-                return XCTFail("not refused as cannot tell now: \(error)")
+            guard case JournaledStepError.refused(.changedSince, _) = error else {
+                return XCTFail("not refused as changed since: \(error)")
             }
         }
         XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: linked.link.path), relative)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: linked.newName.path))
-        XCTAssertEqual(try String(contentsOf: linked.target, encoding: .utf8), targetText)
+        XCTAssertFalse(isALink(made.day2))
         XCTAssertEqual(try String(contentsOf: made.day2, encoding: .utf8), day2Text)
     }
 }
