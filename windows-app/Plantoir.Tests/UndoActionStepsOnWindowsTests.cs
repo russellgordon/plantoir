@@ -63,54 +63,7 @@ internal static class WindowsActionsOnTheMacFixture
                 "Windows writes the timetable as it always has (System.Text.Json, indented two spaces, \"key\": value, its members section, dates, source, recorded in that order, no newline at the end), where the mac's JSONSerialization writes sorted keys with \" : \" and a closing newline; recorded is the day it is written (the mac's test fixed it at 2026-09-08), and a source not given is Windows' \"the teacher\" where the mac's is \"not recorded\". Both readers look members up by name"),
         };
 
-    /// <summary>
-    /// A converted step whose Windows after differs from the mac's for a
-    /// reason that is Windows' own, measured (never retyped): by step name,
-    /// the one line that differs and why. Its traces make the recorded
-    /// step's draft, since their hashes are of the mac's bytes.
-    /// </summary>
-    internal static readonly IReadOnlyDictionary<string, (string After, string Why)> WindowsOwnLine =
-        new Dictionary<string, (string, string)>(StringComparer.Ordinal)
-        {
-            ["addCurriculumMentions"] = ("%%curriculum-start%%",
-                "the line under the block's start marker is Windows' own (“Today's work points here:”, since the block was first written on Windows), where the mac writes “## Curriculum connection”; with the switch off a teacher meets nothing different from before, so it is kept and measured"),
-        };
-
-    /// <summary>
-    /// The converted steps whose new class pages are Windows'
-    /// <c>AssistWorkspace.ClassSkeleton</c>, a C# raw string literal: its line
-    /// endings are the SOURCE file's as checked out, so a checkout with
-    /// <c>core.autocrlf</c> (the PC's, measured 2026-11-21: <c>i/lf w/crlf</c>)
-    /// writes every line of the page CRLF but the two the unit tag adds
-    /// (<c>"tags:\n  - unit-N\n"</c>, written with <c>\n</c>). Measured, never
-    /// retyped: the fixture holds Windows' page to exactly that transform of
-    /// the mac's, so a change to it fails here and the entry is revisited.
-    /// </summary>
-    internal static readonly IReadOnlyList<string> NewClassPageSteps = ["addNextClass", "addNextClassInANewUnit", "addClasses"];
-
-    /// <summary>A raw string literal of this test assembly, compiled from the same checkout as the product's.</summary>
-    private const string RawLiteralProbe = """
-        a
-        b
-        """;
-
-    /// <summary>Whether this build's raw string literals carry CRLF (the checkout's line endings).</summary>
-    internal static bool RawLiteralsCarryCrLf => RawLiteralProbe.Contains('\r');
-
     // ---- Functions -----------------------------------------------------------------
-
-    /// <summary>
-    /// The mac's new class page as this build of Windows writes it (see
-    /// <see cref="NewClassPageSteps"/>): the same bytes on an LF checkout;
-    /// on a CRLF one, every line CRLF but the unit tag's two.
-    /// </summary>
-    internal static byte[] AsThisBuildWritesANewClassPage(byte[] mac)
-    {
-        if (!RawLiteralsCarryCrLf) return mac;
-        string text = Encoding.UTF8.GetString(mac).Replace("\n", "\r\n");
-        text = System.Text.RegularExpressions.Regex.Replace(text, "tags:\r\n(  - unit-[0-9]+)\r\n", "tags:\n$1\n");
-        return new UTF8Encoding(false).GetBytes(text);
-    }
 
     /// <summary>The begin lines in a list folder whose step was applied (a refused step's begin is closed "failed").</summary>
     internal static List<JsonObject> AppliedBegins(string journalFolder)
@@ -584,9 +537,6 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             string full = UndoDoor.FullPath(Folder, path);
             byte[]? want = WindowsActionsOnTheMacFixture.Bytes(file.GetProperty("after"));
             byte[]? have = File.Exists(full) ? File.ReadAllBytes(full) : null;
-            if (want is not null && file.GetProperty("before").ValueKind == JsonValueKind.Null
-                && WindowsActionsOnTheMacFixture.NewClassPageSteps.Contains(name))
-                want = WindowsActionsOnTheMacFixture.AsThisBuildWritesANewClassPage(want);
             if (WindowsActionsOnTheMacFixture.WindowsOwnJson.TryGetValue(name, out var json))
             {
                 Assert.NotNull(want);
@@ -596,25 +546,6 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
                 JsonNode windows = JsonNode.Parse(have!)!;
                 foreach (string member in json.SameMembers)
                     Assert.True(JsonNode.DeepEquals(mac[member], windows[member]), $"{name}: {path}'s {member} is {windows[member]?.ToJsonString()}");
-                continue;
-            }
-            if (WindowsActionsOnTheMacFixture.WindowsOwnLine.TryGetValue(name, out var own))
-            {
-                // Measured: the same lines but ONE, the line after the named
-                // one, and that line differs (a difference that closed would
-                // fail here, and the entry would go).
-                Assert.NotNull(want);
-                Assert.NotNull(have);
-                string[] mac = Encoding.UTF8.GetString(want!).Split('\n');
-                string[] windows = Encoding.UTF8.GetString(have!).Split('\n');
-                Assert.True(mac.Length == windows.Length, $"{name}: {path} has {windows.Length} lines, the mac's {mac.Length}");
-                var differing = new List<int>();
-                for (int line = 0; line < mac.Length; line++)
-                {
-                    if (mac[line] != windows[line]) differing.Add(line);
-                }
-                int only = Assert.Single(differing);
-                Assert.True(only > 0 && windows[only - 1] == own.After, $"{name}: {path} differs at line {only + 1}, not after “{own.After}”");
                 continue;
             }
             Assert.True(want is null ? have is null : have is not null && want.AsSpan().SequenceEqual(have),
