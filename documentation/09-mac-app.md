@@ -22744,6 +22744,30 @@ an event as a dead volume would and proves the quit does not wait and
 nothing is written. No `contracts/` change: `quitConfirmation` asks nothing
 about a rename, before or after.
 
+Review 1 (M1) found the hole a wait leaves: during a `.terminateLater` wait
+the windows stay live, so a rename pressed then (or a plan the halt did not
+reach) could pass to its swap after the quit had decided not to count it, and
+the process could end inside it. The cure is structural, not a re-check: one
+observable latch, `FolderRenameRun.quitIsGoingAhead`, set by
+`quitWaitsAfterHaltingWhatOnlyPlans` in the turn the quit decides. From then
+`FolderRenameRun.canStart` is false, so `start` refuses at once and every
+rename sheet's Rename is disabled in the standard way (L1: a sheet the quit
+halted cannot be pressed again; no new wording, HIG "Sheets", and there is no
+HIG page on quitting beyond "The menu bar"), and `FolderRenameRun.swapBegins`,
+the one place a rename passes from planning to swapping, refuses in the same
+main-actor turn as the rename's cancellation check, with nothing written and
+no record. A swap already begun is still waited for. Nothing clears the
+latch: it is set only once the quit is going ahead (after the work-under-way
+question), and no path calls such a quit off afterwards. Tests:
+`testARenamePressedWhileAQuitWaitsDoesNotStart`,
+`testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap`, and
+`testTheRenameSheetCallsItsRunForEveryWayOut`, which reads the view's own
+calls into the run off the source (L2). Left as on `dev` (L3): a rename that
+is planned again after a `changedSince` refusal keeps its claim marked
+swapping, so a quit waits for that re-plan and Cancel stays grey; it has
+written nothing, and once a quit is going ahead its next pass to the swap is
+refused.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
