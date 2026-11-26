@@ -125,7 +125,7 @@ enum CourseActivity {
         var activeCopies: [CopyRecord] = []
         var activePlanWork: [PlanWorkRecord] = []
         var activeFolderRenames: [FolderRenameRecord] = []
-        /// Whoever waits for every rename to end: the quit (#899 U4b).
+        /// Whoever waits for every rename's swap to end: the quit (#899 U4b).
         @ObservationIgnored var folderRenameWaiters: [CheckedContinuation<Void, Never>] = []
     }
 
@@ -170,10 +170,12 @@ enum CourseActivity {
         return store.activePlanWork
     }
 
-    /// Whether any Rename folder is under way, in any window (#899 U4b):
-    /// asked at quit, which waits for it.
-    static var anyFolderRenameIsUnderWay: Bool {
-        return !store.activeFolderRenames.isEmpty
+    /// Whether any Rename folder has begun its check and swap, in any window
+    /// (#899 U4b): asked at quit, which waits for it. A rename that is only
+    /// planning has written nothing, so a quit does not wait for it; it
+    /// halts it (`FolderRenameRun.haltEveryRunStillPlanning`, U4b2-7).
+    static var anyFolderRenameSwapIsUnderWay: Bool {
+        return folderRenameSwapsUnderWay() > 0
     }
 
     /// The menu-length reason while a Rename folder of the course is under
@@ -227,7 +229,7 @@ enum CourseActivity {
     }
 
     /// Records that a rename has ended, however it ended, and lets the quit
-    /// go on once no rename is left. Safe to call twice.
+    /// go on once no rename's swap is left. Safe to call twice.
     static func endFolderRename(_ claim: FolderRenameRecord) {
         var remaining: [FolderRenameRecord] = []
         for existing in store.activeFolderRenames {
@@ -236,7 +238,7 @@ enum CourseActivity {
             }
         }
         store.activeFolderRenames = remaining
-        if remaining.isEmpty {
+        if folderRenameSwapsUnderWay() == 0 {
             let waiters: [CheckedContinuation<Void, Never>] = store.folderRenameWaiters
             store.folderRenameWaiters = []
             for waiter in waiters {
@@ -245,16 +247,29 @@ enum CourseActivity {
         }
     }
 
-    /// Waits until no Rename folder is under way: the quit path (#899 U4b),
-    /// as `ToolchainReadiness.waitForAllCopies` is for a tools copy. A rename
-    /// killed part way leaves a course half renamed.
-    static func waitForAllFolderRenames() async {
-        if store.activeFolderRenames.isEmpty {
+    /// Waits until no Rename folder's check and swap is under way: the quit
+    /// path (#899 U4b), as `ToolchainReadiness.waitForAllCopies` is for a
+    /// tools copy. A rename killed part way through its swap leaves a course
+    /// half renamed; one still planning has written nothing and is not
+    /// waited for (U4b2-7).
+    static func waitForEveryFolderRenameSwap() async {
+        if folderRenameSwapsUnderWay() == 0 {
             return
         }
         await withCheckedContinuation { (waiter: CheckedContinuation<Void, Never>) in
             store.folderRenameWaiters.append(waiter)
         }
+    }
+
+    /// How many renames, in any window, have begun their check and swap.
+    static func folderRenameSwapsUnderWay() -> Int {
+        var swapping: Int = 0
+        for rename in store.activeFolderRenames {
+            if rename.isSwapping {
+                swapping += 1
+            }
+        }
+        return swapping
     }
 
     /// True while a Rename folder of the course is under way, in any window.

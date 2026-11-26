@@ -62,6 +62,7 @@ final class UndoRenameFolderStepTests: XCTestCase {
         UndoKillPoints.beforeTheRename = nil
         SpecialFolderRenamer.planReadsAPage = nil
         SpecialFolderRenamer.planHasEnded = nil
+        FolderRenameRun.runsUnderWay = []
         // The trail put back is the one from before this test, never one
         // this class made: that folder is removed, and every later line
         // would make it again. MUST FAIL with a test that starts over by
@@ -722,30 +723,45 @@ final class UndoRenameFolderStepTests: XCTestCase {
 
     /// ⌘Q during a rename waits for it (U4b part six's review, M1), as it
     /// waits for a tools copy (#476): the quit's wait resumes only once the
-    /// step is made and the rename's claim has ended. MUST FAIL with the
-    /// rename left out of the quit's wait (`AppDelegate.waitForWorkUnderWay`,
-    /// which `applicationShouldTerminate` awaits; part seven's review, L6).
+    /// step is made and the rename's claim has ended. The rename runs from
+    /// a sheet's `FolderRenameRun`, so the quit's halting of what only plans
+    /// (U4b2-7) is proved to leave a swap that has begun alone. MUST FAIL
+    /// with the rename left out of the quit's wait
+    /// (`AppDelegate.waitForWorkUnderWay`, which `applicationShouldTerminate`
+    /// awaits; part seven's review, L6).
     func testAQuitDuringARenameWaitsForItToFinish() async throws {
         let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
         let reached: XCTestExpectation = XCTestExpectation(description: "the swap reached its first page")
         let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
         UndoKillPoints.beforeTheRename = { @Sendable (index: Int, place: URL) in
             gate.arrive()
         }
-        let first: Task<RenameResult, Never> = Task { @MainActor in
-            return await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        let run: FolderRenameRun = FolderRenameRun()
+        let finished: XCTestExpectation = XCTestExpectation(description: "the rename told its sheet")
+        var told: RenameResult? = nil
+        run.start(
+            renaming: "Tasks", to: "Assessments", using: view.renameFromTheSheet(scope: .perSection),
+            canNoLongerBeHalted: view.renameSwapHasBegun
+        ) { result in
+            told = result
+            finished.fulfill()
         }
-        await fulfillment(of: [reached])
+        await fulfillment(of: [reached], timeout: 30)
 
-        XCTAssertTrue(AppDelegate.quitWaitsForWorkUnderWay(
-            toolchainCopying: false, renamingAFolder: CourseActivity.anyFolderRenameIsUnderWay
-        ), "the quit does not wait for the rename")
+        XCTAssertTrue(
+            AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans(), "the quit does not wait for the rename"
+        )
+        XCTAssertTrue(run.isRenaming, "the quit halted a rename whose swap had begun")
         let quit: Task<(Bool, Int), Never> = Task { @MainActor in
             // The quit's own wait, as `applicationShouldTerminate` runs it
             // (part seven's review, L6).
             await AppDelegate.waitForWorkUnderWay()
             let steps: Int = (try? self.journal().read().records.count) ?? -1
-            return (CourseActivity.anyFolderRenameIsUnderWay, steps)
+            return (CourseActivity.anyFolderRenameSwapIsUnderWay, steps)
         }
         // Until the quit's wait is registered: a bound on turns, not a time.
         var turns: Int = 0
@@ -756,11 +772,156 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertEqual(CourseActivity.store.folderRenameWaiters.count, 1, "the quit is not waiting for the rename")
         gate.open()
         let (stillUnderWay, steps): (Bool, Int) = await quit.value
-        let result: RenameResult = await first.value
+        await fulfillment(of: [finished], timeout: 30)
 
         XCTAssertFalse(stillUnderWay, "the quit went on while the rename ran")
         XCTAssertEqual(steps, 1, "the quit went on before the step was made")
+        let result: RenameResult = try XCTUnwrap(told)
         XCTAssertNotNil(renamed(result), "\(result)")
+    }
+
+    /// ⌘Q while a rename only plans (U4b part eight's review, L3; U4b2-7):
+    /// the plan is held open at its first page on an event, as a dead
+    /// volume would hold it. The quit halts the rename the way its sheet's
+    /// Cancel does and does not wait at all; the rename then returns
+    /// without the held read, its claim ended and nothing written: the
+    /// course's folders, pages and settings as before, no step, no record.
+    /// MUST FAIL with the quit counting a claim that is not yet swapping
+    /// (it waits, as before), and with the quit not halting the run.
+    func testAQuitWhileARenameOnlyPlansHaltsItAndDoesNotWait() async throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let foldersBefore: [String] = listed(course.directoryURL)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
+        let sheetRename: (String, String) async -> RenameResult = view.renameFromTheSheet(scope: .perSection)
+        let run: FolderRenameRun = FolderRenameRun()
+        var told: Bool = false
+        run.start(
+            renaming: "Tasks", to: "Assessments",
+            using: { oldName, newName in
+                let result: RenameResult = await sheetRename(oldName, newName)
+                returned.fulfill()
+                return result
+            },
+            canNoLongerBeHalted: view.renameSwapHasBegun
+        ) { result in
+            told = true
+        }
+        await fulfillment(of: [reached], timeout: 30)
+        XCTAssertTrue(course.isRenamingAFolder, "the claim is held while the plan walks")
+
+        // The quit's own decision, as `applicationShouldTerminate` runs it.
+        let waits: Bool = AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans()
+
+        XCTAssertFalse(waits, "the quit waits for a rename that only plans")
+        // The rename returning is the event; the bound only turns a halt
+        // that did not reach the plan into a failure rather than a hang
+        // (the hold is opened first, so the run ends either way).
+        let waited: XCTWaiter.Result = await XCTWaiter().fulfillment(of: [returned], timeout: 30)
+        if waited != .completed {
+            gate.open()
+            XCTFail("the quit did not halt the rename while it planned")
+            await fulfillment(of: [returned], timeout: 30)
+            return
+        }
+        let quit: XCTestExpectation = XCTestExpectation(description: "the quit's wait returned")
+        Task { @MainActor in
+            await AppDelegate.waitForWorkUnderWay()
+            quit.fulfill()
+        }
+        await fulfillment(of: [quit], timeout: 30)
+        // Its task ends on the main actor after the rename returns.
+        var turns: Int = 0
+        while run.isRenaming && turns < 10_000 {
+            await Task.yield()
+            turns += 1
+        }
+
+        XCTAssertFalse(run.isRenaming)
+        XCTAssertFalse(told, "a halted rename told its sheet")
+        XCTAssertFalse(course.isRenamingAFolder, "the claim was not ended")
+        XCTAssertTrue(CourseActivity.store.activeFolderRenames.isEmpty)
+        XCTAssertEqual(listed(course.directoryURL), foldersBefore)
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
+    }
+
+    /// The sheet's Cancel reaches the plan (U4b part eight's review, L1;
+    /// U4b2-7): driven from the sheet's own run and the very closure the
+    /// sheet is handed (`renameFromTheSheet`), with the plan held open at
+    /// its first page. Cancel (`haltIfStillPlanning`, which the sheet's
+    /// Cancel, its going away and a quit all call) gives the course back
+    /// at once, says nothing to the sheet, and writes nothing. MUST FAIL
+    /// with the halt not cancelling the run's task, and with `onRename`
+    /// awaited in a fresh `Task` (in the run or in `renameFromTheSheet`).
+    func testTheSheetsCancelReachesAHeldPlan() async throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
+        let sheetRename: (String, String) async -> RenameResult = view.renameFromTheSheet(scope: .perSection)
+        let run: FolderRenameRun = FolderRenameRun()
+        var told: Bool = false
+        run.start(
+            renaming: "Tasks", to: "Assessments",
+            using: { oldName, newName in
+                let result: RenameResult = await sheetRename(oldName, newName)
+                returned.fulfill()
+                return result
+            },
+            canNoLongerBeHalted: view.renameSwapHasBegun
+        ) { result in
+            told = true
+        }
+        await fulfillment(of: [reached], timeout: 30)
+        XCTAssertTrue(course.isRenamingAFolder, "the claim is held while the plan walks")
+        XCTAssertTrue(run.canBeHalted, "Cancel is disabled while the rename only plans")
+
+        XCTAssertTrue(run.haltIfStillPlanning(), "Cancel refused to halt a rename that only plans")
+        let waited: XCTWaiter.Result = await XCTWaiter().fulfillment(of: [returned], timeout: 30)
+        if waited != .completed {
+            gate.open()
+            XCTFail("the sheet's Cancel did not reach the held plan")
+            await fulfillment(of: [returned], timeout: 30)
+            return
+        }
+        var turns: Int = 0
+        while run.isRenaming && turns < 10_000 {
+            await Task.yield()
+            turns += 1
+        }
+
+        XCTAssertFalse(run.isRenaming)
+        XCTAssertFalse(told, "a halted rename told its sheet")
+        XCTAssertFalse(course.isRenamingAFolder, "the course is still held after Cancel")
+        XCTAssertTrue(view.saveIsEnabled, "Save is not enabled after Cancel")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
     }
 
     /// A rename halted at Cancel while it is only planning (the plan writes
@@ -846,7 +1007,7 @@ final class UndoRenameFolderStepTests: XCTestCase {
 
         XCTAssertNotNil(failed(result), "\(result)")
         XCTAssertFalse(course.isRenamingAFolder, "the course is still held after Cancel")
-        XCTAssertFalse(CourseActivity.anyFolderRenameIsUnderWay, "a quit would wait for a cancelled plan")
+        XCTAssertTrue(CourseActivity.store.activeFolderRenames.isEmpty, "the cancelled plan's claim is still held")
         XCTAssertTrue(view.saveIsEnabled, "Save is not enabled after Cancel")
         XCTAssertNil(view.folderRenameProblem("Concepts", to: "Ideas", scope: .shared))
         XCTAssertEqual(pages(of: course), before)
@@ -878,7 +1039,7 @@ final class UndoRenameFolderStepTests: XCTestCase {
         CourseActivity.endFolderRename(claim)
 
         XCTAssertFalse(CourseActivity.folderRenameSwapBegins(claim), "an ended claim began its swap")
-        XCTAssertFalse(CourseActivity.anyFolderRenameIsUnderWay)
+        XCTAssertTrue(CourseActivity.store.activeFolderRenames.isEmpty)
         XCTAssertFalse(CourseActivity.folderRenameIsSwapping(folderPath: root.path, courseCode: "ICS3U"))
     }
 

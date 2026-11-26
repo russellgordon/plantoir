@@ -190,11 +190,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // off the main actor a quit would leave some sections' folders
             // moved, some pages relinked and the settings naming the old
             // folder. Bounded by the rename itself; its sheet keeps its
-            // spinner, and a window closed meanwhile does not end it.
-            if AppDelegate.quitWaitsForWorkUnderWay(
-                toolchainCopying: ToolchainReadiness.shared.anyCopyIsRunning,
-                renamingAFolder: CourseActivity.anyFolderRenameIsUnderWay
-            ) {
+            // spinner, and a window closed meanwhile does not end it. Only
+            // a rename whose swap has begun is waited for: one still
+            // planning has written nothing, and the quit halts it, as
+            // Cancel would (U4b2-7).
+            if AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans() {
                 Task { @MainActor in
                     await AppDelegate.waitForWorkUnderWay()
                     if AppDelegate.finishTerminating() == .terminateNow {
@@ -214,13 +214,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return toolchainCopying || renamingAFolder
     }
 
+    /// A quit going ahead, before it decides whether to wait (#899
+    /// U4b2-7): every Rename folder still only planning is halted, the
+    /// same way its sheet's Cancel halts it, so the course is given back
+    /// and nothing waits for it; then whether a tools copy or a rename
+    /// whose swap has begun must be waited for. No question either way.
+    /// One function, so the quit's own decision is what the test runs.
+    static func quitWaitsAfterHaltingWhatOnlyPlans() -> Bool {
+        FolderRenameRun.haltEveryRunStillPlanning()
+        return quitWaitsForWorkUnderWay(
+            toolchainCopying: ToolchainReadiness.shared.anyCopyIsRunning,
+            renamingAFolder: CourseActivity.anyFolderRenameSwapIsUnderWay
+        )
+    }
+
     /// What a quit that answered `.terminateLater` waits for before it
-    /// finishes: every tools copy (#476) and every Rename folder (#899 U4b)
-    /// to end, each an event, never a time. One function, so the quit's own
+    /// finishes: every tools copy (#476) and every Rename folder whose swap
+    /// has begun (#899 U4b, U4b2-7) to end, each an event, never a time. One function, so the quit's own
     /// wait is what the test runs (U4b part seven's review, L6).
     static func waitForWorkUnderWay() async {
         await ToolchainReadiness.shared.waitForAllCopies()
-        await CourseActivity.waitForAllFolderRenames()
+        await CourseActivity.waitForEveryFolderRenameSwap()
     }
 
     /// The trail's last word from this process (#560), written as late as

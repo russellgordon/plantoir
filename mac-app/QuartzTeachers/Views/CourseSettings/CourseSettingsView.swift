@@ -225,14 +225,8 @@ struct CourseSettingsView: View {
                                 sectionNumbers: course.configuration.sectionNumbers
                             )
                         },
-                        onRename: { oldName, newName in
-                            return await renameFolder(oldName, to: newName, scope: .shared)
-                        },
-                        renameCanNoLongerBeHalted: {
-                            return CourseActivity.folderRenameIsSwapping(
-                                folderPath: course.workingFolderPath, courseCode: course.code
-                            )
-                        },
+                        onRename: renameFromTheSheet(scope: .shared),
+                        renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
                         }
@@ -291,14 +285,8 @@ struct CourseSettingsView: View {
                                 sectionNumbers: course.configuration.sectionNumbers
                             )
                         },
-                        onRename: { oldName, newName in
-                            return await renameFolder(oldName, to: newName, scope: .perSection)
-                        },
-                        renameCanNoLongerBeHalted: {
-                            return CourseActivity.folderRenameIsSwapping(
-                                folderPath: course.workingFolderPath, courseCode: course.code
-                            )
-                        },
+                        onRename: renameFromTheSheet(scope: .perSection),
+                        renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .perSection)
                         }
@@ -1122,6 +1110,25 @@ struct CourseSettingsView: View {
         return SpecialFolderRenamer.problem(
             renaming: oldName, to: newName, existingNames: namesInScope,
             isFinishingAnInterruptedRename: finishing
+        )
+    }
+
+    /// What a rename sheet's Rename runs (#899 U4b2-7): `renameFolder`,
+    /// awaited inline, never in a fresh task, so that the sheet's Cancel,
+    /// its going away and a quit reach the plan through `FolderRenameRun`.
+    /// Named, so the sheet-chain test runs the very closure the sheet is
+    /// handed.
+    func renameFromTheSheet(scope: FolderScope) -> (_ oldName: String, _ newName: String) async -> RenameResult {
+        return { oldName, newName in
+            return await renameFolder(oldName, to: newName, scope: scope)
+        }
+    }
+
+    /// Whether this course's rename has begun its check and swap, after
+    /// which it can no longer be halted (#899 U4b).
+    func renameSwapHasBegun() -> Bool {
+        return CourseActivity.folderRenameIsSwapping(
+            folderPath: course.workingFolderPath, courseCode: course.code
         )
     }
 
