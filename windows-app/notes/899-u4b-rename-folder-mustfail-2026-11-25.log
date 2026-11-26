@@ -51,3 +51,15 @@ CourseActivityTests: 9 run, 0 failures
 UndoFilesContractTests: 3 run, 0 failures
 UndoJournalContractTests: 19 run, 0 failures
 SharedRulesContractTests: 67 run, 0 failures
+
+== Part I, 2026-11-25 19:03, merged dev bfe28b848 (head a0c872002 + fix) ==
+BROKEN (UndoCheck.swift as at d47276b8f; the loop test calling setUp() again):
+UndoDoorGuardTests.swift:172: XCTAssertEqual failed: changedSince(firstPath: "courses/TST1O/a.md") is not equal to changedSince(firstPath: "courses/TST1O/old/a.md")
+UndoRenameFolderStepTests.swift:69 (tearDown): XCTAssertFalse failed - the trail put back is one of this class's own (testARenameKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery)
+FIXED, 19:06:
+SpecialFolderRenamerTests: 31 run, 0 failures
+UndoDoorGuardTests: 9 run, 0 failures
+UndoFilesContractTests: 3 run, 0 failures
+UndoJournalContractTests: 19 run, 0 failures
+UndoRenameFolderStepTests: 30 run, 0 failures
+temp-growth.py: test temp folders left by this run: 0

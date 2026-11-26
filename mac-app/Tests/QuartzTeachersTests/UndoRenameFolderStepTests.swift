@@ -34,6 +34,15 @@ final class UndoRenameFolderStepTests: XCTestCase {
 
     override func setUp() async throws {
         previousTrail = ActivityTrail.store
+        useFreshFolders()
+    }
+
+    /// A new list folder and working folder, the list and the trail pointed
+    /// at them. Never takes `previousTrail` again: a test that starts over
+    /// calls this, not `setUp`, or the trail it puts back at the end is this
+    /// test's own, whose folder is removed and then made again by every
+    /// later class's lines (the folder the suite reported left behind).
+    func useFreshFolders() {
         let unique: String = UUID().uuidString
         listFolder = FileManager.default.temporaryDirectory
             .appendingPathComponent("undo-rename-list-\(unique)", isDirectory: true)
@@ -53,6 +62,15 @@ final class UndoRenameFolderStepTests: XCTestCase {
         UndoKillPoints.beforeTheRename = nil
         SpecialFolderRenamer.planReadsAPage = nil
         SpecialFolderRenamer.planHasEnded = nil
+        // The trail put back is the one from before this test, never one
+        // this class made: that folder is removed, and every later line
+        // would make it again. MUST FAIL with a test that starts over by
+        // calling `setUp` (it takes `previousTrail` a second time).
+        XCTAssertFalse(
+            previousTrail.folderURL.lastPathComponent == ".trail"
+                && previousTrail.folderURL.deletingLastPathComponent().lastPathComponent.hasPrefix("undo-rename-"),
+            "the trail put back is one of this class's own"
+        )
         ActivityTrail.store = previousTrail
         try? FileManager.default.removeItem(at: listFolder)
         try? FileManager.default.removeItem(at: root)
@@ -380,7 +398,7 @@ final class UndoRenameFolderStepTests: XCTestCase {
         while try await killARename(at: .beforeSwap(index)) {
             try? FileManager.default.removeItem(at: listFolder)
             try? FileManager.default.removeItem(at: root)
-            try await setUp()
+            useFreshFolders()
             index += 1
         }
         XCTAssertGreaterThanOrEqual(index, 4, "two moves, two pages and the settings: at least four swaps")

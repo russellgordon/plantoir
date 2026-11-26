@@ -272,14 +272,20 @@ nonisolated enum UndoCheck {
             // since the step was made is a change since, judged here before
             // anything is read through it (the second hard review of U2b,
             // MEDIUM 2). changedSince rather than cannotTell: the place was
-            // read, and it is no longer the teacher's folder.
-            var leavesTheFolder: Bool = false
+            // read, and it is no longer the teacher's folder. The refusal
+            // names the place that now leads out, the one that changed, never
+            // the other side of a move, which is as the step left it (U4b's
+            // `placeAsFound` names a moved item only when the item itself is
+            // what changed).
+            var placeLeavingTheFolder: String? = nil
             for place in op.pathsNamed where !UndoPlaces.staysInside(root, place) {
-                leavesTheFolder = true
+                if placeLeavingTheFolder == nil {
+                    placeLeavingTheFolder = place
+                }
             }
-            if leavesTheFolder {
-                if !inTheWay.contains(op.placeAsFound(going: direction)) {
-                    inTheWay.append(op.placeAsFound(going: direction))
+            if let placeLeavingTheFolder {
+                if !inTheWay.contains(placeLeavingTheFolder) {
+                    inTheWay.append(placeLeavingTheFolder)
                 }
                 continue
             }
