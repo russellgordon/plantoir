@@ -36,9 +36,9 @@ RED 5 of 5.
 
 - Red first (product change set aside, the new tests and rows in place): `UndoHandedOverPlaceTests` and `UndoJournalContractTests`, 54 tests, 5 failing. They were `testStackCases` (rows 1 to 5: the step refused at the read-back, so nothing was offered, "nothingToUndo"), `testShapesAAndBAndCAreReadable` and `testAHandedOverStepIsReadBackReadable`. Rows 6 and 7 and the refusal unit tests passed on the base, as guards should. M2 and M3 are their must-fails.
 - Green: the same two classes, 54 of 54.
-- Proof: see the last line of this section.
+- Proof: `UndoHandedOverPlaceTests`, `UndoJournalContractTests`, `UndoFilesContractTests`, `UndoRenameFolderStepTests`, `UndoDoorGuardTests`, `UndoWriterScanTests`, `JournaledStepTests`, `SharedRulesContractTests`, every class that reads `file-formats.json` about the journal (`FileFormatsContractTests`, `UndoActionStepsTests`, `SpecialFolderRenamerTests`, `RestoreRecoveryTests`, `DoorCourseHoldTests`), and the 14 classes that read documentation 09 as text: 440 tests, 0 failures.
 - Python: `test_make_undo_traces.py` 37 tests OK, and the traces are not stale (`test_the_committed_traces_are_what_the_generator_writes` passes; `make_undo_traces.py` not re-run).
-- `origin/dev` 461ee3943 was merged in at the start (97d312ec9; one conflict in documentation 09, both sections kept).
+- `origin/dev` 461ee3943 was merged in at the start (97d312ec9; one conflict in documentation 09, both sections kept). Before hand-back `origin/dev` was still 461ee3943, already in the branch, so no second merge commit.
 
 ## Left for the next piece
 
@@ -54,7 +54,7 @@ Nothing parked.
 1. Broke each fix and watched it fail: M1 to M5 (log).
 2. No timed waits.
 3. Failure paths: no new sentence a teacher reads. The refusal is `unknown.unreadableStep`, as before.
-4. `dev` merged at the start (97d312ec9). Checked again before hand-back (see Runs).
+4. `dev` merged at the start (97d312ec9). Unchanged at hand-back.
 5. No number tuned by trial.
 6. Scope: `UndoFormat.swift`, the test class, the replay, two contract files, the two Python scripts, the ledger, documentation 09, these notes and the log.
 7. The grep for `DispatchQueue|.map {|.filter {|.reduce(|$0` over the changed Swift lines is empty. MARK sections are in place.
