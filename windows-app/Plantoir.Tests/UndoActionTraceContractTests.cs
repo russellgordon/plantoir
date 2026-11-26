@@ -337,8 +337,8 @@ public sealed class UndoActionTraceContractTests
 /// of that state, and the file is compared with that; never with the mac's
 /// bytes. The one file more is judged on Windows' own bytes alone: what the
 /// action wrote while the step is done, its before while it is undone. A
-/// step with neither entry passes every hash through unchanged, so its
-/// files must be the mac's bytes.
+/// file that is not Windows' own JSON must be the mac's bytes after the
+/// action, so its hashes pass through unchanged.
 /// </summary>
 internal sealed class MeasuredStates
 {
@@ -438,7 +438,7 @@ internal sealed class MeasuredStates
     /// <summary>The trace's hand edit made to the mac's bytes of the same state, recorded beside Windows' edited bytes.</summary>
     internal void HandEdited(string where, string kind, byte[] windowsBefore, byte[] windowsEdited)
     {
-        if (!IsMeasured) return;
+        if (!_ownJson) return;
         string windowsHash = UndoCheck.Sha(windowsBefore);
         string? macHash = null;
         foreach (KeyValuePair<string, string> pair in _windowsHashOfMacHash)
@@ -469,10 +469,16 @@ internal sealed class MeasuredStates
                     $"{where}: {own.Path} is not what the step {(_stepIsDone ? "wrote" : "found")}");
     }
 
-    /// <summary>Windows' hash of the state a trace names by the mac's hash; the hash itself for a step that is not measured.</summary>
+    /// <summary>
+    /// Windows' hash of the state a trace names by the mac's hash. A file
+    /// that is not Windows' own JSON was checked to be the mac's bytes after
+    /// the action, so its hashes pass through unchanged: a line edit undone
+    /// or redone over a hand edit makes a state no table could hold
+    /// (action-062), and the mac's hash of it is Windows' own.
+    /// </summary>
     internal string? WindowsHashFor(string? macHash, string where)
     {
-        if (!IsMeasured || macHash is null) return macHash;
+        if (!_ownJson || macHash is null) return macHash;
         Assert.True(_windowsHashOfMacHash.TryGetValue(macHash, out string? windowsHash), $"{where}: the trace names a state Windows never reached");
         return windowsHash;
     }
