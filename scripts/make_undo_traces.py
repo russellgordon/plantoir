@@ -1001,8 +1001,14 @@ def tree_reading(item):
     return ("file", sha(item["text"]) if "text" in item else None)
 
 
-def move_state(op, at_from, at_to):
-    """opKinds.move, judged as a PAIR (#897 piece B, seam 1)."""
+def move_state(op, at_from, at_to, listed_as=None):
+    """opKinds.move, judged as a PAIR (#897 piece B, seam 1). `listed_as`
+    (checkCasesHow's listedAs, U4b2-9) is the spelling the folder lists a
+    capitalisation-only move's one item under: at `from` or `to` it is the
+    pair as given; any other spelling is neither side (UndoCheck.wholeState's
+    `.another`), whatever the item holds."""
+    if listed_as is not None and is_case_only_move(op) and listed_as not in (op["from"], op["to"]):
+        return "neither"
     def side(item):
         reading = tree_reading(item)
         if reading[0] == "absent":
@@ -1238,8 +1244,11 @@ def move_carries(move, edit):
     if part_inside(move["to"], edit["path"]) is None:
         return False
     if is_case_only_move(move):
-        # One place under two spellings: named at the new one, as spelled.
-        return edit["path"] != move["from"] and not edit["path"].startswith(move["from"] + "/")
+        # One place under two spellings: named at the new one. Only the
+        # moved item's own part is compared as spelled (review 1 of
+        # U4b2-9, L3).
+        depth = len(move["from"].split("/"))
+        return edit["path"].split("/")[depth - 1] != move["from"].split("/")[depth - 1]
     return not places_overlap(move["from"], edit["path"])
 
 

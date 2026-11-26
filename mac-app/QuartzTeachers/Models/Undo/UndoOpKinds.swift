@@ -1247,11 +1247,33 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
             if overriding.isEmpty {
                 return listing.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse
             }
+            // An override names a file inside the place as a step names it;
+            // the listing names it as the disk spells it. The two are matched
+            // by the one comparison, `UndoOp.partInside`, without regard to
+            // case, and the file keeps the disk's spelling (review 1 of
+            // U4b2-9, L1).
             var files: [UndoTreeListing.File] = []
-            for file in listing.files where overriding[file.path] == nil {
-                files.append(file)
+            var matched: Set<String> = []
+            for file in listing.files {
+                var given: UndoItem? = nil
+                for (path, item) in overriding where UndoOp.partInside(path, of: file.path) == "" {
+                    given = item
+                    matched.insert(path)
+                }
+                guard let given else {
+                    files.append(file)
+                    continue
+                }
+                switch given {
+                case .absent:
+                    continue
+                case .file(let data):
+                    files.append(UndoTreeListing.File(path: file.path, sha: UndoHash.sha256(of: data)))
+                case .notAFile, .unreadable:
+                    return .holdsSomethingElse
+                }
             }
-            for (path, given) in overriding {
+            for (path, given) in overriding where !matched.contains(path) {
                 switch given {
                 case .absent:
                     continue

@@ -390,13 +390,16 @@ nonisolated final class JournaledStep {
     func placeOnDiskNow(_ url: URL) -> URL {
         let path: String = JournaledStep.key(of: url)
         for move in plannedFolderMoves {
-            let to: String = JournaledStep.key(of: move.to)
-            if path == to {
+            // At or inside `to` by the one comparison (`UndoOp.partInside`,
+            // without regard to case), as `moveCarries` judges the step
+            // (review 1 of U4b2-9, L2).
+            guard let inside = UndoOp.partInside(JournaledStep.key(of: move.to), of: path) else {
+                continue
+            }
+            if inside.isEmpty {
                 return move.from
             }
-            if path.hasPrefix(to + "/") {
-                return URL(fileURLWithPath: JournaledStep.key(of: move.from) + String(path.dropFirst(to.count)))
-            }
+            return URL(fileURLWithPath: JournaledStep.key(of: move.from) + "/" + inside)
         }
         return url
     }
@@ -409,14 +412,14 @@ nonisolated final class JournaledStep {
     func namedPath(of url: URL, under root: URL) -> String? {
         let path: String = JournaledStep.key(of: url)
         for move in plannedFolderMoves {
-            let to: String = JournaledStep.key(of: move.to)
-            if path != to && !path.hasPrefix(to + "/") {
+            guard let inside = UndoOp.partInside(JournaledStep.key(of: move.to), of: path) else {
                 continue
             }
             guard let above = UndoFolderPlaces.relativePath(of: move.to.deletingLastPathComponent(), under: root) else {
                 return nil
             }
-            return above + "/" + move.to.lastPathComponent + String(path.dropFirst(to.count))
+            let named: String = above + "/" + move.to.lastPathComponent
+            return inside.isEmpty ? named : named + "/" + inside
         }
         return UndoFolderPlaces.relativePath(of: url, under: root)
     }

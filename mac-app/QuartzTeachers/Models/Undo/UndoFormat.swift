@@ -1034,8 +1034,12 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         }
         if move.isCaseOnlyMove {
             // The two spellings are one place: the edit is named at the new
-            // spelling, never at the old one, as spelled.
-            return path != from && !path.hasPrefix(from + "/")
+            // spelling, never at the old one. Only the moved item's own part
+            // is compared as spelled, the parts above it by `partInside`
+            // (review 1 of U4b2-9, L3).
+            let fromParts: [Substring] = from.split(separator: "/", omittingEmptySubsequences: false)
+            let pathParts: [Substring] = path.split(separator: "/", omittingEmptySubsequences: false)
+            return pathParts[fromParts.count - 1] != fromParts[fromParts.count - 1]
         }
         return !UndoOp.placesOverlap(from, path)
     }
