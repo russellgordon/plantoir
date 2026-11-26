@@ -198,17 +198,29 @@ public sealed class UndoStartOfYearStepTests : IDisposable
         AssertSamePages(before, PagesNow());
     }
 
+    /// <summary>
+    /// A plan that reaches the step and changes nothing: every page it would
+    /// put into draft is one the writer declines (visible, no key, and no
+    /// column-0 place for one, #421), so the step plans no change and the
+    /// door is never asked: no step on the list, every page as it was.
+    /// </summary>
     [Fact]
     public void APlanThatChangesNothingMakesNoStep()
     {
-        Assert.True(Go(Open()).Changed);
-        int stepsBefore = WindowsActionsOnTheMacFixture.BeginKeys(ListFolder).Count;
+        foreach (JsonElement file in _recorded.GetProperty("files").EnumerateArray())
+        {
+            string full = UndoDoor.FullPath(Folder, file.GetProperty("path").GetString()!);
+            string title = Path.GetFileNameWithoutExtension(full);
+            File.WriteAllText(full, $"---\n  a: 1\ntitle: {title}\n---\n\nBody.\n");
+        }
         var before = PagesNow();
+        AssistWorkspace workspace = Open();
+        Assert.NotEmpty(workspace.PlanStartOfYear(Course, 1).Plan.Drafts);
 
-        StartOfYearOutcome again = Go(Open());
+        StartOfYearOutcome outcome = Go(workspace);
 
-        Assert.False(again.Changed);
-        Assert.Equal(stepsBefore, WindowsActionsOnTheMacFixture.BeginKeys(ListFolder).Count);
+        Assert.False(outcome.Changed, outcome.Message);
+        Assert.Empty(WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
         AssertSamePages(before, PagesNow());
     }
 }
