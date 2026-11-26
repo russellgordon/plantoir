@@ -23610,7 +23610,7 @@ is compared just before the rename and the file moved just after; a file
 that is not the one read is put back. The window left is the instant
 between that last `lstat` and the rename. In `UndoFoldCache.read`, a
 segment gone between the listing and its open is passed over only when it
-is not the newest listed (pruning never deletes the newest), as Windows'
+is not the newest listed (pruning never deletes the segment that is newest when it prunes; one that was newest when a reader without the lock listed it can be pruned once a newer one has started, and that reader then refuses once), as Windows'
 `ReadSegments` does; the newest gone is an unreadable list, never a shorter
 fold that would reuse step numbers (stack row "#1004: the newest segment
 gone after the list was listed", call `newestSegmentGoesWhileRead`). And
