@@ -275,6 +275,9 @@ public class ContractTests
                           AssistWording.DeployRefusedWhileALaterDeployWorks("{course}", "{section}"), heldAndAsked);
         Assert.Equal(wording["deployRefusedWhileItsSectionDeploys"]!.ToString(),
                      AssistWording.DeployRefusedWhileItsSectionDeploys("{course}", "{section}"));
+        // #828 (mac #729): another build of the section was in the way.
+        Assert.Equal(wording["deployRefusedWhileItsSectionIsBeingBuilt"]!.ToString(),
+                     AssistWording.DeployRefusedWhileItsSectionIsBeingBuilt("{course}", "{section}"));
 
         // #489 (mac #457 batch B): the Section menu's twins and its dialog's
         // words, rendered with the contract's placeholders and the generator's
@@ -306,7 +309,11 @@ public class ContractTests
                      AssistWording.PagesAChangeCouldNotFinishFromTheMenu(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
         Assert.Equal(wording["pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"]!.ToString(),
                      AssistWording.PagesAChangeCouldNotFinishFromTheMenuNamingSeveral(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
-        Assert.Equal(wording["sectionIsChangingFromTheMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMenu("{course}", "{section}"));
+        Assert.Equal(wording["sectionIsChangingFromTheMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMenu("{course}", "{section}", ClassNoun.Class));
+        Assert.Equal(wording["sectionIsChangingFromTheMeetingsMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMeetingsMenu("{course}", "{section}"));
+        // #1027: named from the selected section's course, the Meetings menu in a club.
+        Assert.Equal(wording["nothingToUndoFromTheMenu"]!.ToString(), AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class));
+        Assert.Equal(wording["nothingToUndoFromTheMeetingsMenu"]!.ToString(), AssistWording.NothingToUndoFromTheMeetingsMenu);
         Assert.Equal(wording["menuPublishPagesTitle"]!.ToString(), AssistWording.MenuPublishPagesTitle("{course}", "{section}"));
         Assert.Equal(wording["menuHidePagesTitle"]!.ToString(), AssistWording.MenuHidePagesTitle("{course}", "{section}"));
         Pair("menuPublishClassTitle", AssistWording.MenuPublishClassTitle("{course}", "{section}"),
@@ -318,6 +325,125 @@ public class ContractTests
         Assert.Equal(wording["menuNoHiddenPages"]!.ToString(), AssistWording.MenuNoHiddenPages("{course}", "{section}"));
         Assert.Equal(wording["menuNoVisiblePages"]!.ToString(), AssistWording.MenuNoVisiblePages("{course}", "{section}"));
         Assert.Equal(wording["menuSavingACopy"]!.ToString(), AssistWording.MenuSavingACopy("{course}"));
+
+        // #1027 round 3 (review 2): the twins of sentences a club's teacher reads.
+        Assert.Equal(wording["addClassesNeedsAUnitForAMeeting"]!.ToString(), AssistWording.AddClassesNeedsAUnitForAMeeting);
+        Assert.Equal(wording["addClassesNeedsACountForAMeeting"]!.ToString(), AssistWording.AddClassesNeedsACountForAMeeting);
+        Assert.Equal(wording["menuPickPagesToPublishForAMeeting"]!.ToString(), AssistWording.MenuPickPagesToPublishForAMeeting);
+        Pair("addClassCountsNext", AssistWording.AddClassCountsNext(), AssistWording.AddClassCountsNextForAMeeting());
+        Pair("addClassCountsAsACopy", AssistWording.AddClassCountsAsACopy(), AssistWording.AddClassCountsAsACopyForAMeeting());
+        Pair("untickedAtDeployCounts", AssistWording.UntickedAtDeployCounts(3), AssistWording.UntickedAtDeployCountsForAMeeting(3));
+        Assert.Equal(wording["timetableTooShortFrom"]!.ToString(), AssistWording.TimetableTooShortFrom(4, "2026-12-08", 2));
+        Assert.Equal(wording["timetableTooShortFromForAMeeting"]!.ToString(), AssistWording.TimetableTooShortFromForAMeeting(4, "2026-12-08", 2));
+        Assert.Equal(wording["timetableTooShortAfter"]!.ToString(), AssistWording.TimetableTooShortAfter(3, "2026-12-08", 2));
+        Assert.Equal(wording["timetableTooShortAfterForAMeeting"]!.ToString(), AssistWording.TimetableTooShortAfterForAMeeting(3, "2026-12-08", 2));
+        Pair("noDaysAfterTheLastPage", AssistWording.NoDaysAfterTheLastPage(), AssistWording.NoDaysAfterTheLastPageForAMeeting());
+        // #1027 round 4: the planners' refusals.
+        Pair("askForAtLeastOneClass", AssistWording.AskForAtLeastOneClass(), AssistWording.AskForAtLeastOneClassForAMeeting());
+        Pair("cannotMoveClassesWithoutDates", AssistWording.CannotMoveClassesWithoutDates("COMP", 2), AssistWording.CannotMoveClassesWithoutDatesForAMeeting("COMP", 2));
+        Pair("cannotDateNewClassesWithoutDates", AssistWording.CannotDateNewClassesWithoutDates("COMP", 2), AssistWording.CannotDateNewClassesWithoutDatesForAMeeting("COMP", 2));
+        Pair("cannotDateANewClassWithoutDates", AssistWording.CannotDateANewClassWithoutDates("COMP", 2), AssistWording.CannotDateANewClassWithoutDatesForAMeeting("COMP", 2));
+        Pair("cannotReDateWithoutDates", AssistWording.CannotReDateWithoutDates("COMP", 2), AssistWording.CannotReDateWithoutDatesForAMeeting("COMP", 2));
+        Pair("noNumberedClassPagesToReDate", AssistWording.NoNumberedClassPagesToReDate("COMP", 2), AssistWording.NoNumberedClassPagesToReDateForAMeeting("COMP", 2));
+        Pair("noClassOnThatDay", AssistWording.NoClassOnThatDay("Tuesday", "2026-12-08", "COMP", 2), AssistWording.NoClassOnThatDayForAMeeting("Tuesday", "2026-12-08", "COMP", 2));
+        Pair("noClassDateLeftForTheCopy", AssistWording.NoClassDateLeftForTheCopy(), AssistWording.NoClassDateLeftForTheCopyForAMeeting());
+        Pair("whichDayShouldTheNewClassTake", AssistWording.WhichDayShouldTheNewClassTake(), AssistWording.WhichDayShouldTheNewClassTakeForAMeeting());
+        Pair("unusedDatesRunShort", AssistWording.UnusedDatesRunShort(1, 2), AssistWording.UnusedDatesRunShortForAMeeting(1, 2));
+        Assert.Equal(wording["pagesNotNamedTheCoursesWay"]!.ToString(), AssistWording.PagesNotNamedTheCoursesWay(2, "Unit N, Day N"));
+        Assert.Equal(wording["pagesNotNamedTheCoursesWayForAMeeting"]!.ToString(), AssistWording.PagesNotNamedTheCoursesWayForAMeeting(2, "Week N"));
+        Pair("workedOutTheClassDates", AssistWording.WorkedOutTheClassDates(), AssistWording.WorkedOutTheClassDatesForAMeeting());
+        Pair("rememberedTheClassDates", AssistWording.RememberedTheClassDates(12, "{course} Section {section}"),
+             AssistWording.RememberedTheClassDatesForAMeeting(12, "{course} Section {section}"));
+        Assert.Equal(wording["deployHasClassesDatedLaterForAMeeting"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterForAMeeting("{course}", "{section}", new[] { "Week 5" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterNamingSeveralForAMeeting"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterNamingSeveralForAMeeting("{course}", "{section}", new[] { "Week 5", "Week 6" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterAndNoWindowForAMeeting"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterAndNoWindowForAMeeting("{course}", "{section}", new[] { "Week 5" }));
+        Assert.Equal(wording["notANumberedClassPageForAMeeting"]!.ToString(), ClassChangeWording.NotANumberedClassPageForAMeeting("{page}"));
+        Assert.Equal(wording["thePlaceForTheCopyIsStillTakenForAMeeting"]!.ToString(),
+                     ClassChangeWording.ThePlaceForTheCopyIsStillTakenForAMeeting("{copy}", null));
+        Assert.Equal(wording["thePlaceForTheCopyIsStillTakenNamingTheBackupForAMeeting"]!.ToString(),
+                     ClassChangeWording.ThePlaceForTheCopyIsStillTakenNamingTheBackupForAMeeting("{copy}", "{course}_backup_2026-09-08_190000.zip"));
+        Assert.Equal(wording["theCopyCouldNotBeMadeHiddenForAMeeting"]!.ToString(),
+                     ClassChangeWording.TheCopyCouldNotBeMadeHiddenForAMeeting("{page}", "{copy}", null));
+        Assert.Equal(wording["theCopyCouldNotBeMadeHiddenNamingTheBackupForAMeeting"]!.ToString(),
+                     ClassChangeWording.TheCopyCouldNotBeMadeHiddenNamingTheBackupForAMeeting("{page}", "{copy}", "{course}_backup_2026-09-08_190000.zip"));
+
+        // #1027: the Class Dates dialog's own sentences, with the generator's examples.
+        Pair("classDatesPurpose", AssistWording.ClassDatesPurpose(), AssistWording.ClassDatesPurposeForAMeeting());
+        Pair("classDatesCourseMissing", AssistWording.ClassDatesCourseMissing("{course}"),
+             AssistWording.ClassDatesCourseMissingForAMeeting("{course}"));
+        Pair("classDatesNoneGiven", AssistWording.ClassDatesNoneGiven("{course}", "{section}"),
+             AssistWording.ClassDatesNoneGivenForAMeeting("{course}", "{section}"));
+        Pair("classDatesNotWrittenAsDates", AssistWording.ClassDatesNotWrittenAsDates(new[] { "2026-13-01" }, "{course}", "{section}"),
+             AssistWording.ClassDatesNotWrittenAsDatesForAMeeting(new[] { "2026-13-01" }, "{course}", "{section}"));
+        Pair("classDatesOnFileUnreadable",
+             AssistWording.ClassDatesOnFileUnreadable(new[] { "the file is not readable JSON" }, "{course}", "{section}"),
+             AssistWording.ClassDatesOnFileUnreadableForAMeeting(new[] { "the file is not readable JSON" }, "{course}", "{section}"));
+        Pair("classDatesTooFarFromToday", AssistWording.ClassDatesTooFarFromToday(new[] { "2569-09-08" }, "{course}", "{section}"),
+             AssistWording.ClassDatesTooFarFromTodayForAMeeting(new[] { "2569-09-08" }, "{course}", "{section}"));
+        Pair("classDatesCouldNotBeSaved", AssistWording.ClassDatesCouldNotBeSaved("{course}", "{section}", "{reason}"),
+             AssistWording.ClassDatesCouldNotBeSavedForAMeeting("{course}", "{section}", "{reason}"));
+        Pair("classDatesAreRemembered", AssistWording.ClassDatesAreRemembered("{course}", "{section}"),
+             AssistWording.ClassDatesAreRememberedForAMeeting("{course}", "{section}"));
+        Pair("classDatesSetAside", AssistWording.ClassDatesSetAside("2569-09-08"), AssistWording.ClassDatesSetAsideForAMeeting("2569-09-08"));
+        Pair("classDatesAlreadyRecorded", AssistWording.ClassDatesAlreadyRecorded(12, "{course}", "{section}"),
+             AssistWording.ClassDatesAlreadyRecordedForAMeeting(12, "{course}", "{section}"));
+        Pair("classDatesToRemember",
+             AssistWording.ClassDatesToRemember(12, "{course}", "{section}", "2026-09-08 (Tuesday)", "2026-12-15 (Tuesday)"),
+             AssistWording.ClassDatesToRememberForAMeeting(12, "{course}", "{section}", "2026-09-08 (Tuesday)", "2026-12-15 (Tuesday)"));
+        Pair("classDatesHalfRead", AssistWording.ClassDatesHalfRead(new[] { "2026-13-01" }, "the pasted dates"),
+             AssistWording.ClassDatesHalfReadForAMeeting(new[] { "2026-13-01" }, "the pasted dates"));
+
+        // #927 (the mac's #897 piece A): Classes ▸ Add Class…'s dialog, with
+        // the generator's examples (a module course's word; 2026-09-14).
+        Pair("menuAddClassTitle", AssistWording.MenuAddClassTitle("{course}", "{section}"),
+             AssistWording.MenuAddClassTitleForAMeeting("{course}", "{section}"));
+        Pair("menuHowToAddAClass", AssistWording.MenuHowToAddAClass, AssistWording.MenuHowToAddAClassForAMeeting);
+        Pair("menuAddClassNextInThisUnit", AssistWording.MenuAddClassNextInThisUnit, AssistWording.MenuAddClassNextInThisUnitForAMeeting);
+        Pair("menuAddClassNextInANumberedCourse", AssistWording.MenuAddClassNextInANumberedCourse,
+             AssistWording.MenuAddClassNextInANumberedCourseForAMeeting);
+        Pair("menuAddClassInANewUnit", AssistWording.MenuAddClassInANewUnit, AssistWording.MenuAddClassInANewUnitForAMeeting);
+        Pair("menuAddClassAsACopy", AssistWording.MenuAddClassAsACopy, AssistWording.MenuAddClassAsACopyForAMeeting);
+        Assert.Equal(wording["menuAddClassInANewUnitInAModuleCourse"]!.ToString(), AssistWording.MenuAddClassInANewUnitInAModuleCourse);
+        Assert.Equal(wording["menuAddClassInANewUnitInAModuleCourse"]!.ToString(), AddClassWords.InANewUnit(ClassNoun.Class, "module"));
+        Assert.Equal(wording["menuAddClassNextInThisUnitInAModuleCourse"]!.ToString(), AssistWording.MenuAddClassNextInThisUnitInAModuleCourse);
+        Pair("menuAddClassGreyedNoUnits", AssistWording.MenuAddClassGreyedNoUnits, AssistWording.MenuAddClassGreyedNoUnitsForAMeeting);
+        Pair("menuAddClassGreyedNothingToCopy", AssistWording.MenuAddClassGreyedNothingToCopy,
+             AssistWording.MenuAddClassGreyedNothingToCopyForAMeeting);
+        Pair("menuAddClassGreyedRenameUnfinished", AssistWording.MenuAddClassGreyedRenameUnfinished,
+             AssistWording.MenuAddClassGreyedRenameUnfinishedForAMeeting);
+        Pair("menuAddClassGreyedRenameHoldsACopyInANumberedCourse", AssistWording.MenuAddClassGreyedRenameHoldsACopyInANumberedCourse,
+             AssistWording.MenuAddClassGreyedRenameHoldsACopyInANumberedCourseForAMeeting);
+        Assert.Equal(wording["menuAddClassGreyedRenameHoldsANewUnit"]!.ToString(), AssistWording.MenuAddClassGreyedRenameHoldsANewUnit);
+        Pair("menuNeedsClassDatesFirst", AssistWording.MenuNeedsClassDatesFirst, AssistWording.MenuNeedsClassDatesFirstForAMeeting);
+        Pair("menuPickClassToDuplicate", AssistWording.MenuPickClassToDuplicate, AssistWording.MenuPickClassToDuplicateForAMeeting);
+        Pair("menuUnitWordRenameUnfinished", AssistWording.MenuUnitWordRenameUnfinished, AssistWording.MenuUnitWordRenameUnfinishedForAMeeting);
+
+        // #954 (the mac's #897 piece B): Classes ▸ Roll Over to a New Year…,
+        // with the generator's examples (2026-09-08 to 2027-06-24; the
+        // section-1 Netlify marker). The constants are the value walk's.
+        Assert.Equal(wording["menuRollOverTitle"]!.ToString(), AssistWording.MenuRollOverTitle("{course}", "{section}"));
+        Assert.Equal(wording["menuRollOverIntro"]!.ToString(), RollOverWords.Intro(ClassNoun.Class));
+        Assert.Equal(wording["menuRollOverIntroForAMeeting"]!.ToString(), RollOverWords.Intro(ClassNoun.Meeting));
+        Pair("menuRollOverDates", AssistWording.MenuRollOverDates("2026-09-08 (Tuesday)", "2027-06-24 (Thursday)"),
+             AssistWording.MenuRollOverDatesForAMeeting("2026-09-08 (Tuesday)", "2027-06-24 (Thursday)"));
+        Assert.Equal(wording["menuRollOverDates"]!.ToString(),
+                     RollOverWords.Dates(RollOverFromTheMenu.DayAsWritten(new DateOnly(2026, 9, 8)),
+                                         RollOverFromTheMenu.DayAsWritten(new DateOnly(2027, 6, 24)), ClassNoun.Class));
+        Pair("menuRollOverDatesAreOld", AssistWording.MenuRollOverDatesAreOld, AssistWording.MenuRollOverDatesAreOldForAMeeting);
+        Assert.Equal(wording["rolloverCouldNotStartANewWebsiteFromTheMenu"]!.ToString(),
+                     AssistWording.RolloverCouldNotStartANewWebsiteFromTheMenu(".netlify_sites/section1.json"));
+        Assert.Equal(wording["rolloverStartedANewWebsiteFromTheMenu"]!.ToString(),
+                     AssistWording.RolloverStartedANewWebsiteFromTheMenu(".netlify_sites/section1.previous-2026-09-08_071500.json"));
+        Assert.Equal(wording["rolloverStartedANewWebsiteFromTheMenuDeployingToAFolder"]!.ToString(),
+                     AssistWording.RolloverStartedANewWebsiteFromTheMenuDeployingToAFolder(".netlify_sites/section1.previous-2026-09-08_071500.json"));
+        Assert.Equal(wording["menuAddButton"]!.ToString(), AssistWording.MenuAddButton);
+        Assert.Equal(wording["menuDuplicateButton"]!.ToString(), AssistWording.MenuDuplicateButton);
+        Assert.Equal(wording["duplicatedFromTheMenu"]!.ToString(), AssistWording.DuplicatedFromTheMenu("{page}", "{copy}", "2026-09-14"));
+        Assert.Equal(wording["theCopyCouldNotBeMadeHiddenFromTheMenu"]!.ToString(), AssistWording.TheCopyCouldNotBeMadeHiddenFromTheMenu("{page}"));
+        Assert.Equal(wording["menuTheNextPageIsAlreadyThere"]!.ToString(), AssistWording.MenuTheNextPageIsAlreadyThere("{copy}"));
 
         // #475 (the rest of #489): the question about classes dated after the
         // next class, with the generator's own examples — the next class on
@@ -676,8 +802,19 @@ public class ContractTests
                     }
                     else if (expectedMaker == "menu")
                     {
-                        Assert.IsType<BackupMaker.Menu>(backup!.Maker);
-                        Assert.Equal(c["section"]!.GetValue<int>(), ((BackupMaker.Menu)backup.Maker).SectionNumber);
+                        var menu = Assert.IsType<BackupMaker.Menu>(backup!.Maker);
+                        Assert.Equal(c["section"]!.GetValue<int>(), menu.SectionNumber);
+                        // #990: which menu made it rides in the name, and the Backups list says so.
+                        string menuName = c["menu"]?.ToString() ?? "section";
+                        Assert.Equal(menuName, SubjectMenuLayout.ContractName(menu.InMenu));
+                        if (c["description"]?.ToString() is { } words)
+                        {
+                            // In a course whose pages are meetings, a club, the menus are named as its menu bar titles them (#990).
+                            var noun = ClassPageSchemes.NounReading(c["noun"]?.ToString());
+                            Assert.Equal(words, menu.DescriptionFor(noun));
+                            Assert.Equal(c["kept"]!.ToString(), backup.KeptDescriptionFor(noun));
+                            Assert.Equal(name, "ICS3U_backup_2026-08-11_221530" + menu.NameSuffix + ".zip");
+                        }
                     }
                     else
                     {
@@ -846,8 +983,16 @@ public class ContractTests
         var defined = typeof(CredentialRequests).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Select(field => field.GetValue(null)).OfType<CredentialRequest>().Select(request => request.Name)
             .Concat(codeRequests.Keys);
-        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CredentialRequestNames,
-            requests.Select(r => r!["name"]!.ToString()), defined);
+        var named = requests.Select(r => r!["name"]!.ToString()).ToList();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CredentialRequestNames, named, defined);
+        // A request this app has and says in older words (#891's invented
+        // sample names, owed by #920; #696's TTL step, owed by #921) is held
+        // by name: its title, label, secrecy, link and number of steps are
+        // still compared exactly, and its explanation and steps together must
+        // still differ from the contract's, so the entry fails the day they
+        // match. The day the contract drops the request, the entry fails too.
+        NamedGapLedger.StillNamed(NamedGapLedger.CredentialRequestsSaidDifferently, named);
+        int saidDifferently = 0;
 
         foreach (var req in requests)
         {
@@ -857,20 +1002,30 @@ public class ContractTests
             Assert.True(codeRequests.TryGetValue(name, out var codeReq), $"Missing request definition for {name}");
 
             Assert.Equal(req["title"]!.ToString(), codeReq!.Title);
-            // The explanation is the LONGEST thing a teacher reads in one of
-            // these dialogs and was the one field this sweep did not check —
-            // found 2026-09-07 while writing the hand-driven procedure for the
-            // new-site dialog, which told the checker not to eyeball it
-            // "because the contract pins it". It did not. It does now.
-            Assert.Equal(req["explanation"]!.ToString(), codeReq.Explanation);
             Assert.Equal(req["fieldLabel"]!.ToString(), codeReq.FieldLabel);
             Assert.Equal(req["isSecret"]!.GetValue<bool>(), codeReq.IsSecret);
             Assert.Equal(req["linkAddress"]!.ToString(), codeReq.LinkAddress);
             Assert.Equal(req["linkTitle"]!.ToString(), codeReq.LinkTitle);
 
             var expectSteps = req["steps"]!.AsArray().Select(s => s!.ToString()).ToList();
+            if (NamedGapLedger.Holding(NamedGapLedger.CredentialRequestsSaidDifferently, name) is { } held)
+            {
+                saidDifferently++;
+                Assert.Equal(expectSteps.Count, codeReq.Steps.Count);
+                bool same = req["explanation"]!.ToString() == codeReq.Explanation && expectSteps.SequenceEqual(codeReq.Steps);
+                Assert.False(same, NamedGapLedger.ClosedMessage(held));
+                continue;
+            }
+
+            // The explanation is the LONGEST thing a teacher reads in one of
+            // these dialogs and was the one field this sweep did not check —
+            // found 2026-09-07 while writing the hand-driven procedure for the
+            // new-site dialog, which told the checker not to eyeball it
+            // "because the contract pins it". It did not. It does now.
+            Assert.Equal(req["explanation"]!.ToString(), codeReq.Explanation);
             Assert.Equal(expectSteps, codeReq.Steps);
         }
+        Assert.Equal(NamedGapLedger.All.Count(entry => entry.Area == NamedGapLedger.CredentialRequestsSaidDifferently), saidDifferently);
     }
 
     [Fact]
@@ -1197,12 +1352,35 @@ public class ContractTests
         // Every case is played and every mismatch reported, rather than
         // stopping at the first: this list grows from the mac, and a red that
         // names only its first case hides which issues own the rest.
-        var mismatches = cases
-            .Where(c => c is not null)
-            .Select((c, index) => (index, expect: c!["expect"]?.ToString(), actual: FailureExplainer.Explanation(c["output"]!.ToString())))
-            .Where(result => result.expect != result.actual)
-            .Select(result => $"case {result.index}: expected \"{result.expect ?? "null"}\", got \"{result.actual ?? "null"}\"")
-            .ToList();
+        //
+        // A case this app does not recognise yet (#674's PhET stops, owed by
+        // #936; #696's token refusals, owed by #921) is held by its `why` up
+        // to the first colon, the cases having no name. A held case must name
+        // exactly one case and be explained by NOTHING here, the contract's
+        // honest fallback (the raw output is shown): never by another
+        // sentence, and the entry fails the day this app says the contract's.
+        var keys = cases.Select(c => c?["why"]?.ToString().Split(':')[0] ?? "").ToList();
+        NamedGapLedger.StillNamed(NamedGapLedger.FailureExplanationCases, keys);
+        int heldCases = 0;
+        var mismatches = new List<string>();
+        for (int index = 0; index < cases.Count; index++)
+        {
+            var c = cases[index];
+            if (c is null) continue;
+            string? expect = c["expect"]?.ToString();
+            string? actual = FailureExplainer.Explanation(c["output"]!.ToString());
+            if (NamedGapLedger.Holding(NamedGapLedger.FailureExplanationCases, keys[index]) is { } held && keys[index].Length > 0)
+            {
+                heldCases++;
+                Assert.Equal(1, keys.Count(key => key == keys[index]));
+                Assert.False(expect == actual, NamedGapLedger.ClosedMessage(held));
+                Assert.True(actual is null, $"case {index} is held as not recognised here (#{held.Issue}), and this app explains it as \"{actual}\": a wrong explanation, not a missing one");
+                continue;
+            }
+            if (expect != actual)
+                mismatches.Add($"case {index}: expected \"{expect ?? "null"}\", got \"{actual ?? "null"}\"");
+        }
+        Assert.Equal(NamedGapLedger.All.Count(entry => entry.Area == NamedGapLedger.FailureExplanationCases), heldCases);
         Assert.True(mismatches.Count == 0,
             "app-rules.json → failureExplanations: " + mismatches.Count + " of " + cases.Count +
             " cases explained differently here:\n" + string.Join("\n", mismatches));
@@ -1220,8 +1398,9 @@ public class ContractTests
         string deployScript = File.ReadAllText(Path.Combine(repoRoot, "deploy.ps1"));
 
         var previewFlags = section["preview"]!.AsArray().Select(x => x!["flag"]!.ToString().Split(' ')[0]).ToList();
-        // A flag preview.ps1 does not take yet (#729's --for-deploy, owed by
-        // #828) is held open by name; it closes the day preview.ps1 carries it.
+        // A flag preview.ps1 does not take yet is held open by name; it
+        // closes the day preview.ps1 carries it (#729's --for-deploy was,
+        // until #828 landed).
         var deferred = NamedGapLedger.GapsIn(NamedGapLedger.PreviewLauncherFlags, previewFlags,
             previewFlags.Where(flag => previewScript.Contains(flag, StringComparison.OrdinalIgnoreCase)));
         foreach (var flag in previewFlags.Where(flag => !deferred.Contains(flag)))

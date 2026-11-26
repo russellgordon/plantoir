@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Undo;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 using Plantoir.Mcp;
@@ -83,7 +84,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var happened = new List<string>();
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
                                           "ICS3U", 1, AssistSurface.LocalWindow)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             AskAboutClassesDatedLaterInApp = () => Task.FromResult<LaterClassesAtADeploy>(LaterClassesAnswer.CannotAsk),
             PreviewIsShowing = () => true,
             StopPreviewInAppAsync = () => { happened.Add("stop"); return Task.CompletedTask; },
@@ -108,7 +109,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var happened = new List<string>();
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
                                           "ICS3U", 1, AssistSurface.LocalWindow)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             AskAboutClassesDatedLaterInApp = () => Task.FromResult(
                 new LaterClassesAtADeploy(LaterClassesAnswer.NothingToAsk, WillBeRefused: true)),
             PreviewIsShowing = () => true,
@@ -130,7 +131,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var happened = new List<string>();
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
                                           "ICS3U", 1, AssistSurface.LocalWindow)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             AskAboutClassesDatedLaterInApp = () => Task.FromResult<LaterClassesAtADeploy>(LaterClassesAnswer.NothingToAsk),
             PreviewIsShowing = () => true,
             StopPreviewInAppAsync = () => { happened.Add("stop"); return Task.CompletedTask; },
@@ -149,7 +150,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var happened = new List<string>();
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
                                           "ICS3U", 1, AssistSurface.LocalWindow)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             AskAboutClassesDatedLaterInApp = () => Task.FromResult(
                 new LaterClassesAtADeploy(LaterClassesAnswer.NoWindow, new[] { "Unit 2, Day 5", "Unit 2, Day 6" })),
             PreviewIsShowing = () => true,
@@ -177,7 +178,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(
                                               new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()) { Surface = AssistSurface.Menu }),
                                           "ICS3U", 1, AssistSurface.Menu)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             PreviewIsShowing = () => true,
             StopPreviewInAppAsync = () => { happened.Add("stop"); return Task.CompletedTask; },
             ShowPreviewInApp = () => happened.Add("start"),
@@ -209,6 +210,29 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         Assert.Empty(_launcher.Runs);
         Assert.Contains("ICS3U/1 · a deploy was held back for classes dated after the next class — 1 class with no answer",
                         File.ReadAllText(_trail));
+    }
+
+    /// <summary>
+    /// deploy_section hands a club's teacher the refusal's own club form, and
+    /// the model the class form (#1027 review 3, low 5). MUST FAIL with the
+    /// tool's catch returning the message alone.
+    /// </summary>
+    [Fact]
+    public async Task TheServersDeployRefusal_SaysMeetingToAClubsTeacher()
+    {
+        string config = Path.Combine(CourseDirectory, "course_config.json");
+        File.WriteAllText(config, File.ReadAllText(config).Replace("\"section_numbers\": [1]", "\"section_numbers\": [1], \"class_noun\": \"meeting\""));
+        Class("Unit 2, Day 5", Today.AddDays(3), published: true);
+        var workspace = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow, Today = () => Today };
+        var tools = new Plantoir.Mcp.PlantoirTools(workspace);
+
+        var answer = await tools.DeploySection("ICS3U", 1, new Progress<ModelContextProtocol.ProgressNotificationValue>(_ => { }), default);
+
+        var titles = new[] { "Unit 2, Day 5" };
+        Assert.Equal(AssistWording.DeployHasClassesDatedLaterAndNoWindow("ICS3U", "1", titles, ClassNoun.Meeting),
+                     answer.Meta?[AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>());
+        Assert.Equal(AssistWording.DeployHasClassesDatedLaterAndNoWindow("ICS3U", "1", titles), answer.Detail());
+        Assert.Empty(_launcher.Runs);
     }
 
     // ---- What is remembered as kept -------------------------------------------
@@ -255,7 +279,10 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         Class("Unit 2, Day 6", Today.AddDays(4), published: true);
         var workspace = new AssistWorkspace(_folder, _launcher) { Today = () => Today };
 
-        workspace.KeepTheClassesItPublished(TheCourse, 1, new[] { "section1/All Classes/Unit 2, Day 5", "section1/All Classes/Unit 2, Day 4" });
+        // Planned into the press's own step (#899 W7b2-8), then made.
+        var step = new UndoActionStep(new UndoStepMaker("sheet", LinksChecklist.AnsweredActionKey), _folder, "ICS3U", 1);
+        workspace.KeepTheClassesItPublished(TheCourse, 1, new[] { "section1/All Classes/Unit 2, Day 5", "section1/All Classes/Unit 2, Day 4" }, step);
+        step.Make();
 
         // Day 4 is the next class and is never asked about, so it leaves no row.
         Assert.Equal(new[] { new LaterClassesKept.Row("section1/All Classes/Unit 2, Day 5", DateText.Iso(Today.AddDays(3))) },
@@ -405,6 +432,9 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         Assert.Equal("3 classes dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(3));
         string body = MethodBody(ViewSource("MainWindow.Verbs.cs"),
                                  "internal async Task<AssistToolAnswer?> HideClassesForTheDeploy(");
-        Assert.Contains("ClassesDatedLater.UntickedAtDeployCounts(places.Count)", body);
+        Assert.Equal("3 meetings dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(3, ClassNoun.Meeting));
+        // Counted in the section's course's noun (#1027): a club's line counts meetings.
+        Assert.Contains("ClassesDatedLater.UntickedAtDeployCounts(places.Count, noun)", body);
+        Assert.Contains("var noun = Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun", body);
     }
 }

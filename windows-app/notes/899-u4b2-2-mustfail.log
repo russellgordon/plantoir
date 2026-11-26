@@ -1,0 +1,32 @@
+#899 U4b2-2 must-fail log (2026-11-25), branch issue/899-u4b2-2-leaving-place-named, on 3afae9562
+Each sabotage in place, built, run (UndoDoorGuardTests + UndoJournalContractTests), then restored with git checkout; git diff clean after each.
+
+1. Windows' rule in UndoCheck.plan's placeLeavingTheFolder loop: `placeLeavingTheFolder = op.path ?? op.from ?? place`
+   run-mustfail1.log: exit 65, 3 failures of 33
+   UndoDoorGuardTests.swift:188 testUndoRefusedBecauseOnlyTheNewPlaceLeadsOutNamesTheNewPlace: named courses/TST1O/b.md, wanted courses/TST1O/new/b.md
+   UndoDoorGuardTests.swift:237 testRedoRefusedBecauseOnlyTheNewPlaceLeadsOutNamesTheNewPlace: named courses/TST1O/b.md
+   UndoJournalContractTests.swift:118 testStackCases: one row only, "U4b2-2: only the move's new place leads out ..." (the refusal named courses/TST1O/b.md)
+   The "only the old place" and "both" tests and rows stayed green, as they should (Windows agrees there).
+
+2. The LAST place leading out instead of the first (the `if placeLeavingTheFolder == nil` guard taken out)
+   run-mustfail2.log: exit 65, 3 failures of 33
+   UndoDoorGuardTests.swift:203 testUndoRefusedBecauseBothPlacesLeadOutNamesTheOldPlace
+   UndoDoorGuardTests.swift:254 testRedoRefusedBecauseBothPlacesLeadOutNamesTheOldPlace
+   UndoJournalContractTests.swift:118 testStackCases: one row only, "U4b2-2: both of the move's places lead out ..."
+
+3. Python model (scripts/make_undo_traces.py plan): name `path or from` again (Windows' rule)
+   python3 scripts/test_make_undo_traces.py: FAILED (failures=1), test_stack_cases, the "only the move's new place" row:
+   AssertionError: 'courses/TST1O/b.md' != 'courses/TST1O/new/b.md'
+
+RED 3 of 3. Restored: git status clean after each.
+
+Review 1 round (2026-11-25), on 8b1ff15e6. Tests failed first on ddb585569 (run-r1-first.log): all four new UndoDoorGuardTests red, naming the other side of the move (b.md for Undo, a.md for Redo).
+a. Staging check names target.relativePath again: run-r1-mustfail-a, red: testUndoRefusedAtTheStagingCheckNamesTheNewPlaceThatLeadsOut, testRedoRefusedAtTheStagingCheckNamesTheOldPlaceThatLeadsOut.
+b. Swap check names target.relativePath again: run-r1-mustfail-b, red: testUndoRefusedAtTheSwapCheck..., testRedoRefusedAtTheSwapCheck...
+c. placeLeavingTheFolder returns places[0] (Windows' rule): run-r1-mustfail-c, red: both Undo window tests, the two "only the new place" tests, testStackCases (rows "U4b2-2: only the move's new place" and "U4b2-2, Redo: undone, then only the move's new place").
+d. placeLeavingTheFolder returns the last place: run-r1-mustfail-d, red: both "both" tests, testStackCases (the Undo and the Redo "both" rows).
+e. Python model naming path or from: FAILED (failures=2), the Undo and the Redo "only the new place" rows.
+RED 5 of 5 this round. Restored clean after each.
+
+Review 2 round (2026-11-25): the U2 row restored as at a03fecefd, the held old-place Undo row restored.
+f. placeLeavingTheFolder returns the last of the places whenever one leads out: run-r2-mustfail-oldrow, exit 65, red: testStackCases with rows "U4b2-2: only the move's old place ..." (the restored row), both "both" rows and the Redo "only the old place" row; testUndoNeverMovesAFileOutThroughALinkMadeAfterTheDoor, both "both" tests and the three Redo "old place" tests. Restored: mac-app clean.

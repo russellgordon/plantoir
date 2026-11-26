@@ -77,7 +77,8 @@ public static class QuitConfirmation
             : sessionEnding ? ClosingReason.AskedByWindows : ClosingReason.ByTheTeacher;
 
     /// <summary>What this app has under way at the moment of the quit.</summary>
-    public sealed record UnderWay(int Publishes, int PreviewsOpen, int PreviewsBeingBuilt, int CopiesBeingSaved);
+    /// <param name="DeployedFoldersShown">Deployed folders this app shows in the browser (#889): counted, and never a reason to ask, since nothing is built or written.</param>
+    public sealed record UnderWay(int Publishes, int PreviewsOpen, int PreviewsBeingBuilt, int CopiesBeingSaved, int DeployedFoldersShown = 0);
 
     /// <summary>The whole rule; the contract's cases run straight through it.</summary>
     public static bool ShouldAsk(UnderWay underWay, Reason reason) =>
@@ -102,11 +103,23 @@ public static class QuitConfirmation
                 : ("A copy of a course is still being saved",
                    "Quitting now could leave the copy unfinished. Nothing on the class website changes.");
 
-    public const string KeepWorking = "Keep Working";
+    /// <summary>
+    /// The button that keeps working (#987, D7): "Cancel", as the contract's
+    /// <c>buttons.titles.keepWorking</c> says. It was "Keep Working". Apple's
+    /// HIG, Alerts: "Always use 'Cancel' to title a button that cancels the
+    /// alert's action." The choice it makes is still keepWorking.
+    /// </summary>
+    public const string KeepWorking = "Cancel";
     public const string QuitAnyway = "Quit Anyway";
 
-    /// <summary>The trail's line: what was under way, and which button was pressed.</summary>
+    /// <summary>The trail's words for keeping working, the mac's (`QuitConfirmation.trailLine`): what was chosen, not the button's title.</summary>
+    public const string ChoseToKeepWorking = "chose to keep working";
+
+    /// <summary>The trail's words for quitting anyway, the mac's.</summary>
+    public const string ChoseToQuitAnyway = "chose to quit anyway";
+
+    /// <summary>The trail's line: what was under way, and what the teacher chose (#987 review: in the mac's words, not "chose Cancel").</summary>
     public static string TrailLine(UnderWay underWay, bool quitAnyway) =>
-        $"asked before quitting with {WhatIsUnderWay(underWay)} under way — the teacher chose " +
-        (quitAnyway ? QuitAnyway : KeepWorking);
+        $"asked before quitting with {WhatIsUnderWay(underWay)} under way — the teacher " +
+        (quitAnyway ? ChoseToQuitAnyway : ChoseToKeepWorking);
 }

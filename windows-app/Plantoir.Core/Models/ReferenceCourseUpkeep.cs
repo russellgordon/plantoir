@@ -80,7 +80,9 @@ public static class ReferenceCourseUpkeep
         }
         catch
         {
-            try { course.Configuration.RevertToFile(course.ConfigFilePath); } catch { }
+            // A held file keeps the window's copy (#874); here the year this
+            // call set must not stay on as if it were filed, so it goes too.
+            try { if (!course.Configuration.RevertToFile(course.ConfigFilePath)) course.Configuration.DiscardChanges(); } catch { }
             return ReferenceCourse.CouldNotSetSchoolYear(shown);
         }
         ActivityTrail.Note(ActivityTrail.Event.ReferenceCourseSchoolYearChanged,

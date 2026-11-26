@@ -62,7 +62,8 @@ public class UpdateInstallQuitUiTests
                 });
             string startupLog = Path.Combine(app.StateDirectory, "startup.log");
             string Evidence() => $"{Environment.NewLine}startup.log:{Environment.NewLine}{Tail(startupLog)}" +
-                                 $"{Environment.NewLine}trail, the update's lines:{Environment.NewLine}{UpdateLines(app)}";
+                                 $"{Environment.NewLine}trail, the update's lines:{Environment.NewLine}{UpdateLines(app)}" +
+                                 ToolsServersRunning();
 
             // The tools copy must be over first: an install waits for it (#484),
             // and on a fresh folder it can take well over a minute.
@@ -99,6 +100,32 @@ public class UpdateInstallQuitUiTests
             foreach (string left in FilesNamed(Path.GetTempPath(), installerName))
                 try { File.Delete(left); } catch { }
         }
+    }
+
+    /// <summary>
+    /// Every <c>plantoir-mcp.exe</c> running on this machine, by process id and
+    /// path (#770). The product holds an install while ANY of them runs, from
+    /// any folder, because an assistant in another program may be in the
+    /// middle of helping; that is the product working, so a failure here
+    /// names the process that held the update rather than leaving a reader
+    /// to find it.
+    /// </summary>
+    private static string ToolsServersRunning()
+    {
+        var lines = new List<string>();
+        foreach (var server in Process.GetProcessesByName(Plantoir.Core.Assist.MachineWork.AssistantServerName))
+        {
+            using (server)
+            {
+                string path;
+                try { path = server.MainModule?.FileName ?? "(path not readable)"; }
+                catch (Exception error) { path = "(path not readable: " + error.Message + ")"; }
+                lines.Add($"  pid {server.Id}: {path}");
+            }
+        }
+        if (lines.Count == 0) return "";
+        return Environment.NewLine + "plantoir-mcp.exe running on this machine (an install is held while an outside assistant's server runs):" +
+               Environment.NewLine + string.Join(Environment.NewLine, lines);
     }
 
     private static void SeedLastDailyCheck(string workspace, DateTime utc)
@@ -151,7 +178,7 @@ public class UpdateInstallQuitUiTests
     /// <c>.signature</c> and the download's <c>sparkle:signature</c>), with a
     /// throwaway key. Plain TCP, so it binds without a URL reservation.
     /// </summary>
-    private sealed class SignedFeed : IDisposable
+    internal sealed class SignedFeed : IDisposable
     {
         private static readonly byte[] Seed = Enumerable.Range(7, 32).Select(i => (byte)i).ToArray();
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
@@ -161,7 +188,7 @@ public class UpdateInstallQuitUiTests
         public string FeedUrl { get; }
         public string PublicKey { get; } = Convert.ToBase64String(Chaos.NaCl.Ed25519.PublicKeyFromSeed(Seed));
 
-        public SignedFeed(string version, string installerName, byte[] installer)
+        public SignedFeed(string version, string installerName, byte[] installer, bool important = false)
         {
             _listener.Start();
             string root = $"http://127.0.0.1:{((IPEndPoint)_listener.LocalEndpoint).Port}/";
@@ -171,7 +198,7 @@ public class UpdateInstallQuitUiTests
                 "<rss version=\"2.0\" xmlns:sparkle=\"http://www.andymatuschak.org/xml-namespaces/sparkle\"><channel><title>Plantoir</title>\n" +
                 $"<item><title>Plantoir {version}</title><description>New in {version}</description><sparkle:version>{version}</sparkle:version>" +
                 $"<enclosure url=\"{root}{installerName}\" sparkle:version=\"{version}\" length=\"{installer.Length}\" " +
-                "sparkle:os=\"windows\" type=\"application/octet-stream\" sparkle:criticalUpdate=\"false\" " +
+                $"sparkle:os=\"windows\" type=\"application/octet-stream\" sparkle:criticalUpdate=\"{(important ? "true" : "false")}\" " +
                 $"sparkle:signature=\"{Sign(installer)}\" /></item>\n" +
                 "</channel></rss>";
             byte[] feedBytes = Encoding.UTF8.GetBytes(feed);

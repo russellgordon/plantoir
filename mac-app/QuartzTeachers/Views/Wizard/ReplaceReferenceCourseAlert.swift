@@ -7,9 +7,10 @@ import SwiftUI
 /// A sheet since #834 (Russell: "This dialog reads as a wall of text"): the
 /// title asks, one sentence says the new course takes the old one's place,
 /// and the facts are rows (what is being replaced, the day it was kept, the
-/// backup's name and how to undo). Cancel answers Return and Escape, which an
-/// alert could not give one button (#832); Replace takes no key. Nothing is
-/// made, backed up or moved until Replace is pressed.
+/// backup's name and how to undo). No button is the default, so Return does
+/// nothing; Cancel answers Escape and Replace takes no key (#973,
+/// `FactsQuestionSheet`). Nothing is made, backed up or moved until Replace
+/// is pressed.
 struct ReplaceReferenceCourseAlert: ViewModifier {
 
     // MARK: - Stored properties
@@ -25,7 +26,7 @@ struct ReplaceReferenceCourseAlert: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $warning) { (shown: ReferenceReplacer.Warning) in
+            .factsQuestionSheet(item: $warning) { (shown: ReferenceReplacer.Warning) in
                 FactsQuestionSheet(
                     question: shown.question,
                     identifier: "replaceReferenceCourse",
@@ -34,7 +35,12 @@ struct ReplaceReferenceCourseAlert: ViewModifier {
                         onReplace(shown.folderName)
                     },
                     cancel: {
-                        warning = nil
+                        // Only this warning's own answer clears it: a
+                        // dismissal settles the question that was showing,
+                        // never a newer one (#973).
+                        if warning?.id == shown.id {
+                            warning = nil
+                        }
                     }
                 )
             }

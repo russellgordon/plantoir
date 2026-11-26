@@ -30,14 +30,13 @@ struct SidebarMenuCommands: Equatable {
     /// true of it.
     var situation: SubjectMenuRules.Situation
 
-    /// Why Rename and Add Section wait, said under Course ▸ Rename.
-    var structuralReason: String?
-
-    /// Why the Revise items are greyed, each reason once (#458).
-    var reviseNotes: [String]
-
     /// When the selected section deploys on its own, for the Cancel item's title.
     var scheduledFor: Date?
+
+    /// What the selected course calls its class pages, for the Classes
+    /// menu's title: Meetings in a club (#990, Russell, 2026-11-20 evening).
+    /// It greys nothing, so it is not part of the situation the rules read.
+    var classNoun: ClassNoun
 
     /// Runs an item on whatever is selected when it runs.
     var perform: (SubjectMenuRules.Item) -> Void
@@ -46,9 +45,8 @@ struct SidebarMenuCommands: Equatable {
 
     static func == (left: SidebarMenuCommands, right: SidebarMenuCommands) -> Bool {
         return left.situation == right.situation
-            && left.structuralReason == right.structuralReason
-            && left.reviseNotes == right.reviseNotes
             && left.scheduledFor == right.scheduledFor
+            && left.classNoun == right.classNoun
     }
 }
 
@@ -64,11 +62,11 @@ struct SectionSiteCommands: Equatable {
     var deployButtonEnabled: Bool
     var previewIsShowing: Bool
 
-    /// The deployed folder (#850): it can be opened, it is shown, and why
-    /// Open in Browser is greyed for it, said under the item.
+    /// The deployed folder (#850): it can be opened, and it is shown. Why
+    /// Open in Browser is greyed is no longer said under the item (#990,
+    /// Russell's ruling Q14: no grey text rows in the menus).
     var deployedFolderReady: Bool = false
     var deployedFolderShown: Bool = false
-    var deployedFolderReason: String? = nil
 
     /// The assistant's functions (#457 batch B): Undo Last Change's target is
     /// this section, and one of them is running on it.
@@ -97,7 +95,6 @@ struct SectionSiteCommands: Equatable {
             && left.previewIsShowing == right.previewIsShowing
             && left.deployedFolderReady == right.deployedFolderReady
             && left.deployedFolderShown == right.deployedFolderShown
-            && left.deployedFolderReason == right.deployedFolderReason
             && left.lastChangeIsHere == right.lastChangeIsHere
             && left.verbIsRunning == right.verbIsRunning
             && left.previewOpensAt == right.previewOpensAt
@@ -113,18 +110,25 @@ struct CourseSettingsCommands: Equatable {
     var maySave: Bool
     var mayRevert: Bool
 
-    /// Why Revert is dimmed, when it is for a reason the teacher can act
-    /// on: drawn as a line under it, which VoiceOver reads with the menu
-    /// (#708: on the Planning tab, `PlanningWording.revertOnPlanning`).
-    var revertNote: String? = nil
-
     var perform: (SubjectMenuRules.Item) -> Void
+
+    /// Why Revert is dimmed, as the menu item's help tag, or nothing when
+    /// the page in front has no reason to give. Revert is dimmed on the
+    /// Planning tab; until #990 a grey line under it in the Course menu said
+    /// why (#708's `PlanningWording.revertOnPlanning`). Russell's ruling Q14
+    /// took the grey rows out of the menus, and the same sentence became
+    /// this help tag (HIG, Offering help: "Consider offering
+    /// context-sensitive tooltips"). Measured: the tag shows on the dimmed
+    /// item, but a menu item's tag is not exposed to accessibility (no
+    /// AXHelp, an accessibility hint included), so a VoiceOver user has the
+    /// same sentence from Help's course-settings page.
+    var revertHelp: String = ""
 
     // MARK: - Functions
 
     static func == (left: CourseSettingsCommands, right: CourseSettingsCommands) -> Bool {
         return left.maySave == right.maySave && left.mayRevert == right.mayRevert
-            && left.revertNote == right.revertNote
+            && left.revertHelp == right.revertHelp
     }
 }
 

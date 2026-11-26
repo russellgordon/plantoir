@@ -292,4 +292,45 @@ public sealed class NewClassesTests : IDisposable
 
         Assert.Equal(1, Open().DayToCarryOnFrom("ICS3U", 1, unit: 7));
     }
+
+    // ---- Line endings (#1040) ---------------------------------------------
+
+    /// <summary>
+    /// The page on disk carries no carriage return. On a checkout made with
+    /// <c>core.autocrlf true</c> the raw string literal compiles with CRLF
+    /// line ends, so this is the test that catches a skeleton that skips the
+    /// normalising step there.
+    /// </summary>
+    [Fact]
+    public void ANewClassPageIsWrittenWithLfWhateverCheckoutBuiltTheApp()
+    {
+        RememberTenDates();
+        var workspace = Open();
+        workspace.ApplyAddClasses(workspace.PlanAddClasses("ICS3U", 1, 2, firstDay: 1, count: 1));
+
+        byte[] written = File.ReadAllBytes(ClassPath("Unit 2, Day 1"));
+
+        Assert.DoesNotContain((byte)'\r', written);
+    }
+
+    /// <summary>
+    /// The same, however this source file was checked out: the literal is
+    /// given CRLF line ends here, as a <c>core.autocrlf true</c> checkout
+    /// compiles it, and the text that becomes the file must still be LF and
+    /// the same text the app writes.
+    /// </summary>
+    [Fact]
+    public void TheSkeletonFromACrlfCheckoutStillBecomesLfText()
+    {
+        var created = new NewClass("Unit 2, Day 1",
+            "courses/ICS3U/section1/All Classes/Unit 2, Day 1.md", new DateOnly(2026, 9, 8), 1);
+        string literal = AssistWorkspace.ClassSkeletonLiteral(created, 2, 1, "");
+        string asACrlfCheckoutCompilesIt = literal.ReplaceLineEndings("\r\n");
+        Assert.Contains("\r\n", asACrlfCheckoutCompilesIt);
+
+        string pageText = AssistWorkspace.PageTextFromLiteral(asACrlfCheckoutCompilesIt);
+
+        Assert.DoesNotContain('\r', pageText);
+        Assert.Equal(AssistWorkspace.ClassSkeleton(created, 2, 1, ""), pageText);
+    }
 }

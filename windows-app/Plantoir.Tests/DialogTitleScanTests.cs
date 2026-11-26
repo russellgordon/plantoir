@@ -34,9 +34,11 @@ public class DialogTitleScanTests
         ["MainWindow.Guidance.cs"] = 1,
         ["MainWindow.Menus.cs"] = 2,
         ["MainWindow.xaml.cs"] = 6,
+        ["Services/DeployedFolderOpening.cs"] = 1,   // #889: couldNotOpen, its title the contract's couldNotOpenTitle
         ["Services/UpdatePrompts.cs"] = 1,
         ["Views/AboutDialog.cs"] = 1,
         ["Views/AddSectionDialog.cs"] = 1,
+        ["Views/AssistantSettingsPane.cs"] = 1,   // #987, D22: the question before a downloaded assistant is removed
         ["Views/AssistWindow.xaml.cs"] = 2,
         ["Views/CopyAPageDialog.cs"] = 1,
         ["Views/CourseSettingsView.xaml.cs"] = 2,
@@ -44,15 +46,15 @@ public class DialogTitleScanTests
         ["Views/FormBuilders.cs"] = 1,
         ["Views/LinksChecklistDialog.cs"] = 1,
         ["Views/NewCourseDialog.cs"] = 1,
-        ["Views/ObsidianWorld.cs"] = 2,   // the add-ons offer and the reopen question (#581)
-        ["Views/SectionDetailView.xaml.cs"] = 16,   // +2 with #736: Fix with…'s refusal and its "didn’t open"
+        ["Views/ObsidianWorld.cs"] = 4,   // the add-ons offer and the reopen question (#581); the closing question and its alert (#1003)
+        ["Views/SectionDetailView.xaml.cs"] = 16,   // +1 with #899 W7b2-9: ShowAlertAsync, which renders the kept-file alert and its keptGone; +2 with #736: Fix with…'s refusal and its "didn’t open"; #928: "Cannot Preview Yet" for a start that cannot go ahead is one dialog, ShowPreviewRefusal, for the press's two refusals, the run that never started and the automated start (17 became 15)
         ["Views/SectionScheduleDialog.cs"] = 1,
         ["Views/SectionVerbDialog.cs"] = 1,
         ["Views/SidebarPane.Reference.cs"] = 6,
-        ["Views/SidebarPane.xaml.cs"] = 16,
+        ["Views/SidebarPane.xaml.cs"] = 17,
         ["Views/SpecialFoldersHelpDialog.cs"] = 1,
         ["Views/StartOfYearDialog.cs"] = 2,
-        ["Views/TaskProgressView.xaml.cs"] = 2,
+        ["Views/TaskProgressView.xaml.cs"] = 3,   // +1 with #1009: "Stop the deploy?"
     };
 
     [Fact]

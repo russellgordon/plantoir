@@ -1181,8 +1181,11 @@ not there yet, geogebra.org out of reach), and for a kind the site says, that
 record's site has said (`siteSaidComplete`). The section's marker stays
 either way: its deployed site still carries the broken page (ruling 11).
 
-**The marker.** ONE `exclamationmark.triangle.fill`, orange, on the row
-(`SidebarView.sectionRowLabel`), shown while the section's OWN record has a
+**The marker.** ONE `exclamationmark.triangle.fill`, in the caution orange
+(`StatusColour.warning.style`), on the row (`SidebarView.sectionRowLabel`, drawn
+by `SectionRowWarningBadge`); on a SELECTED row it takes the row's own
+colour, white on the blue selection, as the row's words do (#994, D38: the
+orange measured 1.45:1 there), shown while the section's OWN record has a
 row; another section's build never puts it on or takes it off. The stopped
 scheduled deploy already drew the same glyph, so when both apply it is still
 one glyph, and its help and accessibility label say each sentence that applies
@@ -1225,8 +1228,9 @@ applies to every dialog presented within the view it is on, so it appeared on
 this alert too (#731, found driving this piece) — ticking it silently turned
 the add-ons offer off. The offer is now presented from a view of its own
 behind the content (`ObsidianAddOnsOfferDialog.offerHost`), and
-`testOnlyTheAddOnsOfferCarriesASuppressionToggle` holds that there is one
-toggle in the app's views, there. Every answer is remembered by alert key in
+`testEachSuppressionToggleIsTheAddOnsOffersOrTheStopQuestions` holds that there is one
+toggle for it in the app's views, there (the only other is the stop
+questions' box on the progress panel's Cancel, #988). Every answer is remembered by alert key in
 `~/Library/Application Support/Plantoir/problems-acknowledged/<folder id>.json`
 (last 20 per section), so a relaunch does not raise yesterday's alert again
 (plan review, HIGH 2) — never in the record, which the build rewrites. A record
@@ -1295,14 +1299,25 @@ opening message: `open(…, greeting:)` sends `FixWithAssistant.greeting`'s text
 in place of the plain greeting. Every word, number and case is
 `app-rules.json` → `outsideAgents.fixWith`.
 
-**Shown, enabled, handed over.** Each button is shown only while its assistant
-is installed, read from `OutsideAssistantPresence` (asked at launch and when
-the app becomes active, never while the table draws — the view's source scan
-holds that it never calls `isAvailable`), and never on a course kept for
-reference: HIDDEN, never greyed, as Revise With ▸'s door items (`hiddenWhenNotInstalled`;
-the submenu itself has been drawn always since #855, with its set-up item).
-They are enabled while at least one row is handed over: ticked (absent means
-ticked) AND not `fixedInTheSource`. A ticked row another section's later build
+**Shown, enabled, handed over.** All three buttons are shown on every course
+not kept for reference. Since #990 (the HIG review's D11, Russell's ruling
+Q9) a button whose assistant is not installed is DIMMED rather than left out,
+as the menu bar's Revise With items are, and its accessibility hint is
+`fixWith.notInstalledHelp`; until then it was hidden. Since #990's review the
+same reason is the button's help tag as well (`.help`, the one
+`FixWithAssistant.buttonHint` for both, `notEnabledHelp` while nothing is
+handed over, nothing while a press would work), so a sighted teacher holding
+the pointer over a dimmed button reads why: HIG, Offering help, "Consider
+offering context-sensitive tooltips". The HIG asks a tooltip to stay within
+60 to 75 characters "as much as possible" ("Be brief"); since the second
+review `notInstalledHelp` is 70 (it was 91), and it names the place Revise With
+▸ Set Up an Assistant… opens, Settings ▸ Other Assistants, rather than the menu
+item; `FixWithAssistantTests` holds both. Presence is read from
+`OutsideAssistantPresence` (asked at launch and when the app becomes active,
+never while the table draws — the view's source scan holds that it never
+calls `isAvailable`). Each is enabled while its assistant is installed AND at
+least one row is handed over: ticked (absent means ticked) AND not
+`fixedInTheSource`. A ticked row another section's later build
 shows fixed in the source is LEFT OUT (`fixWith.fixedInTheSourceIsLeftOut`):
 the page is already right, this section needs only a build, and an assistant
 asked to fix it would find nothing wrong and might change something that is not
@@ -1442,28 +1457,32 @@ A raw `NSAlert` behaves the same way: a button titled Cancel takes Escape, and
 a Return given to it later is dropped. So "Cancel is the default" and "Escape
 closes the question" cannot both hold in an alert, and the first v2.0.0 shape had
 kept the first and lost the second without anybody noticing: the structure
-test pinned the modifier, not the key. The questions now use the destructive
-row of the table: **Escape is Cancel, and Return presses neither button**, so
-a Return typed out of habit still removes, replaces, starts again or shares
-nothing. That was #832's answer for Remove Group, Start the Groups Again,
-Replace It… and the public-address warning, whose Share Without a Password
-used to take Return. **Since #834 the first three are sheets, where Cancel
-answers Return AND Escape, as Russell first asked** (`FactsQuestionSheet`,
-below), and so, since #833, is the public-address warning: it comes after
-the two tables before a share and is a `FactsQuestionSheet` too, so its
-Cancel answers Return and Escape.
-`QuestionKeysTests` presses both keys on each, through the real modifiers.
+test pinned the modifier, not the key. #832 then used the destructive row of
+the table: **Escape is Cancel, and Return presses neither button**, so a
+Return typed out of habit removes, replaces, starts again or shares nothing.
+That was its answer for Remove Group, Start the Groups Again, Replace It… and
+the public-address warning, whose Share Without a Password used to take
+Return. Since #834 the first three are sheets (`FactsQuestionSheet`, below),
+and since #833 so are the public-address warning and the dialog after Change
+Password. From #834 until #973 Cancel on those sheets answered Return AND
+Escape, as Russell first asked. **Since #973 (Russell, 2026-11-15) the sheets
+follow Apple's Human Interface Guidelines, and on the risky questions Return
+does nothing again**: "Return does nothing on risky questions" below.
+`QuestionKeysTests` presses the keys on each, through the real modifiers.
 
-**A sheet can have both**, and the two-lists sheet does: Cancel keeps Return
-(`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives the sheet
-Escape, which its `.interactiveDismissDisabled()` had taken away. The share's
-console already closed on Escape (SwiftUI closes a sheet with no Cancel of its
-own), measured and pinned, not changed.
+**The two-lists sheet is not a facts sheet and was unchanged by #973:** Cancel
+kept Return (`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gave
+the sheet Escape, which its `.interactiveDismissDisabled()` had taken away.
+**Since #987 no button there is the default and Cancel carries Escape**
+("Question sheets and alerts after the HIG review", below). The
+share's console already closed on Escape (SwiftUI closes a sheet with no
+Cancel of its own), measured and pinned, not changed.
 
 **Rejected in #832:** turning the questions into sheets only so that Cancel
 could keep Return as well; and Cancel with Return and no Escape, which is what
 shipped to `dev` and what Russell reported. #834 then made three of them
-sheets for a reason of its own (below), and with that Cancel got both keys.
+sheets for a reason of its own (below), and with that Cancel got both keys
+until #973 took Return away from it.
 
 ### Questions as one sentence and labelled facts (#834)
 
@@ -1476,9 +1495,124 @@ in `SheetTitle`'s two-line shape; the facts as labelled rows in a grouped
 the action and Cancel. A fact that is missing is no row, never a blank one
 (Replace It…'s "Kept on" when the folder's day cannot be read). Each row is one
 accessibility element, so VoiceOver reads the title, the message, then
-"label, value". Cancel is the default (`.defaultButton(isEnabled: true)`) and
-the sheet's `.onExitCommand` is Cancel too, so it answers Return and Escape;
-the action takes no key.
+"label, value". The buttons and their keys are the next paragraphs.
+
+#### Return does nothing on risky questions (#973)
+
+**Ruled by Russell, 2026-11-15, from Apple's Human Interface Guidelines.** The
+Alerts page (https://developer.apple.com/design/human-interface-guidelines/alerts,
+revised 2024-02-02) says: "Note that you don't want to make a Cancel button the
+default button", and "If you want to encourage people to read an alert and not
+just automatically press Return to dismiss it, avoid making any button the
+default button." It also says Escape and Command-Period are the standard ways
+to cancel, "Always place the default button on the trailing side of a row",
+and "Cancel buttons are typically on the leading side". The Buttons page
+(https://developer.apple.com/design/human-interface-guidelines/buttons,
+revised 2025-12-16) says the primary button is "the button people are most
+likely to choose" and responds to Return, and "Don't assign the primary role to
+a button that performs a destructive action, even if that action is the most
+likely choice." Russell's rulings: on the risky questions **Return does
+nothing**, with no default button; and titles defer to the HIG (not changed in
+this piece; every question's titles are listed for him under #975).
+
+So `FactsQuestionSheet` has two layouts, and in both each visible button
+carries at most one key and the cancelling button leads, the action trails:
+
+| layout | cancelling button | action | Return | Escape |
+|---|---|---|---|---|
+| risky (`goAheadIsTheDefault` false): Replace It…, Remove Group, Start the Groups Again, the public-address warning | `role: .cancel`, `.keyboardShortcut(.cancelAction)` | a plain button, no key (`role: .destructive`, drawn red, until #987) | **nothing**: the sheet stays and nothing is answered | Cancel |
+| going ahead is the default (`goAheadIsTheDefault` true): after Change Password | `role: .cancel`, `.keyboardShortcut(.cancelAction)` (Later) | `.defaultButton(isEnabled: true)`, Return (Share Again) | the action | the cancelling button |
+
+Before #973 the risky layout put the action first and Cancel second, on the
+trailing side, with Cancel the default; the order now follows the Alerts page.
+
+**Escape is a key equivalent, not only `.onExitCommand` (#973).** The first
+version gave the sheet Escape through `.onExitCommand` alone, which fires only
+while something inside the sheet holds the keys. With Keyboard Navigation off
+(System Settings ▸ Keyboard, `AppleKeyboardUIMode` unset, the macOS default
+and what most teachers have) the sheet's window itself is first responder, no
+button answered Escape, and SwiftUI closed the sheet through its binding
+without running `cancel`: measured on the second Mac, where the answer the
+test read was `""`, not `cancel`. The main Mac has Keyboard Navigation on,
+focus lands on a button, `.onExitCommand` fires, and its suite was green. With
+Cancel no longer holding Return, Cancel itself carries Escape in both layouts.
+`.onExitCommand` stays on the sheet as a second way in. Measured on the second
+Mac on 2026-11-16 (157109fc4, without it): Escape answered `cancel` in both
+layouts all the same, and Command-Period failed with or without it, so it is
+not what makes either key work there; whether to take it out is left open.
+
+**Closing without an answer is Cancel (#973, Russell 2026-11-16).** Measured
+on the second Mac (Keyboard Navigation off) on 1f15343b9: Escape and Return
+behaved, but Command-Period closed both layouts' sheets without running
+`cancel` (the answer the test read was `""`), and taking `.onExitCommand` off
+(157109fc4) changed nothing. Rather than catch each key, the rule is now
+structural: every question is presented with `.factsQuestionSheet(isPresented:)`
+or `.factsQuestionSheet(item:)` (`FactsQuestionPresentation` and
+`FactsQuestionItemPresentation`, in `Views/Helpers/FactsQuestionSheet.swift`),
+never a bare `.sheet`. Escape answers through Cancel's own key equivalent, as
+above, so it never needs this. The binding those hand to `.sheet` runs the
+question's `cancel` when SwiftUI itself sets it to false while the question is
+unanswered, before the presenter's own state is cleared: that is the route
+Command-Period took on the second Mac, where nothing in the sheet held the keys,
+and the route any other system dismissal takes (a test drives it on both Macs
+with `cancelOperation` on the sheet's window, and checks the answer is already
+`cancel` at the moment the presenter's state reads closed; with the setter's
+`cancel` taken out it read `""`). In the `isPresented:` presenter, `onDismiss`
+checks the same fact for a sheet its presenter closed with no answer, then
+resets it for the next showing. The item presenter has no `onDismiss`: an
+`onChange` of the item's id cancels the question that WAS showing whenever the
+item becomes nil or another item, which covers the presenter closing it and
+(measured) the case `onDismiss` cannot, because SwiftUI swaps a sheet's
+content when the item changes from A to B and never dismisses A. Its record of
+what is showing is replaced only there, after the old one is settled, so A is
+cancelled as itself and B stays asked. Each of these paths was taken out in
+turn on 2026-11-16 and a test in `QuestionKeysTests` failed for each. An `answered` flag, set by both buttons (and
+`.onExitCommand`) before their closures run, is what makes a second `cancel`
+impossible: Cancel or Escape and then the closing runs `cancel` once, and going
+ahead and then the closing runs nothing more. Nothing is timed, and nothing a
+teacher sees changed. Apple's guidance agrees: the Sheets page says "The Cancel
+(or Close) button dismisses a sheet without saving any changes", and Alerts and
+Keyboards give Escape and Command-Period as ways to cancel. Not chosen,
+and not measured: a `.onDisappear` inside the sheet, or `onDismiss` alone.
+Both are told after the sheet has gone, so the presenter's state would already
+read "not asked" with no answer recorded, and anything reading it in between
+(the tests do) would see a question closed and unanswered.
+Windows owes the same rule: a question dialog closed without an answer is
+Cancel, once.
+
+**Rejected:** the first #973 fix, which kept Cancel the default and put Escape
+on an invisible, zero-size, unlabelled button behind it, because a button
+carries one key. Russell stopped it before the merge as bad interface design:
+no hidden controls. Also rejected, not tried: making the sheet's content
+focusable so `.onExitCommand` fires (it would change what Tab and the focus
+ring do on a sheet whose only controls are its buttons, and still depends on
+where focus lands).
+
+**Tests.** `QuestionKeysTests` presses each key on every such question in a
+sheet whose closures write their answer, and checks the answer, because the
+real presenters' `cancel` clears the same state SwiftUI's own dismissal
+clears, so "the sheet closed" could not tell them apart: on a risky question
+Return leaves the sheet showing and answers nothing and Escape answers
+`cancel`; after Change Password Return answers `go` and Escape `cancel`;
+Command-Period answers `cancel` in both layouts; a sheet closed with no answer
+(by its presenter, Command-Period or Escape) answers `cancel` exactly once, and
+one answered by going ahead runs `cancel` never; every question in the app is
+presented through `.factsQuestionSheet` (a source scan). The item presenter is
+driven on its own (`ItemPage`), including an item that changes while its
+question is open. Which button holds which key is NOT read off the drawn
+buttons: SwiftUI draws a sheet's buttons without `NSButton`s, so
+`buttonKeys(in:)` finds none and `testEachButtonCarriesAtMostOneKey` checks
+nothing today (#977); the keys are proved only by pressing them.
+None of it depends on Keyboard Navigation being on. **The lesson for any sheet, on either platform: a test of a key
+that passes only where focus lands on a control proves nothing for a teacher
+with default settings.**
+
+**Windows** shares the sentences, not the keys' mechanics: the rule sentences
+in `contracts/shared-rules.json` (`referenceCourses.groups.wording.rule`,
+`referenceCourses.replacing.wording.rule`, the public-address warning's rule
+and the shelf's menu lines) now say no button is the default, Return does
+nothing and Cancel answers Escape. Where Microsoft's guidance differs is a
+question for #975.
 
 Three questions use it: Replace It… (`referenceCourses.replacing.wording`:
 `message`, then Being replaced, Kept on, Backed up first as, To undo), Remove
@@ -1500,8 +1634,11 @@ value wrapped. The test fails on that version and passes on this one.
 
 **The Obsidian add-ons offer** (#742, Russell 2026-11-13) takes the same
 shape inside its dialog. When Obsidian is running, Add Them closes the whole of
-Obsidian, so any OTHER course open in it closes too, and only this course
-opens again; the sentence said neither. `offerWhileOpen` and
+Obsidian, so any OTHER course open in it closes too; the sentence did not
+say so. (This said "and only this course opens again" until #995: the code
+reopens every course the list marks open, this one last, and only this one
+when the list cannot be read; `opensAgainValue` now says "{course}, and
+everything else Obsidian had open", the closing question's words too.) `offerWhileOpen` and
 `offerWhileObsidianIsOpen` are now short leads, followed by three facts, one a
 line as "label: value" (`closesLabel`/`closesValue`,
 `opensAgainLabel`/`opensAgainValue`, `keptLabel`/`keptValue`;
@@ -1536,7 +1673,7 @@ control inside read back as the container's name (#832; the rule of #353 and
 before it, and `ContainerIdentifierTripwireTests` names all five.
 
 **The course-code suggestions** in the New Course wizard opened four points
-under the field, over the orange sentence saying the code is already taken
+under the field, over the sentence saying the code is already taken
 (and its Replace It… button), until focus left the field. The field's row,
 field and sentence together, now publishes its own anchor beside the field's
 (`CourseCodeAnchors`, a transform so the field's is kept), and the list opens
@@ -1544,6 +1681,543 @@ below the row (`CourseCodeSuggestionsOverlay.top`). Measured by the geometry
 function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests`);
 the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
 a unit test can read a frame from.
+
+## Escape and Command-Period stop a running preview, deploy or plan share (#988)
+
+The progress panel's Cancel (`TaskProgressView`, `taskCancelButton`) answers
+Escape and Command-Period while a preview builds or a deploy runs, unless
+something else has a use for the key. Until #988 it carried no key, and the
+HIG review (#975, finding D6) found both keys did nothing with Keyboard
+Navigation on or off; with it off, the button could not be reached from the
+keyboard at all. Keyboards
+(https://developer.apple.com/design/human-interface-guidelines/keyboards):
+"Esc: Cancel the current action or process"; "Command-Period: Cancel an
+operation." Progress indicators: "When it's feasible, let people halt
+processing."
+
+**The visible button carries the key, and decides each key when it
+arrives** (the fifth #988 round). Cancel is `TaskCancelButton`, a real
+`NSButton` wrapped for SwiftUI (`CancelKeyNSButton`, a regular push button,
+the bezel SwiftUI's `.bordered` draws on the Mac: 66 x 24 points for both,
+measured by `testTheCancelButtonIsTheSizeAndKindOfTheOneItReplaced`; its cell
+is the accessibility element, role button, title "Cancel"). It overrides
+`performKeyEquivalent(with:)`, which AppKit calls with the key itself before
+the focused box sees it, and takes Escape (no Command, Option, Control or
+Shift) or Command-Period only while `cancelKeysAreLive`
+(`TaskProgressView.cancelHoldsTheKeys`: Cancel shows, the run is under way,
+no preview's site covers the panel (below), no question about stopping is
+open, the panel's window is the key window, `controlActiveState == .key`, so
+a sheet, an alert or a popover in front lets go of it) AND, read at that
+moment, no box in its window is being typed in
+(`KeyWindowTextEditing.isEditingText(in:)`: the window's first responder is
+EDITABLE `NSText`, the field editor every text field and search field edits
+through, or an editable text view). Refused, the key goes on to the box as if
+there were no Cancel; a box with no use for Escape sends `cancelOperation`
+back up to the window, which offers it to Cancel again and is refused again,
+so nothing loops (`testEscapeInAFieldWithNoUseForItStopsNothing`). A click
+and an accessibility press (VoiceOver's VO-Space, Voice Control's "Click
+Cancel", Switch Control) reach `pressCancel` with nothing to inspect and
+always stop the task. The button sets no `keyEquivalent`, so there is one
+route for its keys; with Escape set there as well every pressed-key test still
+passed (sabotage S4, run `988-n4`), so that is a choice, not a fix.
+
+**Why it moved off a SwiftUI shortcut.** Round four put
+`.keyboardShortcut(cancelKeysAreLive ? .cancelAction : nil)` on a SwiftUI
+Cancel. SwiftUI applies a change to that only when it next updates the view,
+so in run `988-n2` (Keyboard Navigation on) a click in the Filter field and
+Escape already waiting together in the event queue, which is what a
+teacher's input becomes when the app is busy for longer than the gap between
+them, met a Cancel that still held the key, and Escape stopped the task.
+The next writer had `pressCancel` read `NSApp.currentEvent` and refuse a
+press that was a key while a box was being typed in. The fifth review found
+that `NSApp.currentEvent` is the last event taken off the queue, not the
+event that pressed the button: an accessibility press has no event of its
+own, so a VoiceOver press coming after a key typed in a box was taken for
+that key and the task kept running (`testAnAccessibilityPressStopsTheTaskWhileABoxHasTheFocus`,
+red with that check put back, sabotage S1). It also still took the key away
+from the box. Deciding in `performKeyEquivalent` reads the key that is
+actually arriving and the window as it is then.
+
+**Only editable text is a box** (the fifth review's low). The console's
+output is `.textSelection(.enabled)`; measured on the main Mac with
+Keyboard Navigation on and off (run `988-n4`), a click in it makes a
+read-only `NSTextView` the window's first responder, so with "is `NSText`"
+as the test, selecting a line of output silenced Escape and Command-Period for
+the running task. Nobody types there, so `isEditingText` asks for
+`isEditable` too (`testSelectingConsoleTextLeavesTheKeysWithCancel`,
+`testOnlyEditableTextIsABox`). The console's own answer field is a box, and
+keeps the keys.
+
+Russell's ruling on #988 (2026-11-19, evening): left as built. While any box
+has the focus (with Keyboard Navigation on, AppKit focuses the sidebar's
+Filter field when the window becomes key), Escape and Command-Period are
+both the box's; a click on Cancel still stops the task
+(`testAClickOnCancelStopsTheTaskWhileABoxHasTheFocus`, a real click through
+the event queue).
+
+**What SwiftUI's field does with a queued Escape is SwiftUI's.** Measured in
+run `988-n4`: with the Filter field's `.onExitCommand`, an Escape queued
+straight behind the click that focused the field runs nothing, with Cancel
+in the window or with no Cancel at all, because SwiftUI learns that its field
+has the focus only when it next updates the view. The queued-key tests
+therefore hold the box to what it does with no Cancel in the window,
+measured first in the same window, and the task to running on; the next
+Escape clears the box as usual. Passing the key on to the box from Cancel's
+action, rejected in round four because it came straight back to Cancel
+through `cancelOperation`, is not needed: the key never reaches the action.
+
+**Rejected, in order:** `CancelKeyCatcher` (round one), an invisible view
+that took the keys: the kind of hidden key-carrying control Russell rejected
+on #973. `CancelOperationResponder` (rounds two and three), an `NSResponder`
+put into the window's chain to answer `cancelOperation(_:)`: the third
+review measured that in a window whose content is a hosting CONTROLLER (the
+shape of the app's own windows) it was not in the chain and Escape did
+nothing, and that taking the window's first-responder place depended on
+Keyboard Navigation; it also needed an invisible installer view.
+`.onExitCommand`, which fires only while something in the panel holds the
+keys, and with Keyboard Navigation off nothing does (#973). A list of fields
+that keep Escape, which goes stale with the next field.
+
+**A preview stops at once; a deploy asks first** (Russell, 2026-11-19, on
+#988), by click or by key: an alert, "Stop the deploy?"
+(`DeployStopWording`), "The website may be left partly updated until you
+deploy again.", with **Stop Deploy**, a plain button and the default (Return),
+and **Cancel** (`role: .cancel`, `.keyboardShortcut(.cancelAction)`: Escape and
+Command-Period), which lets the deploy run on. Alerts: "Always use 'Cancel'
+to title a button that cancels the alert's action"; the destructive style is
+for "a destructive action people didn't deliberately choose", and stopping
+is what the teacher chose. macOS stacks the two buttons in this alert, the
+default at the top (with the box below, AppKit draws them in a row, the
+default trailing). If the deploy ends while the question is open, the
+question goes and nothing is stopped.
+
+**A plan share asks first too** (Russell's rulings on the design,
+`vm-tools/reference/988-stop-questions-design.md`, 2026-11-19): "Stop this
+share?", "The unit plans may be left partly shared until you share them
+again.", **Stop Share** (plain, default) and **Cancel** (`ShareStopWording`),
+and its Cancel holds the stop keys as the deploy's does. The title is not
+"Stop Sharing", which already names taking shared plans down in the
+Planning tab. The sentence becomes "The unit plans stay as they were before
+this share began." when #992's all-or-nothing share lands; a comment on #992
+says so. `TaskProgressView` takes `stopQuestion: StopQuestion?` (`.deploy`
+from the section window, `.share` from `PlanShareConsoleSheet`, `nil` for a
+preview).
+
+**"Don't ask again" on both questions, each its own setting** (rulings 2 and
+3). The box is `.dialogSuppressionToggle` on the panel's Cancel button itself,
+so it reaches the stop question and no other: a suppression toggle applies to
+every dialog presented within the view it is on, which is how the add-ons
+offer's box once reached the Problems alert (#731). It starts unticked each
+time the question opens and is read only by the stopping button
+(`StopQuestion.stopWasChosen`): ticked with Stop Deploy or Stop Share, that
+question is off (`AppSettings.asksBeforeStoppingADeploy` or
+`.asksBeforeStoppingAShare`, both on by default); ticked with Cancel, nothing
+is remembered, so a teacher who backed out is not surprised next time by a
+key that stops at once. Two settings, not one: the HIG's words are "the same
+alert", and one setting would let a tick on a share silently turn off the
+deploy's question (the #731 lesson again). **Once a question is off**,
+`asksBeforeStopping` is false, and Cancel, Escape and Command-Period stop that
+task at once, as a preview's do.
+
+**The way back is Plantoir ▸ Settings ▸ Deploying ▸ Stopping**
+(`StopQuestionSettingsSection`, the pane's first section): "Ask before
+stopping a deploy" and "Ask before stopping a share of unit plans", with the
+footer "When one is off, Cancel stops that task at once, and so do the Escape
+key and Command-Period." They are the grouped form's switches, as the
+Obsidian and Assistant panes draw theirs (Toggles: "Within a grouped form,
+consider using a mini switch"; "In general, don't replace a checkbox with a
+switch"). Each change, from the box or the pane, writes one
+`stop question setting changed` line. Windows records it too since
+[#1009](https://github.com/russellgordon/plantoir/issues/1009), which also
+moved the questions' words into `shared-rules.json` → `stopQuestions`
+(documentation 12 → "Escape stops a running preview or deploy, and the stop
+questions"). The mac reads that section in `StopQuestionsContractTests`: its
+Swift constants pinned to `questions`, `wording` and `trail`, and every one
+of the `cases` played step by step through `StopQuestionAsking` and the
+Settings row's binding, `StopQuestionSettingsSection.isOn`; never
+`appliesOn`, which is for a permanent difference. The same test plays
+`stopQuestions.aStoppedDeploy` (#1009's third review) against
+`MultiDestinationDeployRunner.outcome` and `result`: a destination a stop
+kept the run from reaching counts as not deployed, so a stopped run is never
+`allSucceeded` and `recordWhatWentOut` writes no stamp. On Windows a stop
+could land between two destinations and the run was stamped published and
+the assistant told "deployed"; the mac's Cancel answers only while the shown leg is running or
+between its phases (`TaskProgressView`), so a stop cannot land in that gap.
+One sentence the mac says did change: with three destinations stopped during
+the second, `deployPartiallySucceeded` named only the second as not deployed,
+and now names the second and the third, which never got the site either (the
+contract case "stopped during the second of three", #1009's fourth review). A
+stop in the first of two legs now lists the second as not deployed too, which
+is never said, since no leg went out.
+Rejected: one setting for both (above), and
+Xcode's "Reset all questions" button, which says nothing about which
+question it brings back.
+
+**Only while the panel is in front.** In the section window the preview's site
+is drawn OVER the panel once it serves (`websiteLayers`), and the runner is
+still running then. So `takesTheCancelKeys` is false while `previewURL` is set
+(`SectionDetailView.progressPanelTakesTheCancelKeys`), and Escape on a web
+page never stops the preview; the Section menu's Stop Preview and the toolbar
+button do. Other tabs (Coverage, Problems) do not hold the panel at all
+(#793). No menu item or shortcut was added: those are #990's.
+
+**Once per run** (`CancelOncePerRun`, keyed by the runner's `startedAt`): a
+held key repeating faster than the panel redraws would run Cancel more than
+once, and a plan share's cancel (`stopByUser`) never sets `wasCancelled`.
+Any stop after the first in a run does nothing, and the button goes.
+
+**Tests.** `ProgressCancelKeysTests` presses each key the way a teacher does:
+the panel in a window whose content is an `NSHostingController` (the app's
+own windows' shape, which the class also reads off the host's real window),
+inside a split view with a Filter box, appearing after the window is up,
+the window made the key window of the active app, and the key sent through
+`NSApp.sendEvent`. Escape and Command-Period stop a preview once; a held key
+stops it once; typed in the Filter box, Escape clears the box and neither key
+stops the task, a click in the box with Escape or Command-Period already
+queued behind it stops nothing and leaves the box as it is with no Cancel
+there, and once focus leaves the box Escape stops it; behind a sheet
+(one whose Cancel holds Escape, and one with no use for it) and behind an
+alert neither key stops it; with the site covering the panel neither does;
+on a deploy either key asks, Escape or Command-Period in the question is
+Cancel and the deploy runs on, Return is Stop Deploy and stops it once, and
+the question goes when the deploy ends; ticked with Stop Deploy the box turns
+the deploy's question off and leaves the share's on, ticked with Cancel it is
+not remembered and the next question opens unticked; with a question off,
+Escape and Command-Period stop that task at once; and a share still asks
+with the deploy's question off, Return choosing Stop Share. They take the front from
+the person at the Mac, so they are **opt-in**: `TEST_RUNNER_PLANTOIR_KEY_TESTS=1`
+on the `xcodebuild` line, on a Mac nobody is using; without it they skip and
+say so, and the rule and source tests run. The merge gate on the main Mac
+runs them after the suite (`vm-tools/gate-here.sh`, a `keys:` line that is
+RED on any failure), except while the person is at that Mac's keyboard,
+when the line reads `keys: SKIPPED, screen in use`. Bringing the host forward goes
+through Launch Services when macOS refuses `activate` (cooperative
+activation, no accessibility grant), which makes the accessory host a
+regular app; `tearDown` makes it an accessory again
+(`UnitTestHostWindowsTests`, #633). When the host still cannot be made the
+active app with that window key (a locked screen, #315), those tests skip and
+say so. With Keyboard Navigation on, AppKit puts the focus in the Filter
+box when the window becomes key, so the box owns Escape until the teacher
+clicks elsewhere; the tests start with focus in no box, and
+`testWithKeyboardNavigationOnTheFilterFieldHasEscapeFirst` records that case
+as it is (skipped with Keyboard Navigation off); Russell ruled on 2026-11-19
+that it stays so. Also pressed: an accessibility press (`AXPress`
+on Cancel's accessibility element, the button's cell) and a real click on
+Cancel each stop the task while the Filter box has the focus, the press
+coming straight after a key typed in the box; typed in a text view, or in a
+field with no use for Escape, neither key stops the task; after selecting
+console output, Escape does. A test that focuses the Filter box has the
+window's SwiftUI content update before the next key
+(`applyPendingViewUpdates`), because the field's own `onExitCommand` runs
+only once SwiftUI knows the field has the focus (above; a gap no teacher can
+press a key inside). Measured on the main Mac with Keyboard Navigation on
+and off (`AppleKeyboardUIMode` 3 and 0), the same results (run `988-n4`: 35
+of 35 on, 34 and the one Keyboard-Navigation-on test skipped off). Gated, in
+every suite: the button's rule (`testCancelTakesAKeyOnlyWhenNoBoxIsBeingTypedIn`),
+the keys it answers (`testTheCancelKeysAreEscapeAndCommandPeriod`), only
+editable text is a box, the button's size, kind and accessibility element
+against the SwiftUI Cancel it replaced, and a source check that nothing in
+`Views/Console` is a hidden key catcher: the one representable there is the
+visible Cancel, a titled `NSButton`, and nothing adds a responder, watches
+the event stream, hides a view or reads `NSApp.currentEvent`. Sabotaged in a
+scratch worktree (run `988-n4`): S1, the `currentEvent` check put back, turns
+the accessibility-press test red (the click test stays green, as it was
+before: a mouse-up is the current event); S2, the typing condition taken out
+of `performKeyEquivalent`, turns the text-field, text-view, no-use field and
+both queued-key tests red; S3, selectable text counted as a box, turns the
+console test and `testOnlyEditableTextIsABox` red.
+
+`StopQuestionTests` (in every suite) holds the rest without a key. The
+question's open state and its box are a small `@Observable` model,
+`StopQuestionAsking`, whose `chooseStop()` and `chooseCancel()` the alert's
+buttons call (the fourth review: before it, Cancel-remembers-nothing was
+held only by a source check). Its tests: ticked then Cancel leaves the
+setting on, writes nothing and opens unticked next time; ticked then Stop
+turns off that question only; with a question off Cancel stops at once;
+Return's key is the stopping button's. Also: both on by
+default, the tick counts only with the stop, each setting silences only its
+own question, the Settings rows turn each back on and write their line, the
+answers are remembered apart, Stopping is the pane's first section, and the
+words are the ruled ones.
+
+**For Windows (stage 3, #979):** the progress panel's Cancel takes Escape
+while the panel is in front and no text box, popover, dialog or flyout has
+focus, acts once per run, and for a deploy or a plan share asks first ("Stop
+the deploy?", "Stop this share?"), with the stopping button the default and
+Cancel on Escape, a "Don't ask again" box that counts only with the stop,
+one setting per question, and both turned back on in the Deploying part of
+Settings. The words (`DeployStopWording`, `ShareStopWording`,
+`StopQuestionSettingsWording`) and the cases are in `shared-rules.json` →
+`stopQuestions` since #1009, run by both suites; the trail event
+`stop question setting changed` is in `activityTrail.mustRecord`. Two lessons from the Mac's fifth
+round travel: decide whether a key is the text box's when the key arrives,
+from the focused element as it is then, never afterwards from a "last event"
+global (a click or a UI Automation Invoke on Cancel must always stop the
+task, whatever was typed before it); and a read-only text block a teacher can
+select (the console's output) is not a text box, so selecting a line of it
+must not take the keys from Cancel.
+
+## Red and orange: the colours of a problem, measured (#994)
+
+The HIG review (#975, findings D37, D38 and inconsistency 10) measured the
+orange warning text at **1.98:1 in Light and 3.74:1 with Increase
+Contrast**, against the 4.5:1 the HIG's Accessibility page asks of text up
+to 17 points, and the stopped-deploy badge on a selected sidebar row at
+**1.45:1**. It also found red in some places and orange in others for the
+same kind of problem.
+
+**The rule (Russell, 2026-11-18):** red for a problem that stops the teacher
+going ahead (a name already taken, a form that will not submit, Schedule
+greyed, an act that failed); orange for a caution they can go past (dates
+before today, a domain that does not look like one, a page with no room for
+a key). Each also carries a symbol, so colour is never the only sign (HIG,
+Color, "Inclusive color"): `exclamationmark.triangle` for a caution,
+`xmark.octagon` for a stop. Where one place can be either, it asks which
+applies (Add Section: a number that cannot be added is red, a remark about
+one that can is orange; Cloudflare's Account ID: "it can wait" is orange,
+an ID that stops Create or Save is red).
+
+**One home: `StatusColour`** (`Views/Helpers/StatusColour.swift`), with
+the values in a Color Set each (`QuartzTeachers/StatusColours.xcassets`:
+`StatusWarning`, `StatusBlocking`), with Any, Dark, and High Contrast
+variants of both, so the system resolves the variant and redraws when the
+teacher changes appearance or Increase Contrast (HIG, Dark Mode: "When you
+need a custom color, add a Color Set asset to your app's asset catalog").
+The first version read `accessibilityDisplayShouldIncreaseContrast` inside a
+colour provider and observed nothing, so a change while the app ran was
+never shown; it is gone. `StatusColour.style` is the style a sentence or
+symbol wears; on a selected row (`backgroundProminence == .increased`) it
+gives way to the selected row's text colour, as the row's words do.
+`sentence(_:)` returns ONE `Text` with the symbol inline, so the modifiers
+each place had still apply; VoiceOver hears the words alone. Where the
+words can be selected and copied (Schedule a Deploy's plan, a section
+schedule's failure) `StatusLine` puts the symbol beside the words, so a copy
+carries the words alone. One symbol per meaning, app-wide: the console's
+"Failed" and "Something went wrong" and a failed deploy leg use the stop
+symbol too.
+
+**The values.** Dark keeps the system orange's own published values (R255
+G146 B48, and R255 G160 B86 with Increase Contrast, the HIG's Color page).
+In Light neither system colour passes: the orange is 2.31:1 on white and
+the red 3.57:1, and the system's Increase Contrast orange (R197 G83 B0) is
+3.45:1 on a grey Form row. Measured (WCAG ratio; Light on white / #E0E0E0,
+Dark on #1E1E1E / #3C3C3C, the lightest dark grey the app draws a sentence
+on):
+
+| | Light | Light, Increase Contrast | Dark | Dark, Increase Contrast |
+|---|---|---|---|---|
+| Caution orange | #A84300: 6.06 / 4.59 | #983C00: 7.04 / 5.34 | #FF9230: 7.47 / 4.94 | #FFA056: 8.27 / 5.47 |
+| Stopping red | #BF0019: 6.50 / 4.93 | #9E0014: 8.52 / 6.46 | #FF8587: 7.11 / 4.70 | #FF9496: 7.88 / 5.22 |
+
+#983C00 is the brightest orange that reaches 7:1 on white; it is dark, so
+the triangle carries the kind as much as the hue. (#7A3000, the first
+choice, read as brown, 1.62:1 from body text.)
+
+`StatusColourTests` reads the four values from the Color Sets and checks
+each against those backgrounds, checks that the app draws the catalog's
+Light and Dark values, that the orange keeps an orange hue and the red a
+red one, and scans every Swift file in the app target for `.orange`,
+`.red` (any use: `.tint`, `return`, `.fill`, `.foregroundColor`,
+`Color.`/`NSColor.`) and `systemOrange`/`systemRed`, with four named
+exemptions: the Assistant's Deploy button tint, and the console's
+"Cancelled", "Waiting for your answer…" and "Cancelling…", which are
+statuses, not problems, and keep their colour. **Rejected:** keeping the
+system colours and relying on Increase Contrast (the HIG allows that only
+"if your app doesn't provide this minimum contrast by default", and the
+system's own Increase Contrast orange still fails on a sheet); plain text
+with only a coloured symbol (the ruling asks both colours to meet 4.5:1);
+and reading Increase Contrast by hand (above).
+
+**Selected rows (D38).** A selected row's background is the accent blue,
+on which no orange or red reaches 3:1. The sidebar's badge
+(`SectionRowWarningBadge`) wears `StatusColour.warning.style`, so on the
+selection it turns white with the row's words (5.37:1; it was 1.45:1). The
+Plan Share documents table is AppKit: its cells are
+`StatusTintedTableCellView`, which sets the caution symbol's tint from the
+cell's `backgroundStyle`, white when AppKit marks the row `.emphasized`
+(it was 1.13:1 there). The stopped-deploy band is the orange at 12% over
+the window: its triangle is 5.05:1 in Light and 6.05:1 in Dark (2.09:1
+with the system orange).
+
+**Not changed, named for whoever comes next:** the Assistant window's Deploy
+button is tinted the system orange (`.tint(.orange)`), white on #FF8D28
+being 2.31:1; and "Done", "Finished" and the console's other green labels
+are the system green (2.22:1, measured by the review). VoiceOver hears a
+red sentence and an orange one alike; that belongs to #993. Windows matches in
+stage 3 of #975.
+
+## Question sheets and alerts after the HIG review (#987)
+
+Stage 2 of the HIG review (#975), carrying Russell's rulings of 2026-11-18
+(Q1, Q2, Q3, Q7 and Q-B on #975) and the inventory's findings D1 to D5, D7 to
+D9, D22, D32, D33 and D39 (`vm-tools/reference/975-mac-hig-inventory.md`).
+The HIG pages were read on the day of the change, from Apple's own page data:
+Alerts, Sheets, Buttons, Keyboards, Modality, Menus and Context menus. Russell's
+rule: his own rulings do not override the HIG, and where the HIG does not
+settle a case it is a question for him, not a design.
+
+**Escape and Command-Period always cancel, bound one way.** Every button with
+`role: .cancel`, in a sheet or an alert, carries
+`.keyboardShortcut(.cancelAction)`, and every button titled Cancel has that
+role; `SheetConventionScanTests.testEveryCancelAnswersEscape`,
+`testNoCancelIsTheDefault` and `testEveryButtonTitledCancelHasTheCancelRole`
+scan every view for it. Keyboards: "Esc: Cancel the current action or
+process"; "Command-Period: Cancel an operation." Before, Cancel was bound
+three ways (inventory inconsistency 2): by that key, by `.onExitCommand`
+alone (which does not fire with Keyboard Navigation off, #973), or by the
+role alone (D5). Escape and Command-Period already closed the D5 sheets
+(the inventory's second half), whose Cancel only dismisses, so for them the
+change is uniformity. Two Cancels take the key off while a picker field's
+list is open (Copy a Page and the New Course wizard), so the first Escape is
+still the field's, to put the list away (`PickerEscape`, #457 C1): a key
+equivalent on a button is offered the press before the field. Where a sheet's
+Cancel does more than close it, closing by any other route does the same:
+Import Courses for Reference stops a copy under way when the sheet goes
+(`run?.cancel()` in its `onDisappear`), as its Stop does, and the token
+question's binding keeps the old token when the system closes it. Exempt, by
+name in the scan: the folder-refused alert's lone OK and the repair outcome's
+dismissal (an alert's only button), and the progress panel (#988).
+
+**No Cancel is the default, and no button is the default where work can be
+lost** (Q3). Alerts: "Note that you don't want to make a Cancel button the
+default button", and "If you want to encourage people to read an alert and
+not just automatically press Return to dismiss it, avoid making any button the
+default button." Buttons ▸ Role: "Don't assign the primary role to a button
+that performs a destructive action, even if that action is the most likely
+choice." Decided one by one:
+
+| | question | Return before | Return now | why |
+|---|---|---|---|---|
+| D1 | the assistant's "Put {code} Section {n} back to how it was?" | Cancel (and Escape did nothing) | nothing | it loses the teacher's own edits |
+| D2 | "That token cannot reach … class websites" | Keep My Old Token | nothing | the new token moves students' links; Use the New Token is drawn red, because the teacher chose to change the token, not to break links (Alerts: the destructive style is for "a destructive action people didn't deliberately choose") |
+| D3 | "Set up {tool}?" | Cancel | Download and Set Up | nothing is lost; the teacher chose Set Up |
+| D4 | Plan Share's two tables | Cancel | nothing | a share cannot be taken back once students can open it, as Get Ready counts (Q-B) |
+| D39 | Get Ready's Put These into Draft | the action | nothing | Russell's ruling Q-B |
+| D7 | the quit question (`NSAlert`) | Keep Working | nothing | Cancel may not be the default, and Quit Anyway can leave a deploy part way |
+| D32 | New Course or Club's Create Course | nothing (it only looked like the default) | Create Course, once the form is complete | Q7; Buttons ▸ Role, "the button people are most likely to choose" |
+
+"Once the form is complete" is `NewCourseWizardView.formIsComplete`: a code
+with no problem, a name typed, section numbers, a class-page word and, for a
+club, a class folder, each as `startCreation` would accept it. Until then the
+button is plain and Return does nothing, because a Return typed in the code
+field with the rest unread once made a club named by its code (#457's review).
+Nor is it the default while the course-code list is shown
+(`NewCourseWizardView.createCourseIsTheDefault`, the #987 review): a default
+button is offered Return before the field's `onKeyPress`, so Return with a
+code highlighted made the course instead of choosing the code. Measured, and
+pinned by `QuestionKeysTests.testReturnInTheCodeFieldChoosesTheSuggestion`,
+which presses Return in the wizard's own `CourseCodePickerView` beside a
+Create Course that follows the wizard's rule (and failed with the rule that
+looked at the form alone). **Escape while the course is being made does
+nothing** (Russell, 2026-11-18, on the #987 review), as before #987: the
+wizard's Cancel answers Escape and Command-Period until Create Course is
+pressed and, through the sheet, again once the course is made; a click on
+Cancel still stops the making (`NewCourseWizardView.cancelAnswersEscape`).
+
+**Order.** Cancel leads and the action or default trails in every row:
+"Always place the default button on the trailing side of a row"; "Cancel
+buttons are typically on the leading side of a row." "Set up {tool}?" had
+them the other way round (D3). The quit question puts Quit Anyway first in
+`QuitConfirmation.buttonsInOrder`, because `NSAlert` puts the first button it
+is given on the trailing side, sets each button's key from the same list
+(NSAlert gives its first button Return by itself), and `QuitAlertKeysTests`
+presses Escape, Command-Period and Return on the real alert shown as a sheet.
+
+**Red** (Q1, D33). The risky facts questions' go-ahead (Replace It…, Remove
+Group, Start the Groups Again, Share Without a Password) is a plain button
+now, still with no key. Alerts: "Use the destructive style to identify a
+button that performs a destructive action people didn't deliberately
+choose." **The SwiftUI alerts were left red, a known open point: Russell
+wants the question sheet itself redesigned first (#1000), and until then the
+alerts stay exactly as they are here, none moved to a sheet.** Measured (`AlertKeysTests`), in a SwiftUI `.alert` a plain
+button beside a Cancel takes Return whatever is written on it
+(`.keyboardShortcut(nil)` does not take it away, nor a `.cancelAction` on the
+Cancel); only the destructive role leaves the go-ahead with no key. So an alert
+cannot be both "not red" and "no default", and Q1 asks for both. The HIG itself
+points two ways: Alerts' Empty Trash sentence says the deliberately chosen
+action is not red and "the convenience of pressing Return to confirm" it
+outweighs the warning, while Buttons ▸ Role says not to make a destructive
+action primary. The alerts concerned: Remove (course or section), Delete
+(backup, backups, archive), Remove (a scheduled deploy), Remove (a token,
+an assistant, a Course Settings list entry), Stop Sharing, the assistant's
+put-back (D1) and the new Remove for a downloaded model (D22).
+
+**Ruled since, by the director on 2026-11-18:** the quit question keeps no
+default button, as built; the Plan Share tables (D4) keep no default; the
+links checklist's Not Now stays until #991.
+
+**Titles** (Q2). Alerts: "Always use 'Cancel' to title a button that cancels
+the alert's action." Retitled: Keep My Old Token and Don't Save It → Cancel
+(`deployTokens.words.cancelButton`); Leave It Scheduled → Cancel; the locked
+pages note's Not Now → Cancel (the teacher chose Open in Obsidian); the quit
+question's Keep Working and Finish Setting Up → Cancel. On offers Plantoir
+raised by itself, Not Now: Not Today (today's class on the front page; the
+contract key keeps its name) → Not Now; Later (Reopen Obsidian, and Share
+Again after Change Password) → Not Now. D9: the assistant's dates offer's Yes
+→ Add Dates… (`AssistWording.giveDatesButton`): "Aim for a one- or two-word
+title that describes the result", "avoiding 'Yes' and 'No'", and the ellipsis
+because it opens the class-dates sheet (Buttons ▸ macOS). Its decline, Cancel
+until the #987 review, is Not Now (`AssistWording.declineDatesButton`): the
+offer is one the assistant raised by itself. Left as they were,
+and listed as questions: the links checklist's Not Now (the same sheet opens
+by itself after a build and from the menu), ruled since: it stays as it is
+until #991 stops that sheet opening by itself. The scheduled deploy's question
+is ruled too (Russell, 2026-11-18): its verb is Remove, so the command is
+Remove Scheduled Deploy…, the question "Remove the scheduled deploy?", and its
+buttons Cancel (leading, Escape) and Remove
+(`ScheduledDeployRemovalWording`, `scheduledDeployCancellation.removingOne`).
+
+**D22.** Removing a downloaded assistant in Settings ▸ Assistant asks first,
+as Alerts asks for "an uncommon destructive action that they can't undo".
+
+**Measured with Keyboard Navigation off and on** (`AppleKeyboardUIMode` 0 and
+3, put back to 3 afterwards), on 2026-11-18 in a copy of the app built from
+the branch and launched the `IsolatedLaunch` way (its own `--state-dir`, the
+#975 run's example workspace with stub launchers), keys sent through System
+Events only while that copy was in front, results read from its accessibility
+tree and captured with `screencapture -l` (`vm-tools/runs/987-keys/`). The
+same under both settings: Get Ready, Return left the sheet open with Put These
+into Draft plain, Escape and Command-Period closed it; Class Dates, Schedule a
+Deploy, Keep a Copy for Reference and Add a Section, Escape and Command-Period
+each closed the sheet; Copy a Page with its page list open, the first Escape
+put the list away and the second closed the sheet; New Course or Club, Return
+did nothing on the empty form, Create Course was plain until a code and a name
+were typed and blue from then on, a first Escape with the code list showing
+put the list away and the next closed the sheet, Command-Period closed it; the
+quit question (a stub preview being built), Cancel leading and Quit Anyway
+trailing with no blue button, Return did nothing, Escape and Command-Period
+were Cancel and the app stayed open; Remove Section (unchanged, red), Return
+did nothing and Escape closed it. Not reached in the running app, as in the
+inventory's second half, and covered by the unit tests instead: the token
+question (D2), "Set up {tool}?" (D3, every assistant is installed here), Plan
+Share (D4), the assistant's put-back and dates offer (D1, D9) and D22 (no
+downloaded assistant).
+
+**Windows** (#979) follows: the changed contract keys are
+`deployTokens.words.cancelButton` (replacing `keepOldToken` and
+`dontSaveNewToken`), `quittingWhileWorkIsUnderWay.buttons` (`titles.keepWorking`
+"Cancel", `order`, `default` null, `escape`, `firstButtonByQuestion` gone,
+the cases' `expectCancelButton`), `obsidianAddOnsForFigures.wording.later` and
+`unitPlanning`'s `later` ("Not Now"), `todaysClassOnTheFrontPage.wording.notToday`
+("Not Now"), `assist-wording.json`'s new `giveDatesButton` and
+`declineDatesButton`, `scheduledDeployCancellation.removingOne`, and
+`assistantModelChoice.removal` (`asksFirst`, `words`, whose message carries
+`{machine}`). Since the #987 review the Windows app says them too: the quit
+question's Cancel with no default button, Not Now on today's class and on
+Reopen Obsidian, the scheduled deploy's removal question in
+`ScheduledDeployRemovalWording` with no default, and Remove… beside a
+downloaded assistant asking first (`AssistModelRemovalWording`), each read
+from the contract by `QuitConfirmationTests`, `TodaysClassContractTests`,
+`ObsidianFigureAddOnsTests` and `RemovalQuestionsContractTests`. The dates
+card's titles followed with the #987 merge. #979 then brought the rest of
+the Windows questions into line (no Cancel is the default; a question with no
+default opens with the focus on Cancel, since WinUI otherwise focuses the
+go-ahead and Enter pressed it, measured; the wizard's Create Course default
+and its Escape while making): [12 → "The question dialogs' keys
+(#979)"](12-windows-app.md#the-question-dialogs-keys-979-the-macs-973-and-987).
+Two differences are parked with Russell there: the ContentDialog's fixed
+button order (its Close button always trails), and Enter on a question with
+no default pressing the focused Cancel rather than nothing.
 
 ## A section's Coverage tab (#793)
 
@@ -2174,6 +2848,70 @@ been moved, from …" when the bookmark followed a move) and `working folder
 not reopened` (the reason key and the path). `working folder opened` stays
 the teacher's choice only. A window opened beside another (⌘N) writes
 nothing — neither a choice nor a reopen.
+
+### When a restored window looks for its folder (#998)
+
+Until #998 a window tried its frame against the remembered windows every
+150 ms, seven times, because "a reopened window's frame settles a moment
+after the window exists", and gave up to the next folder by order after
+about a second, showing its quiet spinner meanwhile. `WindowClaimRound` now
+waits on the events instead.
+
+**Measured** with a probe app (a SwiftUI `WindowGroup`, ad-hoc signed,
+2026-11-19), three launches on each system: no saved state, two windows
+restored, and saved state with none restored:
+
+| Step | macOS 26.7.3 (this Mac) | macOS 15.7.7 (Tart guest) |
+|---|---|---|
+| Restored frames put back | before the notification | the window is handed over WITH its restored frame, then SwiftUI moves and resizes it to another frame, all before the notification |
+| `didFinishRestoringWindowsNotification` | posted in all three cases | posted in all three cases |
+| Windows' content joins them (`WindowAccessor`) | after the notification and after `applicationDidFinishLaunching`, frame already final | before the notification |
+| Restored windows handed over | all in one pass of the main actor, before a task the first enqueued | the same |
+
+(On 15.7.7 a stray word in the launch arguments, read as a file to open,
+made SwiftUI open no window at all; the probe's flags take a value for that
+reason.) So no one reading of the frame is right on both systems: on 15 the
+one at hand-over matches and a later one does not.
+
+**What a window does now:**
+
+- **It tries its frame at hand-over, at every move or resize of its own
+  window (`NSWindow.didMoveNotification`, `didResizeNotification`), and when
+  restoration is said to be finished** (`LaunchRestoration`, which records
+  the notification from `applicationWillFinishLaunching`).
+- **It gives up by order only after restoration has finished, one pass of
+  the main actor later** (a task enqueued then, no clock). By then every
+  restored window exists and has been handed its frame, on both systems.
+- **A give-up never takes an entry remembered at another open window's
+  current frame** (`WindowFolderMemory.claimNextEntry(skippingFrames:)`):
+  that entry is that window's, even if its content has not been handed
+  over yet, since AppKit has already made the window. When only such
+  entries are left, the window shows the picker.
+- **What closes claims:** for one window, claiming, giving up, or having
+  settled its folder otherwise; for the launch, the existing ten-second
+  deadline (`WindowFolderMemory.claimsOpenUntil`). The give-up cannot come
+  early because nothing triggers it before AppKit's notification, and
+  nothing but the notification marks restoration finished. If it were ever
+  not posted, a launching window would keep its spinner rather than guess;
+  no launch measured did that. The observers go when the round ends.
+- **`WindowRootView`'s `onReceive` for the notification is gone.** SwiftUI
+  subscribes when the view appears, which on 26 is after the notification,
+  so it could never fire at launch.
+
+Tests: `WindowClaimRoundTests` (a frame right only after a move, two windows
+in one pass, two in separate passes, entries left only for others, no
+give-up without the notification, a real window's move).
+
+What a teacher sees: a restored window shows its folder at once rather than
+after about a second of spinner (HIG, Launching: "Launch instantly", and
+"display windows in the same state and location in which people left
+them"). Not measured: a log-in restore, a full-screen window, a window on
+another display.
+
+`WindowAccessor` lost its own timer at the same time: a fifty-millisecond
+GCD poll stood behind `viewDidMoveToWindow` for "anything installed into a
+view hierarchy that is not yet in a window", and AppKit tells such a view
+when its hierarchy joins a window (`WindowAccessorTests`).
 
 ### Rejected
 
@@ -3175,7 +3913,8 @@ fixing the quit path is the prerequisite either way rather than the alternative.
 Russell decided on 2026-09-25 to match all three rules; Windows did on
 2026-09-30. **The question**: quitting there is closing the LAST window, so
 `MainWindow`'s `AppWindow.Closing` asks (`QuitConfirmation`, all nine contract
-cases, Keep Working the default) when the app's own records show a publish or a
+cases; Keep Working the default until #987, Cancel with no default since,
+"Question sheets and alerts after the HIG review") when the app's own records show a publish or a
 preview being BUILT (`CourseActivity.BeginPreviewBuild`, from the press until
 the page first answers — never the port lease), and never when Windows is
 ending the session: a window subclass hears `WM_QUERYENDSESSION`, Windows'
@@ -3230,7 +3969,8 @@ up. The reasons are `QuitConfirmation.ClosingReason`:
   which only exists while the quit request is being handled; read inside
   that wait's `Task`, a log out would be written down as the teacher's quit
   (plan review N3). It is KEPT (`AppDelegate.closingReason`) only after
-  "Keep Working" has had its chance, so a quit called off leaves nothing.
+  Cancel ("Keep Working" until #987) has had its chance, so a quit called
+  off leaves nothing.
 - **"To install a new version" comes from where the app decides to
   install**: `installNow` (the teacher's Install, straight away or after held
   work) and `heldWorkIsDone`'s postponed-install branch set
@@ -3538,6 +4278,49 @@ and on a healthy Mac that warning appears too — but only for the duplicate
 `[::]` attempt after the `0.0.0.0` one has already succeeded. A host listener,
 or an actual connection, is the only signal that decides.
 
+### What the wait waits ON, and what it still reads once a second (#998)
+
+The wait used to sleep a second at a time in all three phases. Since #998
+it waits on whatever it can be told about, and reads again after a second
+only what cannot tell it anything:
+
+| What the wait needs | Where it comes from | How it waits |
+|---|---|---|
+| The run has ended, could not start, or was stopped | `ScriptRunner` (`@Observable`) | Woken by the change (`ScriptRunnerWait`) |
+| The address | the launcher's line, collected as it arrives (#235) | Woken by the change |
+| "Launching Quartz preview" (phase 1) | `build_site.py`'s line, collected as it arrives (`ScriptRunner.hasAnnouncedQuartzLaunch`) | Woken by the change |
+| The build has written the site (phase 2) | the section's built `index.html`, written from inside the builder | Read again after a second |
+| The server answers (phase 3), the page last viewed (#504) | an HTTP request | Asked again after a second |
+| The quiet bound (#225) | the clock | Read with the file or the request |
+
+`ScriptRunnerWait.untilTheRunChanges(orAfter:)` registers with Observation
+for the runner's standing (running, exit code, launch problem, address,
+launch line, stopped, start time) and returns on the first change or at the
+bound. A registration cannot be withdrawn on macOS 15 (`Observations`, which
+can, needs 26), so each wait holds ONE and a bounded wait leaves it for the
+next instead of adding another; the run's next change releases it, and every
+run ends with one. It does not read the transcript: that would wake it for
+every chunk of build output, which is why the launch line is collected as
+lines arrive, as the address already was, instead of being searched for in
+`displayText` once a second. Phase 1's ten minutes are wall-clock time from
+the start of the phase; phases 2 and 3 still count their one-second turns.
+
+**The late reload.** When phase 2's two minutes ran out (or the run went
+quiet) before the build was seen to land, the page shown may be the build
+before, and the view reloaded it once, 900 ms later: a guess, which a
+build landing later than that missed. It now reloads once WHEN the build
+lands, `index.html` changing from what it was before the run
+(`PreviewLateBuild.waitForTheBuildToLand`), and not at all if the run ends,
+is stopped or is replaced first, or after ten minutes.
+
+**Rejected, for now:** watching `index.html` with a file-system event. It is
+written by the builder's own mirror thread, through the virtual machine's
+shared folder, and whether macOS reports such a write to a watcher has not
+been measured; the APIs that deliver the events are also GCD-based. The
+toolchain printing a line when the mirrored site has landed would let
+phase 2 wait on the run as phase 1 does; it changes `build_site.py`, so it
+is shared with Windows and was left as a question (#998's report).
+
 ## Which folders Plantoir uses
 
 Course Settings carries a **"What else does Plantoir use my folders for?"**
@@ -3570,14 +4353,18 @@ folder the teacher adds to the shared or per-section list, then hands
 `FolderScaffold` the folders it has JUST made (a location already on disk is
 skipped and gets nothing). `FolderScaffold.pages` is pure — folder, scope,
 section numbers, the primary curriculum folder's top-level file names, the
-moment and the template in; paths and texts out — and `writePages` writes
-each page with `.withoutOverwriting`, only into a folder in that list. The
+moment and the template in; paths and texts out — and `planPages` (which
+replaced `writePages` in #899 U4a) plans each folder with its two pages as one
+`createTree`, built beside its place and renamed in, never over anything, only
+for a folder in that list (documentation 09, "U4a"). The
 template comes from the bundle through `SkeletonCatalog.duplicateMeTemplateURL()`
 (the generic family's `Concepts/_DUPLICATE ME.md`); the moment is
 `SectionAdder.timestamp()`; the primary curriculum folder is the first one
-`CurriculumFolderRule.resolvedFolders(for:)` gives (#128), read AFTER the new
-folder is made, so a "Curriculum" folder added to a course with none is
-empty and its own template's connection is taken out.
+`CurriculumFolderRule.resolvedFolders(for:)` gives (#128), read BEFORE the
+step that makes the new folder (since U4a the folder is made with its pages
+in one step), so a "Curriculum" folder added to a course with none finds no
+curriculum page either way: none and an empty folder are treated alike, and
+its own template's connection is taken out.
 
 What was MEASURED before choosing this: there is no shared writer — the
 course creator is `setup_course.py` inside the builder, and each app makes a
@@ -3762,6 +4549,240 @@ test, and choosing it over a hosted-view geometry check was the same call
 [`04-course-setup.md`](04-course-setup.md) records for the Marks caption:
 `Form` renders lazily on macOS, so walking the view tree means fighting the
 layout for an answer the source already gives.
+
+## Layout and small behaviour after the HIG review (#997)
+
+Part of the Mac's review against Apple's Human Interface Guidelines (#975,
+stage 2). Each change names the HIG sentence it follows; the Windows app is
+brought to match in stage 3.
+
+- **Settings panes fit what they hold, up to what the screen shows (D42).**
+  Every pane goes through `settingsPaneFitsItsContent(tallest:)`
+  (`PlantoirSettingsView.swift`): the window's 560-point width, then
+  `.frame(maxHeight:)` with the cap `SettingsPaneHeight` gives, then
+  `.fixedSize(horizontal: false, vertical: true)`. Asked for its ideal
+  height, the capped frame answers the content's own height or the cap,
+  whichever is less, and the grouped form inside, given that height,
+  scrolls the rest. The cap is the visible height of the Settings
+  window's OWN screen (without the menu bar and the Dock) less the window's title bar and pane buttons
+  (`windowChrome`, 88 pt, measured on the running window: 648 pt around
+  a pane held at 560) and 20 pt above and below, and never under 240 pt. Measured in the unit host on 2026-11-20, each pane's own height:
+  Assistant 674 pt, Deploying 532 pt (with its Stopping section, #988),
+  Other Assistants 428 pt, Obsidian 167 pt, Preview 159 pt. The cap is
+  577 pt on a 1280 x 800 screen with the Dock (about 705 pt visible) and
+  432 pt on a scaled 1024 x 640 one (about 560 pt), so on either the
+  Assistant pane scrolls to its last download's button (Download or
+  Remove…) instead of running off the bottom of the screen; on this Mac's
+  1512 x 982 it is 820 pt and nothing scrolls. The first version of #997
+  used `fixedSize` alone, and its review found the 674 pt pane could not
+  be scrolled to its bottom on a short screen. Its second version took the
+  cap once, when the pane was drawn, from the KEY window's screen; the
+  second review found that when Settings first opens that is the main
+  window's screen, so Settings left on an 800 pt laptop beside a tall
+  display opened the Assistant pane 762 pt tall where about 705 show, and
+  nothing recomputed it on a move or a Dock change. Now
+  `SettingsWindowPlacement` is handed the Settings window itself
+  (`WindowAccessor`, the moment the pane joins it) and works the cap out
+  again, from the screen that holds most of that window (how AppKit's
+  `NSWindow.screen` decides), on the notifications AppKit posts when
+  something it depends on has changed: `NSWindow.didChangeScreenNotification`,
+  `didBecomeKeyNotification` (Settings reopened), `didResizeNotification`,
+  and `NSApplication.didChangeScreenParametersNotification` (screens
+  rearranged, the Dock shown, hidden or moved); no timed delay. Before it
+  has a window the cap is the SHORTEST screen's, the one cap never too
+  tall for wherever Settings opens (the second version read
+  `NSScreen.main`). The placement is handed the displays
+  (`SettingsScreenArea` values, `NSScreen.screens` in the app), so a test
+  gives it a laptop beside a tall display and checks the choice of screen
+  itself: the third review found the second version's test passed with
+  the screen read from the key window, because its injected visible frame
+  skipped that choice.
+
+  **When the window is moved.** A taller pane grows the window down from
+  its top edge, so a window that sat on its screen with a short pane runs
+  past the bottom (past the Dock) with a tall one. It is moved ONLY after
+  a resize that grew it and left its bottom in no display's visible area,
+  judged from the frame before and after that resize
+  (`SettingsPaneHeight.originAfterResize` and `bottomIsShown`; the frame
+  before is kept on every resize and every move): up just far enough to
+  undo what the growth hid, to the visible bottom, or, when the person had
+  left the bottom lower than that, back to where they left it, never so
+  far the title bar leaves the top. What it was lifted by is remembered
+  (`SettingsWindowLift`) and given back when a shorter pane shrinks it
+  again, so the same pane lands in the same place every time; the fourth
+  review measured the version before this one: Short at y = 30, Tall,
+  Short ended 451 pt higher than placed, and a window left low at -120
+  went to -120 the first time the tall pane was chosen and to 0 the
+  second. A move that kept the window's size is the person's
+  (`isThePersonsMove`; the placement's own `setFrameOrigin` is not
+  counted), and it clears what is owed: where they put it is theirs. A
+  focus change, a screen change or a person's own drag of an edge
+  (`inLiveResize`) never moves it, so a window left partly below the
+  screen stays where it was put, and one on the upper of two stacked
+  displays whose bottom hangs onto the lower display's visible area is
+  not lifted when a taller pane grows it (the fourth review found a
+  300 pt jump there, with nothing hidden). HIG, Windows:
+  people "can reposition them", and "the system remembers window size and
+  placement". The second version moved it on every one of those
+  notifications, and the third review found it snapped back on every
+  click. (AppKit's own `constrainFrameRect(_:to:)` keeps only the top edge
+  on screen, so it does not cover the bottom.) `LayoutAndSmallBehaviourTests`
+  shows a window (beyond the displays, as the unit host keeps every
+  window, with a pretend display laid around it; the window records the
+  origins it is asked to move to, since the host pins every frame) and
+  resizes it through AppKit: a growing resize past the bottom moves it
+  once, to the visible bottom; a window left low is not moved on becoming
+  key, on a screen change or on a resize that did not grow it. On injected
+  frames and displays it also checks Short, Tall, Short, Tall landing in
+  the same places (placed at 30 and left low at -120), a person's move
+  clearing what was lifted, and a bottom on the display below left alone.
+
+  NOT proven: a real second display (this Mac has one screen), and so the
+  cap changing while a person drags Settings across to a display of
+  another height (the pane would resize mid-drag; left as it is, since it
+  cannot be checked here); and `windowChrome` on macOS 15 (88 pt
+  measured on 26 only; owed). MEASURED, 2026-11-20, on the real Settings
+  window opened in the unit host through `openSettings` (macOS 26): a
+  pane change resizes the window in ONE step, one `didResizeNotification`
+  per change (Preview 247 pt to Assistant 762 pt, Assistant to Obsidian
+  255 pt), posted from SwiftUI's `NSHostingView.updateAnimatedWindowSize`
+  through `NSWindow._setFrameCommon`, with `inLiveResize` false; so the
+  window is moved once per pane change, and nothing waits for an
+  animation's end (`windowDidEndLiveResize` is for a person's drag only).
+  The same run measured the chrome again: 88 pt, the frame less
+  `contentLayoutRect`. Not measured on a window on a display, where AppKit
+  might step an animation; were it to, the rule above would move the
+  window on each step that grew it past the bottom, ending in the same
+  place. Until #997 every pane opened
+  at 560 x 648: the Assistant pane was held at `.frame(height: 560)` and
+  scrolled, and Preview and Obsidian were mostly empty space (the
+  inventory's captures). HIG, Settings: "a settings window accommodates
+  the size of the current pane, people don't need to expand the window to
+  see more." `LayoutAndSmallBehaviourTests` measures every pane, holds the
+  Assistant pane to 400 pt and scrolls its form to the end, where the last
+  download's button must be inside the window (read off the accessibility
+  tree), and checks the cap on the two short screens.
+- **A course's whole code on hover, when it is cut short (D44).** The row's
+  code is `CourseCodeLabel`, a `ViewThatFits` of the plain label and the
+  same label with `.help(code)`: the plain one shows when the whole code
+  fits, the tagged one, cut short, when it does not. So a 12-character
+  code, cut short at the sidebar's default 228-point width, can still be
+  read, and a code that fits is not repeated in a tag over itself (the
+  first version tagged every row, and its review pointed out that the
+  HIG's expansion tooltip is for clipped or truncated text). Middle
+  truncation was not taken: a code is short and read from its start. HIG,
+  Text fields: "Consider using an expansion tooltip to show the full
+  version of clipped or truncated text." `AccessibilityTreeTests` reads the
+  help tags off the tree (`AccessibilityTree.Element.help`): one on a
+  12-character code in a 140-point sidebar, none on EXC2O at 228. That
+  test reads the label in a plain row, because this reader does not find
+  the tag inside the sidebar's folding course row, where the label is
+  merged into one heading. The real row was proven by the second review
+  of #997 (2026-11-20): the folding row's heading carries the help text
+  for a truncated code, a real hover drew the tooltip, and a code that
+  fits has none; `ViewThatFits` decides truncation at layout time and
+  again on every resize.
+- **The Backups total keeps a margin (D45).** `BackupsSectionHeader` puts
+  `trailingMargin` (10 pt) after the total; it was drawn about 2 pt from
+  the divider while the heading's name sits about 14 pt in. HIG, Layout:
+  "make it easy to apply standard margins around content." The tree gives
+  the heading's row and the sidebar's frames (`Element.frame`, new), not
+  the total's own, because a section header reaches it as one heading
+  ("Backups, 271 KB"); the test adds the margin it measures the heading
+  drawing (with against without) to the row's own trailing room.
+- **Tab leaves the class-dates box (ruling Q-C on #975).** The Class Dates
+  sheet's box (also reached from Add Class, Make Room and Roll Over) is
+  `ClassDatesTextBox`, AppKit's own text view in a representable, whose
+  delegate answers `insertTab:` and `insertBacktab:` by moving along the
+  window's key view loop (from the scroll view, then from the text view if
+  that left the focus where it was), and types nothing. Return still makes
+  a new line, and typing, undo, pasting and VoiceOver are the text view's.
+  A SwiftUI `TextEditor` typed a tab and kept the focus, as a text view
+  does (Keyboards lists Control-Tab for moving on); the box only holds
+  dates, so Russell ruled Tab moves on. HIG, Text fields: "Ensure that
+  tabbing between multiple fields flows as people expect." REJECTED:
+  `.onKeyPress(.tab)` on the `TextEditor` (whether SwiftUI sees the key
+  before the text view inserts it is not documented), and making the text
+  view a field editor (Return would end editing instead of starting a new
+  line). The box's VoiceOver name (D41) moved onto the text view itself,
+  where VoiceOver lands: SwiftUI's `.accessibilityLabel` on a representable
+  names the scroll view around it, and the tree then had two elements
+  called `sectionScheduleTypedField`. The text view
+  (`ClassDatesTextView`) takes the focus when it is put in the sheet's
+  window, as the `TextEditor` did: without that, measured in the running
+  app on 2026-11-20 with Keyboard Navigation on, the sheet opened with the
+  focus on the route picker. It takes it once (`hasTakenTheFocus`) and
+  by `makeFirstResponder` alone: setting the window's
+  `initialFirstResponder` as well was tried and REJECTED, because in the
+  running app Tab then stayed in the box and Shift-Tab went to the sheet
+  itself (the unit test, in a window that is never key, did not see it).
+  Driven in that app on 2026-11-20 (an isolated copy with `--state-dir`):
+  with Keyboard Navigation on, the sheet opened with the focus in the box,
+  Tab went to "Where these came from" and then Cancel, and Shift-Tab came
+  back the same way; with it off, Tab and Shift-Tab moved between the box
+  and "Where these came from". The box held only what was typed.
+
+  After the first review (2026-11-20): the box takes the focus only when
+  the sheet opens on it (`takesTheFocusWhenShown`, false once the teacher
+  has changed the route, `SectionScheduleSheet.hasChangedRoute`), so
+  arrowing the route picker from Upload back to Typed leaves the keyboard
+  in the picker; before, the new box took the focus as it was drawn. The
+  binding now follows the text storage (`NSTextStorageDelegate`,
+  `didProcessEditing`) rather than the text view's did-change notice:
+  `testUndoAndRedoInTheDatesBoxReachTheBinding` found that Undo and Redo
+  changed the box without that notice, so the sheet went on holding the
+  undone text. The tests now name the control the keys reach, in a key
+  window of the active app (`ClassDatesBoxKeyTests`, opt-in with
+  `PLANTOIR_KEY_TESTS=1` because it takes the front, and run by the gate's
+  pressed-key step): VoiceOver's focused element is the box as the sheet
+  opens; Tab goes to "Where these came from" (`sectionScheduleSourceField`)
+  in either Keyboard Navigation mode; Shift-Tab from the box goes to the
+  route picker with Keyboard Navigation on and to "Where these came from"
+  with it off. The same is asserted in `SectionVerbSheet`'s Class Dates
+  stage, which is what Add Class, Make Room and Roll Over open when the
+  section has no dates (`askForDatesFirst`). `LayoutAndSmallBehaviourTests`
+  adds a paste of several lines (from a pasteboard of the test's own, so
+  the person's clipboard is untouched) and Undo and Redo reaching the
+  binding.
+- **No sideways scroll bar under the Publish Pages picker (D48).** The
+  picker's Folder and Date columns have set widths, 135 and 175 pt
+  (`SectionVerbSheet.pickerFolderColumnWidth`, `pickerDateColumnWidth`),
+  the widths they came to at the sheet's opening size, so Page is the one
+  column that takes the table's width as it changes. With all three
+  flexible (Page from 90, Folder 80 to 140, Date 120 to 180), measured in
+  `PageTablesSheetTests` with the scroll bars a mouse shows: when the rows
+  arrive after the table is drawn, as they do in the app, the table shared
+  the change between the three in half points (146.5, 134.5, 174.5) and
+  the columns ended at 501.5 in a table that shows 501, so AppKit put a
+  sideways scroll bar under the rows; with the set widths they come to 145,
+  135 and 175 and end at 501.0 both at open and after the rows arrive.
+  Folder and Date could be dragged 5 pt wider at most before, so a teacher
+  loses almost nothing; Page, which holds the long titles, still resizes.
+  HIG, Lists and tables: "Consider ways to preserve readability of text
+  that might otherwise get clipped or truncated." REJECTED, from the first
+  version: hiding the sideways scroll indicator
+  (`.scrollIndicators(.never, axes: .horizontal)`), which hid the symptom
+  and left the half point; and setting the ideal widths to 145, 135 and
+  175, which changed nothing (the half points came from sharing the
+  change, not from the ideals). Also tried, after the second review
+  (2026-11-20), so a teacher could drag Folder and Date wider to read a
+  long folder name: `.width(min: 135, ideal: 135, max: 400)` and
+  `.width(min: 175, ideal: 175, max: 400)`, with Page's ideal at 130 and
+  then at 2000. Both came out the same: Folder and Date grew to 153.5 and
+  193.0 at open and the columns ended at 501.5 in 501 once the rows
+  arrived, so the sideways bar came back; SwiftUI's `TableColumn` gives
+  no way to make a column resizable by a person without also sharing the
+  table's own changes with it. Still owed: a way to let them be widened
+  that keeps them at 501; until then a long folder name is read from its
+  help tag. `testThePickerShowsNoSidewaysScrollBar`
+  checks both moments with no tolerance (the first version allowed half a
+  point, which was the fault, so it passed either way) and that the
+  sideways scroll bar is still on, and fails with the widths put back.
+- **D12 (the empty Planning tab with no assistant installed) cannot be
+  reached.** The Planning tab is absent unless an assistant is installed
+  (`unitPlanning.tab.tabCases`, `PlanningTab.isShown`, read from the same
+  `OutsideAssistantPresence` as the empty tab's buttons), so the empty tab
+  is never drawn with no button under it. Nothing was changed for it.
 
 ## Course Settings lists are tables, and why
 
@@ -5488,8 +6509,25 @@ on the Planning tab for as long as the form would; one refused (a held-back
 Save, with the form's reason), failed (a write error) or saved with a notice
 to read takes the teacher to Settings, where the form shows its sentence
 beside the field (`CourseDetailTabs.afterASave`). Revert is dimmed on
-Planning, with `words.revertOnPlanning` as a line under it in the Course menu,
-which VoiceOver reads: it would discard edits the teacher cannot see.
+Planning: it would discard edits the teacher cannot see. **Where the teacher
+learns why** (#990 review): until #990 `words.revertOnPlanning` was a grey
+line under the item in the Course menu; Russell's ruling Q14 took the grey
+rows out of the menus, and the same sentence is now the Revert item's help
+tag while Planning is in front (`CourseSettingsCommands.revertHelp`, empty on
+Settings). HIG, Offering help: "Consider offering context-sensitive tooltips.
+For example, you could provide different text for a control's different
+states." Help's course-settings page says it too, and that is where a
+VoiceOver user learns it. Measured on 2026-11-19 (macOS 26.7.3, the debug
+build under `--state-dir`, a fixture course, Claude Code, Codex and Copilot
+installed so the Planning tab shows): with Planning in front and the pointer
+held on the dimmed item, the tag "Revert works on the Settings tab, where the
+changes are shown." appears beside it (screenshot); System Events read the
+open item as `enabled false` and found NO `AXHelp` attribute on it, with and
+without an `.accessibilityHint` added to the item (a menu item exposes title,
+key and enabled state only, as Finder's do), so neither a tooltip nor a hint
+reaches VoiceOver from a menu item and the hint was not kept. Rejected: an
+accessibility hint (measured not to reach VoiceOver), a text row (the
+ruling), and a hidden explanatory control (no invisible controls).
 `CourseDetailStructureTests` draws the real form in a window never put on
 screen and checks the tree with Planning showing (no editable field, box or
 table), the footer case, Undo, that a draft typed on Settings survives the
@@ -6830,16 +7868,170 @@ anything was written. What it found, and what is true now:
 
 | | Before (dev, 2026-10-08) | Since #457 |
 |---|---|---|
-| Menus | Plantoir · File · Edit · View (empty) · **Preview** · Window · Help | Plantoir · File · Edit · View · **Course** · **Section** · Window · Help |
+| Menus | Plantoir · File · Edit · View (empty) · **Preview** · Window · Help | Plantoir · File · Edit · View · **Course** · **Section** · Window · Help (and **Classes** after Section since #990) |
 | File | **New ▸** New Plantoir Window ⌘N / New Assistant Window; Open Working Folder… ⌘O, Import…, Restore from Archive…, Reload Courses ⇧⌘R — all greyed with no window | New Window ⌘N, New Course… ⇧⌘N · Open Working Folder… ⌘O, Open Recent ▸ · Import…, Restore from Archive…, Reload Courses ⇧⌘R · Close ⌘W |
 | Edit | the system's, plus **Rename Course** | the system's only |
 | View | nothing of Plantoir's | Back ⌘[, Forward ⌘], Reload Page ⌘R, before the system's items |
 | Window | listed **About Plantoir** a second time | windows only (`.commandsRemoved()` on the About scene) |
-| Print / Page Setup | none (so ⇧⌘P was free) | none |
+| Print / Page Setup | none (so ⇧⌘P was free; #990 moved Preview off it anyway, to ⌘Y, since the HIG keeps ⇧⌘P for Page Setup whether or not an app has one) | none |
 
 The whole tree is pinned by `MenuBarTreeTests` against
 `mac-app/Tests/Goldens/menu-bar.txt`, read out of the real menu bar — titles,
 keys and dividers, never enablement (that is `subjectMenus`' job).
+
+### Section and Classes: two menus drawn from the contract (#990, grouping A)
+
+Russell, 2026-11-20, through the dialog, choosing grouping A of the
+proposal for D27 (the Section menu's length; the proposal, with its HIG
+sentences, is `reference/990-section-menu-proposal.md` in the private setup
+repository). The Section menu had 23 commands and a submenu in 9 groups;
+it is now two menus, and the menu bar reads Plantoir · File · Edit · View ·
+Course · **Section** · **Classes** · Window · Help.
+
+```text wrap
+Section: Preview ⌘Y (⌥⌘Y alternate), Rebuild Preview ⇧⌘Y, Open in Browser, Stop Showing Deployed Folder | Publish Class for a Date…, Publish Pages…, Hide Pages…, Publish Pages That Links Lead To…, Undo Last Change, Undo Getting Ready for the Start of the Year… | Deploy… ⇧⌘D, Schedule Deploy…, Remove Scheduled Deploy | Revise With ▸ | Open in Obsidian, Show in Finder, New Terminal at Folder | Remove Section
+Classes: Add Class… | Class Dates…, Re-date Classes…, Make Room for Classes… | Roll Over to a New Year…, Get Ready for the Start of the Year…
+```
+
+**Why.** HIG, Menus (read 2026-11-20): "If a menu is too long, consider
+dividing it into separate menus", and "Prefer keeping all logically related
+commands in the same group, even if the commands don't all have the same
+importance". The menu bar: "Your app's custom menus appear in the menu bar
+between the View menu and the Window menu", "Prefer short, one-word menu
+titles", and "As much as possible, reflect your app's hierarchy in
+app-specific menus": courses hold sections, sections hold classes. Section
+holds what is done to the section's website, in a teaching day's order (look
+at it, choose what students see, send it); Classes holds the class calendar.
+Rebuild Preview joined Preview, Publish Pages That Links Lead To… joined the
+publishing items, and the deploy schedule joined Deploy…. REJECTED: grouping
+B (the same order in one menu, 22 commands, no shorter) and grouping C
+(three submenus in one menu, against "Use submenus sparingly").
+
+**The split is data.** `contracts/shared-rules.json` →
+`subjectMenus.layout` says which menu each section item is in, in groups, and
+both apps draw their two menus from it: the mac's
+`Models/SubjectMenuLayout.swift` holds the same lists, and one `SectionMenu`
+type draws either menu (`SectionMenu(layout: .section)`,
+`SectionMenu(layout: .classes)`) by walking the groups, a `Divider` before
+every group but the first, with the item's title from
+`SectionMenu.title(for:)` and its key where it has one. The keys did not
+move. `SubjectMenuLayoutTests` checks the lists against the contract, the
+real menu bar's order against `layout.menuBar.mac`, the real Section and
+Classes menus line for line against the lists, that with no Plantoir window
+in front every item is drawn and none can be pressed (dimmed, never hidden),
+that the two menus carry exactly the ruled keys, and that menu paths follow
+the item. A trail line's menu path (`SectionVerbs.menuPath`) takes its menu
+from the layout, so "Classes ▸ Re-date Classes… — carried out" moved with the
+item.
+
+**Left where they are.** The two Undo items stay in Section, last in the
+publishing group, until #899 U7 folds them into Edit ▸ Undo. Change Deploy
+Time… (#525) is not built; its place is in `layout.reservedPlaces`, between
+Schedule Deploy… and Remove Scheduled Deploy, and a test fails the day it
+becomes an item without a place in the layout.
+
+**Ellipses** (ruled on #990, 2026-11-20: "an ellipsis goes on a command only
+when more information must be provided … a confirmation does not count"):
+Remove Section and Remove Scheduled Deploy lost theirs, in the menu bar and
+on the section row's right-click menu
+(`ScheduledDeployRemovalWording.menuItem`, the contract's
+`scheduledDeployCancellation.removingOne.words.menuItem`). Deploy…'s is
+#996's.
+
+**Menu paths.** `help/menu-paths.json`, `help/outline.json`, the two menu
+sentences that named Section ▸ Class Dates… (`menuNeedsClassDatesFirst`,
+`menuRollOverDatesAreOld`) and the comments that named the five moved items
+say Classes now. A club's twins of those two sentences name "the Meetings
+menu" (below). The
+three Undo sentences that name Section ▸ Undo Last Change are U7's and stay.
+
+**Name the real menu** (Russell, 2026-11-20, on #990). A sentence that says
+where a change came from names the menu the action is in, read from
+`SubjectMenuLayout`, never typed: the copy saved before a Classes item is
+`<CODE>_backup_<stamp>_classes-section<N>.zip`, listed as "before a change
+from the Classes menu to Section N" ("The Classes menu, Section N" in the
+Backups window), and its trail line reads "the Classes menu backed up the
+course as …". A Section item's copy keeps `_menu-section<N>`, the name every
+menu copy had before the split, so an older copy reads as it was written.
+`SectionVerbs.perform` tells the runner the item's menu for one call
+(`AssistToolRunner.menuMakingTheChange`). The menus' copies are pruned
+together, five between them (`course-management.json` → `backups.pruneCases`,
+`zipNames`). A sentence that covers both menus says "the Section or Classes
+menu" (`SubjectMenuLayout.eitherMenu`): `nothingToUndoFromTheMenu`,
+`sectionIsChangingFromTheMenu` and the Help pages' Undo and greyed-item
+lines. A released app before #990 does not know the
+`classes-section` piece and leaves such a copy unlisted, as `zipNames` does
+with any maker it does not know. Get Ready for the Start of the Year… saves
+the teacher's own kind of copy ("made by you"), as before.
+
+**In a club the menu is titled Meetings** (Russell, 2026-11-20 evening, on
+#990: "in a club the menu itself is titled Meetings, on both platforms, so
+no sentence a club's teacher reads says 'class'"). `SubjectMenuLayout.title(of:noun:)`
+takes the course's class noun (`class_noun`) with no default: Classes for
+`.class`, Meetings for `.meeting`; Section never changes
+(`subjectMenus.layout` → `titleForAMeeting`). The NOUN decides it, not the
+club code, because the noun is what every club sentence is chosen by (the
+`…ForAMeeting` keys), so a sentence that names the menu always names the one
+on the screen. The title follows the selection live: the sidebar publishes the
+selected course's noun in `SidebarMenuCommands.classNoun` (beside the
+situation, not in it, since it greys nothing), and `SectionMenu`'s
+`CommandMenu` title reads it, Classes with no window in front. Every sentence
+that names the menu for a club follows: the two club sentences ("Add them
+with Meetings ▸ Meeting Dates…" since #1027), `sectionIsChangingFromTheMeetingsMenu` ("the
+Section or Meetings menu"), the trail's backup lines and "ran from a menu"
+paths ("Meetings ▸ Make Room for Meetings…" since #1027), and the Backups list's
+sentences, which read the noun of the backup's course when drawn
+(`WorkspaceModel.classNoun(ofCourse:)`; a backup of a course no longer in
+the folder is read by its code, a club's code meaning meetings). The file
+name does not change. `ClubNounTests` checks every club sentence for "class"
+with no exception for menu titles. The HIG has no sentence on a
+menu title that follows the selection; the nearest, Menus, has an item's
+"changeable label that describes an item's current state", and The menu
+bar's "Always show the same set of menu items" is kept: only the title
+changes. `SectionAndClassesMenusUITests.testTheClassesMenuIsTitledMeetingsWhileAClubIsSelected`
+proves it live in the real menu bar.
+
+**And its items say meeting** (#1027, Russell, 2026-11-20 night). Every item
+of Section or Classes whose title says class has a club title in the contract,
+`subjectMenus.layout.itemTitles`: Publish Meeting for a Date…, Add Meeting…,
+Meeting Dates…, Re-date Meetings…, Make Room for Meetings…. They are drawn
+from `SubjectMenuLayout.titleSayingTheNoun(of:noun:)` (nonisolated, so the
+assistant's sentences can use it), which `SectionMenu.title(for:noun:)` calls,
+so the menu bar, a section row's right-click menu (by the row's course) and
+the "ran from a menu" path (`SectionVerbs.menuPath`, "Meetings ▸ Add
+Meeting…") say the same words, live with the selected course; the items, their
+order, ellipses and greying do not change (The menu bar: "Always show the same
+set of menu items"; Menus: the ellipsis for an action that "requires more
+information before it can complete", which each still does). The two club
+sentences that used to point at "the Meetings menu" without the item's title
+now name it ("Add them with Meetings ▸ Meeting Dates…, then try again"), and
+Undo Last Change's nothing-to-undo is named from the selected section's
+course: `SectionVerbs.perform` sets the runner's `menuSelectedCourseCode` for
+one call (contract key `nothingToUndoFromTheMeetingsMenu`). `ClubNounTests`
+walks every item of the two menus against the contract list (an item not
+listed may not change with the noun nor say class), the list's
+`ranFromAMenuCases`, and every `…ForAMeeting` / `…FromTheMeetingsMenu`
+sentence whose class twin names an item. Help's club page quotes the titles
+with `say` tokens.
+
+**The Class Dates sheet says meeting too** (#1027's first review, MEDIUM 1).
+Meeting Dates… opens `SectionScheduleSheet`, and every sentence it says
+itself has a `classDates…` key with its `…ForAMeeting` twin
+(`AssistWording.classDatesPurpose`, `…CourseMissing`, `…NoneGiven`,
+`…NotWrittenAsDates`, `…OnFileUnreadable`, `…TooFarFromToday`,
+`…CouldNotBeSaved`, `…AreRemembered`, `…SetAside`, `…AlreadyRecorded`,
+`…ToRemember`, `…HalfRead`). The sheet reads its course's noun
+(`SectionScheduleSheet.noun`) and says each refusal through
+`SectionScheduleSheet.sentence(for:noun:)`, which asks
+`SectionTimetableStore.Problem` or `SectionScheduleSource.Problem` for
+`sentence(noun:)`; their `errorDescription`, which every tool result the model
+reads is built from, stays the class form, as #267 requires. The proposal is
+`RememberTimetablePlan.description(noun:)` on the sheet and `.description`
+(class) in tool results. The trail line when remembered dates are set aside
+is said in the course's noun by the reader, which holds the course; the
+missing-course line knows a club by its code (`ClubCodeRule`), since the
+course's settings are gone. `ClubNounTests.testTheClassDatesSheetSaysMeetingInAClub`
+checks each against the contract.
 
 ### The shape: one focused value per OWNER of the state
 
@@ -6860,11 +8052,28 @@ the teacher has left.
 `SubjectMenuRules.enabledItems(situation)`, and its cases are the contract:
 `contracts/shared-rules.json` → `subjectMenus` (neutral item names, so
 Windows can run them). **Presence follows the Mac, enablement follows the
-selection**: a Revise With target is DRAWN only when this Mac has it
-(`OutsideAssistantPresence`, asked at launch and on becoming active, never
-while the menu is drawn), and ENABLED by the rule. Everything else GREYS
-rather than disappears; the context menus keep HIDING, because they are about
-one row.
+selection**: since #990 (the HIG review's D11, Russell's ruling Q9) every
+Revise With target is DRAWN on every Mac, and ENABLED only when this Mac has
+it (`OutsideAssistantPresence`, asked at launch and on becoming active, never
+while the menu is drawn) and the rule allows it (`ReviseWithMenu.entries`,
+pinned by `SubjectMenusHIGTests`). HIG, The menu bar: "Always show the same
+set of menu items… If a menu bar item isn't actionable, disable the action
+instead of hiding it from the menu." Until #990 a target this Mac lacked was
+left out. Everything else GREYS rather than disappears too; the context menus
+keep HIDING, because they are about one row (HIG, Context menus: "Hide
+unavailable menu items, don't dim them"), and that includes an assistant this
+Mac lacks.
+
+**No grey text rows** (#990, Russell's ruling Q14, 2026-11-18). Until then
+the Course and Section menus drew a dimmed line of explanation under some
+items: why Rename and Add Section wait, why Revert is dimmed on the Planning
+tab (`revertOnPlanning`), why Open in Browser is greyed, "Available once
+deploy completed" under the start-of-year group, and why a Revise item is
+greyed. They were drawn exactly like dimmed commands (the inventory's capture
+of the Course menu), and the HIG describes menus as commands only, so they
+are gone from the menu bar; `SubjectMenusHIGTests` fails on any `Text` in
+`SubjectMenus.swift`. A row's context menu keeps its lines; the ruling named
+the two menus.
 
 **The same code, not a copy.** Every menu item calls what its other route
 calls: the sidebar's `performMenuItem` dispatches to the same functions the
@@ -6910,19 +8119,57 @@ onto Course ▸ Save Course Settings.
 | ⇧⌘R | File ▸ Reload Courses |
 | ⌘[ ⌘] ⌘R | View ▸ Back, Forward, Reload Page (on menu items because a focused web view swallows keys before toolbar shortcuts see them) |
 | ⌥⌘N | Course ▸ Add Section… |
-| ⇧⌘C | Course ▸ Copy a Page from This Course… (there is no Format menu, so no Show Colors to collide with) |
+| ⇧⌘K | Course ▸ Copy a Page from This Course… (#990; it was ⇧⌘C, the system's Show Colors and Shift added to ⌘C Copy, both against the HIG's Keyboards page) |
 | ⌘S | Course ▸ Save Course Settings |
 | ⇧⌘O | Open in Obsidian — Course's, or Section's when a section is selected |
-| ⇧⌘P | Section ▸ Preview / Stop Preview — titled "Preview" or "Preview at Last Viewed" by Settings ▸ Preview (#504) |
-| ⌥⇧⌘P | Section ▸ Preview's Option alternate: the other start page (#504; a native `NSMenuItem.isAlternate`, so it is not a second item and `testEachKeyEquivalentMeansOneThing` skips it) |
+| ⌘Y | Section ▸ Preview / Stop Preview — titled "Preview" or "Preview at Last Viewed" by Settings ▸ Preview (#504). ⌘Y since #990 (Russell, 2026-11-18): it was ⇧⌘P, the HIG's Page Setup; ⌘Y is Finder's Quick Look, the same idea |
+| ⌥⌘Y | Section ▸ Preview's Option alternate: the other start page (#504; a native `NSMenuItem.isAlternate`, so it is not a second item and `testEachKeyEquivalentMeansOneThing` skips it) |
 | ⇧⌘D | Section ▸ Deploy… |
-| ⇧⌘B | Section ▸ Rebuild Preview (batch B: free in batch A's census; not a macOS system-wide key; Bold only under a Format menu, which Plantoir has none of; `WKWebView` binds nothing to it) |
+| ⇧⌘Y | Section ▸ Rebuild Preview. ⇧⌘Y since #990 (Russell, 2026-11-18), the Shift partner of Preview's ⌘Y; it was ⇧⌘B (batch B), which added Shift to ⌘B, Bold, for an unrelated command. ⇧⌘Y is in no row of the HIG's Keyboards table and in no symbolic hot key. A stock Mac's Services menu gives it to Stickies' Make New Sticky Note (Stickies' `NSServices` entry, key `Y`, which takes selected text), and inside Plantoir the app's own item wins: "When an application already has a shortcut with that key equivalent, the application's shortcut wins" (Apple's Services Implementation Guide). See "Rebuild Preview's ⇧⌘Y beside the Stickies service, measured" below |
 
 Never taken: ⌘Q ⌘H ⌥⌘H ⌘, ⌘W ⌥⌘W ⌘M ⌘` ⌃⌘F ⌃⌘S ⌥⌘T ⌘Z ⇧⌘Z ⌘X ⌘C ⌘V ⌘A ⌘F
 ⌘G ⇧⌘G ⌘E ⌘P ⌘T ⇧⌘/ ⌘. ⌃⌘Space ⌥⌘D (the Dock, system-wide) ⇧⌘Q ⌃⌘Q ⌥⌘Esc
 ⇧⌘3/4/5 ⌥⌘I, and ⌥⌘S (SwiftUI's hidden sidebar toggle, measured in Help).
 `MenuBarTreeTests.testEachKeyEquivalentMeansOneThing` fails on any key on two
 visible items.
+
+**Rebuild Preview's ⇧⌘Y beside the Stickies service, measured** (#990).
+Russell ruled ⇧⌘Y on 2026-11-18. A stock Mac lists ⇧⌘Y in System Settings ▸
+Keyboard ▸ Keyboard Shortcuts ▸ Services as Make New Sticky Note (Stickies'
+`NSServices` entry, `NSKeyEquivalent` `Y`, send types plain text and RTF),
+and Apple's Services Implementation Guide says "When an application already
+has a shortcut with that key equivalent, the application's shortcut wins."
+`RebuildPreviewKeyUITests` measures it, and was run once on the main Mac on
+2026-11-19 (macOS 26.7.3; Stickies not running): a fixture course and a STUB
+`preview.sh` under `--state-dir`, the preview started, the page's text
+selected with ⌘A in the web view, Plantoir ▸ Services checked to offer
+Stickies' item ENABLED at that moment (so the service had something to
+take), then a real ⇧⌘Y. The trail read `Section ▸ Rebuild Preview — rebuilt`
+and Stickies was not started in the five seconds watched: the menu item
+fired and no sticky note was made. The only loss is making a sticky note
+from text selected inside Plantoir with that key; the Services menu still
+offers it by click. The test skips, saying so, while Stickies is running.
+
+Since the second review the test no longer selects text, and is opt-in
+(`PLANTOIR_UI_TESTS=1`, as `ContainerIdentifiersUITests` is), because the
+scheme's Test action includes the UI target: with the page's text selected,
+a regressed key would have let the service start Stickies, which reopens
+the teacher's own notes, and save a note with the fixture's text that
+nothing removed. A note made that way cannot be removed safely: the runner
+is sandboxed and cannot read or change Stickies' container
+(`~/Library/Containers/com.apple.Stickies`), and a note must never be picked
+out from the teacher's own by guessing. So the test now presses ⇧⌘Y with
+the sidebar's row focused and nothing selected, after checking that
+Plantoir ▸ Services offers no live Stickies item (the service's send types
+are plain text, RTF and flat RTFD, and an outline row's selection holds
+none), so the failing path cannot make a note at all; the trail's `Section ▸
+Rebuild Preview` line is the proof the menu item ran. It records whether
+Stickies was running before the key. The test never quits another app (the
+runner is sandboxed and cannot): if Stickies was not running before the key
+and is running afterwards, the test fails with "Stickies started during the
+test and is still running; quit it by hand; no note was made because nothing
+was selected". The precedence over a LIVE service is the
+measurement above, taken once; it is not re-taken by the test.
 
 **Why ⇧⌘O moves rather than sitting on both Open in Obsidian items** — the
 director's ruling allowed one key on two items that are never enabled at the
@@ -7001,7 +8248,7 @@ be opened with no course behind it. `FileCommands` replaces `.newItem`:
 ### A course kept for reference: the menu bar and its rows agree
 
 Two disagreements the implementation review found, both decided by the
-director: **Section ▸ Cancel Deploy at…** is greyed on a course kept for
+director: **Section ▸ Remove Scheduled Deploy…** (Cancel Deploy at… until #987) is greyed on a course kept for
 reference — its section row's context menu has no Cancel, nothing deploys from
 a kept course, and Plantoir turns any schedule it still has off itself
 (`ScheduledDeployCleanup.Reason.theCourseIsKeptForReference`); the plan's
@@ -7026,7 +8273,7 @@ all. They are Section menu items now, in two groups after Open in Browser:
 | Publish Pages… | a searchable table of the hidden pages to tick, classes first (#608), then the plan as a table (#524), the pages already visible folded under it (#622) | `plan_publish_pages`, then `publish_pages` |
 | Hide Pages… | the same, of the visible pages | `plan_unpublish_pages`, then `unpublish_pages` |
 | Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan as a table (#524) | `plan_publish_class_on`, then `publish_class_on` |
-| Rebuild Preview ⇧⌘B | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
+| Rebuild Preview ⇧⌘Y | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
 | Undo Last Change | nothing: it runs and says what it put back | `undo_last_change` |
 | Add Class… (since #897; it replaced Add Next Class) | a sheet asking how: the next class in this unit, in a new unit, or as a copy of a class; the first two are added at once, a copy shows its plan first (the section after this one) | `add_next_class` (with `unit: "next"` for a new unit); a copy `plan_add_next_class`, then `add_next_class`, with its source's path |
 | Re-date Classes… | the plan | `plan_re_date_classes`, then `re_date_classes` (never a `website` key: that makes it a rollover) |
@@ -7116,7 +8363,7 @@ Two things only the built-in assistant's window could do had no menu item:
 starting a new unit, and duplicating a class as the next one (the audit of
 #897; the record is in [documentation/10](10-local-ai-assistant.md#what-only-the-built-in-assistant-could-do-and-where-it-is-on-the-menus-897)).
 Russell ruled, on the night of 2026-11-13, that they are not items of their
-own: **Section ▸ Add Class…** replaces Add Next Class and its sheet asks how
+own: **Section ▸ Add Class…** (Classes ▸ Add Class… since #990) replaces Add Next Class and its sheet asks how
 the class is added. The ways are data, in this order
 (`SubjectMenuRules.AddClassWay`; `shared-rules.json` →
 `subjectMenus.addClassSheet`):
@@ -7158,7 +8405,7 @@ of the menu's situation. REJECTED: reading them with the window's " — Edited"
 marker and greying the item on them (the implementation review's finding 9:
 it changed nothing anyone sees, since the item is never greyed for them, and
 it walked the class folders on the main thread on every window activation). The trail line
-is `ran from a menu` with "Section ▸ Add Class…" and the way in its counts.
+is `ran from a menu` with "Classes ▸ Add Class…" (Section ▸ until #990) and the way in its counts.
 
 **The copy, read on `.menu` only.** `duplicateFileFromTheMenu`
 (`AssistToolRunner.menuDuplicateFileArgument`) is read when the runner's
@@ -7393,7 +8640,7 @@ sheet says it was turned off and to set it again. Re-registering it is an
 operation #899's journal does not have yet (amendment 15), so it is listed for
 #899 rather than built here.
 
-The trail line is `ran from a menu` with "Section ▸ Roll Over to a New Year…"
+The trail line is `ran from a menu` with "Classes ▸ Roll Over to a New Year…" (Section ▸ until #990)
 and the website in its counts ("website: new", "website: kept", "website: not
 deployed yet", "website: deploys to a folder", "website: kept, a new one would
 have the same address"), read from what the call sent, so an unanswered
@@ -7888,8 +9135,11 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   2026-10-08 (the implementation review asked for it): as the default button,
   a Return typed in the Course code field with no row highlighted created a
   club named by the code, with its name empty and the rest of the form unread.
-  It wears the accent through `.prominentButton(isEnabled:)` instead, grey
-  while the folder is getting ready; a long form is finished with a click. **Class Dates' Read the Dates does NOT take
+  It wore the accent through `.prominentButton(isEnabled:)` instead, which
+  made it look like the default without being one (finding D32). **Since
+  #987 it is the default once the form is complete**
+  (`NewCourseWizardView.formIsComplete`), plain and without Return before,
+  grey while the folder is getting ready. **Class Dates' Read the Dates does NOT take
   Return while the dates are being typed**: the box needs Return for a new
   line, a default button can take Return before a text box does, and a probe
   app could not put focus in its box to settle which wins — so the risk was
@@ -8169,7 +9419,10 @@ which needs a window on screen for the rename feature's sake and is left as it
 is there, read MPM2D as closed while it was loaded). A registry that cannot
 be read while Obsidian runs counts as open too: Obsidian rewrites it in place,
 so a read can land mid-write. Add Them checks again when it is answered, in
-case the course was opened while the question was up. A hidden, minimised,
+case the course was opened while the question was up; since #995 that case
+asks the reopen question rather than closing Obsidian at once, because the
+button pressed said "Add Them", not that Obsidian would close ("Plantoir never
+closes Obsidian unasked (#995)", below). A hidden, minimised,
 full-screen or other-Space Obsidian holds the list in memory all the same. The
 rule over-reports (a stale mark), which is the safe direction: the pass waits
 and Open in Obsidian asks to reopen. The vaults reopened afterwards are every
@@ -8451,8 +9704,8 @@ page left off). The rule, every case and the words are in
 - **The toolbar button** reads "Preview" or "Preview at Last Viewed" — the
   setting's choice, or the other one while Option is held — and "Stop Preview"
   while a preview runs, when Option changes nothing.
-- **Section ▸ Preview** (⇧⌘P) carries the same title, with an Option
-  **alternate** (⌥⇧⌘P) titled the other way.
+- **Section ▸ Preview** (⌘Y; ⇧⌘P until #990) carries the same title, with
+  an Option **alternate** (⌥⌘Y; ⌥⇧⌘P until #990) titled the other way.
 - **A page that has gone** — renamed, deleted, unpublished — opens the front
   page with **no dialog and no band** (decision 504-3); the trail says why.
 
@@ -8607,7 +9860,8 @@ follows the setting through `SectionSiteCommands.previewOpensAt`, which is in
 its `==`, so the menu is republished when the setting changes.
 `MenuBarTreeTests` reads the pair back in its resting form (front-page
 default) whatever the teacher's setting is, and the golden carries
-`Preview at Last Viewed  [⌥⇧⌘P]  (alternate)`.
+`Preview at Last Viewed  [⌥⇧⌘P]  (alternate)` (`[⌥⌘Y]` since #990 moved
+Preview to ⌘Y; the probe's finding holds for any key).
 
 **The toolbar** has no native alternate. Whether `modifierKeyAlternate` swaps
 a TOOLBAR label could not be measured headlessly — in a window that was never
@@ -8701,6 +9955,92 @@ of the Option alternate, Alt read at the click, WebView2's `SourceChanged` and
 `ContentLoading` in place of KVO and didCommit, and the page kept in its own
 file — `12-windows-app.md` → "Preview at Last Viewed on Windows (#514, the
 mac's #504)".
+
+## Plantoir never closes Obsidian unasked (#995)
+
+Finding D21 of the HIG review (#975); Russell's ruling Q13 (2026-11-18): never
+quit Obsidian without asking, and the button that goes ahead says plainly that
+Obsidian will be closed. HIG, Alerts: an alert can "warn them when their
+action might destroy data, and give them an opportunity to confirm … another
+important action they initiated"; "Aim for a one- or two-word title that
+describes the result of selecting the button"; "Always use 'Cancel' to title a
+button that cancels the alert's action."
+
+**What was wrong.** Obsidian's `open?path=` link reaches only vaults in its
+list (`obsidian.json`), and a running Obsidian holds that list in memory and
+writes it back whole when it quits. So `FolderActions.open`, on a course
+Obsidian had never seen, quit a running Obsidian (`application.terminate()`,
+every vault with it), wrote the list and reopened what had a window on
+screen, with no question at all. It was reached from every route: the
+toolbar, both menus, a row's menu, the assistant, a Coverage tab code, and
+Course Settings' How I Teach row, which called FolderActions directly.
+
+**What it does now.** `FolderActions.open` never closes Obsidian: registered,
+it opens the link; not registered with Obsidian not running, it writes the
+list and opens (the link starts Obsidian, which reads the list fresh);
+not registered with Obsidian running, it does nothing. The route asks first:
+`WorkspaceModel.openObsidian`, which every open in `OpenInObsidianRoute.swift`
+goes through, checks `ObsidianClosingRule.mustAsk` (Obsidian running and no
+vault in the list holds the file; an unreadable list holds nothing, so it
+asks) and sets `obsidianClosingRequest`, which `MainWindowView`'s
+`ObsidianClosingAlert` shows: "Close Obsidian to open {course}?", a sentence,
+then Closes / Opens again / Kept as lines (#834's shape), and the buttons
+Cancel and "Close Obsidian and Open" (the rename's "Close Obsidian and Rename"
+shape). Cancel opens and closes nothing. The go-ahead calls
+`ObsidianOpening.closeAndRegister` (`FolderActions.closeObsidianAndRegister`:
+note what is on screen, quit, seed defaults, register, reopen), then hands
+Obsidian the file. How I Teach goes through `openHowITeachPageInObsidian`,
+the same question without the add-ons scan or the reference note it never had.
+
+**The add-ons offer** titles its yes "Close Obsidian and Add Them" whenever
+that yes closes Obsidian (`ObsidianAddOnsRequest.addButtonTitle`: open or
+cannot tell), and "Add Them" otherwise. When the course was closed as the
+offer was shown and is open by the time Add Them is pressed, the reopen
+question asks rather than closing straight away (it used to close at once).
+
+**The rename** already asked, with "Close Obsidian and Rename"; unchanged.
+
+**Words and cases:** `contracts/shared-rules.json` → `obsidianNeverClosedUnasked`
+(`closeCases`, `wording`, `knownLimits`, `rejected`). Tests:
+`ObsidianNeverClosedUnaskedTests`, and `ObsidianFigureAddOnsTests.testAddThemChecksAgainWhenAnswered`
+(changed on purpose: it asserted the old unasked close). Windows owes the same
+under #1003 (v2.0.0); its tests do not read the new key yet. The add-ons
+offer's step 6 in `obsidianAddOnsForFigures.sequence` says the same.
+
+**Asked again at the answer** (reviews of #995): if Obsidian has quit or now
+knows the course, it just opens. If Obsidian does not close after the wait,
+nothing is written under it and nothing is handed to it: it does not know
+the course, so a link would only show Obsidian's own error
+(`FolderActions.closeObsidianAndRegister` answers whether it closed). If it
+closed but the hand-over still fails (the list could not be written), nothing
+more is tried. Both failures are on the trail only ("asked to close Obsidian
+to open a course", `obsidianNeverClosedUnasked.trail`): the route has no
+on-screen report for a course that could not be opened in Obsidian, and
+designing one is Russell's (a morning question, recommending the nearest
+existing words). And if Obsidian starts between the route's check and the
+open, `FolderActions.open` hands nothing over and answers false, and the
+route asks instead of the press doing nothing. What opens again after the
+close is every vault Obsidian's list marks open, read before the quit — the
+add-ons' reopen's own rule — so both questions' "Opens again" lines read
+"{course}, and everything else Obsidian had open". It replaced
+`openVaultPathsNow` (a window on screen required), which left a hidden
+Obsidian's courses closed. "Everything", not "each course": a vault can be a
+parent folder.
+
+**Rejected:** opening the course without registering it (Obsidian shows its
+own "vault not found"); registering under a running Obsidian (the addition is
+lost when it quits); folding the question into the add-ons offer (Not Now
+opens Obsidian too, so all three answers would have to carry the closing).
+
+**Ruled since (Russell, 2026-11-19, on #995):** the reopen question's button
+is "Close and Reopen Obsidian" (`obsidianAddOnsForFigures.wording.reopen`,
+changed on both apps under #1003), and an answer that cannot finish shows an
+alert, "Could not open {course} in Obsidian", one sentence and OK
+(`obsidianNeverClosedUnasked.couldNotOpen`). Windows shows that alert since
+#1003; **the mac does not yet**, and still writes only the trail line. Windows
+records the trail event since #1003 (its `NamedGapLedger.cs` entry is gone):
+`documentation/12-windows-app.md` → "Windows never closes Obsidian unasked
+(#1003)".
 
 ## Open in Obsidian opens the page the preview shows (#518)
 
@@ -11467,8 +12807,9 @@ warning, a facts sheet since #834: title `wording.title`, the sentence
 `wording.message`, and rows for the sections, pages and size, the day the
 folder was made (absent when it cannot be read), the name the backup will
 have in Backups (the folder's), and that restoring that backup undoes it
-(plan review M9). Cancel is the default and answers Return and Escape (see
-"Questions as one sentence and labelled facts (#834)"). Composed by
+(plan review M9). No button is the default, so Return does nothing, and
+Cancel answers Escape (see "Return and Escape in this release's questions"
+and "Questions as one sentence and labelled facts (#834)"). Composed by
 `ReferenceReplacer.offer`; presented by the shared
 `ReplaceReferenceCourseAlert` modifier, which keeps its name.
 
@@ -11660,7 +13001,7 @@ and EVERY change is refused with `couldNotReadGroups`, which names the way
 out rather than saying "try again", since waiting does not help a hand-edited
 copy (implementation review M2). **The way out is Start the Groups Again…**,
 on the Reference Courses heading's menu only while the arrangement cannot be
-read, asked first (a facts sheet, Cancel the default, #834). It MOVES the unreadable file aside to
+read, asked first (a facts sheet with no default button, #834 and #973). It MOVES the unreadable file aside to
 `reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
 name is taken; never deleted, never written over), and the shelf is the year
 layout with every control working. A NEWER version's file is never moved by
@@ -16301,7 +17642,11 @@ it by hand. Since #397, pressing **Preview** in a section window asks:
 
 > **Show Unit 2, Day 5 on the front page?**
 > Today's class is published, but the front page still shows Unit 2, Day 4.
-> [Show on Front Page] [Not Today]
+> [Show on Front Page] [Not Now]
+
+(The decline was titled Not Today until #987; "Not Now" is the title on offers
+Plantoir raises by itself, Russell's ruling Q2 on #975. The contract key and
+the record keep the name `notToday`.)
 
 The rule, its cases and the sentences are data: `contracts/class-planning.json`
 → `todaysClassOnTheFrontPage` (42 cases, run by
@@ -16964,6 +18309,302 @@ it, and the scheduled-publish path registers a real Task Scheduler task. The
 `windows` issue for this asks for the intent — redirect `AppDataRoot` in the
 test assembly and add a source-scan test — not the Swift mechanism.
 
+## Testing: a test removes the temporary folders it makes (#978)
+
+**What happened.** Every full run of the unit suite left its scratch folders
+in the user temp folder (`getconf DARWIN_USER_TEMP_DIR`). Measured on the
+second Mac on 2026-11-16, `dev` 2c16ed77e, listing that folder immediately
+before and after one full run: **189 new test-made entries, 277.9 MB**. The
+biggest were `WorkspaceInitializationTests` (4 folders, 172 MB: the two
+initialisation tests copy a whole `.toolchain/` in), `CloudSyncedFolderTests`
+(13, 86 MB) and `FixtureWorkspace` copies that eight window classes never
+removed (18, 11 MB); the rest were small and many (`ScheduledDeployTests` 40,
+`cq4t-builds-` 27, `AssistFixture` 20, the configuration round-trip files of
+`CloudflareDeployTests`, `AdditionalDeployTargetsTests` and
+`CourseConfigurationTests`, and trail folders in five classes).
+`ReferenceShelfTests` did remove its folder, but the removal failed silently
+on the files a reference lock had marked `uchg`. The second Mac, with 31 GB
+free, had 660 such folders by then.
+
+**The rule.** A test that makes a folder or file outside its own process
+removes it when the test ends, whether it passed, failed or threw — so not a
+line at the end of the test body, which a failed `XCTUnwrap` skips.
+`Tests/QuartzTeachersTests/TemporaryFolders.swift` is the one place that does
+it:
+
+- `makeTemporaryFolder(prefix:)` makes `<prefix>-<UUID>` and registers its
+  removal; `removeWhenTestEnds(_:)` registers the removal of something else
+  made the folder (`FixtureWorkspace.materialize()`, a `.json` a round-trip
+  test writes). Both are `addTeardownBlock`, which XCTest runs on every
+  outcome.
+- The removal (`TemporaryFolders.unlockAndRemove`) clears the user flags on
+  every entry first, because nothing inside a `uchg` folder, and no `uchg`
+  file, can be deleted. A symbolic link handed in is removed as a link:
+  the entry is examined without following it, so nothing in its target is
+  unlocked or removed (`TemporaryFoldersTests` proves it with a real link
+  to a locked folder).
+- **Whatever points at a folder lets go before the folder goes, by order,
+  never by a delay.** XCTest runs teardown blocks last-registered first,
+  and all of them before the class's own `tearDown`, so a store put back in
+  `tearDown` was put back AFTER its folder had gone, and a late trail line
+  would have made the folder again. `useThrowawayTrail(prefix:)` registers
+  the removal and then the restore of `ActivityTrail.store`, so the restore
+  runs first (`CoverageRefreshInThePageTests`, `DetailTabsLayoutTests`,
+  `RepairChangesTheEditedMarkerTests`, `QuestionKeysTests`). What order
+  cannot close is a writer already past its read of the store:
+  `ActivityTrail.note` reads `ActivityTrail.store` and then appends, so a
+  note in progress on another thread when the store is put back can still
+  append after the removal and make the folder again; so can a launcher
+  still running after the test, handed the path as `PLANTOIR_TRAIL_DIR` by
+  `HelperPrograms.environment`. None of those four classes starts one.
+  `removeWhenTestEndsAfterTheWindowLetsGo(_:)` is for a fixture shown in the
+  app's own window (the nine classes that drive `WorkspaceModel.windowModels`):
+  one block points every window still showing it at the run's resting
+  folder (`plantoir-resting-folder-under-test-<pid>`, a fixture copy made on
+  first need) through `chooseWorkspace(at:)`, so the window lets go the way
+  it does when a teacher opens another folder, and only then removes it.
+  If no resting folder can be made, the fixture is left in place and the
+  test fails saying so, rather than being removed under the window.
+  The tests' own in-body `removeItem` of a fixture still on screen went.
+- `TemporaryFolders.removeWhenThisTestEnds(_:)` is for a static helper with
+  no test case to hand (`AssistFixture.makeRunner`); `TemporaryFolderSweeper`,
+  an `XCTestObservation` registered by the bundle's principal class, removes
+  those when each test finishes.
+- The same sweeper removes, when the bundle finishes, the four folders the
+  APP points at for the whole run while it is a test host —
+  `RealHome.homeWhileTesting`, `BuildOutputLocation.buildsRootWhileTesting`,
+  `ClaudeCodeLauncher.supportDirectoryWhileTesting` and
+  `ProblemReportStore.throwawayFolderURL` — and the resting folder. They are
+  one per run on purpose (a test writing through one door reads back
+  through another), so they can only go after the last test.
+- **No point inside a run comes after the host's last write.** The test host
+  is the app; it keeps running (its tasks, a launcher it started) after
+  `testBundleDidFinish`, the last callback the bundle gets. So the run's
+  folders are removed there, and anything the host makes again afterwards
+  is removed by the NEXT run, when its bundle starts, **by name alone**:
+  every per-run folder ends with its run's `RealHome.testRunIdentifier`,
+  `<pid>-<UUID>` (`plantoir-{home,builds,assist,resting-folder}-under-test-<pid>-<UUID>`
+  and `Plantoir-tests-<pid>-<UUID>`; one UUID per run, made once per
+  process, since #978c). The pid says when the run has finished; the UUID
+  makes the name ONE run's. Before #978c the first four ended in the pid
+  alone, and the third review found what that cost: a new run given a dead
+  run's pid between the sweep's liveness check and its removal could have
+  its fresh folders removed, and a run reusing a dead run's pid wrote into,
+  and inherited, that run's leftover home, builds and assist folders. With
+  the UUID, a later run with the same pid makes different names, which are
+  never in the listing a sweep is working through. The change is in app
+  code (`RealHome`, `BuildOutputLocation`, `ClaudeCodeLauncher`,
+  `ProblemReportStore`), in names read only when the process is a test
+  host or a UI test with no state folder, so a teacher's app never makes
+  one. The
+  sweep lists the temp folder and acts only on an entry whose whole name is
+  one of those shapes with a plain decimal pid above 1 that is not its own
+  process, and only when `kill(pid, 0)` answers `ESRCH`. Any other answer,
+  a live process (a run still going, or an unrelated process holding a
+  reused pid) or one it cannot ask about, leaves the entry; so a gate and
+  another test run going at once under one account each leave the other's
+  folders. The shapes are read from the run's own folder URLs, where the
+  names are made, so the names recognised cannot drift from the names
+  given. Nothing is written to say what a run made and nothing is read back
+  from any file (the run record of the first follow-up was removed after
+  the second review: a record could name another live run's folder, and
+  reading it raced with a new run reusing the pid). The entry is removed
+  without following a link, and the flag-clearing walk inside a folder goes
+  by file descriptor (`Tests/Shared/UserFlagClearing.swift`, shared with the
+  UI target): the folder is opened once with `O_NOFOLLOW | O_DIRECTORY`,
+  each entry is looked at with `fstatat(…, AT_SYMLINK_NOFOLLOW)` relative to
+  it, a subfolder is opened with `openat(…, O_NOFOLLOW | O_DIRECTORY)`, any
+  other entry with `openat(…, O_SYMLINK)` (the link itself), and flags are
+  changed through the descriptor with `fchflags`. No path is resolved
+  twice, so an entry swapped for a link at any moment is refused or opened
+  as the link. (Until #978c the walk listed folders by path: a folder
+  swapped for a link between its check and its listing had the flags of the
+  link's whole target cleared, never removed, by something writing in the
+  user's own temp folder.) Older names the sweep no longer recognises,
+  `Plantoir-tests-<UUID>` without a pid and the pid-only
+  `…-under-test-<pid>` of the first follow-ups, are never swept by it.
+  The bench's `vm-tools/tidy.py` takes only some of them: a
+  `Plantoir-tests-<pid>-<UUID>` folder whose pid has gone, an older
+  `Plantoir-tests-<UUID>` while no Plantoir is running, each over a day
+  old, and its fixed list of `<prefix>-<UUID>` test folders. A pid-only
+  `…-under-test-<pid>` folder is in none of those, so nothing removes it;
+  a person deletes any that are left. So **one run leaves
+  nothing listed anywhere**; what can remain after a run is its own per-run
+  folders, if the host wrote again after the last callback, and the next
+  run on the same Mac removes them.
+- `InAppUserInterfaceTests` writes its six screenshots to a folder of its
+  own, removed when it ends, unless `UITEST_SCREENSHOT_DIR` names one (which
+  is kept). They used to go to the temp folder's root under fixed names;
+  nothing in the repository, its scripts or the bench read them there.
+
+**The UI target (`QuartzTeachersUITests`), since #978c.** It was left out
+of the first pass with no reason written down beyond its being part of no
+gate. What it leaves does not land in the user temp folder, because its
+runner is sandboxed: `FixtureWorkspace` copies and `IsolatedLaunch`'s
+`plantoir-state-` folders go to
+`~/Library/Containers/ca.russellgordon.QuartzTeachersUITests.xctrunner/Data/tmp`,
+which nothing measured. Measured on the main Mac on 2026-11-18, before the
+fix: 717 `cq4t-fixture-<UUID>` and 151 `plantoir-state-<UUID>` entries there
+(1.9 GB, almost all of it the website builder the app copies into each
+fixture, about 68 MB a copy), dated 2026-08-09 to 2026-11-01. Attributed by
+what each fixture holds: 587 plain fixtures from a launch with no working
+folder handed in (`QuartzTeachersUITests.launchApp()`, `UnitWordRowUITests`,
+`StateDirectoryUITests`), 62 with a stub preview (`QuartzTeachersUITests`'
+preview and publish tests), 28 `ContainerIdentifiersUITests`, 19
+`AssistantRolloverUITests`, 16 `NewSiteDialogUITests`, 5
+`TodaysClassOnTheFrontPageUITests`.
+
+`Tests/QuartzTeachersUITests/UITestFolders.swift` now removes them. Every
+UI test makes its fixture through `UITestFolders.makeFixture()` (which calls
+`FixtureWorkspace.materialize()` and registers the copy), and
+`IsolatedLaunch.launch` registers its state folder, the fixture it made when
+none was handed in, and the app it launched. `UITestFolders` is an
+`XCTestObservation`, registered on first use; in `testCaseDidFinish`, after
+the test's `tearDown` has reaped its stub launchers and whatever the
+outcome, it:
+
+1. **quits every app that test launched** (`terminate()` unless already
+   ended) and waits for XCTest to report `.notRunning`. The app is a separate
+   process writing into both folders (its trail, the website builder it
+   mirrors in) until it ends, so the order is the point, not a pause. If any
+   app has not ended within 30 seconds, that test's folders are left and the
+   console says so: never removed under a running app;
+2. **then ends what that app started and `terminate()` left running**
+   (`LaunchProcesses`). `terminate()` skips the app's own quit path, so a
+   `llama-server` an `AssistantRolloverUITests` launch started outlived the
+   app, reparented to `launchd` (seen 2026-11-18: two of them after the
+   class). A process is chosen only when one of its arguments is, or lies
+   inside, a folder this test made (`<runner temp>/plantoir-state-<UUID>`,
+   where `--model` points through the weights' links, or
+   `<runner temp>/cq4t-fixture-<UUID>`, where a stub launcher runs), and only
+   this account's processes, never the runner. Never by program name: a
+   model server of the teacher's own Plantoir names their real home, so it
+   cannot match. The sandboxed runner cannot spawn `ps`, so the list and each
+   process's arguments come from the kernel (`sysctl` `KERN_PROC_UID`,
+   `KERN_PROCARGS2`). `SIGTERM`, a wait until each has gone (a ceiling of 10
+   seconds, not a pause), and `SIGKILL` only for one whose arguments still
+   name the folder;
+3. **then removes that test's folders**, each only if it is still, at that
+   moment, exactly `<runner temp>/cq4t-fixture-<UUID>` or
+   `<runner temp>/plantoir-state-<UUID>` (upper-case UUID, nothing after it)
+   and a real folder by `lstat`, so a symbolic link of that name is left
+   alone. User flags are cleared inside it without following links (a state
+   folder holds links to the real assistant weights,
+   `linkRealAssistantWeights`), and `removeItem` removes a link as a link.
+   Nothing is read back from a file or the environment: the folder
+   `UITEST_WORKSPACE` names is never registered, and a registration with
+   any other name is refused with a failure the day it is written. Last,
+   the launch's preferences folder,
+   `/private/tmp/plantoir-state-preferences-<16 hex>`: the only parent the
+   preferences daemon honours a path suite under, so outside the state
+   folder (see "Testing: the UI target keeps its state in `--state-dir`").
+   Its name is built here by the app's rule (the first 16 hex digits of the
+   SHA-256 of the state folder's path) from the state folder this run made,
+   never read from the note the app leaves; a name that is not exactly that
+   shape directly in `/private/tmp` is refused. The runner's sandbox writes
+   only its container, so the UI target's entitlements
+   (`QuartzTeachersUITests.entitlements`) add a read-write exception for
+   `/private/tmp/`, for this removal alone.
+
+**It never ends a copy of Plantoir it did not launch, and no test skips
+because another Plantoir is open** (Russell, 2026-11-18). XCUITest's
+`launch()` ends a running copy of the bundle it launches; measured on
+2026-11-18 it goes by path, so a copy started from another folder (as
+`/Applications/Plantoir.app` is) stays running and a copy started from the
+build's own `Plantoir.app` would be ended. The second is the teacher's own
+copy whenever the Dock points at the build folder the tests run from (the
+default DerivedData Debug build), or a copy under Xcode's debugger. So
+before each launch `IsolatedLaunch` lists this account's running copies at
+the build's own path (`appUnderTestURL`), and if one is not this run's the
+test FAILS there, before anything is launched, naming the path and pid and
+saying that the run will not end a Plantoir it did not start and that
+whoever opened the copy must close it; the copy is never quit. A copy this
+run launched is recorded by more than its path: after each launch, the one
+running Plantoir whose arguments name that launch's own state folder is
+recorded by its pid AND its start time (`ProcessStamp`, from `sysctl`), so
+a copy opened at the same moment from the same build, or a later process
+given a pid this run used, is never taken for the run's own; a record is
+dropped once its process has ended. **A tripwire guards every other copy
+without resting on that measurement:** immediately before each launch
+`IsolatedLaunch` records every running Plantoir this run did not launch
+(pid, start time and path, wherever it was opened from), and immediately
+after it fails the test, naming the path and pid, if any of them is no
+longer the same process, because the launch ended a Plantoir the run did
+not start. It never skips, quits or relaunches that copy; a copy at another
+path otherwise does not touch these tests (element queries go to the
+launched bundle), so they run beside it. **One skip is left as it was, for
+Russell to rule on:** `StateDirectoryUITests.testALaunchKeepsItsStateInItsOwnFolder`
+skips while any Plantoir of this account is open, because it asserts that
+the teacher's REAL trail, preferences and Application Support did not
+change during the launch, and another copy's own writes to them cannot be
+told apart from a leak without a design change (attributing each write to
+a process). Before #978c the way to run the target was to quit the
+teacher's Plantoir first; an agent must not do that. *Rejected: giving the
+test build its own bundle identifier*: a project change to every Debug
+build, which is also the build the Dock opens. The marketing captures make
+their own `XCUIApplication`, are opt-in and drive the real toolchain, and
+carry no such check.
+
+`UITestFoldersTests` (in the UI target, launches nothing) pins the name
+check, that a link with a removable name is not followed, and that a link
+inside a fixture goes as a link while the locked file it points at stays
+locked; and, since #978c, the preferences folder's shape, that a process is
+matched only by a launch's own folder, and that the runner can read a
+process's arguments at all (a sandbox that refused would leave every model
+server running and every other check green).
+
+**Measured after the fix** (main Mac, 2026-11-18, the container's tmp,
+`/private/tmp` and the user temp folder listed before and after each run).
+On the first commit of the fix: the changed classes with
+`PLANTOIR_UI_TESTS=1` (31 tests, the rollover with real weights included)
+and then the whole target once (49 tests, 25 opt-in skips) each added
+**0 entries** to the container's tmp, but each launch still left a
+`plantoir-state-preferences-` folder in `/private/tmp` (49 by then) and the
+rollover class left two `llama-server`s running, as the base branch `dev`
+e028ded80 does too. On the branch's final head, with the process ending,
+the preferences removal and the launch check above: the changed classes
+(31 tests, 0 skipped) and then the whole target with `PLANTOIR_UI_TESTS=1`
+(52 tests, 18 skipped, every one of them a marketing capture without
+`MARKETING_WORKSPACE`) each added **0 entries** to the container's tmp and
+**0** to `/private/tmp`, and left **no `llama-server`** running
+(`pgrep -x llama-server` empty; the console says how many processes each
+test ended). The user temp folder gained only the system's own entries
+(`BlobRegistryFiles-*`, a `<UUID>` folder of Xcode's, a
+`CFNetworkDownload_*.tmp`). The 49 older preferences folders, from runs
+before this, were left for a person to remove. Two tests in
+`QuartzTeachersUITests` (`testCourseCodeRevealButtonReopensAfterEscape`,
+`testDecliningTheSkeletonPutsTheDefaultFoldersBack`) fail, and fail the
+same way on the base branch's build: #981 and #982.
+
+*Rejected: deleting the
+existing 1.9 GB from the code*: a sweep of whatever is in the folder would
+be a path the code did not build for this run. It is listed for a person to
+remove instead.
+
+*Rejected: a sweep of old `<prefix>-<UUID>` folders by age* (the second Mac's
+`tidy.py` does that today, as a stopgap): it hides a new leak instead of
+naming it, and needs every machine that runs the suite to carry it.
+*Rejected: having the app remove its per-run test folders itself*: app code
+for a test-only concern; the test bundle owns its own mess. *Rejected:
+changing `FixtureWorkspace.materialize()` to register its own removal*: it is
+shared with the UI target, which has no such observer, and the call sites
+that already removed their copy would have removed it twice.
+
+**Keeping it fixed.** The second Mac's `run27.sh` ends every run with a line
+in `result.txt`, `test temp folders left by this run: N, M MB (prefix
+counts)`, from `temp-growth.py`, which counts only names shaped the way the
+suite names its folders. It is a number, never a failure. After the fix, the
+same before-and-after listing on the second Mac (branch head c251102e6, one
+full run, 3,675 tests) found **0 test-made entries, 0 MB**; the only new
+entries were the system's own (`TemporaryDirectory.*`, `BlobRegistryFiles-*`,
+and a `<UUID>-<pid>-…` folder of Xcode's), which the count leaves out.
+Since the #978 follow-ups a run's count is 0 unless its host wrote again
+after the bundle finished; any such folder carries the run's pid and the
+next run removes it.
+
+**Windows.** Nothing to do: it shares no test code, and its xUnit fixtures
+are its own question.
+
 ## Testing: the UI target keeps its state in `--state-dir` (#154)
 
 **Read this first: the launchers the app runs are NOT redirected.** A child
@@ -17062,7 +18703,7 @@ in `IsolatedLaunch.swift` and `MarketingScreenshotTests.swift`.
 | `__CFPREFERENCES_AVOID_DAEMON=1` with it? | The write went nowhere at all. Unusable. |
 | `UserDefaults(suiteName: "/abs/path/<name>")`? | **Works** from a probe process: writes `/abs/path/<name>.plist`, creating the folders; reads back. |
 | …with `<name>` = the app's OWN bundle identifier, inside the app? | **No — it is the real domain.** In the unit host, `…/ca.russellgordon.Plantoir` created no file and `UserDefaults.standard` saw the write (caught by `StateDirectoryTests`, 2026-09-26; the probe key was removed and the real domain checked clean). |
-| …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). Each launch leaves that small folder behind (`IsolatedLaunch` never deletes it); macOS empties `/private/tmp` at restart, which is all the tidying it needs. The unit test asserts the file appears where the note says and that the standard store never sees the write. |
+| …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). Each launch makes that small folder; since #978c `UITestFolders` removes it once the app has quit, building its name by the app's rule from the state folder it made (before that it was left, for macOS to empty `/private/tmp` at restart). The unit test asserts the file appears where the note says and that the standard store never sees the write. |
 | Does a path suite see the argument domain? | Yes: `-assistantAsksBeforeChanging YES` reads, and is not written into the file. |
 | And the global domain? | Yes: `AppleLocale`, `NSQuitAlwaysKeepsWindows`, `AppleInterfaceStyle`. Reading creates no file. |
 | Can the sandboxed UI runner read the real Logs and Preferences? | Its entitlements carry `temporary-exception.files.absolute-path.read-only` for `/`, plus `(allow signal)`. `StateDirectoryUITests` FAILS rather than skips on any read that is refused, so this is re-measured on every run. Measured green on 2026-09-26: every read of the real trail, `runs/`, `scheduled/`, `assist/`, `builds/`, `LaunchAgents` and the real preferences file succeeded. |
@@ -18203,9 +19844,11 @@ the course has a page — found by listing, so the teacher's own spelling counts
 a page that appears between the look and the write is the teacher's and is
 what opens) and nothing else: #209 rejected a starter text because an assistant
 reads the page as the teacher's own approach. It opens in Obsidian through
-`FolderActions.openPageInObsidian`, which shares the register/quit/reopen body
-with `openInObsidian` but targets the PAGE — `obsidianTarget` is for folders
-and would open the vault. Disabled, as the toolbar's Open in Obsidian is, when
+`WorkspaceModel.openHowITeachPageInObsidian` (since #995; until then
+`FolderActions.openPageInObsidian` directly), so a course a running Obsidian
+has never seen is added only after the teacher answers "Close Obsidian to open
+{course}?" ("Plantoir never closes Obsidian unasked (#995)"). It targets the
+PAGE — `obsidianTarget` is for folders and would open the vault. Disabled, as the toolbar's Open in Obsidian is, when
 Obsidian is not installed. Whether a page is there is read on every drawing and
 redrawn when the window becomes key (#152's `marksWalkGeneration`). Trail:
 "How I Teach page started" (or could not be, and why); opening writes nothing.
@@ -18550,7 +20193,8 @@ this is the app's half.
   `goAheadIsTheDefault`: Share Again takes Return (Russell's choice; it goes
   through `PlanShareRunner.shareAgain`, the bar's own path, the tables first)
   and Later takes Escape. `goAheadIsTheDefault` is false for every other
-  question, which keeps Cancel on Return and Escape.
+  question, where no button is the default, Return does nothing and Cancel
+  takes Escape (#973).
   The bar shows `words.newPasswordNotInUse` while the marker says
   `newPasswordWaiting`, so a relaunch, a failed share or a declined one
   keeps it; `changePasswordNote` stays as the button's tooltip, no longer the
@@ -18670,15 +20314,15 @@ checked before it is saved (#696)"; the words are
   cut). When the new
   token cannot reach some of the folder's class websites the sheet stays open
   behind an alert naming them (a course's shared unit plans as "MPM2D unit
-  plans for 2026", `placeUnitPlans`), with Keep My Old Token (the default:
-  Return chooses it, and Escape does nothing, because `.cancel` and
-  `.defaultAction` on one alert button give it Return only, as #832 measured
-  in `QuestionKeysTests`) and Use the New Token, which saves it with
-  `--use-anyway`. When no token was saved before the change the first button
-  says Don't Save It instead, and the trail says a new token was not saved
-  rather than writing `keptOld` (review M7). Before the pane's first check has
-  answered nothing is known, and it says Don't Save It, which is true either
-  way (the fix review's M-c). The pasted token is held in memory
+  plans for 2026", `placeUnitPlans`), with Cancel and Use the New Token,
+  which saves it with `--use-anyway`. Since #987 neither is the default:
+  Return does nothing, Escape and Command-Period are Cancel, and Use the New
+  Token is red. (Until #987 the first button was Keep My Old Token, or Don't
+  Save It when no token was saved before, and it was the default with Escape
+  doing nothing.) When no token was saved before the change the trail says a
+  new token was not saved rather than writing `keptOld` (review M7). Before
+  the pane's first check has answered nothing is known, and the trail says
+  the token was not saved, which is true either way (the fix review's M-c). The pasted token is held in memory
   only while that alert is open.
 - **Remove Token** asks first and says a deploy set for later will not run.
 - **The end date travels to the Deploy screen** through
@@ -18867,6 +20511,55 @@ Mac can reach the address while it runs, as it can a preview. `~/Desktop`
 and `~/Documents` are `drwx------`, so this is longer exposure than a
 preview's, and a one-time key cookie was offered and declined.
 
+### Stop is finished only when nothing is listening (#1013)
+
+`NWListener.cancel()` only asks: the listener lets its address go a moment
+later, on the framework's own time, and reports `.cancelled` through its
+delivery queue once it has. Until #1013 `DeployedFolderShows.stop` returned as soon as it
+had asked, so under load the address went on answering after Stop had
+returned. Measured on the M4 Pro with twelve busy processes beside the
+suite: **3 of 40** runs of `DeployedFolderOfferTests` failed, at both
+places that check the address right after Stop. With the delivery queue
+held back (`testStopIsNotFinishedWhileTheListenerIsStillOpen`, which waits
+for Stop to announce that it is waiting rather than counting yields) it
+failed **5 of 5**, without load. So it was the product, not the test's timing.
+
+Now:
+
+- `DeployedFolderServer.stop()` is `async` and returns once the listener's
+  own `.cancelled` has arrived (`ListenerClosed`). One state handler serves
+  the listener's whole life, so no state change falls between a starting
+  handler and a running one, as it could before.
+- `DeployedFolderShows.stop(_:reason:)` and `stop(courseCode:…)` are
+  `async`. The show leaves the list BEFORE any wait, so the notice goes the
+  moment Stop is pressed and a second Stop finds nothing to do; the trail
+  line ("stopped showing the deployed folder…") is written once the address
+  is free. Stop pressed while a start is under way waits for that start to
+  stop itself.
+- Open pressed while a Stop of the same folder is still letting the address
+  go waits for it (`stopsUnderWay`), so the folder comes back at its usual
+  address rather than moving because its own old listener held it, and the
+  trail does not wrongly say the address moved
+  (`testOpenRightAfterStopGetsTheSameAddressBack`, which holds the queue
+  back so the Stop is certainly still waiting when Open is pressed; with
+  the wait removed it failed 3 of 3).
+- A listener's "ended" and a server's "folder gone" are matched on the
+  server, not the folder's path, so a late word from an old listener cannot
+  stop a newer show of the same folder
+  (`testAnOldListenerEndingDoesNotStopANewerShowOfTheFolder`).
+
+**Rejected:** a fixed wait in the tests before checking the address, which
+would only hide the product's race and load can outlast; and polling the
+port until it is free, a duration by another name. Quitting
+(`stopEverything`) still does not wait: the process is about to end and the
+kernel lets the address go with it.
+
+**Windows** does not have this shape in its Stop: `TcpListener.Stop()`
+closes the socket before it returns, so the port is free when
+`DeployedFolderShows.Stop` returns. Its Stop pressed while a start is under
+way returns before that start has stopped itself, as the mac's did; the
+window is the few milliseconds of one bind.
+
 ### Measured (2026-11-13, M4 Pro, macOS 26)
 
 - `browser-checks/crawl_deployed_folder.py --app <Plantoir.app>` on a
@@ -18956,12 +20649,16 @@ as it is.
 ### What Windows owes
 
 The same three places in the window, the same wording keys and trail
-events, and an `HttpListener` on `http://127.0.0.1:<port>/` running every
-case. What HTTP.sys answers itself before the app sees a request (a Host it
-does not match, a canonicalised `..`), the excluded port ranges inside and
-below the block (`netsh int ipv4 show excludedportrange protocol=tcp`), and
-whether an unelevated shell may listen on the block are to be measured
-there. The `windows` issue for #850 carries the list.
+events, and a server running every case. The `windows` issue for #850
+(#889) carries the list. Measured there on 2026-11-13: an `HttpListener`
+(HTTP.sys) answers some requests itself before the app sees them (403 for
+`..`, 400 rather than 414 and 431) and gives the app no connection to close
+when full, so four cases could not be met; Windows serves with a
+`TcpListener` and its own HTTP/1.1 reader instead, as this side does with
+`NWListener`, and the contract is unchanged. Nothing is reserved in the
+block, an unelevated process listens there, and a loopback-only listener
+raises no firewall prompt. `12-windows-app.md` → "A deployed folder opened
+in the browser (#889, the mac's #850)".
 
 ## Undo and Redo: one list for the app (#899)
 
@@ -19194,6 +20891,37 @@ the list); anything else reads the journal whole again. This is safe because not
 rewritten: the one truncation, of a torn last line, only ever cuts bytes
 after the last line feed, which is where every remembered end sits.
 
+**Every read of the list throws rather than ends the app** (U2a, the
+sweep's F4). The fold cache, the tail check and the torn-line cut read
+with `FileHandle.read(upToCount:)` through `UndoFileReads.read`, never the
+legacy `readData(ofLength:)`, which on a read error (a failing disk, a
+network home that drops mid-read) raises an Objective-C exception Swift
+cannot catch, inside Publish. A failed read is `UndoJournalError.couldNotRead`:
+the list is unreadable for that attempt, so a step in shadow goes ahead
+without a record (a trail line, "the list could not be read"), and a live
+step, Undo or Redo is refused before anything changes. A tail that cannot
+be read makes the remembered fold untrusted, so the next read is a whole
+one. The review of U2a found the same hole one step earlier: a segment
+that could not be OPENED (EIO, EACCES, EMFILE) was skipped as if it were
+gone, and a failed seek read as an empty segment, so a fold missing its
+newest segment passed as valid, would have reused step numbers and let
+Undo act on an older step past a newer one. Now `UndoFileReads.openFile`
+answers nil only for a file that is gone (a segment pruned since it was
+listed), and throws for everything else; the torn-line cut, the tail
+check, the blobs and the folder's identifier file all open through it. A
+blob that is there and cannot be read is the list unavailable, never
+`contentMissing` (which clears the list for good); an identifier file that
+cannot be read is never set aside (that would give the folder a new
+identifier and put every step under the old one out of reach). Left as
+they are, and why: the fold's size and file-number checks (a failure only
+makes the fold untrusted, and the whole read then throws), a page that
+cannot be read (`UndoItem.read` calls it neither, so changed since: a
+teacher's page, not the list, and a question for U7 before the switch),
+the published-pages record (`cannotTell`), and the blob sweep's listing
+(it then deletes nothing). Not reproduced on a real failing disk; the seam
+`UndoKillPoints.readOfTheListFails` proves the path
+(`UndoJournalCoreTests.testAReadThatFailsIsAnUnreadableList`).
+
 ### Write-ahead, and recovery from the content
 
 A step runs in three phases (`JournaledWrite.perform`): under the lock,
@@ -19304,8 +21032,9 @@ U1 builds `writeFile` (a whole file, by SHA-256, with both copies as blobs)
 and `editLine` (one top-level front-matter key's entry: its line and the
 lines its value runs on to, carriage returns kept), and records
 `recompute` (a file kept true by a rule, such as the section's front page,
-re-derived after the other ops; run by U2). The rest of plan 3.1 arrives
-with U2 and U5. `JournaledWrite.ops(for:)` chooses `editLine` for a change
+re-derived after the other ops; run since U2). U2 defines the six kinds
+that were reserved (below, "The kinds U2 adds"); `trash` and `storeHeld`
+arrive with U5. `JournaledWrite.ops(for:)` chooses `editLine` for a change
 only when applying its ops to the before text gives the after text byte for
 byte AND undoing them gives the before text back; otherwise the change is
 one `writeFile`. So a page the line model cannot describe exactly falls back
@@ -19326,6 +21055,189 @@ exact bytes as `utf8Hex`, the check cases give such a page as `bytesHex`,
 and the shadow record of a publish takes each page's `before` from the
 disk's own bytes rather than from the text the action read.
 
+### The kinds U2 adds, and `recompute` run (U2b)
+
+U2b (branch `issue/899-u2b-op-kinds`, on U2a) turns the six reserved shapes
+into kinds every reader of this version acts on, each with its rule in
+`file-formats.json` → `undoJournal.opKinds` and its rows in
+`undo.checkCases` (94 rows now, 64 of them U2's), and adds `undo.listingCases`
+(4) for the one piece of text both platforms must make byte for byte. The
+code is `Models/Undo/UndoOpKinds.swift` (the content and the checks),
+`UndoCheck.swift` (the plan and the swap) and `JournaledWrite.perform(ops:)`
+(the door for a step given as ops). Nothing a teacher sees changes: no
+action writes these kinds yet (U3 and U4 wire them), and the switch stays
+off.
+
+- **`replaceText`**: a hunk of a page, held in the op itself. It is found
+  by its WINDOW (the text either side plus the hunk), compared as UTF-8
+  bytes; a window counts only when it occurs exactly once and every
+  occurrence of the other window lies inside it, so a page holding the hunk
+  twice, or holding the old text in one place and the new in another, is a
+  change since rather than a guess. Rejected: the reserved shape's long text
+  in blobs. A change too long for a hunk is a `writeFile`, and a hunk read
+  from a blob would make the check depend on content the list may have lost.
+- **`editJSON`**: one member, by key path, of a JSON file whose top level is
+  an object; before and after are any JSON, compared as JSON (true is never
+  1, 1 equals 1.0, strings code point for code point, objects in any order).
+  A member holding null is not a member that is absent: the op leaves out
+  `before` or `after` for "not there", and `null` means null. **Only the
+  member's own bytes change** (the hard review of U2b, LOW a, after the
+  first version rewrote the whole file in the app's form and turned 0.1
+  into 0.10000000000000001, re-ordered keys and dropped a key written
+  twice): `UndoJSONBytes` scans the file to the member, replaces its value's
+  bytes with the new value spelled compactly (keys sorted, slashes as they
+  are), takes a removed member out with its own comma, and adds a new one
+  after the last member, spaced as that one is; every other byte stays.
+  A key written twice in an object on the path, a file that is not UTF-8
+  or not one JSON object, or bytes that do not scan, refuse the move as a
+  change since; the result must read back as exactly the file with that
+  one member changed. `undo-json-cases.json` → `editJSONCases` pins the bytes for both
+  platforms; the Python reference produces the same ones, except the six
+  rows Windows and the Python both refuse until their key order is
+  measured to match Foundation's (W6's second review: they answer cannot
+  tell rather than guess). The reserved
+  `element` (an array element) is left to the piece that needs it: an op
+  carrying it cannot be read here, so an older reader can never undo it by
+  the member rule.
+- **`move`**: a file (by its SHA-256) or a folder (by its listing) moved,
+  judged as a PAIR (#897 piece B, seam 1, the piece B review's I1): the
+  place it left free and the place it went holding it is undoable; the
+  original back and the other free is redoable; anything else is a change
+  since, and an undo then leaves BOTH places as they are and never deletes
+  the destination alone. The case that motivated it: a rollover onto a new
+  website moves `.netlify_sites/section<N>.json` aside, a deploy writes a new
+  marker in the emptied place, and an Undo that judged the halves apart
+  deleted the kept copy, losing last year's site id (`stackCases` 'a deploy
+  wrote a new marker in its place'). The move itself is ONE rename that
+  never replaces (`renamex_np` with `RENAME_EXCL`), the pair re-read just
+  before it. The containment check (the place inside the working folder, links resolved) runs at plan time, before staging, before each change, before a re-derivation and in the tidying; the change itself is a second system call, so a link swapped in during that one call is not caught (`undo.knownLimits.linkBetweenTheCheckAndTheChange`; closing it needs `renameat` against an open folder handle, U7 or later). Rejected: a move as a `writeFile` pair (a copy written and the
+  original deleted), which loses the file's mode (a Cloudflare marker is
+  0600, #961) and is two changes where the rename is one.
+- **`createTree` and `removeTree`**: a folder made or removed, everything in
+  it held in the list (the LISTING, `folder <path>` and `file <sha> <path>`
+  lines in the order of the paths' UTF-8 bytes, and every file's bytes, as
+  blobs). A folder matches only when its listing hashes to the recorded one:
+  a file added, changed or removed, or an empty folder added, is a change
+  since. A folder to take out is renamed aside under a staged name and
+  removed only once every change of the step has gone in, so a later swap
+  that is refused puts it back whole (`UndoOpKindsTests`); a folder to make
+  is built beside its place and renamed in, never over anything. A process
+  that dies with a folder set aside never has it deleted by recovery's
+  tidying, as a staged file is: the folder is the teacher's own, so it is
+  renamed back into its place whenever that place is free, whatever it now
+  holds (the director's rule after U2b's third review: an earlier rule that
+  kept a changed folder hidden left the teacher's new file unseen for good).
+  If it is as the step recorded, recovery judges the step as the work left
+  it; if it changed while aside, it is in the way, the step is recorded
+  interrupted and the list cleared, and the trail line "undo found a folder
+  set aside" says what changed. When something else now holds its place,
+  the folder is renamed to a visible name beside it, `<name> (kept by
+  Undo)` (or `(kept by Undo 2)` and on, the first name nothing holds), the
+  step is recorded interrupted, the list cleared, and the line names both
+  (Russell's ruling of 2026-11-19: nothing of the teacher's stays hidden,
+  nothing is merged or overwritten; before it, both were left as they were
+  and the folder stayed hidden for good). Both renames never replace
+  (`RENAME_EXCL`), and the trail line is written just before the rename,
+  so a death between the rename and the list's record loses nothing (the
+  fourth review of U2b, LOW 4; `recoveryCases` with
+  `recoveryStopsAfterTheTidy`). A place that cannot be read now is neither
+  free nor taken: the folder is left as it is, nothing is said, and the
+  step is cannot tell now, tried again (LOW 3: it used to say something
+  else held the place). A folder a step TAKES OUT is never deleted in
+  place: once every change has gone in it is renamed from its `-orig` name
+  to its `-gone` name, which recovery never puts back, and only then
+  deleted (`UndoSwap.removeAFolderTakenOut`). A recursive delete is not
+  atomic, and before this a death part way left a half-deleted `-orig`
+  folder that recovery put back in the teacher's place and judged
+  "neither", clearing the list (the fourth review's MEDIUM); now recovery
+  finishes deleting a `-gone` remnant as a staged file and the step is
+  completed (`recoveryCases` with `halfDeleteTheGoneFolder`, kill point
+  `whileDeletingAFolder`).
+  `heldBy` (content held in a backup zip) is U5's.
+- **`external`**: something outside every working folder, `<family>:<name>`;
+  this version knows `preference:<name>`, the app's own preferences store (`PlantoirDefaults.shared`, which follows `--state-dir`)
+  (`UndoAppPreferences`), and a step of external ops alone needs no working
+  folder. Like a move and a tree it goes in after every file's content has been swapped in, in the order of the step's ops, re-read just before it is set, and is set back if a later change cannot go in.
+  U3b adds `scheduledDeploy:<label>`, a deploy set for later (below,
+  "U3b: the rollover as one step"); Obsidian's vault list is a family a
+  later piece defines, and until then an op naming one cannot be read here.
+- **Whole ops stand alone.** A move, a tree and an external op are judged
+  against the disk as it is, never against what an earlier op of the same
+  step would leave, so no other op of a step may share their places; a step
+  that does is one this version cannot read (a barrier). U3 meets this
+  first: a rollover that moves the published-pages record's fragments into
+  a `…previous-<stamp>/` folder it creates records the moves without a
+  `createTree` for that folder (the folder is left, empty, by an undo), or
+  records the folder's move whole.
+
+**A file that cannot be read now is "cannot tell", never "changed since"**
+(the director's ruling on U2b's review, 2026-11-19, for every kind and for
+U1's own `UndoItem.read`, which until then read a failing read as a file
+changed by hand and so CLEARED the list). Something the op must read that
+is there and fails to read (no permission, a disk error, a file a cloud
+service has not downloaded) gives the state `cannotTell`: Undo and Redo are
+refused with `cannotTellNow`, the list is left as it is, and recovery
+leaves the step in flight and tries again on its schedule, as for a file in
+use. Only content that was read and differs is `changedSince`, and that
+still clears the list (ruling 13). `checkCases` rows with `cannotBeRead`
+pin it for each kind.
+
+**`recompute` is run** (`UndoMaintainers`). Each maintainer is a REGISTERED
+runner, and the runner is `async`: the one maintainer, `sectionFrontPage`,
+is the app's own rule (`UndoSectionFrontPage.rederive`, which calls
+`SectionIndexPointer.repointIndex`, the rule a publish, a re-date and the
+start of the year use), and it lives on the main actor while the list is
+moved off it. So the list never calls a runner itself: the entry points the
+app uses, `undoNewestAndRederive`, `redoNewestAndRederive`,
+`JournaledWrite.performAndRederive(ops:)` and
+`UndoRecovery.recoverAndRederive`, do the journal's work (recovery, the
+check, the swaps, the closing line) synchronously and then, with the lock
+released, AWAIT each runner on its own actor. The main actor is never
+blocked while the lock is held and the lock never waits for the main
+actor. U7 calls `UndoMaintainers.registerTheAppsFrontPage()` with the
+switch. Recovery re-derives every step it settles, whichever way
+(re-deriving is idempotent), and a step that keeps a file true by a rule is
+settled ONLY by a recovery that re-derives: a recovery run inside another
+write's lock (U1's door, `undoNewest` alone) leaves it in flight, and the
+door for ops recovers and re-derives before it begins (the second hard
+review of U2b, MEDIUM 1; `recoveryCases` with `recoveredBy`): judged by its content ops alone, a step that
+died after its swaps and before its re-derivation would otherwise be left
+with its front page stale (the Fable sweep of U1, T5; `recoveryCases` with
+`withAMove`). **Until a runner is registered for a maintainer, a step
+holding its `recompute` is not available to Undo or Redo, and recovery
+holds it open, unsettled, rather than settle it with the re-derivation
+skipped** (the hard review of U2b, MEDIUM 5). The crash window that is
+left: a process that dies after the closing line and before its awaited
+re-derivation leaves the front page stale until the next re-derivation of
+that section (any publish, re-date or Undo there); U7 closes it by
+re-deriving every `recompute` file of the steps on the list at launch,
+which costs nothing when nothing is stale.
+
+**Conditions U7 must meet before the switch (left by U2b's reviews):**
+
+- **Register the app's front-page runner at launch, before any recovery.**
+  No app code calls `UndoMaintainers.registerTheAppsFrontPage()` today;
+  only the tests do. While none is registered, a step a dead process left
+  holding a `recompute` is never settled, so the plain doors refuse
+  ("another change is under way") on that course for as long as the step
+  waits, which, with no runner, is for ever (the fourth review of U2b,
+  LOW 5). U2b deliberately does not register one: the switch is off and
+  nothing is recorded live. U7 registers it with the switch and proves a
+  dead front-page step is settled at the first launch.
+
+Rejected: a synchronous runner
+hopped to the main actor with a blocking wait (GCD, and a deadlock when the
+list is driven from the main actor); making the front-page rule and
+everything it reads (`Course`, `CourseConfiguration`, `AssistSectionGraph`)
+nonisolated in U2, a change across the app for a list still off.
+`UndoOpKindsTests.testTheAppsOwnFrontPageRunnerIsRegisteredAndRunAfterAnUndo`
+registers the app's runner and proves the landing page follows; the suite
+otherwise registers a recording runner.
+
+**Measured** (a standalone build of `Models/Undo/` with the replay, Apple
+M4 Pro, swiftc -O): every check, listing, stack (61), step, recovery (26)
+and deployed case and all 20 traces, 0 failures, before the suite ran them.
+
 ### All or nothing, staged then swapped (ruling 4, W5)
 
 `UndoSwap` writes every new content beside its target as a dot file
@@ -19336,6 +21248,47 @@ mode and owner are its own; a copy on a volume without links) until every
 swap is in. If one cannot go in, the swaps already made are reversed and
 the file is named (`undo.stepCases`). A rename happened or it did not, so
 a process killed part way leaves each file wholly old or wholly new.
+
+**A staging write that fails leaves nothing, and says so in its own word**
+(U2a, the Fable sweep of U1's F1). On a 3 MB disk image filled to the brim
+the sweep measured a refused step leaving `.a.md.plantoir-undo-2-apply-new`
+(0 bytes) and a refused Undo leaving `.a.md.plantoir-undo-1-undo-new` beside
+the page, both still there after room came back and two more steps ran:
+the exclusive create had made the file, the write into it failed, and the
+catch dropped it. Recovery never saw it, because it tidies only steps
+closed `interrupted` and these closed `failed`. Now the staging loop
+removes the file it made before it refuses (`UndoSwap.removeStaged`), and
+the refusal is `UndoRefusal.couldNotWrite` (contract word `couldNotWrite`:
+the disk is full, or the folder will not take a new file), not
+`fileIsInUse`, which would have had U7 tell the teacher a file was open
+somewhere. Like a file in use it changes nothing on the list: the step is
+still offered, and nothing is cleared or dropped. Every failure of the
+staging step is this word (making the folder, the exclusive create, the
+write, the flush): none of them is another program holding the target,
+which only a rename can meet. Keeping the original before the swap is the
+same word when it fails for room or permission (`UndoSwap.isRoomOrPermission`:
+on a volume without hard links the original is copied, and the copy can
+fill the disk); anything else there stays `fileIsInUse` (the review of
+U2a, LOW 1). Recovery retries a `couldNotWrite` swap on the schedule a
+file in use has. The `stepCases` row `stagingFailsAt` pins it,
+through a test seam (`UndoKillPoints.stagingWriteFailsAt`) that creates the
+staged file and then fails as a full disk does; the disk image itself is
+not in the suite.
+
+**A line op that cannot be placed is a change since** (U2a, the sweep's
+F2). The sweep made a step turn `draft: true` into `publish: false` (two
+line ops), removed the page's front matter by hand, and Undo answered
+`contentMissing`: the `draft` op still read "as the step left it" (absent),
+but putting its line back needs a block that is gone, and `UndoCheck.plan`
+returned the moment `moved` gave nil, before it reported the pages already
+in the way. With M9 built as it is the list was cleared either way and
+only the reason was wrong; with M9 turned the other way, this hand edit
+would have stopped clearing the list, against ruling 13. Now a line op
+that cannot be placed puts its page in the way, the check goes on through
+every op, and every page in the way is reported (`changedSince`) before
+any content found missing from the list. `contentMissing` is left for a
+blob the list no longer holds. The `stepCases` row with `step: twoLines`
+pins it.
 
 ### Linear, cleared, pruned
 
@@ -19535,10 +21488,15 @@ the one the limits already distrust); the union of every fragment (the
 record's own readers take the union to know what has EVER been shown,
 which is the wrong question here).
 
-### The one action recorded in U1
+### The one action recorded in U1 (replaced by U3)
+
+**Since U3 this is history**: `UndoShadowPublish` is gone, and publishing and
+hiding go through the door like every other daily action ("U3: every daily
+page action through the door", below). What follows is what U1 built, kept
+for its reasons (the list read off the main actor, `canonicalPath`).
 
 Publishing and hiding pages (`AssistToolRunner.carryOut`, from the menu,
-the built-in window and an outside assistant) is recorded in shadow beside
+the built-in window and an outside assistant) was recorded in shadow beside
 today's history by `UndoShadowPublish`: before `AssistPublishPlanner.apply`
 runs, it works out what apply will write with the same functions and
 records that; afterwards the step is kept (`applied`) only if what was
@@ -19615,6 +21573,1408 @@ not, and sharing unit plans are not counted (rulings 17 and 18; whether
 setting or cancelling a deploy for later is a step is held as M10), and
 `DeployCommand.releaseSite`, the rollover's "cut loose", is U4's with the
 rollover. 87 files wrote on the branch; with `dev` merged (#785a and #897c), 90: `OneSectionRestore` (an `unzip -p` that only reads), and the shared Media store's `SharedMediaStore` and `SharedMediaFiles` (U5's).
+
+### U3: every daily page action through the door
+
+U3 (#899) wires the daily page actions through the door. Each action is
+ONE step, and the step is now how the action writes. Before U3, publishing
+was recorded in shadow BESIDE its own writes (`UndoShadowPublish`, gone) and
+every other action wrote file by file. Now the action plans every file into
+a `JournaledStep` (`Models/Undo/JournaledStep.swift`) and makes the step
+once. `JournaledWrite.perform` writes the `begin` line, stages every file
+beside its target, swaps them in together and writes `applied`. While
+`undoJournalIsLive` is off this runs in SHADOW: the files are written
+exactly as planned whether or not the list could take the step (a busy or
+unwritable list leaves one trail line, `undo could not record a step`), and
+nothing is ever offered.
+
+**Reading through the plan.** An action that reads what it has just
+written now reads it from the step: `readText`, `fileExists` and
+`markdownFiles(under:onDisk:)` answer as the step will leave the disk. Make
+Room reads the pages it renamed under their new names, and the links it
+rewrote. Two actions plan more than once into one step: a whole unit,
+published or hidden class by class, and the links checklist (its pages,
+then the classes dated later it published). For those, the readers a plan
+is built from (`AssistSectionGraph.read`, `.classPages`,
+`ClassPages.summary`) read pages through `JournaledStep.planning`. That is
+set only inside `whilePlanning { }`, which never spans an `await`, so each
+class's plan sees what the classes before it planned, as it saw what they
+had written before U3. Rejected: a separate step per class. Undo would then
+take back one class of a unit, while today's history takes back the whole
+unit as one entry.
+
+**What cannot be named in a step.** Some writes cannot be named in a step:
+
+- a course not under a `courses` folder (no working folder);
+- a file reached through a link that leads outside the working folder;
+- a target that is not a plain file (a folder, a file that cannot be
+  read).
+
+A page that is a link is not among them since U4b2-1 (Russell's ruling of
+2026-11-25): it is planned at the file the link leads to, and is named in a
+step whenever that file is inside the working folder.
+
+In shadow those files are written with one trail line by
+`JournaledStep.writePlainly`, which since U3a's second round is all or none
+like the door (the first review of U3a, LOW 3: it wrote file by file, so a
+failure part way left half an action while the reply said "Nothing was
+changed"). It stages every file beside its target and swaps them in
+together (`UndoSwap`, under a label of its own, `shadow-<pid>-<id>`, since
+the third round), each still holding what it held when
+it was planned and a page that was absent still absent. A target that was
+a folder or a file that could not be read when it was planned is refused
+before anything is written, as a live step refuses it: its content cannot
+be checked. (Until U4b2-1 a link was refused here too, because the old
+`.atomic` write over a link replaced the teacher's link with a regular file
+(measured: `Data.write(.atomic)` to a link leaves a regular file at the
+link's place and the linked file untouched); a link is now written through,
+"U4b2: linked-page-written-through" below.) Chosen over making the sentence true of a part-way write,
+because every caller would then need a part-way sentence and a trail count
+of its own, and live refuses the same targets anyway. Live (U7), the step
+is refused before anything changes.
+
+**The front page is the rule's, never content.** Publish, hide, a whole
+unit, re-date and the start of the year name the section's front page as a
+`recompute` op (`sectionFrontPage`) and repoint it once, after the step is
+made. The repoint is written through `UndoKeptFiles.write`.
+`SectionIndexPointer` has no writing call of its own any more. The start of
+the year used to repoint twice (once inside publish, once after its
+stray-key pass). It now repoints once, after both, which is where the
+second repoint left the page. Today's class on the front page is different:
+the class line there is the teacher's own choice, so it is content of the
+step, not the rule's.
+
+**The main actor.** The planners are synchronous and run on the main
+actor, so a step's lock and flush are taken there. That is at most 50 ms of
+lock wait in shadow, and one `F_FULLFSYNC` (4.0 ms median on the M4 Pro,
+U1's measurement). The expensive part, a process's first whole read of the
+list (100 to 380 ms at a year's 2 to 6 MB), is taken OFF the main actor
+first, by `JournaledStep.readTheListAhead()`. The runner calls it before
+every tool, Get Ready for the Start of the Year before its write, and,
+since U3a's second round (the first review, LOW 6), every sheet that makes
+a step on the main actor while the teacher reads it: the links checklist
+(`.task`), today's class and Not Today (when the question is put, inside
+`TodaysClassOnTheFrontPage.offer`, so every place that asks it reads ahead),
+the classes dated later at Deploy (`SectionVerbSheetModel.ask`), the class
+dates sheet and Course Settings (for Start the How I Teach Page…), each a
+`.task` or an unawaited `Task`, so nothing waits for the read and the order
+of effects is unchanged. `UndoReadAheadTests` pins all seven places as they
+really run (each sheet shown in a window off the screen, each question put,
+a tool of the runner, Get Ready), seen through `JournaledStep.readAheadHook`
+and an expectation, never a timed wait; it replaced a search of the source
+text (the second review of U3a, LOW 4). The step reads on from there (the
+director's ruling 8 on U1's third round).
+
+**For U7, to settle before the switch (the first review of U3a, LOW 9).**
+In shadow the main actor waits at most 0.05 s for the lock to begin a step
+(`UndoSwitch.shadowLockWaitSeconds`) and 0.05 s to finish it. Live it waits
+up to 2 s to begin (`lockWaitSeconds`) and up to 10 s to finish
+(`finishWaitSeconds`), per action, so a busy list (another window, an
+outside assistant, a scheduled deploy holding the lock) could hold the
+window for 12 s. U7 must either move the step's `make()` off the main
+actor (the planners would become async) or bound the live waits on the
+main actor to what the HIG allows a window to stall, and say which, before
+`undoJournalIsLive` is turned on. Also in `undo.laterPieces.U7`.
+
+#### The actions, their keys and makers
+
+| Action | Code | Step key | Files in the step |
+|---|---|---|---|
+| Publish Pages / Hide Pages | `AssistToolRunner.carryOut` → `AssistPublishPlanner.apply` | `publishPages` / `hidePages` | each page (editLine), front page as recompute |
+| A whole unit published or hidden | `wholeUnitRequested`, one `JournaledStep` for the unit, `planWrites` per class | `publishPages` / `hidePages` | every class and page of the unit, front page as recompute |
+| Publish Class for a Date | `carryOut` with `planningAlso` | `publishClassForADate` | the pages, and `section<N>.later-classes-kept.json` when the class would be asked about at Deploy (one step; on its own step when the publish changed nothing; written only inside a step that goes in, see "The second round") |
+| Add Next Class, in a new unit, Add Classes | `PlaceholderClassPlanner.apply` | `addNextClass` / `addNextClassInANewUnit` / `addClasses` | each new page (writeFile, before absent) |
+| Make Room for Classes | `ClassInsertionPlanner.apply` | `makeRoomForClasses` | each rename (the new name written, the old removed), each link rewritten, each date moved, each new page |
+| Duplicate Class (the window) | `duplicateClassRequested`, `ClassInsertionPlanner.apply(into:)` | `duplicateClass` | the room made and the copy, in one step. When the copy is refused after the room is planned, the room alone is made, as before U3 |
+| Duplicate as Next Class (the menu) | `duplicateAsTheNextClassFromTheMenu` | `duplicateAsTheNextClass` | the copy (a page that was absent; a page that appeared meanwhile refuses `changedSince`, which says `menuTheNextPageIsAlreadyThere`) |
+| Re-date Classes | `SectionReDatePlanner.apply` | `reDateClasses` (`rollOver` when it is a rollover's re-date) | each page re-dated, front page as recompute |
+| Class Dates (remember timetable) | `SectionTimetableStore.applyRememberTimetable` | `rememberTimetable` | the section's timetable file |
+| Add curriculum mentions | `AssistCurriculumMentions.apply` | `addCurriculumMentions` | the page |
+| Write How I Teach / start the page from Course Settings | `writeHowITeach` / `HowITeachPage.startOrFind` | `writeHowITeach` / `startHowITeachPage` | the page, `holds: course`, no section |
+| Get Ready for the Start of the Year | `StartOfYearPlanner.apply` | `getReadyForTheStartOfTheYear` | every page hidden and every stray per-section key set, front page as recompute |
+| Today's class on the front page / Not Today | `TodaysClassOnTheFrontPage.show` / `NotToday.write` | `showTodaysClassOnTheFrontPage` / `notTodayOnTheFrontPage` | the front page (content) / `section<N>.front-page-not-today.json` |
+| Publish pages links lead to (the links checklist), Not Now | `LinksChecklistPublisher.publish` / `LinksChecklistAnswered.write` | `answerTheLinksChecklist` | the pages, `section<N>.links-checklist-answered.json`, and the later classes it published kept, in ONE step (the front page is not repointed, #379 ruling F1) |
+| Classes dated later kept at Deploy | `ClassesDatedLater.keep` / `KeptRecord.write` | `keepClassesDatedLater` | `section<N>.later-classes-kept.json` |
+
+`madeBy` is the runner's surface: `menu`, `builtInAssistant:<id>`, or
+`outsideAssistant::<id>`. A planner called with no maker is a sheet's
+(`sheet`). Every step has `class: A` and the argument `pageCount`, which
+counts every file the step changes. Keys are open strings, and U7 names
+their words.
+
+#### What changed for a teacher: nothing on success, less on failure
+
+Every page an action writes is byte for byte what it wrote before U3. Each
+action records the same `AssistChange` in today's history, and Undo Last
+Change, the window's "undo that" and Undo Getting Ready answer exactly as
+before (`UndoActionStepsTests.testTodaysUndoAnswersExactlyAsBefore`; the
+whole suite's `AssistToolRunnerTests`, `SectionVerbsTests`,
+`MakeRoomForClassesTests` and `StartOfYearTests` unchanged). The tool
+surface digest and `AssistWording` are unchanged.
+
+The failure path is different, deliberately. A write that failed part way
+used to leave the earlier pages written. Now a step is all or none: an
+unreadable page stops the plan before anything is written, and a swap that
+cannot go in reverses the swaps already made. The error is Foundation's
+"could not be saved" sentence for the file the door names
+(`JournaledStepError`), so the wording is the old family.
+
+- `AssistPublishPlanner.StoppedAfterWriting` and
+  `SectionReDatePlanner.StoppedAfterWriting` are no longer thrown, so
+  `writesWithNoNewUndoEntry` no longer counts those paths. The Section
+  menu's trail line for such a failure now says "changed nothing", which is
+  true. A re-date now says "Nothing was changed: …", naming the file in the
+  way, where it used to list the pages already re-dated.
+  `SectionVerbsEndingTests` pins all three paths
+  (`testAPublishThatCannotWriteEveryPageWritesNone`,
+  `testAWholeUnitThatCannotWriteEveryPageWritesNone`,
+  `testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`); they replace
+  the three tests that pinned the part-way writes.
+- Make Room's per-file "could not finish" counts for a failed write
+  (`linksNotUpdated`, `notReDated`) can no longer happen. A rename whose new
+  name is taken, and a new page whose name appeared meanwhile, are still
+  carried past and named.
+- A publish, a hide and a whole unit that cannot write every page now say
+  "Nothing was changed: …" with the reason, as a re-date does, and never
+  `publishStoppedPartWay` ("Only part of … was changed"), which is false of
+  a disk where nothing was written (the first review of U3a, MEDIUM 1;
+  `undo.rule.stagedThenSwapped` and ruling 4 make all-or-nothing the final
+  behaviour, not U7's to word). `AssistWording` is untouched and no
+  `assist-cases` case pins this path. `PublishStoppedPartWayTests` pins the
+  page list, the whole unit and an outside assistant; no Restore Section
+  pointer is added, since there is nothing to put back.
+- The one exception is a step left PART WAY: a swap refused after some
+  files went in whose reversal could not put one back. A page then holds
+  the new content, so "Nothing was …" would be false. The door throws
+  `JournaledStepError.leftPartWay`, and every caller says only part was
+  changed, naming where each page's earlier content is kept ("The third
+  round", below).
+
+#### The second round (the first review of U3a)
+
+- **The befores are the plan's (MEDIUM 2).** `JournaledStep.recordableChanges`
+  read each file again at `make()`, so an Obsidian edit, or a page that
+  appeared at a rename target or a new page's place, between planning and
+  making became the step's before and was written over. The bytes `plan()`
+  read when it first planned the file are now the before
+  (`plannedBefore`), so the door refuses `changedSince` and the other
+  program's file is left as it wrote it
+  (`JournaledStepTests.testAFileEditedBetweenPlanAndMakeIsRefusedAndLeftAsTheOtherProgramWroteIt`,
+  `testAPageAppearingAtANewPagesPlaceIsRefused`, and the same for a step
+  written plainly).
+- **The swap reads the kept original back (the Windows W2b review, matched
+  here).** An edit made IN PLACE by another program between the swap's
+  re-read and its rename lands in the inode the kept original links to;
+  the tidy then deleted it. After each rename the original is read back:
+  changed, it is put back over the new content and the step refused
+  `changedSince`; unreadable, put back and refused `cannotTellNow`. No
+  contract row: those are the existing refusals. On a volume without hard
+  links the original is a copy, which the race never reaches, so it is not
+  seen there (as before). `JournaledStepTests.testAnEditThatRacesTheSwapIsPutBackAndTheSwapRefused`
+  mirrors Windows' `UndoSwapTests.AnEditThatRacesTheSwapIsPutBackAndTheSwapRefused`.
+- **A reversal that cannot complete leaves the step in flight (the Windows
+  W3 review, matched here).** `UndoSwap.swap` ignored `reverse()`'s result
+  and the step was closed `failed`, so a page could be left new with its
+  original in a staged file nothing recorded. Now `reverse()` says whether
+  every swap went back; when one did not, the swap answers `notPutBack`
+  (no new refusal word: the caller says the refusal that stopped it), no
+  closing event is written, nothing is tidied, and recovery settles the
+  step from the content once the process is gone (`rule.recovery`).
+  `testAReversalThatCannotCompleteLeavesTheStepForRecovery`.
+- **A shadow swap without the list is tidied after a kill (LOW 8).** The
+  door's fallback when the list cannot take a step, and `writePlainly`, swap
+  under label `shadow` with no `begin` naming their files. Before staging,
+  `UndoShadowStaging` notes the targets in `shadow-staged/` in the list's
+  folder under this process, and removes the note when the swap ends. A
+  note whose process is gone is tidied by the next recovery and the next
+  read ahead: its `-shadow-new` and `-shadow-orig` files are removed, the
+  teacher's files left as the process left them. When the list's folder
+  cannot take the note the swap goes ahead untracked, and a leftover is
+  replaced by the next shadow swap of the same file. A swap that answered
+  `notPutBack` drops its note, since what it left may be a page's only
+  original. `testAShadowSwapWithoutTheListKilledPartWayIsTidiedByTheNextRecovery`.
+  (Changed in the third round, below: each swap has its own label, the note
+  is kept on `notPutBack`, and a kept original that differs from its page
+  is never tidied.)
+- **The links checklist says what is true for each refusal (LOW 7).** A
+  page the plan cannot read: the unreadable-page sentence, as before. A
+  page changed since it was checked: `linksChecklist.wording.pageChangedSince`,
+  named as the sheet names a page. A file that cannot be read just now:
+  the unreadable-page sentence. Anything else (a full disk, a file in use,
+  a list that cannot take the step once live): "Nothing was changed: …"
+  with Foundation's could-not-be-saved sentence for the file, as the
+  runner says it.
+- **Publish Class for a Date's kept record (LOW 10).** Before U3 the record
+  was written after the publish, whatever came of it: a publish refused
+  part way (a page it uses could not be written) still recorded an
+  already-visible class as kept, silencing the Deploy question for a class
+  the request never reached. Now it is written inside the publish's own
+  step, before `history.record`, so it goes in only with the pages. It is
+  not part of today's `AssistChange`, as before, so Undo Last Change leaves
+  it, as it did. `UndoActionStepsTests.testAPublishClassForADateThatIsRefusedKeepsNothing`
+  and `testPublishClassForADateKeepsTheClassItPublishesInTheSameStep`.
+- **Reading through the plan is pinned (LOW 4)** for the whole unit
+  (`testAWholeUnitReadsWhatItsEarlierClassesPlanned`: it writes what
+  publishing its classes one by one wrote), Publish Class for a Date's
+  record and the checklist's kept classes
+  (`testTheLinksChecklistKeepsTheLaterClassItPublishes`).
+- **The front page, repointed once per unit instead of once per class,
+  changes no class's plan.** Checked from the code: the repoint changes
+  only the front page's embed of a class. A publish plan follows links out
+  of the class it publishes and never reads who links in. A hide plan
+  reads who links in (`pageStillLinking`), but a class candidate stops at
+  `aClassOfItsOwn` before that, and the front page's embed names only a
+  class. So every class of a unit is planned the same with the front page
+  as it was before the unit or after any class of it.
+- **The flaky test (LOW 5).**
+  `UndoActionStepsTests.testAListThatCannotBeWrittenChangesNothingAboutAnAction`
+  failed once in three for the review, comparing the two courses' files.
+  It was not reproduced here: 15 runs alone, 26 in its class (6 and then
+  20 in a row), every one green, on the M4 Pro with other agents' builds
+  running. Read for a cause: both courses are laid out from fixed dates,
+  Add Classes dates its pages from the timetable, the copy it makes first
+  and the folder's id are outside what is compared, and a list whose lock
+  is busy for longer than 0.05 s goes through the same staged swap and
+  leaves the same files. No timed wait was added. The assertion now names
+  every file that differs and both texts, so a failure says which.
+
+#### The third round (the second review of U3a, and the Windows recovery review)
+
+The second review found one MEDIUM in three parts: a reversal that could
+not complete, in shadow (every teacher today), was said as "Nothing was
+changed", and recovery then deleted the only copy of what the page held.
+
+- **(a) A step left part way says so.** `UndoSwapResult.notPutBack` now
+  carries `keptOriginals`, the hidden name of each kept original left beside
+  a page still swapped. The door answers `JournaledWriteOutcome.leftPartWay`
+  and `JournaledStep.make()` throws `JournaledStepError.leftPartWay(refusal,
+  fileName:, keptOriginals:)`, whose description is Foundation's
+  could-not-be-saved sentence followed by "What “<page>” held before is kept
+  beside it as the hidden file “<name>”." The runner's eleven "Nothing was
+  …: …" catches go through `saidWhenTheStepStopped`, which says
+  `publishStoppedPartWay` for this case only (true there) and counts it in
+  `writesWithNoNewUndoEntry`, so the Section menu's trail does not say
+  "changed nothing". The links checklist says the same. Today's class reads
+  the front page back instead of answering "could not save": the page does
+  name the class. No new wording and no contract row: the sentence is the
+  existing key. Tests: `PublishStoppedPartWayTests.testAPublishThatCannotBePutBackIsSaidAsPartWay`,
+  `JournaledStepTests.testAReversalThatCannotCompleteLeavesTheStepForRecovery`,
+  `UndoActionStepsTests.testAChecklistPressLeftPartWaySaysOnlyPartWasChanged`
+  and `testTodaysClassLeftPartWayIsAnsweredByWhatThePageShows`.
+- **(b) A kept original that is the only copy is never tidied away.** A
+  `-orig` is a copy only when its page holds the same bytes
+  (`UndoSwap.isACopyOfItsPlace`). `UndoSwap.tidyLeftovers(keepingOnlyCopies:
+  unlessTheListCanPutBack:)` keeps every other one, except where the list
+  holds every piece of content the step's ops on that page need
+  (`UndoRecovery.listCanPutBack`: a line or a key needs none, a whole file
+  its blobs), since recovery can then put the page back from the list. It is
+  used by recovery's first tidy, before the plan (the Windows recovery
+  review's 15); by `tidyClosedSteps` (in shadow a differing original is
+  always kept, since shadow never puts a page back; live, unless the list
+  can put it back); and by pruning's tidy of a step closed unsettled (kept,
+  since pruning then deletes its content). A step that settles (completed,
+  nothing took effect, rolled back) is tidied fully. Tests:
+  `JournaledStepTests.testInShadowAReversalThatCannotCompleteKeepsTheOriginal`
+  and `testRecoveryTidiesNoOnlyCopyBeforeItKnowsTheStepSettles`; the
+  `recoveryCases` row "and on the ordinary path it is not tried again before
+  its time" pins the list check (a file in use, its content in the list:
+  nothing staged is left).
+  - **One place still removes an only copy, as the contract says today.** A
+    live step whose put-back cannot even be planned (content it needs is
+    missing) is closed `interrupted`, reason `couldNotPutBack`, and its
+    staged files are removed at that closing, as the two `recoveryCases`
+    rows on missing content and `rule.recovery` ("leaves nothing of the
+    journal's in a course") pin. Russell's ruling of 2026-11-20, 15:20,
+    replaces it: a kept original whose hash matches what the journal
+    recorded puts the page back and the step is rolled back. That changes
+    those two rows and the rule's sentence on staged files, so it is a
+    contract change and its own piece (Mac first, then Windows' W4 from the
+    same rows), not this round. The first tidy already leaves the original
+    in place for it. (Built in U3c, below: no tidy removes an only copy now.)
+- **(c) A shadow swap without the list keeps what it must.** Each such swap
+  has a label of its own, `shadow-<pid>-<id>` (`UndoShadowStaging.newLabel`,
+  stored in its note as `Note.label`; LOW 2: one label shared by every
+  process let a dead process's note remove a running swap's staged files for
+  the same page). The note is kept when the swap answers `notPutBack`, so
+  its staged new content is found once the process is gone, and the tidy
+  keeps a kept original that differs from its page. The note goes once its
+  files are tidied; a kept original then stays beside its page under its
+  hidden name for good, which is the price of never deleting the only copy.
+  A note written before the label was stored does not decode and is left as
+  it is (no release ever wrote one). Tests:
+  `testInShadowWithoutTheListAReversalThatCannotCompleteKeepsItsNote`,
+  `testAShadowSwapWithoutTheListKilledPartWayIsTidiedByTheNextRecovery`
+  (now: the new content tidied, the original kept) and
+  `testADeadProcesssNoteLeavesAnotherSwapsStagedFiles`.
+- **Recovery before every prune (the Windows recovery review's 14).**
+  `UndoJournalWriter.recoveredInThisHold` is set by `UndoRecovery.run`, and
+  `UndoPruning.prune` returns at once without it. `JournaledWrite.finish`,
+  `clearAfterARefusal` and `clearTheListAsTheSwitchGoesLive` now run
+  recovery (`trySwapsNow: false`, so the ordinary path pays nothing for a
+  refused put-back) before they prune. Before, a dead step past the limits
+  could be closed `unsettled`, its original tidied and its content deleted,
+  though a recovery in the same hold could still have settled it.
+  `testPruningRefusesWithoutRecoveryInTheSameHold`.
+- **The checklist's "could not be read" (LOW 3)** is said for
+  `cannotTellNow` only when the file really cannot be read now
+  (`UndoItem.read` is `unreadable`); a place that is a folder or a link
+  cannot be checked and so is not written, which the could-not-be-saved
+  sentence says.
+  `testAPressThatCannotBeCheckedSaysUnreadableOnlyForAFileThatCannotBeRead`.
+- **The flaky test's cause (LOW 1).** `AssistFixture` wrote
+  `course_config.json` without `.sortedKeys`, so two fixture courses could
+  hold their keys in different orders (a dictionary's order is not fixed
+  from one run to the next) and a test comparing the two courses' files
+  failed now and then. Sorted now; `testTheFixtureWritesItsSettingsInOneOrder`
+  fails without it (measured: the keys came out unsorted).
+- **The window left between a read and the write (LOW 5).** The befores are
+  the plan's (second round), so what is left is two narrow windows. Between
+  a planner's own read of a page and `plan()`'s first read of it: the same
+  main-actor turn, with no `await` between, so another program can only
+  slip in during those microseconds, and then its file is the before and is
+  replaced as it would have been a moment earlier. Between the swap's
+  re-read and its rename: covered by the read-back of the kept original
+  after the rename on a volume with hard links (second round); on a volume
+  without them the original is a copy that the race never reaches, so such
+  an edit is not seen there.
+
+#### U3c: a kept original puts a page back; nothing that is an only copy is deleted
+
+Russell's ruling of 2026-11-20, 15:20, and the third review of U3a's six
+lows. The contract is `undo.rule.recovery` (its "WHAT STAYS FOR GOOD"
+sentence and the kept-original sentences), `file-formats.json` →
+`undoJournal.stagedFiles`, the `recoveryCases` and `stackCases` rows marked
+U3c, and four `activityTrail.mustRecord` events (the fourth, "undo kept
+what it replaced", from the first review's fix round).
+
+- **A kept original puts the page back.** `UndoCheck.plan(keptOriginal:)`
+  asks, for a `writeFile` whose blob the list no longer holds, for a kept
+  original of the step's own beside that page (`UndoRecovery.keptOriginal`:
+  any of the step's labels, `-orig` or `-<n>-orig`) whose bytes hash to
+  exactly the sha the op wants. Recovery passes it, so a step that died part
+  way with its content gone is rolled back (or an undo or redo ends where
+  it began) and its staged files, the kept original now a copy of its page
+  included, are removed. The door's Undo and Redo pass it too, and tidy the
+  one used once the swap went in. A kept original that does not match is
+  never used. Rejected: trusting a kept original by its name alone; a file
+  someone edited is then put back as if it were the record.
+- **Nothing a put-back sets aside is lost (the first review of U3c,
+  MEDIUM).** The swap that puts a page back from its kept original keeps
+  what the page held a moment before as its own `-undo-orig`, `-redo-orig`
+  or `-recover-orig`, and its tidy deletes it; with the list's content gone,
+  that was the only copy of the step's other side, and the Redo the Undo
+  then offered came to contentMissing (the reviewer's probe: "offered [1],
+  not [1, 2]"). Now `UndoCheck.plan(keptOriginalUsed:)` reports each use
+  (`UndoKeptOriginalUse`: the kept bytes, the other direction's sha, and what
+  the page holds at that op), and `UndoRecovery.storeWhatKeptOriginalsGive`,
+  inside the lock and before the swap, writes the kept bytes back as their
+  blob and the outgoing bytes as the other direction's blob when they hash
+  to the recorded sha. When the list will not take the outgoing content (a
+  full or read-only disk: the contract's `contentCannotBeStored`), the swap
+  is told to keep that page's original (`keepingTheOriginalsOf`), and "undo
+  kept what it replaced" names the hidden file. Recovery does the same
+  before its put-back's swap; it keeps the outgoing content only for a step
+  that stays on the list (an undo or a redo ending where it began: a change
+  rolled back leaves the list, and what it set aside is its own new
+  content), naming it with "undo kept what a page held". Rejected: writing
+  the blobs after the swap (a death between the two would lose them).
+- **A kept original whose own bytes the list will not take stays (the
+  second review of U3c, MEDIUM).** `storeWhatKeptOriginalsGive` ignored a
+  failed write of the kept bytes. With only that blob gone and its folder
+  taking no new file (the contract's `beforeContentGoneAndCannotBeStored`;
+  `contentCannotBeStored` could not see it, since it takes the whole folder
+  and the other blob is then always missing too), the Undo put the page back
+  from the kept `-apply-orig`, the tidy removed it as a copy of its page, the
+  Redo was real, and the Redo's swap tidied its own copy of the before bytes:
+  they were in no file, and the Undo the list offered came to
+  `contentMissing`. It now answers `UndoWhatTheListCouldNotTake`, whose
+  `keptOriginalsHolding` carries the hash of every kept original's bytes the
+  list did not take, and the door's tidy and recovery's settled tidy pass it
+  as `keepingCopiesHolding`: a kept original holding one of those hashes is
+  never removed for being a copy of its page. The next move that uses it
+  tries the write again, and once the list takes the bytes the kept
+  original goes as before. The line "undo kept what it replaced" names it as
+  what the page "holds now"; recovery names it with "undo kept what a page
+  held", "because the list no longer holds a copy of it".
+- **An offer may rest on a kept file (Russell's ruling of 2026-11-20,
+  night; the second review of U3c, LOWs 1 and 2).** After an Undo or a Redo
+  whose other side the list cannot store, the step stays on the list with
+  the other direction offered, resting on the files kept beside its pages,
+  exactly as recovery's offers already did (`-recover-orig`, found by hash).
+  If such a file is gone or changed when the Undo or Redo is chosen, it is
+  refused then with its true sentence, and the list answers that refusal as
+  any other (ruling 13 or 22 for an Undo, ruling 20 for a Redo). Rejected,
+  and replaced: the door dropping the Redo, or clearing the whole list after
+  a Redo, because "an offer must not rest on" a hidden file. Clearing after
+  a Redo that succeeded predicts a refusal that may never come and costs the
+  teacher the whole history on a full disk; withholding only that step's
+  Undo would strand every older step behind it on a linear list, a clearing
+  in all but name. Dropping that clearing also took the door's second lock
+  away (LOW 1: the drop or clear ran after the finish under a lock of its
+  own, so another process acting between the two left the trail line saying
+  "not offered" untruly, and a kill between them left the state the old
+  "Rejected" paragraph forbade): the move now writes once, and its trail
+  line says nothing of an offer withheld, because none is.
+- **A kept original that cannot be read just now (LOW 5)** (a cloud
+  placeholder not downloaded, a permission) is "cannot tell now", never "no
+  match": `UndoRecovery.keptOriginal(couldNotRead:)` reports it, recovery
+  leaves the step for the next try (`leftByRecovery`, so an Undo answers
+  `cannotTellNow`), and the door answers `cannotTellNow` with the list kept
+  instead of `contentMissing`, which clears it.
+- **Nothing that is an only copy is deleted.** A kept original FILE is
+  removed only when its bytes are its page's (`UndoSwap.isACopyOfItsPlace`)
+  or exactly what the list gives for its page, undone or redone from what
+  the page holds now (`UndoRecovery.listHolds`, which plans the step's ops on
+  that page both ways; a whole file needs its blob, a line, a hunk or a
+  member is derived from the page). It replaced `listCanPutBack`, which only
+  asked whether the step's blobs were there: a key edit needs none, so a
+  racing edit's only copy was tidied away when the step settled (LOW 1;
+  `recoveryCases` "a step whose first page was edited in place by another
+  program as the swap went in…"). Every tidy keeps such a file: recovery's
+  before it plans (which since the first review of U3c, LOW 1, keeps every
+  kept original that differs from its page, even one the list gives, and
+  tidies those only once the plan is ready: another page may yet stop the
+  put-back and the list be cleared, and then the first page's kept original
+  is the only copy), after a step settles, at a `couldNotPutBack` closing, of
+  a step already closed (live too now, since nothing will put a closed
+  step's page back and its content is pruned with it), and pruning's.
+- **What the trail says.** `couldNotPutBack` writes "undo could not put back
+  a change that stopped" (no longer the "changed by hand since" line, which
+  was untrue there), naming each kept original left, read after the tidy. A
+  step that settles with one left writes "undo kept what a page held",
+  saying why for each: "because it differs from what the list recorded"
+  (its hash is nothing the journal recorded for the page: a racing edit), or
+  "because the list no longer holds a copy of it" (its hash is exactly a
+  recorded before or after whose content is gone; the first review of U3c,
+  LOW 2, where "it differs" was untrue). Both give the page and the hidden
+  name, never page text.
+- **An Undo or Redo refused for a step left part way (W3's LOW 4, from
+  W4).** When the newest step is a gone process's that recovery, run at once
+  by the Undo, tried and left (a file in use, a page it cannot read now),
+  `UndoJournal.move` answers that refusal from
+  `UndoJournalWriter.leftByRecovery`, never "another change is under way",
+  writes nothing to the list, and writes "undo refused for a change left
+  part way" through `UndoTrailHook.leftNewestLine`.
+- **A kept original's name is never reused (LOW 6).** Step numbers are not
+  unique across two Macs syncing one folder or after a list is started
+  again, and an earlier undo of the same step can leave its kept original
+  for good. `swapAFile` no longer removes whatever holds the `-orig` name:
+  it keeps its original under the next free `-<n>-orig`
+  (`UndoSwap.freeKeptName`), and since the first review of U3c a folder a
+  tree op sets aside takes the next free name too (LOW 3: it was refused
+  `fileIsInUse` for good). A file that appears at the chosen name after it
+  was found free is never overwritten or removed (LOW 4): `keep` answers
+  `EEXIST` from `link` without falling back to a copy, the copy itself is
+  `COPYFILE_EXCL` (`keepByCopying`), and the swap takes the next free name.
+  Rejected: a label
+  carrying a machine and list identity (it changes the staged-name format
+  both platforms parse, for a case the next free name settles); refusing
+  (a step whose undo once kept an edit could then never be undone again).
+- **Class dates and today's class left part way (LOWs 2 and 3).**
+  `SectionTimetableStore.applyRememberTimetable` passes
+  `JournaledStepError.leftPartWay` through; the class-dates sheet says the
+  dates ARE remembered and the assistant says it as part way. Since the
+  first review of U3c (LOW 6) the Class Dates sheet carries on exactly as a
+  plain save does (`SectionScheduleSheet.save` answers
+  `.rememberedKeeping`): one alert, "The class dates for … are
+  remembered." naming the kept file, whose OK calls `onRemembered` and
+  closes the sheet, so a verb waiting on the dates (`afterTheDates`)
+  continues; before, it was a `.blocking` status line and nothing waiting
+  ran. Today's class answers `.shownKeepingWhatItHeld`, and its trail line
+  names the kept file. The Section window shows one alert naming it
+  (Russell's ruling of 2026-11-20, night): "The front page now shows
+  {class}." / "What the front page held a moment before is kept beside it,
+  hidden, as “{kept}”." with OK and Show in Finder, never "The Front Page
+  Was Not Changed" (`class-planning.json` → `todaysClassOnTheFrontPage.wording`,
+  `keptTitle`, `kept` and `showKept`). Apple's HIG Alerts page, read that
+  night: a title that is a complete sentence takes sentence-style capitals
+  and a full stop; "OK" for acceptance in an informational alert; a button
+  title is a verb phrase naming its result, title-style; the default button
+  on the trailing side of a row or at the top of a stack; and "avoid using
+  an alert merely to provide information … informative, but not
+  actionable", which the second review raised (LOW 3: the teacher could not
+  find the file the alert named). **Show in Finder (Russell's second ruling
+  of 2026-11-20, night)** is beside OK on both kept-file alerts, today's
+  class's and the Class Dates sheet's; OK stays the default
+  (`.keyboardShortcut(.defaultAction)`), and either button closes the alert
+  and carries on. It shows the kept files selected in their folder
+  (`FolderActions.showInFinder(files:)`, `NSWorkspace.activateFileViewerSelecting`).
+  Measured on this Mac that night before it was built, with Finder not
+  showing hidden files (no `AppleShowAllFiles`): asked to show a file whose
+  name starts with a dot, Finder opened its folder with the file listed,
+  greyed, and selected ("1 of 2 selected"), so the button never opens a
+  folder in which the file cannot be seen, and the app never changes
+  Finder's settings. The alert is shown once the question has gone, before
+  whatever the preview then says, which waits behind it (`frontPageKept`,
+  `afterThePreviewAlert`). It is proved through the real window
+  (`TodaysClassOnTheFrontPageUITests.testShowGoingInPartWayNamesTheKeptFileInOneAlert`,
+  which also checks OK is the default and trailing, and
+  `testShowInFinderShowsTheKeptFileItNames`) with the debug-only
+  `--ui-test-edit-races-the-swap <file name>` (`UndoUITestSeam`, honoured
+  only beside `--state-dir`), which makes the first swap of that file race
+  an in-place edit with the put-back failing, and
+  `--ui-test-record-show-in-finder <file>`, which writes what Show in
+  Finder was asked to show into that file instead of bringing Finder to
+  the front.
+  The plain-words check of that wording runs with `{kept}` filled by a
+  placeholder: the hidden name is the app's, and holds "index".
+- **How I Teach (LOW 4)** is said as part way with no pointer at a copy of a
+  section (documentation 10).
+
+**What stays on the disk for good, and what a teacher sees of it.** Two
+kinds of leftover are never removed, by design: a kept original that is the
+only copy of what it holds (above), and, in shadow, the staged files of a
+swap without the list whose note could not be written (nothing records that
+they are Plantoir's to remove, `UndoShadowStaging`). Both are dot files
+beside the page, `.<page name>.plantoir-undo-…`: Obsidian, the Finder and
+the website builder pass over them, so a teacher sees nothing of them unless
+they show hidden files. The way to one is its trail line (each kept
+original is named there, with its page), and a problem report carries the
+trail. Removing one by hand loses only what it holds.
+
+#### If the app dies part way: what is on disk
+
+Every action has the same five places to die, because every action is one
+step through the same door:
+
+1. **Before `begin` is on the disk.** Nothing changed.
+2. **After `begin`, before the first swap.** Every new content is staged
+   beside its target as a dot-file (`.<name>.plantoir-undo-<seq>-apply-new`);
+   every page is as it was.
+3. **Between swap *i* and *i*+1.** The first *i* files are new and the rest
+   old; each replaced file's original is kept beside it as a hard link
+   (`-orig`).
+4. **After the last swap, before `applied`.** Every file is new.
+5. **After `applied`.** The step is made.
+
+Live (U7), recovery puts places 2 to 4 right once the process is gone.
+Places 2 and 3 are put back to before the step: `failed`, or `rolledBack`
+with one trail line. Place 4 is completed (`done`). Nothing staged is left,
+except a kept original that is the only copy of what it holds (U3c, below).
+
+In SHADOW (today), recovery never writes into a working folder. A step left
+at place 3 is recorded `interrupted` and the list cleared. Its staged new
+content is removed, and the pages stay as the process left them. That is
+the same on-disk state an action that died between two writes left before
+U3, with one addition since the third round: the kept original of each page
+that was swapped (`-orig`) differs from its page and is the only copy of
+what the page held that a teacher can reach (shadow never puts a page back
+from the list), so it stays beside the page under its hidden name.
+
+The files per action are those in the table above. The largest step a
+daily action makes is Make Room's: the renames (two files each), the links,
+the dates and the new pages, six or more files on a small section. It is
+the worst case: killed between its second and third swap, two files are new
+and the rest old, which is a half-shuffled unit.
+
+`UndoActionStepsTests.testAMakeRoomKilledPartWayIsPutBackWholeByRecovery`
+proves it. It runs the step live (`JournaledStep.modeOverride`), kills it at
+`beforeSwap(2)` and runs recovery as another process would. Every page is
+back as it was, nothing staged is left, and the step reads `rolledBack`.
+`testAShadowStepKilledPartWayLeavesNothingOfTheJournalsInTheCourse` is the
+shadow half (Add Classes, killed between its two pages). Recovery writes
+none of the teacher's files, the step reads `interrupted`, and the
+journal's own staged files are removed.
+
+That last part is new in U3. U1's `rule.recovery` said shadow recovery
+never writes into a working folder, and in U1 a shadow step staged nothing.
+Since U3 a shadow step is staged like a live one, so recovery's tidy of a
+closed step's staged files runs in shadow too. It runs only for a step whose
+every op changes a file in place; a step that moves or makes a folder is
+left for a live recovery. Measured red before the change: the dot-files
+stayed in the course.
+
+#### The action traces: through the real action code
+
+`UndoActionStepsTests.testEveryDailyActionIsOneStepThroughTheDoor` runs 20
+actions through their real code (the runner's tools on the shared
+assistant fixture, and the sheets' own writers) and reads back the one step
+each leaves: its key, its maker, its ops, and every file's whole text before
+and after. That is `contracts/undo-action-steps.json`, written by the test
+(`TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1`) and never by hand. On any
+other run the test is red when the actions record something else, with the
+moment a record carries (`answeredAt`, `recorded`) blanked.
+
+`scripts/make_undo_traces.py` makes six traces of each recorded step
+(`ACTION_TRACES_PER_STEP`): 120 `actionTraces` in
+`contracts/undo-traces.json`, beside the 20 seeded `traces`, which are
+unchanged byte for byte. Each trace makes the step from its files' befores
+(the door choosing `editLine` or `writeFile` by its own rule; the trace
+pins the op kinds), then undos, redos, hand edits of the step's files, and
+notes, then the closing run.
+`UndoActionStepsTests.testEveryActionTraceReplaysAsTheContractSays`
+replays them through the live door; `scripts/test_make_undo_traces.py`
+checks the generator. Windows reads `traces` only until it builds W7 (#949),
+so its `UndoTraceContractTests` are unchanged.
+
+#### Who owns `releaseSite` and `PublishedPagesRecord.release`: U3
+
+**U3 owns both.** They are the rollover's writes, not a deploy's and not a
+setting's:
+
+- `DeployCommand.releaseSite` moves the site markers aside when a section
+  rolls over onto a new website.
+- `PublishedPagesRecord.release` moves the record's fragments aside and
+  removes the two answered records.
+
+The rollover's ONE step is U3's (#897 piece B, seam 3). Splitting it would
+leave the rollover as two steps, which is the fault #897 B fixed in today's
+history. Since U3b both are planned into that step (below):
+`PublishedPagesRecord.release` writes nothing any more and has left the
+writer scan, and `DeployCommand.planSiteRelease` plans the markers. The
+plain `DeployCommand.releaseSite` is kept only for Keep a Copy for
+Reference, which cuts the COPY loose from the website as it makes it; that
+is part of making the copy, U4's step, so the scan's `DeployCommand.swift`
+entry now reads `waitsFor: U4`. The deploy that `DeployCommand` starts is still
+not counted (rulings 17 and 18). Schedule Deploy and Cancel Scheduled
+Deploy remain U4's (ruling 23); only the schedule a rollover REMOVES is an
+op in the rollover's step (seam 2, an `external` op).
+
+### U3b: the rollover as one step (#899, #959)
+
+Roll Over to a New Year (Section ▸ Roll Over to a New Year…, the built-in
+window's rollover, an outside assistant's `re_date_classes` with
+`rollover`/`website`) is ONE step, key `rollOver`, made through the door
+that takes every kind (`JournaledWrite.perform(ops:)`, from
+`JournaledStep.makeAsOps`). Under one begin it holds, in this order:
+
+1. every page re-dated (`editLine`, or `writeFile` when the lines cannot
+   say it), planned by `SectionReDatePlanner.apply(…, into: step)`;
+2. the two answered records removed (`writeFile`, after absent:
+   `links-checklist-answered.json`, `later-classes-kept.json`) and each
+   published-pages fragment moved into `…published-pages.previous-<stamp>/`
+   (`move`), planned by `PublishedPagesRecord.release(…, into: step)`;
+3. with "new", each site marker a deploy goes on with a site from moved
+   aside (`moveApart`), and each stale leftover brought in from the built
+   output set aside on its own (`setAside`; nothing else is moved),
+   planned by `DeployCommand.planSiteRelease`;
+4. with "new", each deploy set for later in this working folder for the
+   section turned off (`external`, target `scheduledDeploy:<label>`);
+5. the front page (`recompute`, `sectionFrontPage`), repointed by the runner
+   once the step is made, as the re-date's own step does.
+
+The same step is made when the dates are already right (the record and
+the website alone: the menu's `menuRolloverWithTheDatesAlreadyRight`, the
+window's second turn). An ordinary re-date (no `rollover`) is still its own
+`reDateClasses` step.
+
+**Nothing is said, recorded or left on the trail until the step is made.**
+The website is PLANNED (`planTheWebsite` → `PlannedWebsite`) before the
+make and FINISHED after it (`finishTheWebsite`: the sentences, the trail
+line, the window's second history entry). A step that is refused changes
+nothing and the reply is the runner's "Nothing was changed: …", so every
+sentence a teacher or an assistant hears on a failed rollover is true of
+the disk. A step refused PART WAY (a file could not be put back after the
+refusal: `JournaledStepError.leftPartWay`, U3a's third round) is never
+tried again and is said through `saidWhenTheStepStopped`, as part way, on
+all three of the rollover's paths (the review of U3b, LOW 1: the retry
+below once ran after a half-made first attempt, and the reply said
+"Nothing was changed" while a removed schedule or a moved file stayed
+changed). Two exceptions are deliberate, each true:
+
+- **A deploy set for later that cannot be removed** (its plist will not
+  go): the step is refused `couldNotWrite` on that target; the runner takes
+  that op out and makes the rest (`makeTheRolloverStep`), and the reply says
+  `rolloverCouldNotTurnOffTheScheduledPublish`, as before U3b. The failed
+  attempt leaves a `failed` step on the list, which is never offered, and
+  nothing else: the swap removes every folder it made for a place that had
+  none (`UndoSwap.swap`'s `foldersMade`, by `rmdir`, so never a folder with
+  anything in it), where a refused step once left an empty
+  `…published-pages.previous-<stamp>/` behind (the review of U3b, LOW 4).
+  A job whose files cannot be read is left out the same way. Only a plain
+  refusal is retried; a step left part way never is.
+- **The legacy Netlify marker** (`.merged_output/section<N>/.netlify_site.json`)
+  lives in the built output, a link out of the working folder, where a step
+  cannot name a place (`undo.rule.stagedThenSwapped`). **Russell ruled on
+  2026-11-20**: before the step it is brought into the working folder in the
+  current format, exactly as a deploy does on its next run, and the step
+  then names it like any other record (`moveApart`), so Undo puts it back
+  whole. `DeployCommand.moveTheLegacyMarkerIn` reuses `deploy.py`'s rule
+  (`load_netlify_marker`): the current record (`.netlify_sites/section<N>.json`)
+  is the one read; only when there is none is a legacy record that reads as
+  JSON written there (its bytes, mode 0600) and the legacy one removed.
+
+  **One question decides every record: which one would `deploy.py` read
+  right now?** (the review of U3b's fixes, round three, MEDIUM 1). It is
+  answered in one place, `DeployCommand.netlifyRecordADeployReads`, with
+  exactly `load_netlify_marker`'s rule: a current record that parses as JSON
+  wins, whatever it holds (`null` included, which names no site, so a
+  deploy starts a new website and does not migrate); else a legacy record
+  that parses, which a deploy would migrate; else none. "Parses" is
+  Python's `json.loads(path.read_text(encoding="utf-8"))`: strict UTF-8, no
+  byte order mark (Python's `json` refuses one), any JSON value
+  (`DeployCommand.parsedRecord`). The rule is pinned by
+  `contracts/shared-rules.json` → `undo.netlifyRecordCases`, 20 states, run
+  through deploy.py's OWN function by
+  `scripts/test_netlify_record_a_deploy_reads.py` and through the Swift by
+  `UndoRolloverStepTests.testWhichRecordADeployReadsIsTheContracts`; one
+  table drives both. Known to differ only on what no tool writes: Python's
+  `json` also takes `NaN` and `Infinity`, and numbers too large for a
+  double.
+
+  **The section's website is the SITE a deploy goes on with**
+  (`DeployCommand.netlifySiteADeployGoesOnWith`, round four): the record it
+  reads, and the site that record names, a JSON object's `id` (what
+  `deploy.py` takes, `site_marker.get("id")`, and only when it is not
+  empty) or, failing that, its `site_id` (the same id in every record
+  Netlify returns, which `deploy.py` writes whole). A record that names no
+  site (`null`, `{}`, `[]`, a string, an empty `id`) is not a website: a
+  deploy starts a new one from it, so a rollover moves nothing of it and
+  says the section was on no website (`menuRollOverNotDeployedYet`,
+  `rolloverHadNoWebsiteYet`), never "last year's details are kept at…" or
+  "deploying it will still replace last year's website" (round four,
+  LOWs 2 and 3: a record that is not UTF-8 had been said to be still
+  pinned, and `{}` to be last year's website). A record whose bytes cannot
+  be read at all is still pinned: what it names cannot be told now.
+
+  **Only what must move, moves** (round four). Each round before this one
+  named more of the states a leftover can be in and found another that
+  collided (review 4's MEDIUM: a broken current record and an
+  `.unreadable.json` already there were both given
+  `section<N>.unreadable.previous-<stamp>.json`, and the rollover was
+  refused for good). The question that removed the cases instead: what does
+  a file no deploy can parse need? Nothing. `load_netlify_marker` ignores
+  it wherever it sits; a deploy that finds no site writes the new one over
+  a current record that does not parse (`save_netlify_marker`, a plain
+  `write_text`), with or without a rollover; and if the rollover never
+  moves it, its Undo never has to put it back. So:
+
+  - **no site** (a deploy would start a new website now): nothing of the
+    Netlify records is brought in or moved, whatever is there; a deploy
+    starts a new website before the rollover, after it, after its Undo and
+    after its Redo;
+  - **the legacy record's site** (no current record that parses, the legacy
+    one does and names a site): it is written in the current record's place
+    and removed from the built output, as a deploy's migration does, and
+    the step moves it as the record (`moveApart`). A current record there
+    that does not parse (a migration's `write_text` killed part way) is
+    first moved out of the way to `.netlify_sites/section<N>.unreadable.json`
+    (the next free name), where the migration would have written over it,
+    and is NEVER moved again: no deploy reads it there. Before round three
+    the bring-in asked only whether a current record EXISTED, took the good
+    legacy record for a stale leftover, and after Rollover and Undo a
+    deploy found no record and made a new website;
+  - **the current record's site**: the step moves the current record
+    away, after which a deploy WOULD read a legacy record that parses, so
+    that one must leave the built output. When it says the same as the
+    current record (compared PARSED, never by bytes: `deploy.py` rewrites a
+    record it migrates with `json.dumps(indent=2)`, LOW 7) it is what a
+    migration that stopped before its removal leaves, and it is only
+    removed. Otherwise it is a STALE LEFTOVER, brought in as
+    `.netlify_sites/section<N>.from-built-output.json` (the next free name,
+    `.2`, `.3`…, LOW 5) and set aside in the step (Russell's ruling of
+    2026-11-20, evening). A legacy record that does not parse stays where it
+    is: no deploy reads it, before or after.
+
+  A legacy record whose bytes a leftover already there holds (a bring-in
+  that died before its removal) is only removed. The step (`planSiteRelease`)
+  sets every `section<N>.from-built-output[.<k>].json` aside, each as a
+  **`setAside`** op: judged and moved as `move` is, standing apart from its
+  step ON ITS OWN, never one of the group of records (below). Undo puts a
+  leftover back byte for byte where the step found it; a leftover that
+  cannot be set aside is left where it is, since no deploy reads it. A
+  leftover is never in `SiteRelease.keptFiles`; its two halves are in
+  `savedFiles`, so today's undo puts it back.
+
+  **Every kept name of a step is chosen in ONE place,
+  `DeployCommand.KeptNames`**, which knows both the disk and every name
+  this step has already chosen: a file's own name with `.previous-<stamp>`
+  before `.json`, then `.2`, `.3`… after the stamp, the first that is
+  neither (a link that leads nowhere counts as on disk). So no two ops of a
+  step share a place, and a file already at a kept name never stops a
+  rollover or pins a record (before round four, a record whose kept name
+  was taken was still pinned).
+
+  Before the rollover and after its Undo a deploy goes on with the same
+  site, in every state
+  (`testEveryRecordStateRolledOverUndoneAndRedoneLeavesADeployOnTheSameSite`:
+  each of the 20 states beside each of five sets of files already in
+  `.netlify_sites` (none; a stale leftover; an `.unreadable.json`; both and
+  a second stale leftover; the kept names this rollover would choose
+  already taken, at a moment fixed by `DeployCommand.momentForATest`),
+  rolled over, undone and redone, checking at each point the site a deploy
+  goes on with, what the reply says and that the kept file it names holds
+  last year's record, that no file already there changes, and that Undo
+  puts every one back).
+
+  The only refusal left is a record that cannot be read, written, moved or
+  removed (or a current record that is there and cannot be read at all, so
+  what a deploy reads cannot be known), said as "Nothing was changed: the
+  website record “.merged_output/section1/.netlify_site.json” could not be
+  moved to “.netlify_sites/section1.json”." (`LegacyMarkerNotMovedIn`; what
+  the bring-in changed is changed back, and a `.netlify_sites` folder it
+  made removed, so the folder is as it was). Every record is placed WHOLE
+  (`DeployCommand.placeWhole`: written beside its place as
+  `.<name>.bringing-in-<id>`, its mode set, then renamed in, never over
+  anything), so a death mid-write leaves no partial record where a deploy
+  reads one; the next bring-in removes any such half-written copy of any
+  of the section's records. This code lives in
+  `Models/LegacyNetlifyRecord.swift`, which the writer scan lists as
+  `notAStep` (the built output is outside the working folder, and the
+  bring-in is a deploy's own migration), so U4 does not take it as work.
+
+  **A step refused after the record was brought in puts it back**
+  (`LegacyMarkerBroughtIn.putBack`, from `makeTheRolloverStep`: never over
+  anything, and only while its new place still holds the same bytes; a
+  current record moved out of its way is moved back; the `.netlify_sites`
+  folder the bring-in made is removed once it is empty again, LOW 6), so
+  "Nothing was changed" is true. If any of it cannot be put back, the reply
+  says what is still moved instead: "Nothing else was changed: … The
+  website record “…” is now at “…”, where a deploy reads it; it names the
+  same website." (for a leftover: "The old website record “…” is now at
+  “…”, where no deploy reads it."; for a current record moved out of the
+  way: "The website record “…”, which no deploy could read, is now at “…”,
+  where no deploy reads it either.") (`RolloverStoppedAfterARecordMoved`,
+  `saidWhenTheRolloverStopped`). A
+  step left part way, or a process that dies, leaves it where it is: the
+  step's own `before` names it there, and recovery settles the step from
+  that. Gone with the fix round's design: the move outside the step,
+  `PlannedSiteRelease` and its `putTheLegacyMarkerBack`, the action argument
+  `legacyMarkerSetAsideOutside`, and `JournaledStep.extraArguments`, which
+  only carried it. Rejected before the ruling: naming the builds root as a
+  second place of the step (a second root in the format for one file that
+  only very old folders hold); leaving the whole website out of the step.
+
+**What changed in the order of effects, and why.** The window's rollover
+moved its markers and turned its schedule off AFTER the preview was
+rebuilt; now both go in with the step, BEFORE the rebuild, because the
+step cannot be split around it (the dates must be on disk for the
+rebuild). The window's reply, its `detail`, and today's two history
+entries (the re-date, then the website) are unchanged; the website's trail
+line now comes before the preview's. The menu's order is unchanged.
+
+**Today's in-memory undo answers exactly as before**: the menu's one entry
+(`menuRolloverChange`, the marker halves that left their place,
+`onlyTheHalvesMovedAway`), the window's two, the front page in the same
+place among the files. `RollOverFromTheMenuSafetyTests` and
+`RolloverWebsiteTests` pass unchanged.
+
+#### Q3 and #959: what stands apart from its step
+
+Russell ruled on 2026-11-19: after a rollover onto a new website and a
+deploy, Undo takes back the rest (the dates and the record), leaves both
+markers where they are, says once that the section stays on its new
+website, and the step leaves the list so earlier steps can still be undone.
+
+That needed an op whose being changed since does not refuse its step. The
+plan (above, before U3b) proposed a key, `"standsApart": true`, on a
+`move`. **Rejected**, because `undoJournal.unknown.keys` forbids it: a
+known kind never gains a key that changes what undoing it does, since an
+older reader would undo it by the old rule (here: refuse and CLEAR the
+list). So it is a kind of its own, `moveApart`: judged, made, undone and
+redone exactly as `move`, but an Undo or a Redo (`UndoCheck.plan(…,
+leavesApart: true)`) that finds its pair changed since LEAVES it, both
+places untouched, names its place in `UndoOutcome.undone(seq:, leftApart:)`
+(or `redone`), and goes on with the rest. A reader that does not know
+`moveApart` (Windows W1, a Mac before U3b) reads the step as a barrier:
+greyed, never undone in a guessed way. Making a step never leaves an op
+apart (`perform(ops:)` and recovery plan with `leavesApart` false): a step
+is made whole or not at all, and a dead process's step is put back whole
+or completed whole.
+
+"The step leaves the list" is built as the journal's ordinary Undo: the
+step moves to the redo side, and the step below it is the one Undo offers
+next. A Redo then takes the dates and the record forward again and leaves
+the markers apart again (the section is already on its new website).
+Today's Undo Last Change has no redo, which is where #959's "comes off the
+list" came from; the U7 menu greys Redo as for any other step only when
+there is none. With no deploy between, the marker is moved back from its
+kept copy (one rename, its 0600 mode kept, #961) and nothing is apart.
+
+**Records move as a group** (the director's decision of 2026-11-20, on
+#899). A section on two hosts has two records, each a `moveApart`. If a
+deploy reached one host and not the other, judging them one by one would
+put one back and leave the other: the section split across two websites.
+So `UndoCheck.plan` first asks whether any `moveApart` of the step is
+changed since (`aWebsiteRecordIsChangedSince`); if one is, every one not
+already where it is wanted is left apart and named, and U7 says once that
+the section stays on its new website. Redo the same way. **The group is the
+records a deploy reads, never a leftover** (the review of U3b's fixes,
+LOW 3): a leftover is a `setAside`, so a teacher who deletes or edits a
+leftover, or its kept copy, has it skipped and named at Undo or Redo while
+the records go back (or forward); and a record changed since keeps only the
+records apart, while the leftover goes back with the rest
+(`testALeftoverChangedOrMissingIsSkippedAndNamedAndTheRecordGoesBack`).
+`setAside` is a kind of its own for `moveApart`'s reason: a key on
+`moveApart` would be read by an older reader as a group member.
+
+The schedule stands apart too, by its family: an `external` op on
+`scheduledDeploy:` that an Undo cannot set back because the job's moment
+has gone by (`UndoExternalPlaces.canSet`, false for a moment past) is left
+off and named (#897 piece B, seam 2: never registered again for a moment
+already past). A plist with no `PLANTOIR_SCHEDULED_FOR` (older jobs) is
+never set back either: its moment cannot be known to be ahead, and its
+calendar entry has no year, so it would fire on that day next year (the
+review of U3b, LOW 2). A schedule the SWAP cannot set (launchd refuses the
+job, or the write is off the main thread) is left apart the same way and
+named after what the check left apart, never a refusal of the whole Undo
+(`UndoSwap.swap`'s `leaveApart`, given only by an Undo or a Redo): a label
+that stayed loaded would otherwise block its step, and every step under
+it, for good (the review of U3b, LOW 3). If launchd refuses and the plist
+just written cannot be taken away again, it stays in LaunchAgents and loads
+at the next login: it is neither back (it will not run at its moment unless
+the teacher logs out and in before it) nor left apart (it will run). It has
+its own answer (the review of U3b's fixes, round three, LOW 2):
+`UndoExternalPlaces.writeSaying` answers `.startsAtTheNextLogin`, the swap
+names its target in `UndoOutcome.undone(seq:, leftApart:,
+startsAtTheNextLogin:)` (or `redone`), U7 says
+`AssistWording.undoScheduleStartsAtTheNextLogin` ("The deploy set for later
+is back, but it could not be started now. It starts the next time you log
+in, so it will not run at its time unless you log out and back in before
+then."), and the trail says `scheduled deploy could not be set` with "put
+back a scheduled deploy for <moment>, but macOS would not start it now; it
+starts the next time you log in to this Mac, and will not run at its time
+unless you log out and in before then"
+(`testAScheduleWhosePlistCannotBeTakenAwayAgainStartsAtTheNextLoginAndIsSaidSo`).
+That line is written only once the WHOLE swap has gone in and the step is
+closed (`UndoExternalPlaces.noteItStartsAtTheNextLogin`, called by the
+journal after `.swapped`), never from inside the write, where a later
+target's failure would roll the swap back and refuse the Undo after the
+line had said the schedule was put back (round four, LOW 4;
+`testNoTrailLineForAScheduleWhenItsUndoIsRefused`). A schedule left apart
+writes no trail line of its own; it is named only in the outcome, which
+exists only for a swap that went in. Undone while its moment is ahead, the plist and its script
+come back byte for byte and the job is loaded again (`UndoScheduledDeploys`,
+through the action's own `LaunchControlRunning`, never the real
+`launchctl` under the suite). That runner is the main actor's, so a write
+made off the main thread answers false (a change that could not be made,
+left apart, as above): **U7 should make an Undo of such a step on the main actor**,
+or give the runner a nonisolated form, and must pass `UndoAppPlaces` (not
+the core's default `UndoAppPreferences`) as `places` to every Undo, Redo
+and recovery.
+
+Cases: `checkCases` (4 `moveApart` rows, 3 `setAside` rows), `stackCases`
+(13 U3b rows: the calls `rollOverOntoANewWebsite`,
+`rollOverOntoNewWebsitesOnTwoHosts`, `rollOverTurningOffASchedule`,
+`theScheduleCannotBeSetNow`, `rollOverSettingALeftoverAside`,
+`removeTheKeptLeftover` and `theScheduleStartsOnlyAtTheNextLogin`, keys
+`leftApart`, `schoolYear`, `cloudflareMarkers`, `leftoverMarkers` and
+`startsAtTheNextLogin`), both replayed by the Mac and the Python model
+(`plan(…, leaves_apart=True)`, its group rule, and `set_or_leave_apart` for
+a schedule the swap cannot set or that starts at the next login), and
+`netlifyRecordCases` (20 rows, above). The traces are byte-identical. The group rule
+is a rule of a step, not of one op, so it has no `checkCases` row: a check
+case holds a single op.
+
+#### If the app dies part way through a rollover
+
+The step is one door, so the five places to die are U3a's ("If the app dies
+part way" above). Its swaps go files first (the pages, the removed
+records), then the moves (fragments, markers), then the schedule. Live,
+recovery puts places 2 and 3 back to before the step (`rolledBack`): whole
+in the OLD year, marker in place, record in place, schedule registered
+again through the same places. Place 4 is completed (`done`): whole in the
+NEW year. `UndoRolloverStepTests.testARolloverKilledBetweenItsSwapsIsWholeInItsOldYearAfterRecovery`
+(killed at `beforeSwap(2)`) and `…KilledAfterItsLastSwapIsWholeInItsNewYearAfterRecovery`
+(at `beforeApplied`) prove both, and the closing line says which. A
+death between bringing in the legacy record and the step's begin leaves
+the record in its current place and the legacy one gone (or, between the
+write and the removal, both holding the same bytes): a deploy reads the
+current one, the same website, and the next rollover finishes the removal
+(`testACrashBetweenBringingInTheLegacyRecordAndTheStepLeavesAFolderADeployReads`). A leftover brought in and then killed at
+any point is the same: after the bring-in or between the swaps it is beside
+the current record (the step closed `failed` or `rolledBack`), after the
+last swap it is set aside (`done`), and never back in the built output
+(`testADifferentLeftoverKilledAtEachPointIsSettledByRecovery`). In SHADOW, recovery never writes the teacher's files (U3a's rule);
+a rollover step moves files, so its staged files are left for a live
+recovery, as for any step with a move.
+
+A list that cannot take the step in shadow changes nothing about the
+rollover: the step is made all or none WITHOUT a record
+(`JournaledStep.makeWithoutARecord`, the same staged swap with nothing
+written down in the list, noted through `UndoShadowStaging` so a kill part
+way is tidied, and judged against the bytes the plan read), and the same
+goes for a step that cannot be named in one.
+`testInShadowAListThatCannotBeWrittenChangesNothingAboutTheRollover`.
+
+#### The rollover's action traces
+
+`UndoActionStepsTests` records two more steps from the real code:
+`rollOverOntoANewWebsite` (the menu, "new": re-date, record, checklist
+answers, marker) and `rollOverKeepingTheWebsite` (the window, "same":
+re-date and record), 22 steps in all. `undo-action-steps.json` gains
+`moves` for a step that moves files (from, to, content, `standsApart`; the
+moment in a kept copy's name set to one fixed moment so the file is the
+same on every run). `scripts/make_undo_traces.py` makes six traces of each
+(132 `actionTraces`); a trace of a step with a `moveApart` may hold a
+`deploy` call (a new marker in the emptied place, nothing on the list), and
+an undo or redo after it carries `leftApart`. The 20 seeded traces and the
+120 of U3a are unchanged byte for byte.
+
+#### For U4
+
+U4 owns Schedule Deploy… and Cancel Scheduled Deploy (ruling 23) and can
+take the family whole: `UndoScheduledDeploys` reads and writes a job by its
+label, `{plist, script}` in base64, and `UndoAppPlaces` routes it. A
+schedule SET is an `external` op from not set to the job's value; cancelled,
+the reverse. It stands apart by its family, which is right for the
+rollover; whether a schedule step U4 makes should stand apart (an Undo of
+Schedule Deploy after the job has fired) is U4's to decide, and if not, U4
+gives its ops a family or kind of their own rather than changing this one.
+A settings save goes through the door as U4a below describes;
+`setExternal` for a preference; `places` set to `UndoAppPlaces`
+whenever a step holds an external op. (`extraArguments` is gone: nothing
+used it once the legacy record moved inside the step; a piece that needs
+an action argument adds it back with its reason.) An Undo or Redo passes
+`leaveApart` to `UndoSwap.swap`; making a step and recovery never do.
+
+### U4a: Course Settings, Add folder and Set School Year (#899)
+
+Three actions, each ONE step through the door, made as ops
+(`JournaledStep.makeAsOps`). Nothing a teacher sees changes, and the switch
+stays off.
+
+- **Save Course Settings** (`CourseSettingsView.save`, key
+  `saveCourseSettings`, made by `sheet`): one step whatever it changes, one
+  `editJSON` per TOP-LEVEL setting whose value the Save changes, in key
+  order. The unit is #265's merge (per top-level key), and it is the unit
+  #986 will make one step per change. `CourseConfiguration.planWrite(to:into:)`
+  is `write(to:)` planned instead of written: the same merge, the same name
+  and label cleaning, and the same read-again loop, which is now the plan
+  (read, merge, read again, up to three times, until the read the plan was
+  built from is still the file). That read is each op's `before`, read at
+  PLAN time (the U3a trap was a `before` read when the step is made). A
+  setting that was absent has no `before`, so Undo makes it absent again,
+  never an empty list (#986 section 4.5: the first Marks tick creates
+  `graded_folders`). The bytes each member leaves are worked out at plan
+  time by the member rule (`UndoJSONMember.moved`, the bytes
+  `undo-json-cases.json` → `editJSONCases` pins). After the make `finishWrite` reads the file
+  back, so `lastSavedData` and `values` are the file as it is, a member
+  another program changed between the plan and the make included (U4b,
+  from U4a review 1, LOW 2). A file that is missing, is not one JSON object, or whose
+  bytes the member rule cannot move (a key written twice, a number a double
+  cannot hold) is planned WHOLE, the bytes `write(to:)` writes, and the door
+  chooses `writeFile`. `writeAsOneStep(to:madeBy:)` plans, makes and
+  finishes (`finishWrite`: `values`, `lastSavedData`,
+  `WorkspaceModel.followWrite`, as before); a step refused because one of
+  ITS members was changed between the plan and the make (a build's
+  preflight) is planned again from the file then, up to three times, as the
+  loop always did. `WriteResult` is unchanged, so the notice and the trail
+  line are too. Revert writes nothing and makes no step; a Save that
+  changes no value writes nothing and makes no step (it used to rewrite the
+  same values pretty-printed).
+- **What changes on disk.** Only the changed members' bytes: each new value
+  is spelled compactly with its keys sorted (`"hidden" : ["Media"]` where
+  the app used to write it one item to a line). Every value a build reads
+  is the same. An Undo spells the value it puts back the same way, so the
+  file after an Undo has the old VALUES, not the old spacing.
+- **Undo takes back only what the step changed (ruling 4).** Another
+  copy's Save of another setting (a window, or Add Section's write, which is
+  not on the list until U4c), or a build adding a folder it found to a list
+  this Save did not change, is left as it is, and the Save's own settings go
+  back. A setting this Save changed that something else changed again is a
+  change since: the Undo is refused, names `course_config.json`, and the
+  list is cleared (ruling 13).
+- **Add folder** (`CourseSettingsView.createFoldersOnDisk`, key
+  `addFolder`): one `createTree` per folder made, holding exactly the folder
+  and FolderScaffold's two pages (`FolderScaffold.planPages`, which replaced
+  `writePages`), the highest folder of its path that is not there yet being
+  the tree's root. All of them or none: a place taken by the time the step is
+  made refuses the step and nothing is made or said, as a folder that could
+  not be made said nothing before. The list's own change is Save's, in
+  Save's step, as before. Undo takes a folder out only while its listing is
+  what the step made; a page the teacher put in it refuses the Undo and names
+  the folder (#986 ruling 7).
+- **Set School Year** (`SetSchoolYearSheet.write`, key `setSchoolYear`): one
+  step, its one `editJSON` `reference_school_year`.
+- **`StringListEditorView`** writes no file; `removeItem(named:)`, which the
+  writer scan counted as a removal, is `takeOutOfTheList(named:)`.
+
+The writer scan: `CourseSettingsView`, `StringListEditorView`,
+`SetSchoolYearSheet` and `FolderScaffold` are off the list (they write
+nothing outside the door); `CourseConfiguration` keeps its two calls,
+`write(to:)` and `recordOnDisk`, for the callers still on today's path
+(U4b the renames and Rename Course, U4c Add Section, U4d Keep a Copy, U5
+archive and restore).
+
+#### If the app dies between two writes
+
+- **Save or Set School Year**: one file, one swap. Before the begin: nothing
+  is on the list and the file is as it was. After the begin and before the
+  swap: recovery finds nothing took effect, closes the step `failed`, and
+  the file is whole as before (`testASaveKilledBeforeItsSwapIsWholeBeforeAfterRecovery`).
+  After the swap and before `applied`: recovery closes it `applied`; the
+  file is whole as the Save left it (`…KilledAfterItsSwap…`). A staged copy
+  beside the file is tidied either way.
+- **Add folder**: one swap per folder, each a rename of a folder built whole
+  beside its place. Killed between two folders: recovery takes the first
+  back out (its listing is still what the step made) and closes the step
+  `rolledBack`; neither folder is there. Killed after the last: `applied`,
+  every folder there with its pages
+  (`testAddFolderKilledBetweenItsFolders…`, `…AfterItsFolders…`).
+- With the switch off and a list that cannot take the step, the change is
+  made all or none with no record (`makeWithoutARecord`, which now also
+  makes a step's trees), and the trail line says what became of it.
+
+#### The action traces
+
+`UndoActionStepsTests` records three more steps from the real code
+(`UndoActionStepsCourseSettings.swift`): `saveCourseSettings` (the first
+Marks tick, `graded_folders` absent before, and a sidebar hide),
+`addFolder` (a shared folder, its pages' moment fixed through
+`createFoldersOnDisk(named:scope:created:)`) and `setSchoolYear`, 25 steps in
+all. `undo-action-steps.json` gains `members` (every `editJSON` op: file,
+key path, before and after, left out for absent) and `trees` (every folder
+made: path, folders inside, every file's text). `make_undo_traces.py` makes
+each file planned member by member into its `editJSON` ops, and each tree
+into a `createTree` after the moves; its model now moves a member by the
+member rule's bytes (`json_bytes_moved`), as both apps do, so a settings
+file hashes the same after an Undo everywhere; a folder hashes as its
+listing. The traces before them are unchanged byte for byte.
+
+#### Lows carried in from U3c's review 3, the U3 sweep and the merge review
+
+- **No pile of kept copies** (U3c review 3, LOW 1). With both contents gone
+  and the list taking no new file, every Undo and Redo kept its outgoing
+  bytes under a new name. Now, after such a move, the step's kept copies
+  beside each page are thinned to ONE per content
+  (`UndoRecovery.removeSupersededKeptCopies`): an offer rests on content, not
+  on a file, and that content stays.
+- **Show in Finder for a kept file that is gone** (LOW 2) says
+  `FrontPageWording.keptGone` in an alert with OK and asks nothing of Finder
+  (`FolderActions.whatIsStillThere`).
+- **No only copy deleted by an Undo or a Redo** (LOW 3). Under the lock,
+  before the swap, every page's outgoing bytes that the step's other
+  direction needs (a `writeFile` op's after for an Undo, its before for a
+  Redo) go into the list when it lacks them
+  (`UndoRecovery.storeWhatTheOtherDirectionNeeds`); when it will not take
+  them, the swap keeps them beside the page and the other direction is made
+  from that kept file, as U3c does for a put-back.
+- **The `undo could not record a step` line is written from what happened**
+  (the U3 sweep, finding 2): `UndoUnrecordedChange` (went ahead, nothing was
+  changed, stopped part way, made with its record finished at the next
+  chance), passed once the shadow write has answered. It used to say "The
+  change went ahead" before a write that could still refuse, always for a
+  page that is a link. `undo.rule.shadow` now says what the switch-off
+  refusals are (finding 3).
+- **Duplicate Class** (finding 4): a room that cannot be made after the copy
+  is refused is said as nothing changed, never "a blank class page is
+  waiting".
+- **`undo.wording`** (finding 5) holds the sentences that were in Swift
+  alone: a kept file named after a step refused part way, the Class Dates
+  alert, and the rollover's records still moved.
+- The two stack rows the merge added say and check what is true (the merge
+  review's two lows; one row added that stops at the rollover's Undo).
+
+#### For U4b
+
+The renames plan into a step the same way: `recordOnDisk` gets a planning
+form beside `planWrite` (the change applied to a fresh read, one `editJSON`
+per top-level member it changes, `before` from that read), and the folder
+moves are `move` ops on folders in the same step. `JournaledStep.editJSON(at:read:members:leaving:)`
+takes a file once; a step that edits `course_config.json` twice (a rename
+and its record) works out both changes on one read and plans once. When
+U4b moves its callers, `CourseConfiguration`'s scan reason loses U4b.
+
+### U4b, first part: U4a's lows and the U4a sweep's (#899)
+
+Branch `issue/899-u4b-rename-folder`. Nothing a teacher sees changes, and
+the switch stays off. Rename folder through the door is NOT in this part
+(see "For U4b", above, which still holds for it).
+
+- **After the make, this copy is the file** (U4a review 1, LOW 2):
+  `CourseConfiguration.finishWrite` reads `course_config.json` back once the
+  step is made, so `lastSavedData` and `values` hold another program's
+  change of ANOTHER member made between the plan and the make (the door
+  kept it), never the plan's read. Only a file that cannot be read back as
+  one object leaves this copy as the plan said
+  (`UndoCourseSettingsStepTests.testAfterTheMakeThisCopyIsTheFileWithAnotherMemberChangedInTheGap`).
+- **A fourth refusal in a row** (LOW 3): a Save whose own member is changed
+  by something else before every make is tried four times in all; the
+  fourth refusal writes nothing, keeps the edits unsaved, and the sheet
+  says "Could not save: The file “course_config.json” couldn’t be saved."
+  (`…testAFourthRefusalInARowWritesNothingAndKeepsTheEditsUnsaved`). The
+  sentence is true of the disk. `write(to:)` wrote after its third
+  read-again; the refusal is deliberate, since writing over a member that
+  just changed is what #265 forbids.
+- **Two contract rows for U3c review 3's kept-copy rules** (LOW 4):
+  `stackCases` 'U4a, LOW 4 (a)' (the outgoing bytes kept beside the page
+  when the list takes no new file, and the Redo made from them), 'U4a, LOW
+  4 (a), stored' (the same with the list taking the bytes: nothing kept,
+  the Redo made from the list; added in U4b, the part-one review's LOW 2,
+  and measured to fail with only the store branch of
+  `storeWhatTheOtherDirectionNeeds` taken out, the Redo coming to
+  `contentMissing`; an earlier row for it was dropped in 4cd1ccac4 because
+  that one passed either way) and
+  'U4a, LOW 4 (b)' (seven moves, two kept files), with the call
+  `afterContentGone` and the key `keptBesideThePage` (`stackCasesHow`). The
+  Python model (`make_undo_traces.py`) now stores the outgoing bytes as the
+  door does (`store_what_the_other_direction_needs`); before, it had only
+  the U3c store from a kept original. Held for Windows under W4c.
+- **The trail line `undo kept what it replaced` is true on the list's path**
+  (the sweep, LOW 1): it said the page was put back "from what was kept
+  beside it" whenever anything was kept, also when the page came from the
+  list and only its outgoing bytes were kept
+  (`storeWhatTheOtherDirectionNeeds`). The phrase is now said only when a
+  kept original was used, decided page by page since U4b (the part-one
+  review's LOW 1: a step of two pages, one put back from the list with its
+  outgoing bytes kept and one from its kept original, said it of both):
+  `putBackFromAKeptOriginal` names the pages the check's uses name, and a
+  step with pages both ways says "put back “A.md”, and put back “B.md” from
+  what was kept beside it"; `activityTrail.mustRecord` says so
+  (`UndoKeptCopiesTests.testTheKeptLineSaysFromTheListWhenThePageCameFromTheList`,
+  `…testTheKeptLineIsDecidedPageByPage`).
+- **A settings file that is a link is saved again with the switch off** (the
+  sweep, LOW 2, run, not only read): U4a planned the Save at the link's own
+  place, the swap found a link there (`lstat`), refused it as changed since,
+  and after four tries the Save said "Could not save". `planWrite` now plans
+  where the link leads (`CourseConfiguration.fileALinkLeadsTo`, the last
+  component's links followed, at most `MAXSYMLINKS`), and the link stays a
+  link, for a target inside the course and one outside the working folder
+  (`…testASettingsFileThatIsALinkIsSavedThroughTheLinkWithTheSwitchOff`).
+  Measured with the fix taken out: only the link leading OUTSIDE the working
+  folder was refused ("Could not save"); one leading inside it was saved.
+  Measured: before U4a, `write(to:)`'s atomic write REPLACED the link with a
+  plain file and left the teacher's real file as it was; rejected, for the
+  reason `rule.shadow` gives for a daily page.
+  **Owed at U7, written down now (U4b part one's review, LOW 4):** a link
+  leading OUTSIDE the working folder is saved through `writePlainly` with
+  the switch off, since `UndoFolderPlaces.relativePath` cannot name it;
+  LIVE, `makeAsOps` throws `couldNotRecordTheStep` and that Save is refused.
+  That refusal is right by "live never writes outside what the step names",
+  but it is a Save the teacher could make before Undo, so U7 decides it
+  before the flip (keep the refusal with a sentence of its own, or save it
+  off the list as credentials are) and says it in `rule.shadow`.
+  **A dangling link** (the same review, LOW 5): `fileALinkLeadsTo` gives the
+  missing target, `before` is nil, and the Save makes a new file where the
+  link points, which with the switch off can be outside the working folder;
+  nothing is overwritten, and before U4a the link itself was replaced by a
+  file. A link that loops ends at a link after `MAXSYMLINKS` hops,
+  `UndoItem.read` answers not-a-file, and the Save is refused writing
+  nothing, its "Could not save" sentence true.
+- **Show in Finder's real path is read by a test** (the sweep's note): the
+  alert and what Finder selects are worked out first
+  (`FolderActions.showInFinderPlan`), and the app's path follows that plan
+  (`…testShowInFinderTheAppsPathAlertsForAGoneFileAndSelectsOnlyWhatIsThere`);
+  before, only the debug recorder's branch was tested.
+- Documentation's #506 section no longer says `writePages` writes with
+  `.withoutOverwriting` (the sweep, LOW 3), and `undo.laterPieces.U4` says
+  what U4a landed and what U4b still owes (LOW 4).
+
+### U4b, second part: an edit inside a moved folder, its recovery, and a capitalisation-only rename (#899)
+
+- **The order rule** (`opKinds.wholeOps`' one exception, commit 2410aed27):
+  an edit named at a move's new place, after the move, is made and redone
+  after it and taken back before it; the move is judged as if its own edits
+  there were taken back. Five `stackCases` rows ("U4b, ...").
+- **Recovery settles a step killed between its move and its edits whole, by
+  content.** `UndoRecovery.fileStates` reads a carried edit where its folder
+  is NOW (`placeNow`: under the move's `from` while the folder is still, or
+  again, there; before the fix such an edit read as "neither" and the step
+  was closed as interrupted, the list cleared, at every kill point but the
+  middle ones) and judges the carrying move as if the step's edits inside
+  were taken back, without the step's own staged files and kept originals
+  inside the folder (`carryingMoveState`; before the fix the undo's kept
+  copy of the page, kept by the first tidy as differing from its page, made
+  the folder "changed since"). Its tidy and `listHolds` also look beside the
+  carried page at the folder's old place (`placesStagedBeside`), so a kept
+  copy the folder took with it when it moved back is removed once the list
+  holds what it holds. Eleven `recoveryCases` rows (`withAMovedFolder`; each
+  kill point of a step, an undo and a redo, and one with a kept copy left
+  inside the folder moved back), run from the JSON and modelled in
+  `make_undo_traces.py` (`swap_groups`, `stopped_part_way`, `recover`; the
+  model holds no staged files, so the left-out kept copies are the Swift
+  replay's alone). Measured before the fix: seven of the first ten rows
+  failed. Not settled here, for U7: a step killed after its edit went in
+  and then edited by hand elsewhere puts its other pages back through a
+  plan that does not leave the step's own kept copy inside the folder out,
+  so the folder is then refused as changed since too and the step is closed
+  as interrupted without those pages put back (the list is cleared either
+  way).
+- **A capitalisation-only rename** (`Media` to `media`; `opKinds.move` now
+  says so). The pair rule as written found both places holding the folder
+  on a case-insensitive volume, and the contract called such a move
+  unreadable, so the rename the teacher asked for could be neither one step
+  nor undone (invariant 1). Now a `move` whose `from` and `to` are spelled
+  alike but for case, in the last part only (`UndoOp.isCaseOnlyMove`), is
+  readable; where the two spellings are ONE item (the same device and file
+  number, `UndoMoveSide.spellingListed`) it is judged by the spelling the
+  folder lists (as `to` holding the content: as the step left it; as `from`:
+  as before; a third spelling or other content: changed since), and the swap
+  renames it only while the folder lists the spelling it leaves. Where they
+  are two items (a case-sensitive volume) it is any move. Measured on this
+  Mac's APFS (case-insensitive): `renamex_np(RENAME_EXCL)` renames `Media`
+  to `media` and returns 0, so the same rename serves; the notes' guess
+  that it refuses was wrong. An edit the rename carries is named at the new
+  spelling, never the old one as spelled. A move whose folders above the
+  last part differ in case stays unreadable. Rows: three `checkCases` (the
+  old "not readable" row replaced) and one more for a folder above, three
+  `stackCases` (undo, undo and redo, and a third spelling by hand since).
+  Rejected: two moves through a middle name (they share a place, which
+  `wholeOps` forbids), and a removeTree with a createTree (they overlap the
+  same way).
+
+### U4b, third part: Rename folder is one step (#899)
+
+**What it is.** Course Settings' Rename folder (`CourseSettingsView.renameFolder`) is ONE step, key `renameFolder`, made through the door: every folder's `move` first (one per section that has the folder, for a per-section folder), then every page whose qualified links change, inside the moved folder (named at its new place, so the move carries it, `opKinds.wholeOps`) and outside it, then one `editJSON` per `course_config.json` member `SpecialFolderRenamer.renaming` changes (`CourseConfiguration.planRecordOnDisk`, the planning form of `recordOnDisk`). All of it goes in or none of it does.
+
+**How it is planned.** `SpecialFolderRenamer.plan` reads the disk OFF the main actor and writes nothing: each folder's listing SHA-256 (the move's pair) and each page's bytes and rewritten bytes (`FolderRenamePlan`, `Sendable`). On the main actor `apply` plans it into a `JournaledStep` (`moveFolder(_:to:listingSha:)`, `write(_:to:plannedFrom:)`, whose `before` is the walk's read, never a second one), the settings are planned from one read, and the step is made. A step refused as changed since (a page or a setting changed between the plan and the make) is planned again from the disk, up to three times, as Save is. In `JournaledStep`, a place at or inside a planned folder move's `to` is read where it is now (`placeOnDiskNow`) and named from the folder above `to` with `to`'s own spelling (`namedPath`), so a capitalisation-only rename is not named by the spelling the disk lists now (`realpath` gives the old one). A step that cannot be recorded in shadow is swapped in without the list (`makeWithoutARecord`): the folder moves first, each carried page staged only at its turn.
+
+**Refused.** A refused rename writes nothing and the sheet says `undo.wording.renameFolderNothingWasChanged` ("“{old}” was not renamed, and nothing was changed: {said}"); one refused part way whose swaps could not all be put back says `renameFolderStoppedPartWay`, with each kept file named. The two old half-failure sentences ("renamed N of M copies", and "renamed, but could not write the change to this course's settings") are gone: neither state can happen now.
+
+**The rename record is KEPT while the switch is off** (the director, 2026-11-21, after the part-two review's L6). With `undoJournalIsLive` off, recovery records and repairs nothing, so a rename killed part way (say between its moves and its pages) would be left half done with nothing to finish it. So `courses/.internal/renames/<code>.json` is still written before the step is made (when a folder moves) and cleared once the step is made or refused with nothing changed; a refusal left part way, or a kill, leaves it, and `interruptedRenameTarget` finishes the rename as before (`testWithTheSwitchOffARenameKilledPartWayIsFinishedFromItsRecord`). **U7 owes**: once the switch is on and recovery settles a killed rename whole before or whole after, stop writing the record (keep reading one an earlier version left), and drop its writer-scan entry (`SpecialFolderRenamer.swift`, `waitsFor: U7`).
+
+**Save, then rename, then Undo, Undo** (U4a review 1, L1): both are `editJSON` on `course_config.json`, so the rename's Undo puts its members back by value and the Save's Undo then finds its members as it left them (`testSaveThenRenameThenUndoAndUndoTakesBothBack`, both touching `expandable`). The whole-file fallback (`writeFile`, for a file the member rule cannot move) below a Save's `editJSON` steps is refused by the Save's Undo BY DESIGN: a `writeFile` is judged by the whole file's hash, and a member put back by value is spelled compactly, so no writer of this file plans one except that fallback.
+
+**What is on disk if the app dies** between any two writes: the step's own staged files beside their places and the folders part moved; with the switch on, recovery settles it by content, whole before or whole after, at EVERY kill point (`testARenameKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery` kills before each swap in turn until none is left; the swap's order is each move, then the pages it carries, then the rest, so `beforeSwap(1)` is between the two sections' folders and `beforeSwap(2)` after the first section's carried page). One thing stays beside the settings file when the step is put back after its settings swap went in: the apply's kept original of `course_config.json`, because the members are put back by value and the teacher's spacing is then only in that copy (an only copy is never deleted); the test checks it is the file exactly as it was. With the switch off nothing is repaired (shadow recovery runs inside the next step's begin and records only) and the rename record finishes it: a shared folder killed after its move is finished by renaming again (`testWithTheSwitchOffARenameKilledPartWayIsFinishedFromItsRecord`). A per-section rename killed BETWEEN its sections is a mixture, which the record's rule has never finished (`interruptedRenameTarget` is nil, the record kept): pinned as today's behaviour by `testWithTheSwitchOffARenameKilledBetweenItsSectionsIsLeftAsTodaysRecordLeavesIt`, and owed to U7, whose live recovery settles it whole.
+
+**Not in this part.** The recorded trace (`renameFolder` in `undo-action-steps.json` and `undo-traces.json`): `UndoActionStepsTests.record` and `make_undo_traces.py`'s `action_trace` know file moves only, and a folder move with carried pages needs both, and the Swift action-trace replay, to learn one.
+
+**The part-two review's M1, fixed.** The step's own staged files and kept originals inside a folder a move carries edits with (named `.<file>.plantoir-undo-<seq>-…`, from ANY of its swaps) are never the folder's content: the check of an Undo, a Redo or a recovery's put-back (`UndoCheck.plan`'s `ownSeq`, `UndoSwap.stepsOwnFilesInside`) and each swap's last look before the rename (by the step number in its label) leave them out, on either side; only the step's own names, anything else inside still counts. Before, a kept copy a tidy could not remove (or one a page's outgoing bytes rest on) made the next Undo "changed since", clearing the list and naming a folder the teacher never touched, and a per-section rename killed after its first carried page could not be put back (a page missing, a kept file left). `UndoRecovery.keptOriginal` looks where the page is now (`placeNow`). Rows: the two `stackCases` "U4b, M1: …" (`leaveAKeptCopyInsideTheMovedFolder`); `opKinds.wholeOps` says it. A refused Undo or Redo names a moved folder where the teacher finds it now (`UndoOp.placeAsFound`: `to` before an Undo, `from` before a Redo), in the plan and in the swap; a marker's `moveApart` keeps its name.
+
+#### U4b, fourth part: off the main actor, links, and the part-way sentences (#899)
+
+**The step is made off the main actor** (part four's review, M1). The door's forward check (`UndoCheck.plan`) and the swap's last look before each folder's rename each read and SHA-256 every file in every moved folder, a megabyte at a time; measured by the reviewer on this Mac, 0.46 to 0.49 s per GB per pass, warm cache. Made on the main actor (as it was from part D), a 2 GB shared `Media` froze the window for about two seconds where the old rename was one instant `moveItem`. `SpecialFolderRenamer.make` now hands the planned step to a detached task (`StepHandedOver`, unchecked `Sendable` because the planner touches the step no more until it returns) and the view awaits it; `finishRecord` and the trail line stay on the main actor. The list's one queued lock is held only while the step is begun and while it is finished (`JournaledWrite.perform(ops:)`: `beginOps`, then `finish`); the check (`UndoCheck.plan`) and the swap run OUTSIDE it, for this step as for every step. What keeps another step of the same course out meanwhile is the rename's claim in `CourseActivity` (fifth part, below), and for anything else (another program, a step of another course touching the same file) the swap's content checks. While a rename is under way `Course.isRenamingAFolder` is true in every window (it reads `CourseActivity`): Save (the button, Course ▸ Save Course Settings, and the Planning tab's ⌘S) is disabled, a second `renameFolder` is refused with nothing changed, and the rename sheet keeps its small spinner beside Rename with the field and an interactive dismiss disabled. The HIG's progress-indicators page (read 2026-11-21): an indeterminate spinner where the length cannot be known, in one consistent place, and "when it's feasible, let people halt processing": Cancel halts the rename while it only plans, and is visibly disabled, never hidden, once its check and swap begin, because a rename halted part way is the negative side effect. `testTheRenameIsMadeOffTheMainActorAndNothingElseStartsMeanwhile` holds the swap at its first page on an event (an `NSCondition` the main actor opens), not a time.
+
+**The two reads are kept, not shared.** The check is the step's judgement (made outside the list's lock, after the step is begun under it), the contract's `opKinds.move` rule, the same for a make, a Redo and a recovery's put-back; the swap's read is its last look just before the rename. Letting the check's read stand for the last look would leave the time between them (staging every page and the settings) unseen; letting the last look stand for the check would make a forward folder move a case of its own in the contract. Both now cost nothing a teacher sees: the window stays live and the sheet says the rename is under way. (The plan's own walk, `SpecialFolderRenamer.plan`, is a third read, off the main actor since part D, and is what the step's `before` is.)
+
+**A folder holding a symbolic link** (L4). A folder's listing now lists a link as `link <SHA-256 of the bytes the link holds> <path>` (`readlink`, never followed), so a folder move with a link inside is judged by it and renamed as before U4b, the link moved as a link (`testAFolderHoldingASymbolicLinkIsRenamedWithTheLinkMovedAsALink`, a link that leads nowhere). Before, the reading answered `.notATree` and the rename was refused "cannot tell now". A listing holding a link is never made from blobs (`UndoTreeReading.make` refuses it), and `createTree`'s check still finds a link inside a made folder changed since, because the step's listing has none. No contract row yet: `listingCases` has no way for Windows to hold a row by name, and a held `checkCases` row must read as not readable there; W8 adds the row with its listing. Not changed: a per-section folder that is ITSELF a link is still refused (its place reads `.notATree`); rare, and the old rename moved the link. Owed to U4b2 (see the fifth part).
+
+**With the switch off, a killed rename's staged files are tidied** (L3). Shadow recovery tidied only steps that change files (`changesOnlyFiles`), so a rename killed part way left `.course_config.json.plantoir-undo-<seq>-apply-…` beside the settings (and its pages') until the switch flipped. Now it tidies steps that change files and move files or folders whole (`changesOnlyFilesAndMoves`): a move sets nothing aside, so all the tidy removes is the step's own staged names beside each page, at its place and, for a carried page, at its place before the move; a kept original that differs from its page stays. A step that makes or takes out a folder, or stands apart, is still left to a live recovery. The files go at the next shadow recovery, which runs inside the next step's begin.
+
+**The sentences on the part-way paths match the disk** (L1). A per-section rename refused at a later section whose earlier folder then cannot be moved back says `undo.wording.renameFolderRenamedOnlyInPart` ("“{old}” was renamed only in part, and Plantoir could not put everything back as it was. Still called “{new}”: {places}. {said}"), naming each folder left at its new name (`SpecialFolderRenamer.foldersLeftAtTheirNewName`, read from the disk after the refusal, by the listed spelling for a capitalisation-only rename); "was not renamed" is said only when no folder is. (Fifth part: a folder counts as left renamed when something is at its new name, whatever is at its old one, read by `lstat` only.) A retry after a changed-since refusal clears the rename record before it plans again (L2), so a re-plan that is refused (a destination that appeared, a frozen course, an unreadable listing) leaves no record hiding the one-section restore offer: the record is written before each make and cleared once the step is made or refused with nothing changed, on every path.
+
+**Must-fail, part four** (each sabotaged in place, built, run, restored; `git status` clean after): the step made on the caller's actor fails the off-main test ("the swap ran on the main thread"; the second rename then ran too, two steps); a link read as not a tree fails the link test (refused, nothing to undo); shadow tidying only steps of files fails `testWithTheSwitchOffARenameKilledPartWayIsFinishedFromItsRecord` ("a staged file was left"); the old part-way sentence fails `testARenameStoppedWithAFolderLeftRenamedSaysWhichFolder`; the record not cleared before the retry fails `testARetryWhoseReplanIsRefusedLeavesNoRecord`.
+
+**Not in this part.** The recorded `renameFolder` trace (the recorder, `make_undo_traces.py` and the Swift action-trace replay know file moves only), and the part-two review's L1 to L5.
+
+#### U4b, fifth part: one piece of work the whole app knows about (#899)
+
+Part four put the check and the swap off the main actor, and two things that had been impossible became possible part way through a rename (part six's review): a quit, and another window's act on the same course. The invariant: a rename under way is ONE piece of work the whole app knows about; nothing else in the app can change that course meanwhile, and the app does not quit out from under it. With `undoJournalIsLive` off the teacher meets nothing different from before U4b except that the window stays responsive.
+
+- **The claim is the course's, not the window's** (M2). `CourseActivity.beginFolderRename` records the rename by working folder and course code (`FolderRenameRecord`), as copies, publishes and plan work are recorded, and refuses a second one of the same course from any window: so a second rename can neither overwrite nor clear the first's interrupted-rename record (`courses/.internal/renames/<code>.json`, one file per course). `Course.isRenamingAFolder` now reads it, so every window's copy of the course, and a copy remade by File ▸ Reload Courses, knows. While it is held: another window's Save is disabled and says "Available once the folder rename has finished" beside it (a press that reaches `save()` anyway is refused with the click sentence); that window's rename sheet shows the click sentence "A folder in {course} is being renamed right now. Try again once the rename has finished." with Rename disabled; Rename Course, Add Section… and restoring a backup are greyed through `structuralHoldReason` with the menu reason and refused at the click through `structuralRefusal` with the click sentence (the `whenBusy` sentences name a preview or a deploy and would be false); removing a course or a section is refused with it (`ScheduledDeployCleanup`); Replace reference course is refused with it (`ReferenceReplacer.Problem.folderBeingRenamed`, key `replaceWhileAFolderIsRenamed`, Mac only; no contract case at this part, since Windows has no off-thread rename yet: U4b2-6 made it a `referenceCourses.replacing.sequence` case, see "U4b2: rename-sentences-in-contract"); Preview and Deploy are greyed and refused the way a copy being zipped greys them (the section window's buttons, `verbMayRunNow`, the press, the in-app and outside assistant's deploy and rebuild, which say the click sentence). A rename is refused while the course is being copied (#351), so the archive before a removal or restore never zips a course half renamed. **Rejected:** putting the rename into `busyDescription`, which would have reached every reader at once, because a dozen of its readers answer with a sentence about a preview or a deploy.
+- **The quit waits for it** (M1), as it waits for a tools copy (#476): `applicationShouldTerminate` answers `.terminateLater` while a rename's swap is under way (`AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans`), awaits `CourseActivity.waitForEveryFolderRenameSwap()` (a continuation resumed when the last swapping claim ends, an event, not a time), then finishes terminating. No question: the tools copy's pattern asks none, the rename is bounded by itself, and its sheet keeps its spinner. Once its swap has begun, closing the window does not end it either: the rename runs in an unstructured task started by the sheet's button, which a closed window does not cancel. (Sixth part: while it only plans, Cancel or the sheet going halts it and gives the course back at once. U4b2-7: a quit halts it the same way and waits only for a rename whose swap has begun, `CourseActivity.anyFolderRenameSwapIsUnderWay` and `waitForEveryFolderRenameSwap()`; see "U4b2: planning-rename-holds-nothing".)
+- **Cancel halts a rename that is only planning** (L3). The sheet keeps the rename's task; Cancel cancels it and closes the sheet. `renameFolder` asks `Task.isCancelled` on the main actor after the plan (which writes nothing) and in the same turn marks the swap begun (`folderRenameSwapBegins`), so a Cancel lands either before (nothing is made, no record) or after, when the button is disabled (`renameCanNoLongerBeHalted`) and a press that lands as it greys is ignored. (Part seven's review found the plan itself was not halted: see the sixth part.)
+- **The part-way sentence** (L1, L2): `foldersLeftAtTheirNewName` counts a folder left renamed when something is at its new name (by `lstat`, nothing read or hashed on the main actor), whatever is at its old one: the likeliest reason a move back fails is that something appeared at the old name.
+- Tests: `UndoRenameFolderStepTests.testWhileARenameRunsAnotherWindowsCopyOfTheCourseIsHeldToo`, `testAQuitDuringARenameWaitsForItToFinish`, `testARenameCancelledWhileItPlansChangesNothing`, `testAMoveBackBlockedAtTheOldNameStillSaysWhichFolderIsRenamed`; must-fail logs in the notes.
+
+#### U4b, sixth part: Cancel gives the course back (#899)
+
+Part seven's review (M1) found that Cancel closed the sheet but did not stop the plan: the walk ran in a `Task.detached`, which does not inherit cancellation, and `renameFolder` awaited its `value`, so the claim (and every greyed control in every window, and a ⌘Q's wait) lasted until the walk ended, which on an iCloud vault with evicted pages is minutes and on a network volume gone away is never. The invariant: **Cancel gives the course back.**
+
+- **The walk is told to stop, and nobody waits for it** (`SpecialFolderRenamer.planHaltingAtCancel`). The walk still runs detached, off the main actor; the caller's cancellation is forwarded to it (`withTaskCancellationHandler`), and `plan` checks for cancellation before each folder and each page (`Task.checkCancellation()`), so it stops at its next file. A read that blocks inside the system cannot be interrupted, so the caller does not wait for the walk at all: the plan comes back through an `AsyncThrowingStream`, whose `next()` returns nil the moment the waiting task is cancelled. `renameFolder` then returns "nothing was changed" (said to no one: the sheet has gone), and its `defer` ends the claim in the same moment: Save is enabled, the course is free in every window, and a quit does not wait. Nothing was written: the plan writes nothing, and the rename record is written only after the plan, just before the make. (U4b2-8: the walk now runs on a thread of its own, never detached, and `plan` asks one function, `stopIfThePlanIsHalted`, at those points; see "U4b2: plan-read-off-the-pool".)
+- **A cancelled plan can never reach the swap.** Its result has nowhere to go (the stream was given up); a plan that returned just before the Cancel is caught by the `Task.isCancelled` check in the turn the swap is marked begun; and `CourseActivity.folderRenameSwapBegins` now returns false, marking nothing, for a claim no longer held, so an ended claim is never taken up again.
+- **The sheet going halts it too**, however it goes (`onDisappear` → `haltARenameStillPlanning`), but never once the swap has begun. (U4b2-8: the sheet's own `.onDisappear` is not called when the list that presents it leaves the window, so the Course Settings page going away halts a rename that is still planning as well; see "U4b2: plan-read-off-the-pool".)
+- **Rejected:** ending the claim from the sheet at Cancel while the rename's own task still waited for the walk. It would have given the course back, but left a task holding a stale view's state and needed the sheet to know the claim; returning at once from the one place that holds the claim is simpler and true by construction.
+- **Rejected:** a timed give-up. The stream's cancellation is the event.
+- **What a quit waiting on a swap shows** (L5): what the tools copy's wait shows, the work's own indicator and nothing quit-specific. For the tools copy that is the window's getting-ready banner; for a rename, the sheet's spinner beside Rename (the sheet cannot be dismissed while the swap runs: Cancel and an interactive dismiss are disabled) and, in every window, the course's sidebar row spinner, labelled "Renaming a folder" (L2, below). Nothing new was added for the quit.
+- **A copy being saved refuses a rename before it plans** (L1): the sheet's Rename is disabled with, and a press that reaches `renameFolder` is refused with, `AssistWording.courseIsBeingCopiedFromTheMenu` ("A copy of {course} is being saved in Plantoir. Wait for that to finish, then try again."), as the other menu-path busy refusals say it. Before, the refusal said `CocoaError(.fileWriteUnknown)`'s "The file couldn’t be saved.". A second rename of the same course reached by a path that is not a control now says the rename sentence (`CourseActivity.folderRenameIsUnderWay`) for the same reason.
+- **Greyed Preview, Deploy and section actions say why** (L2), where the app's other busy states say it: Preview's and Deploy's help tags give `CourseActivity.availableOnceTheFolderIsRenamed` after the folder-getting-ready reason (`SectionDetailView.greyedReason`), and the course's sidebar row shows the small spinner a copy being zipped shows, labelled (and with a help tag) "Renaming a folder" (`CourseRowLabel.workUnderWay`; the copy's spinner now carries its "Saving a copy" as a help tag too). The section actions are greyed with no help tag of their own, as for a copy; the row says why.
+- **The quit's wait is one function** (L6): `AppDelegate.waitForWorkUnderWay()` (every tools copy, then every rename), awaited by `applicationShouldTerminate` and by `testAQuitDuringARenameWaitsForItToFinish`.
+- Tests: `testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing` (the plan held at its first page on an `NSCondition`; seams `SpecialFolderRenamer.planReadsAPage` and `planHasEnded`, nil in the app), `testTheSwapRefusesARenameWhoseClaimHasEnded`, `testARenameWhileACopyIsBeingSavedIsRefusedNamingTheCopy`, `testWhileARenameRunsPreviewDeployAndTheSidebarRowSayWhy`; must-fail logs in the notes.
+
+#### For U4b2 (the unit-word rename and Rename Course)
+
+- **Owed from U4b, carried here:** the recorded `renameFolder` trace (the recorder, `make_undo_traces.py` and the Swift and Windows action-trace replays know file moves only; folder moves with carried pages); the part-two review's L1 to L5; a per-section folder that is ITSELF a symbolic link, renamed before U4b by `moveItem` (the link moved as a link) and refused since (its place reads `.notATree`): the door's `move` needs a way to judge an item that is a link, by the bytes it holds, in the contract's `opKinds.move` and in recovery, which is a door change for both apps.
+- Each one's busy claim in `CourseActivity` and the quit's wait, the way `renameFolder` does (fifth part): a Rename Course moves the whole course folder.
+- **Part seven's review, L3 and L4, carried here** (already so on `dev` before U4b, so not regressions): several readers of busy state do not read the rename's claim: Back Up Now (`SidebarView` greys on `isBeingCopied` only; `WorkspaceModel.backUp`), the unit-word rename (`UnitWordRenameSheet.busyProblem` reads `courseIsBusy`, which does not include the claim), and the outside assistant's page writes (no busy check at all); and a scheduled deploy, `Plantoir --mcp-stdio`, another copy of Plantoir and Windows do not see the claim, because the rename takes no lease file (`WorkLeaseRegistry.reconcile` derives leases from previews and publishes only). Give U4b2's claims and the rename's one way every reader sees, a lease included.
+- Each one's plan halted at Cancel the way `renameFolder`'s is (sixth part): `planHaltingAtCancel`, cancellation checked per file, the claim ended at once.
+
+- `UnitWordRenamer` still calls `recordOnDisk`; give it `planRecordOnDisk` and `finishRecord` in one step with its page renames, the way `renameFolder` does. Its pages are files moved (`move`), not folders, and an edit of a moved file is carried the same way (`wholeOps`).
+- Rename Course (`CourseRenamer`) moves the course's own folder: every op of the step then sits inside that move's `to`; plan the move first through `moveFolder`, and every edit after it at its new place.
+- Keep each one's interrupted-rename record, if it has one, while the switch is off, for the reason above.
+- Make each step off the main actor the way `renameFolder` does (`SpecialFolderRenamer.make`), with Save disabled meanwhile and its sheet's Cancel halting the plan and disabled once the swap begins: a course folder's move reads every file in the course twice.
+- Rename Course moves the course folder with the kept `-apply-orig` of `course_config.json` a put-back may have left beside it (part four's review, L6): it is content of the folder, and an only copy.
 
 ### The U1 harness
 
@@ -19716,18 +23076,380 @@ under a linked root, falls outside it: reproduced standalone, and red on the
 bench as `UndoShadowPublishTests.testAPublishIsRecordedInShadow`), 785a's 31
 days (the 40-day sweep case), and the second round's scan (11 checks).
 
+### U4b2: linked-page-written-through
+
+With the switch off, a daily action whose page is a symbolic link writes
+the file the link leads to, and the link stays a link: Russell's ruling on
+#899, 2026-11-25, one rule on both platforms (`undo.rule.shadow`; Windows
+already did so, `UndoActionStep.PlaceWritten`). `JournaledStep` plans every
+write at `placeALinkLeadsTo`, which follows the last component link by link
+as U4a's Save does (`CourseConfiguration.fileALinkLeadsTo`), so `before`,
+staging, swap and any kept file are all at that file, and reads through the
+plan find the page by its link as well as by its file. A link to a file in
+the working folder is named in a step at that file; one to a file outside it
+cannot be named and is written by `writePlainly`, with one trail line that
+says the change went ahead. `writeNew` and `remove` never follow a link
+(removing what a link leads to would leave the link pointing at nothing), and
+a link to a folder or to a file that cannot be read is still refused before
+anything changes. So Insert Class, which writes a later class's new name and
+removes its old one, is refused when that later class is a link, until the
+pieces that move a link (review 1, MEDIUM 1); Windows' Insert Class still
+goes ahead outside the door, a plain copy at the new name and the link
+deleted, which the contract names as the Mac's alone. A dangling link is
+written through: its file is made where it leads, and the file's folder too
+when that is missing, as Windows' `UndoSwap.MakeTheFolderOf` makes it
+(review 1, LOW 1; review 2, MEDIUM A reversed a refusal of the missing
+folder). In shadow the Mac records an inside
+link as a step at its file while Windows writes it without the list; the
+contract names the difference and leaves it to U7 (LOW 2). Live, an inside
+link is now recorded at its file rather than refused, which U7 decides on
+purpose (LOW 3). Rejected: one rule per action (every writer goes through
+`plan`), and refusing as U3 did (the Publish of a linked page failed for a
+teacher who had linked a class page in from elsewhere).
+`UndoSweepFindingsTests` holds the cases, every planning entry point and read through the plan included.
+
+### U4b2: leaving-place-named
+
+When an Undo or a Redo is refused because one of an op's places now leads
+out of the working folder (a folder on its path replaced since by a link to
+outside), the refusal names the first of the op's places, in the order
+`path`, `from`, `to`, that leads out, never the other side of a move, which
+is as the step left it (#899, 2026-11-25). U4b part I made the Mac do this
+(`UndoCheck.plan`, `placeLeavingTheFolder`); this piece pins it, with one
+sentence in `undo.rule.stagedThenSwapped`, `stackCases` rows for Undo and
+Redo (only the new place leads out: names it; only the old: names it; both:
+names the old) read through a new key,
+`refusalNamed`, three new calls (`moveThePageIntoAFolder`,
+`moveThePageBetweenFolders`, `linkItsNewFolderOutside`), and nine
+`UndoDoorGuardTests`. Review 1 found the check made again just before each
+change (staging and swap) named the target's own path, so a link made
+between the plan and the change that took only the other side out named the
+side as the step left it; both now name the place through the same function
+the plan uses (`UndoCheck.placeLeavingTheFolder`, via
+`UndoSwap.placeLeadingOut`), tested at `afterTheCheck` and `beforeSwap(0)`.
+A check row could not carry it: `checkCasesHow` makes a place that is itself
+a link, never a folder on its path replaced after the step. Windows names a
+move's `from` always (`UndoCheck.Plan`, `op.PlaceName`), so the "only the
+new place" rows are its real gap; all six rows are held under W8 because its
+replay does not yet check `refusalNamed`. The U2 link row is left as it was,
+without the key, so Windows still runs it. Windows' staging and swap checks
+(`UndoSwap.cs`) name `target.RelativePath`, as the Mac's did before review
+1; W8 changes them too (documentation 12 notes).
+
+### U4b2: rename-record-owned
+
+The interrupted-rename record (`courses/.internal/renames/<CODE>.json`)
+exists only while the rename that wrote it is unfinished, and nothing clears
+a record another run wrote. Both writers, `CourseSettingsView.renameFolder`
+and `SpecialFolderRenamer.rename` (the form for a caller with no settings to
+change; no caller in the app), now decide every exit through one model type,
+`RenameRecordClaim`. The record is one file per course, so a run that writes
+its own has replaced whatever was there (another folder's interrupted
+rename); the claim reads that earlier record once, before the first write.
+Refused with nothing changed (a changed-since retry included): the earlier
+record is put back byte for byte, or no record is left when there was none.
+Stopped part way or killed: this run's record stays. Whole: a record of
+this same rename (folder and target) is cleared, since it is finished. A
+record of this folder renamed to another name is cleared only when the old
+name is gone for good: this run moved the folders, or the caller writes the
+settings away from it (`renameFolder` does; `rename` does not, so a `rename`
+that moves nothing leaves that record, whose rename can still be finished).
+Any other earlier record is put back, and a rename that moved no folder
+touches nothing else. Before this, `renameFolder` cleared the file on every success, retry
+and refusal, so renaming one folder lost another folder's unfinished rename
+and the sheet stopped offering to finish it (review 1, M1; the final sweep's
+L5 for `rename`). A put-back or clear that fails writes a `folder renamed`
+trail line, since a record left by mistake greys the one-section restore;
+it says "did not rename" after a refusal and "renamed" only once the rename
+is whole.
+One window is accepted: a kill between this run's write and the put-back
+loses the earlier record, as it always did before; refusing a rename while
+another is unfinished would be a new sentence and its own contract piece,
+and U7 drops the record. Chosen over removing `rename`, which five tests in
+`SpecialFolderRenamerTests` and one in `AssistCurriculumMentionsTests` call.
+
+### U4b2: kept-line-by-path
+
+The trail line `undo kept what it replaced` decides "from what was kept
+beside it" page by page, and since this piece a page is its place in the
+working folder, never its file name alone. `UndoCheck` passes each kept file
+by its path (the page's folder plus the hidden name), the pages a kept
+original put back by their paths, and every page the step changes;
+`UndoTrail.pageOfKept` gives a kept file's page and `UndoTrail.nameOnTheLine`
+names it. The words are unchanged when no other page of the step has the
+same file name. When one does (two sections' `index.md`, even if only one
+is named on the line), the page is named by its path inside the course
+(“Section 1/index.md”), in the opening clause and the hidden-file sentences
+alike; a page not under `courses/<course>/`, or in a step with no course,
+by its path in the working folder (“index.md” at its top). The hidden file
+is always its bare name, and names that differ only in capitals are
+different names. Before this, section 1's `index.md` put back from the list
+was said to come "from what was kept beside it" because section 2's
+`index.md` had, and two kept files with the same hidden name in two folders
+were named once (the part-two review of U4b, LOW 4; review 1 of this piece,
+LOW 1 to 3). The contract says so in the row's `carries` and in the stack
+case "U4b2-4: two pages named index.md in two sections…" (held for Windows'
+W4c in `NamedGapLedger.cs`). Tests: the U4b2-4 section of
+`UndoKeptCopiesTests` (Undo, Redo, the top of the working folder, no course,
+capitals).
+
+### U4b2: part-way-line-true
+
+A rename that stops part way names the folders at the new name as the disk
+has them, whether this run moved them or an earlier, interrupted run did. A
+run finishing an interrupted rename moves no folder, so the old reading,
+`foldersLeftAtTheirNewName(planned.moves, …)`, was always empty there and
+the run said "did not rename the folder Concepts to Ideas" (trail line and
+`renameFolderStoppedPartWay`) with every folder at "Ideas" (part nine's
+review, L1). It is replaced by one function,
+`SpecialFolderRenamer.foldersAtTheirNewName`, which walks
+`folderLocations(named: newName…)` by `lstat` (a capitalisation-only rename
+counts a folder only when its directory lists the new spelling), so both runs
+choose between `renameFolderRenamedOnlyInPart` and `renameFolderStoppedPartWay`
+by the same reading; no sentence changed (U4b2-6, below, adds a third,
+`renameFolderMayBeRenamedInPart`). `activityTrail.mustRecord` →
+`folder renamed` → `carries` and `contracts/README.md` now say the two
+part-way states are the Mac's and name Windows' one part-way line until W8
+(folders moved, settings not written); README's 2026-09 clause that the event
+"records no link counts" now says it records pages relinked.
+
+Review 1 (M1) found that the disk alone cannot tell a renamed folder from one
+that was at the new name all along (a per-section plan skips a section with no
+folder at the old name before its taken-destination check, so a hand-made
+`section2/Assessments` is never refused), and the reading then said "renamed
+only in part … still called Assessments: section2/Assessments" after a step
+moved wholly back. The rule now: a place is named only if it belongs to this
+rename AND the disk shows it at the new name. Belongs means a destination of
+this run's planned moves, or a place the record of the rename it finishes
+names: the record gains `moved`, written with this run's moves and the
+earlier record's places when that record is of the same rename (at this
+review one string with a place per line; an array of strings since U4b2-6,
+below). A record without `moved` (Windows', or one written before this) fell
+back at this review to the reading `looksLikeAnInterruptedRename` already
+trusts, a new-name place whose old name is absent beside it; since U4b2-6 it
+names no folder (below). The disk then decides: `lstat`, never followed;
+a folder counts; a link only where this run moved a link (`Move.isALink`, L3);
+a capitalisation-only rename asks the listing for the new spelling. Only "no
+such file" reads as absent: any other refusal, or a listing that fails, is
+returned as unreadable and told on the trail ("could not tell whether these
+are at the new name: …", L2), while the sheet's sentence is chosen by what
+could be read (no new sentence at this piece). Rejected: recording places only in a finish
+run (a start run after a killed one then forgets the earlier run's section).
+
+### U4b2: rename-sentences-in-contract
+
+The three sentences a teacher reads while a folder is being renamed are in
+`shared-rules.json` → `undo.wording`, beside the rename's other run-time
+sentences (`renameFolderUnderWay` with `{course}`,
+`renameFolderUnderWayMenuReason`, `renameFolderUnderWaySidebarRow`), and the
+Swift is pinned to them byte for byte as the block around them already is
+(`UndoSweepFindingsTests`). Replace It… refusing because a folder in the
+course is being renamed is a `referenceCourses.replacing.sequence` case
+(`folderRename: atTheStart`, `said: replaceWhileAFolderIsRenamed`, whose
+sentence is `renameFolderUnderWay`), run by `ReferenceReplacerTests` through
+a real `CourseActivity.beginFolderRename` claim. The record of an
+interrupted rename now has its format in `file-formats.json` →
+`folderRenameRecord`: `moved` is an array of strings (a name holding a line
+break is one place), the Mac reads `from`, `to` and `scope` as strings and
+every other key only in its own shape, so a key in another shape never makes
+the record unreadable (it was a map-of-strings cast). A record without `moved`
+(Windows', or an older build's) names no folder as this rename's: its places
+(a new-name folder whose old name beside it is absent or unreadable) are told
+as ones it cannot tell are this rename's, and carried forward by the next run
+as `mayHaveMoved`. With no folder known to be at the new name but such a
+place, or one that could not be read, the sheet says the new
+`renameFolderMayBeRenamedInPart` and the trail line begins "may have renamed
+the folder … only in part", never "was not renamed", which could not be
+checked (HIG, Writing: be clear, say what is known). One function,
+`SpecialFolderRenamer.partWayEnding`, chooses the line and the sentence.
+
+### U4b2: planning-rename-holds-nothing
+
+Until a rename's swap begins it has written nothing, so nothing waits for
+it: Cancel, the sheet going away and Command-Q each end a rename that is only
+planning at once and give the course back; only a rename whose swap has
+begun is waited for by a quit. (U4b2-8, the next section: so does the Course
+Settings page going away, because the sheet's own `.onDisappear` is not
+called when the list that presents it leaves the window.) The sheet's task and the one rule for halting
+it moved out of `StringListEditorView`'s `@State` into a small `@Observable`
+model, `FolderRenameRun` (`start`, `haltIfStillPlanning`, `canBeHalted`), so
+the chain from the sheet to the plan can be driven in a unit test (a view's
+`@State` cannot); the view keeps only the calls. Every run whose task has
+not ended is listed in `FolderRenameRun.runsUnderWay`, and a quit going
+ahead calls `AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans`, which halts
+each through the same `haltIfStillPlanning` Cancel uses
+(`haltEveryRunStillPlanning`) and then waits only while
+`CourseActivity.anyFolderRenameSwapIsUnderWay`. Nothing is asked either way
+(HIG, Feedback: no warning where nothing is lost; Progress indicators: let
+people halt processing when it has no negative side effects). The halting
+happens only once the quit is going ahead, after the work-under-way question,
+so a quit called off leaves the rename running. A claim that is still
+planning when a quit decides not to wait cannot reach its swap: its task is
+cancelled, and the swap is marked begun in the same main-actor turn as the
+cancellation check. The closure the sheet is handed is the named
+`CourseSettingsView.renameFromTheSheet(scope:)`, awaited inline, so
+`UndoRenameFolderStepTests.testTheSheetsCancelReachesAHeldPlan` runs the very
+chain the sheet runs and fails if the halt stops cancelling, or if
+`onRename` is awaited in a fresh `Task` in either place;
+`testAQuitWhileARenameOnlyPlansHaltsItAndDoesNotWait` holds the plan open on
+an event as a dead volume would and proves the quit does not wait and
+nothing is written. No `contracts/` change: `quitConfirmation` asks nothing
+about a rename, before or after.
+
+Review 1 (M1) found the hole a wait leaves: during a `.terminateLater` wait
+the windows stay live, so a rename pressed then (or a plan the halt did not
+reach) could pass to its swap after the quit had decided not to count it, and
+the process could end inside it. The cure is structural, not a re-check: one
+observable latch, `FolderRenameRun.quitIsGoingAhead`, set by
+`quitWaitsAfterHaltingWhatOnlyPlans` in the turn the quit decides. From then
+`FolderRenameRun.canStart` is false, so `start` refuses at once and every
+rename sheet's Rename is disabled in the standard way (L1: a sheet the quit
+halted cannot be pressed again; no new wording, HIG "Sheets", and there is no
+HIG page on quitting beyond "The menu bar"), and `FolderRenameRun.swapBegins`,
+the one place a rename passes from planning to swapping, refuses in the same
+main-actor turn as the rename's cancellation check, with nothing written and
+no record. A swap already begun is still waited for. Nothing clears the
+latch: it is set only once the quit is going ahead (after the work-under-way
+question), and no path calls such a quit off afterwards. Tests:
+`testARenamePressedWhileAQuitWaitsDoesNotStart`,
+`testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap`, and
+`testTheRenameSheetCallsItsRunForEveryWayOut`, which reads the view's own
+calls into the run off the source (L2). Left as on `dev` (L3): a rename that
+is planned again after a `changedSince` refusal keeps its claim marked
+swapping, so a quit waits for that re-plan and Cancel stays grey; it has
+written nothing, and once a quit is going ahead its next pass to the swap is
+refused.
+
+### U4b2: plan-read-off-the-pool
+
+A rename's planning walk runs on a Foundation `Thread` of its own, started per
+plan (`SpecialFolderRenamer.planHaltingAtCancel`), never in a `Task.detached`.
+Swift's shared pool has as many threads as the Mac has cores (12 on the Mac16,8
+this was measured on), and a read that blocks inside the system (an evicted
+iCloud page, a network volume gone away) cannot be interrupted: on the pool,
+Rename then Cancel repeated on a dead volume took one thread a round, and
+with all twelve held no other async job in the app could run. Measured with
+`testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree` (rounds = cores
++ 4 = 16, each plan held at its first page on an event): with the walk
+detached, round 13's plan never started; on its own thread, all 16 start, an
+unrelated `Task.detached` runs at once, and the process went from 7 threads
+to 23 while the 16 were held, and back to 7 when they were let go. A stuck walk
+now costs its own thread's stack (512 KB reserved, not committed) and nothing
+the app needs. Cancel is forwarded as before (`withTaskCancellationHandler`
+now cancels the thread), and `plan` asks one function,
+`stopIfThePlanIsHalted`, between folders and before and after each page:
+the task's cancellation (for `rename`'s callers) or the thread's. The caller
+still returns at Cancel without waiting, and a late result is still dropped.
+Riding lows from U4b2-7 review 2: the rename sheet is now hosted off screen
+and its own Rename and Cancel pressed through accessibility
+(`testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet`,
+`testTheRealSettingsPageShrunkOrScrolledKeepsARenameAndLeavingItHalts`),
+which found that the sheet's `.onDisappear` is not called when the list that
+presents it leaves the window (the sheet closes, the plan went on). The halt
+for that case is NOT on the list (review 1, M1): Course Settings draws its
+lists in a lazily drawn grouped `Form`, where a row leaving the visible area
+is not the teacher leaving the rename. The page owns its two renames
+(`CourseSettingsRenames`, one `FolderRenameRun` per folder list, handed to
+each list) and its own `.onDisappear` (Settings left for Planning, the course
+closed or switched, the window closed) halts those still planning through
+`haltIfStillPlanning`. The real page, grouped `Form` and all, is hosted: made
+220 points tall, and scrolled to its top and bottom, the row is out of view
+and the rename goes on; leaving the page halts it. And AppKit can ask again during
+a `.terminateLater` wait (Apple's `terminateLater` documentation: the run loop
+runs in `NSModalPanelRunLoopMode` until the reply, the mode in which a sheet
+takes input), so `applicationShouldTerminate` first asks
+`AppDelegate.answerWhileAQuitGoesAhead`: while the latch is set, a second
+request is answered `.terminateLater` at once, asking nothing and refusing
+nothing, and the first quit's reply ends the process.
+
+### U4b2: case-only-rule-pinned
+
+Whether a path is at or inside a move's `to` is ONE comparison,
+`UndoOp.partInside` (part by part, without regard to case, the rest spelled
+as the path spells it): `placesOverlap`, `moveCarries`, a swap's own files
+inside a moved folder (`ownFilesInside`), following them when it moves
+(`followTheMove`), a carried page's place before the move and the plan's and
+recovery's carried-page overrides all call it (`part_inside` in
+`scripts/make_undo_traces.py`). Before, `moveCarries` matched without regard
+to case and the swap compared as spelled, so an edit named `Renamed/a.md`
+under a move to `renamed` was carried but its kept original was neither left
+out nor followed: the Undo went back and left
+`.a.md.plantoir-undo-1-undo-orig` inside the folder
+(`UndoOpKindsTests.testAnEditSpelledWithOtherCapitalsUnderACarryingMoveIsUndoneAndRedone`,
+red before). Case-insensitive, not as spelled, because the working folder's
+volume is case-insensitive on the Mac by default and on Windows, and the
+readability rule already says such places overlap. **Rejected:** comparing
+as spelled everywhere, which would make that step unreadable (it overlaps
+by `placesOverlap`) rather than undoable, and would leave the case-only
+rename's own edits (named at `to`, never `from`, as spelled) as they are
+anyway. Review 1 of this piece took it further: the moved folder's listing
+is matched to a step's overrides by the same function (`UndoMoveSide.read`,
+so `Renamed/Sub/a.md` meets the disk's `sub/a.md`), the writer's own carried
+judgement (`JournaledStep.placeOnDiskNow`, which decides where a planned
+edit's before is read and whether it is staged after the move, and
+`namedPath`) calls it, and a capitalisation-only move tells its two sides
+apart by the moved item's own part alone, as spelled, the parts above it by
+`partInside`. In `checkCases`, the row "…lists it as
+`to`, holding something else" gave changed since with the rule or without
+it; it is replaced by a folder row that fails without it, and a row with a
+third spelling (`current.listedAs`, `a.JSON`) pins `.another` in
+`wholeState`: folded into `.from` it says already back.
+
+### U4b2: carried-subfolder-left-out
+
+A carried edit that makes a file in a folder that was not there
+(`renamed/sub/x.md`) makes the folder too (the swap's `makeTheFolder`).
+Before this piece the move's judgement left the file out but kept every
+listed folder, so the Undo of an untouched step was refused as changed
+since, and had it gone through the empty `sub` would have gone back with the
+folder. Now `UndoMoveSide.readNamingFoldersLeftOut` also leaves out folders that
+hold nothing but files left out and folders so left out (the candidates,
+`foldersHoldingOnly`, inside by `UndoOp.partInside`). A candidate may be the
+step's or an empty folder of the content's own, and the list keeps only the
+listing's hash, so review 1 of this piece had each decided on its own:
+`foldersTheContentLacks` tries every set of candidates that leaves a folder
+out only with every candidate below it, from all down to none, and the one
+whose listing matches `listingSha` is what the content lacked (two sets give
+two listings, so at most one matches). Up to eight candidates (at most 256
+hashes) every such set is tried; beyond eight only all or none, so a step
+with more, some of the content's own, is refused as changed since, which
+takes nothing back. The swap's last look before the rename names the folders
+left out, and once every swap has gone in and the tidy has removed the
+step's own files, `UndoSwap.removeAFolderLeftOut` removes each where it now
+is: first a lone `.DS_Store` if it is a regular file (the Finder writes one
+when the teacher opens the folder; it is never listed, so without this the
+folder stayed and the next Redo was refused), then `rmdir`, which never
+removes a folder holding anything; a failure is not told, because every
+swap has gone in and the folder holds something. A folder the teacher put
+inside `sub` since keeps `sub` in the judgement, so the Undo is refused and
+nothing is moved. Rows: seven `stackCases` with the keys `madeFolder` and
+`foldersInside`. **Rejected:** having the check hand the swap a list of
+folders to remove (a second judgement, which the swap's own last look
+already makes); recording in the step which folders its edits made (a
+journal format change, kept out of this piece by the director); removing
+every empty folder inside the moved folder after an Undo (an empty folder of
+the content's own, or one the teacher made, is never the step's to remove).
+Recovery judges through the same `UndoMoveSide.read` and runs the same swap,
+with one gap: a process killed after the tidy and before the folder is
+removed leaves an empty made folder, which recovery then reads as a change
+(by review 1's reading of the code, not run) and settles the step as changed
+by hand, clearing the list and leaving the empty folder; nothing is lost.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
-reached also from Help ▸ Set Up an Assistant… and Revise With ▸ Set Up an
-Assistant… (the same words in both since Russell's evening ruling; one view, `SetUpAnotherAssistantButton`, in the menu bar, every
-live row's context menu and the Help menu, so the item cannot differ between
-them). Each row's sentence and buttons come from `AssistantSetUpState.decide`,
+reached also from Revise With ▸ Set Up an Assistant… (one view,
+`SetUpAnotherAssistantButton`, in the menu bar and every live row's context
+menu, so the item cannot differ between them). Help ▸ Set Up an Assistant…
+carried the same words until #990, when Russell ruled it out of the Help menu
+(Q10): the same words twice in the menu bar is what #457 item 4 rules out. Each row's sentence and buttons come from `AssistantSetUpState.decide`,
 run against `outsideAgents.setUp.stateCases`. Set Up… opens
 `AssistantSetUpSheet` (on `SheetTitleScanTests.sheets`): what is downloaded,
 from whom, where it goes, that it is checked once in place, and where the
 course content goes; a link to the maker's plans page; for GitHub Copilot,
-Help's `github-education` page. Cancel is the default answer.
+Help's `github-education` page. Since #987 Download and Set Up is the
+default answer and Cancel leads with Escape (it was Cancel, on the trailing
+side, until then).
 
 `ReviseWithMenu` is always drawn now; the golden (`Tests/Goldens/menu-bar.txt`)
 pins the set-up item and the divider above it (`[if any reviser]`). Quitting
@@ -19743,3 +23465,196 @@ page until then, with the anchor on the trail either way.
 How a set-up runs, what it records, what was measured and what was rejected
 are in `documentation/10-local-ai-assistant.md` → "Setting up an outside
 assistant (#855)".
+
+## Names VoiceOver reads, and state in more than colour (#993)
+
+Part of the Mac HIG review (#975, findings D16 to D20, D40, D41). Apple's
+VoiceOver page asks an app to "provide alternative labels for all key
+interface elements" and to "exclude purely decorative images from
+VoiceOver"; its Accessibility page asks it to "convey information with more
+than color alone" and, under Reduce Motion, to reduce "automatic and
+repetitive animations".
+
+- **Whose words a name is.** A control with a visible title, a printed
+  label beside it (`LabeledContent`, a Course Settings row, "Section
+  number:"), or a placeholder standing in for one ("Filter", "Where these
+  came from") is named with exactly those words, passed where it is drawn.
+  `AccessibilityNames` (`Views/Helpers/`) holds only the names of controls
+  that show no words at all, so the wording can be read in one place. Each
+  is a plain one- to three-word label in **sentence case**, the case of the
+  app's printed field labels ("Course name", "Folder name"): the HIG's
+  Writing page asks for one capitalisation style per kind of element, and
+  Apple's accessibility programming guide asks that a label begin with a
+  capitalised word, not end with a period, and not name the control's kind
+  ("button"), which VoiceOver says itself. The first version mixed title
+  case ("Choose Emoji", "Later Classes") with sentence case; the review
+  caught it.
+- **Why names were wrong rather than missing.** An icon-only button with no
+  label is named by SwiftUI from its symbol: the send button read "Arrow Up
+  Circle", the emoji button "face.smiling", the unsaved-settings icon
+  "Info". A segmented `Picker("")` with hidden labels gave its radio group
+  no name although each segment had one, so `DetailTabs` takes a `name`:
+  the window's own title ("EXC2O-S1" on a section, "EXC2O" on a course),
+  words already on the screen. The first version invented "Section View"
+  and "Course View", which appear nowhere a sighted teacher can see; a bar
+  with no title of its own is named after the page whose views it
+  switches.
+- **A name said once.** A `Stepper` with a title already carries that title
+  as its name even with `.labelsHidden()`; giving it an
+  `.accessibilityLabel` of the same words as well made VoiceOver read
+  "Section number, Section number" (Add a Section, the first review). Only
+  the number field beside it is labelled.
+- **Placeholders are not names.** A `TextField("Filter", …)` shows its title
+  as placeholder text, which assistive apps read as a placeholder, not as
+  the field's name (measured: such a field reads with no description); the
+  sidebar's filter field, the Class Dates sheet's "Where these came from"
+  field and Publish Pages' Find a Page field are labelled with those same
+  words, and Course Settings' club short-label field with "Short label
+  beside emoji" (its placeholder's words without the parenthesis; the
+  second review found it unnamed). The rest were named in #1012, each
+  read back from the hosted view's tree by `PlaceholderFieldNamesTests`
+  and failing without its name: the assistant's composer "Ask about this
+  section" (its placeholder's words without the ellipsis; the field is its
+  own view, `AssistComposerField`, so a test can host it without opening
+  an assistant window, which starts the assistant), Class Dates' Google
+  Sheet link "Google Sheet address" (its placeholder is an address, so the
+  words come from the sentence above it and the route it sits under), the
+  sidebar's course-code rename field "Course code", the list editor's
+  rename field "New name" and its add field "New folder name" or "New file
+  name" (its prompt's words), the console's answer box "Your answer" and
+  its spinner "Running" (the state "Finished" replaces), the credential
+  field by the label printed above it ("Netlify token"), and the footer box
+  "Footer", its section's heading.
+- **A `Form` row's label is a name.** The tree reader counts the words of
+  a control's linked title element (`AXTitleUIElement`) as its name when
+  the control carries no label or title of its own. Measured 2026-11-20: a
+  `TextField` with a title inside a `Form`, and a field inside a
+  `LabeledContent`, carry neither, and are linked to the label drawn beside
+  them, which VoiceOver reads. So five fields the first list counted as
+  placeholder-only were named already, and are pinned rather than labelled
+  twice: Course Settings' folder path ("Folder"), Printing's "School name",
+  Settings' "Cloudflare Account ID", the New Course window's code field and
+  Copy a Page's page field; the unit word sheet's field too ("What do you
+  call a unit?"). Course Settings' custom domain fields sit inside the
+  collapsed Advanced group, which the hosted view does not open, so they
+  were not read.
+- **The question alert's answer field is not drawn (found in #1012, not
+  fixed).** A task's plain question opens `.alert("Input required")` with
+  `TextField("Your answer", …).borderedTextField()`. Measured 2026-11-20 by
+  hosting the alert and listing the alert window's views: with
+  `.borderedTextField()` (or any wrapper of ours) the alert holds no text
+  field at all, only the title, the question and Cancel and Send; a bare
+  `TextField`, or one with only `.accessibilityIdentifier` or
+  `.accessibilityLabel`, is drawn. In the alert AppKit takes neither the
+  label nor the identifier, so the field could only ever be named by its
+  placeholder. #457 put the modifier there so the bordered rule had no
+  exemptions; whether the alert loses it, or the question moves to a sheet
+  whose field can be bordered and named, is Russell's, put to him in #1012's hand-back.
+- **Decorative icons are hidden.** An `info.circle` (or the token notice's
+  triangle) beside a sentence that says everything is `accessibilityHidden`,
+  so VoiceOver reads the sentence alone.
+- **State in words, and in more than colour.** The multi-destination deploy
+  checklist names each destination's state ("Waiting", "Deploying",
+  "Done", "Failed", `DeployDestinationChecklist.stateName`) and reads as
+  one element per destination. Copy a Page's problem line is #994's
+  `StatusColour.blocking.sentence`, the stop symbol inside the sentence,
+  VoiceOver hearing the words alone; the branch's own symbol for it was
+  dropped at the merge. Plan Share's three status lines that say a share
+  may not be what the teacher expects (the last share did not finish, Stop
+  Sharing not confirmed, the new password not in use yet) are
+  `StatusColour.warning.sentence`: the caution's orange and triangle. They
+  were done here rather than left for #992, because #992's design changes
+  the sheet and leaves the bar's lines as they are.
+- **The restoring-folder spinner** is its own view,
+  `RestoringFolderPlaceholder` (`MainWindowView.swift`), named "Opening
+  folder"; a bare `ProgressView` gave VoiceOver nothing to say.
+- **Reduce Motion.** The assistant's breathing dots stand still and dim
+  while Reduce Motion is on (`AssistTypingIndicator.breathes`), and turning
+  it on mid-wait removes the repeating animation rather than leaving it
+  running.
+- **The About window's links (D46, #993's second piece).** The credit
+  links were inline Markdown links in a `Text`, which SwiftUI reports to
+  accessibility as links with AXEnabled false (measured: "Quartz",
+  "sponsoring him on GitHub", "Phosphor Icons", "Russell Gordon") and which
+  Tab does not reach with Keyboard Navigation on. Russell ruled option A of
+  `vm-tools/reference/993-about-window-design.md` on 2026-11-19: the
+  sponsor sentence stays whole as plain text, with two `Link` views beneath
+  it inside the callout ("Quartz", and "Sponsor Jacky Zhao on GitHub",
+  which starts with a verb as the HIG's Writing page asks of a link); the
+  three credit lines became a label-and-value `Grid` in the shape of the
+  Website and Email rows (Icon, Phosphor Icons (MIT); Design, Russell
+  Gordon; Made with, Claude). Each of the six links is now one enabled
+  AXLink with its own words, listed in the rotor's Links.
+  `AboutWindowLinksTests` reads the real `AboutView` through
+  `AccessibilityTree`: each link by identifier (`aboutQuartzLink` and the
+  rest) is an enabled link with its own words, the window holds exactly
+  those six, the sentence is read whole, the credits' labels are words of
+  their own, every link offers the press action an assistive app uses (VoiceOver's
+  rotor, Full Keyboard Access), which is how the HIG has a person reach it
+  with Keyboard Navigation off, when macOS moves Tab only between text
+  fields and lists (that test runs in both modes; measured live in an
+  isolated debug build on 2026-11-19 with Keyboard Navigation off, Tab
+  left the focus on the window and reached no link, and each of the six
+  offered AXPress), and that pressing each one opens its own page (since
+  #1012 the test performs the press through the accessibility API, with an
+  `OpenURLAction` in the environment that records the address instead of
+  opening it, and checks it against an address written in the test, so a
+  link pointed at the wrong page fails: measured with the sponsor link
+  pointed at the profile page), and with Keyboard
+  Navigation on, Tab stops once on each of the six and
+  comes round again (that test skips, saying why, with it off; in the test
+  host the accessibility API names no focused element, so it counts the
+  window's first responders, and the words of each stop were read live). With the inline links put
+  back (measured 2026-11-19, `dev`'s `AboutView` in place of this one) four of
+  the five fail: no link has its identifier, four read as disabled, the
+  credits have no labels of their own, and Tab stops only twice. The window's `.focusEffectDisabled()` (added
+  2026-08-10 so the window did not open with a ring around its one link)
+  is gone: measured live in an isolated debug build with Keyboard
+  Navigation on, Tab moved through all six links with no ring drawn on
+  any, so a keyboard user could not see where they were. The HIG's Focus
+  and Selection page asks to "rely on system-provided focus effects" and to
+  "indicate focus using visual appearances that are consistent with the
+  platform". The cost is the ring that macOS draws around the Website link
+  when the window opens with Keyboard Navigation on; with it off no link
+  takes focus and nothing is drawn. Rejected: splitting each sentence around its
+  link (SwiftUI wraps mixed `Text` and `Link` pieces as blocks, so the
+  sentence breaks oddly at larger text sizes), a row of four link buttons
+  (reads as actions, wider than the window at larger sizes), and hiding the
+  inline links behind one element with custom actions (VoiceOver would
+  hear no link and the rotor's Links would be empty). The Windows About
+  panel (`AboutDialog.cs`) follows: `HyperlinkButton`s of their own in
+  place of inline `Hyperlink`s, the same words and rows; its source is
+  pinned by `AboutDialogLinksSourceTests`, what UI Automation gives a
+  screen reader and where Tab goes by `AboutDialogLinksUiTests`
+  (`12-windows-app.md` → "The About panel's links"; there the inline links
+  were already enabled, focusable and reached by Tab, measured, so Windows
+  changed to follow the mac's layout, not to fix a fault), and the sentence holds the word
+  "Quartz" through a constant so the label scan's one exception (the bare
+  credit name) still covers it.
+- **Tests read what the app exposes.** `AccessibilityTreeTests` hosts the
+  real views (the tab bar, the emoji field, Add a Section, the Class Dates
+  sheet, the Publish Pages picker, the spinner, a stopping sentence) in an
+  off-screen window with a title of its own, and reads that window through
+  the accessibility API an assistive app uses (`AXUIElement`, on the test
+  host's own process, so no permission is asked): each element's role,
+  identifier, description and title (`AccessibilityTree`, in the test
+  target). A control with no name, or one name said twice, fails there,
+  which reading the source cannot show: SwiftUI joins a control's own title
+  and a label of the same words into one description ("Section number,
+  Section number"), and with the stepper's extra label put back
+  `testAddASectionNamesTheNumberOnce` fails. `testTheReaderCatchesADoubled
+  AndAMissingName` proves the reader sees both faults, so a reader that
+  found nothing cannot pass the rest. AppKit's own `NSAccessibility` methods
+  on the hosting view are no substitute: measured on 2026-11-19, a SwiftUI
+  hosting view answers them with one childless group until a client asks
+  through the API. `AccessibilityNamesTests` still reads the view source
+  for controls deep inside views that need a whole window to draw (the
+  wizard, Course Settings, the send button, the sidebar's filter field),
+  looking for the naming modifier on the line above the control's
+  identifier; those check that a name is given, not what VoiceOver hears.
+  The first review's outside reader of an isolated debug build
+  (`vm-tools/reference/993-review-1/ax993tools`) is the same idea from
+  outside the process.
+
+**For Windows:** each name here has a WinUI counterpart in
+`AutomationProperties.Name`; stage 3 of #975 mirrors this piece.

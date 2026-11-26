@@ -34,7 +34,12 @@ every page, caption and alt text is written by Fable from a fact sheet
    its words ("ready for the start of the year"), is ordinary prose and
    passes. A label the app shows (no full stop) is never checked when typed,
    so always name a button or label with `{{control:}}` and a menu with
-   `{{menu:}}`: a typed label goes stale silently.
+   `{{menu:}}`: a typed label goes stale silently. **A sentence named by its
+   place in a list** (`cases[16]`) is written with the opening words it
+   expects after a `~`: `{{say:app-rules#failureExplanations.cases[16].expect
+   ~ Your computer couldn't reach the}}`. When a case is added to the list
+   before it, the build stops and says so, rather than showing the wrong
+   sentence.
 4. **Publish and deploy: a person is the check.** Deploy sends a section's
    site somewhere (a folder, Netlify, Cloudflare Pages). Publish marks a page
    for inclusion, so students see it once the section is next deployed.
@@ -245,7 +250,7 @@ horizontal rules and other quote blocks are refused with the file and line.
 |---|---|---|
 | `{{menu:<id>}}` | the path in bold | `mac-app/Tests/Goldens/menu-bar.txt`, or `system-menus.json` for a `system` entry |
 | `{{control:<id>}}` | the label in bold | a Swift string literal in `mac.file`; the literal of `static let`/`var` `mac.wording` (`Type.member`) under `mac-app/QuartzTeachers`; or `mac.say` |
-| `{{say:<file>#<key path>}}` | a sentence the app shows | `contracts/<file>.json`, dotted path with `[n]` for list items; the value must be a string |
+| `{{say:<file>#<key path>}}` | a sentence the app shows | `contracts/<file>.json`, dotted path with `[n]` for list items; the value must be a string. A path with `[n]` carries a pin, `{{say:<file>#<key path> ~ <opening words>}}`: the sentence must start with those words (check 9) |
 | `{{fact:<id>}}` | the value | `facts.json` |
 | `{{key:<id>}}` | the shortcut | a menu id's key in the golden, or `controls.json` → `keys` |
 | `{{count:<name>}}` | a number | counted from `support/` by `helpbook/counts.py` |
@@ -382,6 +387,36 @@ header.
    computer", which loses the word the app itself shows beside it ("A folder
    on this Mac").
 
+9. **A sentence named by its position carries a pin** (`pin_problem` in
+   `helpbook/tokens.py`, #952). A `{{say:}}` token whose key path holds a
+   list position (`cases[16]`) is written with the opening words of the
+   sentence it expects: `{{say:app-rules#failureExplanations.cases[16].expect
+   ~ Your computer couldn't reach the}}`. The pin is not shown; the check
+   fails, naming the page, the line, the pin and the sentence now there, when
+   the sentence at that position does not start with the pin, and when the
+   pin also opens a different sentence at the same place in the list (give
+   more words). When the pin does not open the sentence, the check says
+   where in the list the sentence that does open with it now is, or, when
+   none does, that the pin is mistyped or the sentence was reworded. A pin
+   is at least three words (`PIN_FLOOR_WORDS`), or the whole sentence when
+   that is shorter: every pin on the pages on 2026-11-14 met that, and a
+   one-letter pin would pass a case replaced in place by another that opens
+   with the same letter. The neighbours compared are those of the innermost
+   list only; a shift of an outer list (another request's `steps[k]`) is
+   caught by the pin itself unless that request's step opens the same way,
+   which on 2026-11-14 happened only where the two sentences are identical.
+   A token with no position may carry a pin and is checked the same way. The reason: on 2026-11-14 two pieces inserted failure cases
+   into `contracts/app-rules.json`, every later case moved along by one or
+   two, and ten sentences on the deploy-failed page showed another failure's
+   words while every check passed. The entries in `controls.json` were never
+   at risk, because each carries its whole label and is compared with it.
+   The separator is `~` because `|` would split a table cell the token sits
+   in. Rejected for now: stable ids for the failure cases, so a page names a
+   case by id rather than by position. That is the better end state, but it
+   changes authored contract data both apps read, so it waits for the other
+   side's agreement. Rejected: pinning a whole sentence by default, which
+   would make every rewording of a contract sentence a Help failure as well.
+
 ## The Mac book
 
 `Plantoir.help/Contents/Info.plist` holds exactly the keys of decision 2
@@ -491,5 +526,10 @@ P6, not this folder's.
 repository: no names, nothing real) to a temporary folder, change one thing,
 and run `build_help.py` against it with `-I -B`. The `hiutil` tests skip off a
 Mac; the search test runs `search.js` with `node` and skips without it.
-`verify.sh` runs each file. Windows' `PythonToolchainTests` discovers only
-`scripts/test_*.py` today, so wiring these in is a Windows obligation.
+`verify.sh` runs each file. Windows' `PythonToolchainTests` discovers and
+runs them too since #886, from the repository root with the runtime's `node`
+on PATH, so only the `hiutil` tests skip there. That is why `build_help.py`
+writes UTF-8 whatever the console's code page, and why every test that reads
+a child's output decodes it with `encoding="utf-8"` rather than
+`universal_newlines=True` (the locale's encoding, cp1252 on Windows): keep
+both when adding a test.

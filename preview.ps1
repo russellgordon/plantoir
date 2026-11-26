@@ -56,6 +56,7 @@ if ($args.Count -lt 2 -or ($args[0] -eq '--help') -or ($args[0] -eq '-h')) {
     Write-Host "  --full-rebuild                    Clear entire output folder and re-copy scaffold"
     Write-Host "  --build-only                      Build static site only (no local preview server)"
     Write-Host "  --non-interactive                 Refuse rather than ask, for a build nobody is watching"
+    Write-Host "  --for-deploy                      With --build-only: this build is a deploy's first step"
     Write-Host "  --stop                            Stop this section's preview processes (build or server) and exit"
     Write-Host "  --port N                          Serve the preview on port N (default 8081; 8081-8084 available)"
     Write-Host "  --help, -h                        Show this help and exit"
@@ -93,6 +94,7 @@ $FORCE_NPM_INSTALL = $false
 $FULL_REBUILD      = $false
 $BUILD_ONLY        = $false
 $STOP_MODE         = $false
+$FOR_DEPLOY        = $false
 $PREVIEW_PORT      = 8081
 $OVERRIDE_IMAGE    = $null
 # Nobody is at the computer. Every question this script asks becomes a refusal
@@ -142,6 +144,7 @@ if ($Flags) {
             '--build-only'                    { $BUILD_ONLY = $true; $i++; continue }
             '--non-interactive'               { $NON_INTERACTIVE = $true; $i++; continue }
             '--stop'                          { $STOP_MODE = $true; $i++; continue }
+            '--for-deploy'                    { $FOR_DEPLOY = $true; $i++; continue }
             '--port'                          {
                 if ($i + 1 -ge $Flags.Count) { Write-Host "--port requires a value"; exit 1 }
                 $PREVIEW_PORT = [int]$Flags[$i + 1]
@@ -159,6 +162,16 @@ if ($Flags) {
             }
         }
     }
+}
+
+# --for-deploy (#828 / mac #729, contracts/app-rules.json -> launcherFlags.
+# preview): a deploy's own build leg says so on its command line, so another
+# launcher's guard (the block below) reads it as a deploy rather than as a
+# rebuild. It changes nothing this build does and is not handed to the
+# builder. Alone it means nothing, so it is refused before anything else.
+if ($FOR_DEPLOY -and -not $BUILD_ONLY) {
+    Write-Host ("{0} --for-deploy goes with --build-only." -f [char]::ConvertFromUtf32(0x274C))
+    exit 1
 }
 
 # Called immediately before every question this script asks, and only ever on
@@ -577,9 +590,17 @@ function Write-TrailLine {
 #     --reset-token, --logout or --help, which deploy nothing. Its folder is
 #     the script's own directory when the path names one; a relative path
 #     names none, and a deploy of this very section whose folder cannot be
-#     told still counts (the safe side for the deploy).
-# 'later' wins when both are seen: a wrapper's own deploy leg is in the table
-# beside it. This run and its ancestors never count, so a scheduled run's own
+#     told still counts (the safe side for the deploy). Since #828 (mac
+#     #729) also a deploy's own build leg, preview.ps1 C S --build-only
+#     --for-deploy, read by the same course, section and folder rules.
+#   * 'building' (#828 / mac #729) - any OTHER preview.ps1 C S --build-only
+#     of this folder, not --stop: the assistant's rebuild, or one typed at a
+#     command line. Two builds of one section clear and fill the same folder,
+#     so the first one fails. A preview being SERVED is not counted: the
+#     table cannot tell one still building from one already serving.
+# 'later' wins when it is seen at all (a wrapper's own deploy leg is in the
+# table beside it), then 'another', then 'building' (a deploy.ps1 beside its
+# own rebuild is a deploy). This run and its ancestors never count, so a scheduled run's own
 # legs are never refused by its own wrapper, and a folder deploy's own
 # rebuild is never refused by the deploy.ps1 that started it. A table that
 # cannot be read - the query fails or times out, or its answer does not list
@@ -644,8 +665,9 @@ function Get-ScheduledDeployScriptNames([string]$Course, [string]$Section, [stri
     }
 }
 
-# 'later', 'another', or $null (nothing, or a table that cannot be trusted).
-# Pure over its arguments, so test_launcher_rules.ps1 can run the cases.
+# 'later', 'another', 'building', or $null (nothing, or a table that cannot
+# be trusted). Pure over its arguments, so test_launcher_rules.ps1 can run
+# the cases.
 function Get-WhatIsDeployingThisSection {
     param($Snapshot, [string]$Course, [string]$Section, [string]$Here, [string]$FolderId, [uint32]$Self)
     if ($null -eq $Snapshot) { return $null }
@@ -675,7 +697,8 @@ function Get-WhatIsDeployingThisSection {
         $script = $words[$at]
         $leaf = ($script -split '[\\/]')[-1]
         if ($scheduledNames -icontains $leaf) { return 'later' }
-        if ($leaf -ine 'deploy.ps1') { continue }
+        $isBuild = $leaf -ieq 'preview.ps1'
+        if (-not $isBuild -and $leaf -ine 'deploy.ps1') { continue }
 
         # Its own arguments, each split into words: the app and the wrapper
         # QUOTE a course with a space ("AP CALC"), and one quoted word must
@@ -688,9 +711,14 @@ function Get-WhatIsDeployingThisSection {
         $same = $true
         for ($w = 0; $w -lt $courseWords.Count; $w++) { if ($own[$w] -ine $courseWords[$w]) { $same = $false; break } }
         if (-not $same -or $own[$courseWords.Count] -cne $Section) { continue }
-        $deploysNothing = $false
-        foreach ($flag in $own) { if ($flag -in @('--reset-token', '--logout', '--help', '-h')) { $deploysNothing = $true } }
-        if ($deploysNothing) { continue }
+        if ($isBuild) {
+            # A build only: a serving preview, and --stop, build nothing here.
+            if (($own -icontains '--stop') -or -not ($own -icontains '--build-only')) { continue }
+        } else {
+            $deploysNothing = $false
+            foreach ($flag in $own) { if ($flag -in @('--reset-token', '--logout', '--help', '-h')) { $deploysNothing = $true } }
+            if ($deploysNothing) { continue }
+        }
 
         if ($script -match '^[A-Za-z]:[\\/]|^[\\/][\\/]') {
             try {
@@ -698,7 +726,11 @@ function Get-WhatIsDeployingThisSection {
                 if ($folder -and $Here -and ($folder -ine $Here)) { continue }
             } catch {}
         }
-        $seen = 'another'
+        if ($isBuild -and -not ($own -icontains '--for-deploy')) {
+            if ($seen -ne 'another') { $seen = 'building' }
+        } else {
+            $seen = 'another'
+        }
     }
     return $seen
 }
@@ -710,9 +742,13 @@ function Get-WhatIsDeployingThisSection {
 # #381's rule: its runner lives for the whole run) because the preview would
 # be serving from the folder the run is about to build into; a DEPLOY does
 # not, because that run may be waiting for the very deploy it would refuse.
+# A plain rebuild ('building', #828) is NOT a deploy: refusing a preview while
+# the assistant refreshes it would say something false. A deploy's build leg
+# ('another', --for-deploy) is.
 function Test-SectionIsBeingDeployed {
     param($Snapshot, [string]$Course, [string]$Section, [string]$Here, [string]$FolderId, [uint32]$Self)
-    if (Get-WhatIsDeployingThisSection -Snapshot $Snapshot -Course $Course -Section $Section -Here $Here -FolderId $FolderId -Self $Self) { return $true }
+    $who = Get-WhatIsDeployingThisSection -Snapshot $Snapshot -Course $Course -Section $Section -Here $Here -FolderId $FolderId -Self $Self
+    if ($who -eq 'later' -or $who -eq 'another') { return $true }
     if ($null -eq $Snapshot) { return $false }
     $rows = @($Snapshot)
     if (-not ($rows | Where-Object { [uint32]$_.ProcessId -eq $Self })) { return $false }
@@ -744,10 +780,23 @@ function Get-ProcessTable {
 # Asked by deploy.ps1 (not with --reset-token or --logout, which deploy
 # nothing) and by preview.ps1 on a --build-only run only - a serving preview
 # has #386's own guard, which counts every deploy - after the arguments are
-# checked and before anything is changed. LEG is 'deploy' or 'build'. The
-# sentences are contracts/shared-rules.json -> deployWhileItsSectionDeploys.
-# sentences.launcher, and the trail lines that entry's launcherLines; both are
-# checked word for word by test_launcher_rules.ps1. Exit 1, as #386's.
+# checked and before anything is changed. LEG is 'deploy', 'build', or
+# (#828 / mac #729) 'deploy-build': a deploy's own build leg, preview.ps1
+# --build-only --for-deploy. The sentences are contracts/shared-rules.json ->
+# deployWhileItsSectionDeploys.sentences.launcher, chosen by
+# Get-DeployRefusalSentence, and the trail lines that entry's launcherLines;
+# both are checked word for word by test_launcher_rules.ps1. Exit 1, as #386's.
+
+# The contract's sentence key for who is in the way and which leg asked
+# (launcherCasesShape): a deploy takes the 'Deploy' sentences and a build the
+# 'Build' ones; a deploy's build leg takes 'Build' too, except that another
+# BUILD in the way says 'buildingDeploy' - the teacher pressed Deploy, so the
+# line says it cannot be deployed.
+function Get-DeployRefusalSentence([string]$Who, [string]$Leg) {
+    if ($Leg -eq 'deploy' -or ($Leg -eq 'deploy-build' -and $Who -eq 'building')) { return $Who + 'Deploy' }
+    return $Who + 'Build'
+}
+
 function Stop-WhileThisSectionDeploys([string]$Course, [string]$Section, [string]$Leg) {
     $who = Get-WhatIsDeployingThisSection -Snapshot (Get-ProcessTable) -Course $Course -Section $Section -Here $WORKDIR_PHYSICAL -FolderId $WORKDIR_ID -Self ([uint32]$PID)
     if (-not $who) { return }
@@ -755,19 +804,22 @@ function Stop-WhileThisSectionDeploys([string]$Course, [string]$Section, [string
     $dot = [char]0x00B7
     $dash = [char]0x2014
     Write-Host ""
-    if ($who -eq 'later' -and $Leg -eq 'build') {
-        Write-Host ("{0} {1} section {2} is still being deployed by a deploy that was set for later, so it cannot be built until that has finished." -f $cross, $Course, $Section)
-    } elseif ($who -eq 'later') {
-        Write-Host ("{0} {1} section {2} is still being deployed by a deploy that was set for later, so it cannot be deployed again until that has finished." -f $cross, $Course, $Section)
-    } elseif ($Leg -eq 'build') {
-        Write-Host ("{0} {1} section {2} is already being deployed, so it cannot be built until that has finished." -f $cross, $Course, $Section)
-    } else {
-        Write-Host ("{0} {1} section {2} is already being deployed, so it cannot be deployed again until that has finished." -f $cross, $Course, $Section)
+    switch (Get-DeployRefusalSentence $who $Leg) {
+        'laterBuild'     { Write-Host ("{0} {1} section {2} is still being deployed by a scheduled deploy that is still running, so it cannot be built until that has finished." -f $cross, $Course, $Section) }
+        'laterDeploy'    { Write-Host ("{0} {1} section {2} is still being deployed by a scheduled deploy that is still running, so it cannot be deployed again until that has finished." -f $cross, $Course, $Section) }
+        'anotherBuild'   { Write-Host ("{0} {1} section {2} is already being deployed, so it cannot be built until that has finished." -f $cross, $Course, $Section) }
+        'buildingDeploy' { Write-Host ("{0} {1} section {2} is already being built, so it cannot be deployed until that has finished." -f $cross, $Course, $Section) }
+        'buildingBuild'  { Write-Host ("{0} {1} section {2} is already being built, so it cannot be built again until that has finished." -f $cross, $Course, $Section) }
+        default          { Write-Host ("{0} {1} section {2} is already being deployed, so it cannot be deployed again until that has finished." -f $cross, $Course, $Section) }
     }
     Write-Host "   Nothing was changed."
     Write-Host ""
+    # The trail's {leg} is 'deploy' or 'build': a deploy's build leg is a build.
+    if ($Leg -eq 'deploy-build') { $Leg = 'build' }
     if ($who -eq 'later') {
-        Write-TrailLine ("{0}/{1} {2} the {3} stopped before it started {4} this section was still being deployed by a deploy that was set for later" -f $Course, $Section, $dot, $Leg, $dash)
+        Write-TrailLine ("{0}/{1} {2} the {3} stopped before it started {4} this section was still being deployed by a scheduled deploy that was still running" -f $Course, $Section, $dot, $Leg, $dash)
+    } elseif ($who -eq 'building') {
+        Write-TrailLine ("{0}/{1} {2} the {3} stopped before it started {4} this section was already being built" -f $Course, $Section, $dot, $Leg, $dash)
     } else {
         Write-TrailLine ("{0}/{1} {2} the {3} stopped before it started {4} this section was already being deployed" -f $Course, $Section, $dot, $Leg, $dash)
     }
@@ -821,9 +873,12 @@ if (-not $BUILD_ONLY) {
 # A --build-only run is the build leg of the window's Deploy, of an
 # assistant's deploy and of a scheduled run - and the assistant's "rebuild
 # the preview" - and it rebuilds the very folder a deploy of this section is
-# uploading from. --stop never builds, so it is not asked.
+# uploading from. --stop never builds, so it is not asked. Since #828 (mac
+# #729) it is refused by another BUILD of the section too, and a deploy's own
+# build leg (--for-deploy) asks as 'deploy-build', so its words say deployed.
 if ($BUILD_ONLY -and -not $STOP_MODE) {
-    Stop-WhileThisSectionDeploys $COURSE ([string]$SECTION) 'build'
+    $guardLeg = 'build'; if ($FOR_DEPLOY) { $guardLeg = 'deploy-build' }
+    Stop-WhileThisSectionDeploys $COURSE ([string]$SECTION) $guardLeg
 }
 
 # ---- Validate SECTION against course_config.json ----

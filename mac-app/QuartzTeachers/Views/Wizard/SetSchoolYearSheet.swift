@@ -73,8 +73,7 @@ struct SetSchoolYearSheet: View {
             }
 
             if let entryProblem {
-                Text(entryProblem)
-                    .foregroundStyle(.orange)
+                StatusColour.blocking.sentence(entryProblem)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("setSchoolYearProblem")
             }
@@ -84,6 +83,7 @@ struct SetSchoolYearSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 Button("Set School Year") {
                     setSchoolYear()
                 }
@@ -108,16 +108,30 @@ struct SetSchoolYearSheet: View {
     // MARK: - Functions
 
     func setSchoolYear() {
+        if let refused = SetSchoolYearSheet.write(schoolYear, to: course, on: today) {
+            problem = refused
+            return
+        }
+        dismiss()
+        onSet()
+    }
+
+    /// Writes the year to the course's settings and leaves the trail line,
+    /// or answers the sentence the sheet shows when it could not be written
+    /// (the year in memory then put back). ONE step on the list, its one
+    /// `editJSON` the school year (#899 U4a).
+    static func write(_ schoolYear: Int?, to course: Course, on today: CalendarDay) -> String? {
         let before: Int? = course.schoolYear(on: today)
         course.configuration.referenceSchoolYear = schoolYear
         do {
-            try course.configuration.write(to: course.configFileURL)
+            try course.configuration.writeAsOneStep(
+                to: course.configFileURL, madeBy: UndoStepMaker.sheet("setSchoolYear")
+            )
         } catch {
             // Never the raw Foundation string. A teacher reads a sentence
             // about their course, not "NSCocoaErrorDomain Code=513".
             course.configuration.referenceSchoolYear = before
-            problem = ReferenceWording.couldNotSetSchoolYear(course: course.displayCode)
-            return
+            return ReferenceWording.couldNotSetSchoolYear(course: course.displayCode)
         }
         ActivityTrail.note(
             .referenceCourseSchoolYearChanged,
@@ -126,7 +140,6 @@ struct SetSchoolYearSheet: View {
                 from: before, to: schoolYear
             )
         )
-        dismiss()
-        onSet()
+        return nil
     }
 }

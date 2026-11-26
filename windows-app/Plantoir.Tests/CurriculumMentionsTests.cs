@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Plantoir.Core.Assist;
 
 namespace Plantoir.Tests;
@@ -123,6 +125,30 @@ public sealed class CurriculumMentionsTests : IDisposable
 
     // ---- Writing ----------------------------------------------------------
 
+    /// <summary>
+    /// #899 W7b2-10 (review 1 L3): a mention that is already on the page
+    /// changes nothing, so the action makes no step and writes nothing, not
+    /// even its backup.
+    /// </summary>
+    [Fact]
+    public void AMentionAlreadyOnThePageMakesNoStepAndNoWrite()
+    {
+        ClassPage("Movement Concepts", "We moved.\n\n![[A2.2]]\n");
+        string list = Path.Combine(_folder, "state-undo");
+        var workspace = new AssistWorkspace(_folder, _launcher)
+        {
+            UndoList = new Plantoir.Core.Undo.UndoForThisProcess(list, Plantoir.Core.Undo.UndoMode.Shadow, null),
+        };
+        List<string> before = WindowsActionsOnTheMacFixture.EveryFileBut(_folder, list);
+
+        var plan = workspace.PlanCurriculumMentions("ADA1O", 1, "Movement Concepts", new[] { "A2.2" });
+        var result = workspace.ApplyCurriculumMentions(plan);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(0, WindowsActionsOnTheMacFixture.Begins(list));
+        Assert.Equal(before, WindowsActionsOnTheMacFixture.EveryFileBut(_folder, list));
+    }
+
     [Fact]
     public void TransclusionsGoInsideTheCurriculumMarkers()
     {
@@ -158,11 +184,19 @@ public sealed class CurriculumMentionsTests : IDisposable
                     text.IndexOf("## Things to do", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void AnExistingBlockIsAddedToRatherThanReplaced()
+    /// <summary>
+    /// A block on a page already is recognised by its markers, whichever line
+    /// opens it: "Today's work points here:" on a page Windows wrote before
+    /// #1039, the Mac's heading on one written since. The opening line is
+    /// left exactly as it was; an existing page is never rewritten.
+    /// </summary>
+    [Theory]
+    [InlineData("Today's work points here:")]
+    [InlineData("## Curriculum connection")]
+    public void AnExistingBlockIsAddedToRatherThanReplaced(string openingLine)
     {
         ClassPage("Movement Concepts",
-            "%%curriculum-start%%\nToday's work points here:\n\n![[A1.1]]\n%%curriculum-end%%\n");
+            $"%%curriculum-start%%\n{openingLine}\n\n![[A1.1]]\n%%curriculum-end%%\n");
 
         var workspace = Open();
         var plan = workspace.PlanCurriculumMentions("ADA1O", 1, "Movement Concepts", new[] { "A2.2" });
@@ -175,6 +209,35 @@ public sealed class CurriculumMentionsTests : IDisposable
         // separate curriculum notes on the same page.
         Assert.Equal(2, text.Split("%%curriculum-start%%").Length);
         Assert.Equal(2, text.Split("%%curriculum-end%%").Length);
+        Assert.Contains($"%%curriculum-start%%\n{openingLine}\n\n![[A1.1]]\n", text);
+    }
+
+    // ---- The Mac's block (#1039) ------------------------------------------
+
+    /// <summary>
+    /// A new block is the Mac's, byte for byte. The case is the Mac's own
+    /// <c>addCurriculumMentions</c> run on a fixture and written down in
+    /// <c>contracts/undo-action-steps.json</c>: the page before, and the page
+    /// after with its <c>## Curriculum connection</c> block.
+    /// </summary>
+    [Fact]
+    public void ANewBlockIsTheBlockTheMacWrites()
+    {
+        JsonElement macStep = ContractLoader.LoadDocument("undo-action-steps.json").RootElement
+            .GetProperty("steps").EnumerateArray()
+            .Single(step => step.GetProperty("action").GetString() == "addCurriculumMentions");
+        JsonElement macFile = Assert.Single(macStep.GetProperty("files").EnumerateArray());
+        string before = macFile.GetProperty("before").GetString()!;
+        string after = macFile.GetProperty("after").GetString()!;
+        string code = Regex.Match(after, @"!\[\[([^\]]+)\]\]").Groups[1].Value;
+        Assert.Equal("A1.1", code);   // an expectation this fixture's course has
+        File.WriteAllText(ClassPath("Loops"), before);
+
+        var workspace = Open();
+        var plan = workspace.PlanCurriculumMentions("ADA1O", 1, "Loops", new[] { code });
+        workspace.ApplyCurriculumMentions(plan);
+
+        Assert.Equal(after, File.ReadAllText(ClassPath("Loops")));
     }
 
     [Fact]

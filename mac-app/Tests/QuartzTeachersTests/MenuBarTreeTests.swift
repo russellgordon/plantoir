@@ -4,7 +4,7 @@ import XCTest
 
 /// The REAL menu bar, read out of `NSApp.mainMenu` in the hosted app (#457):
 /// its menus in order, and every title, key equivalent and divider in File,
-/// View's own group, Course, Section and Help, against
+/// View's own group, Course, Section, Classes (#990) and Help, against
 /// `mac-app/Tests/Goldens/menu-bar.txt` — plain indented text a reviewer
 /// reads without running anything.
 ///
@@ -16,14 +16,15 @@ import XCTest
 /// - **Hidden items are skipped**: Edit carries hidden Start Dictation and
 ///   Emoji & Symbols alternates, and Help a hidden ⌥⌘S "Toggle Sidebar".
 /// - **Titles, keys and dividers only** — never enablement, which follows the
-///   selection and is `SubjectMenuRules`' to pin; and the two titles that
-///   change with state (Stop Preview, "Cancel Deploy at 6:30 AM…") are read
+///   selection and is `SubjectMenuRules`' to pin; and the title that
+///   changes with state (Stop Preview; Remove Scheduled Deploy no longer
+///   carries the time since #987, nor an ellipsis since #990) is read
 ///   back in their resting form — and so are Preview and its Option
 ///   alternate (#504), which the teacher's setting swaps.
 ///
-/// A Revise With item is in the golden with a tag — `[if claude]`, `[if
-/// codex]`, `[if local]`, `[if any reviser]` — and is expected only when
-/// this Mac has it (`OutsideAssistantPresence`): presence follows the Mac.
+/// Every Revise With item is in the golden untagged since #990 (D11): one
+/// this Mac does not have is drawn dimmed, not left out, so the menu bar is
+/// the same on every Mac.
 @MainActor
 final class MenuBarTreeTests: XCTestCase {
 
@@ -86,9 +87,6 @@ final class MenuBarTreeTests: XCTestCase {
             } else if title == PreviewStartPageWording.preview && item.isAlternate {
                 title = PreviewStartPageWording.previewAtLastViewed
             }
-            if title.hasPrefix("Cancel Deploy at ") {
-                title = "Cancel Deploy at…"
-            }
             var line: String = pad + title
             let key: String = keyText(item)
             // ⇧⌘O sits on whichever Open in Obsidian is live, so it is
@@ -125,7 +123,7 @@ final class MenuBarTreeTests: XCTestCase {
             titles.append(item.title)
         }
         lines.append("menus: " + titles.joined(separator: " · "))
-        for name in ["File", "View", "Course", "Section", "Help"] {
+        for name in ["File", "View", "Course", "Section", "Classes", "Help"] {
             lines.append("== " + name)
             let menu: NSMenu = try XCTUnwrap(topMenu(named: name), name)
             var menuLines: [String] = []
@@ -172,31 +170,15 @@ final class MenuBarTreeTests: XCTestCase {
         return lines.joined(separator: "\n")
     }
 
-    /// The golden, with each tagged line kept or dropped by what this Mac has.
+    /// The golden, without its comment lines.
     static func expectedText() throws -> String {
         let golden: String = try String(contentsOf: goldenURL(), encoding: .utf8)
-        let presence: OutsideAssistantPresence = OutsideAssistantPresence.shared
         var lines: [String] = []
-        for rawLine in golden.components(separatedBy: "\n") {
-            if rawLine.hasPrefix("#") || rawLine.isEmpty {
+        for line in golden.components(separatedBy: "\n") {
+            if line.hasPrefix("#") || line.isEmpty {
                 continue
             }
-            var line: String = rawLine
-            var keep: Bool = true
-            let tags: [(String, Bool)] = [
-                ("  [if claude]", presence.claudeIsInstalled),
-                ("  [if codex]", presence.codexIsInstalled),
-                ("  [if copilot]", presence.copilotIsInstalled),
-                ("  [if local]", presence.localAssistantCanRun),
-                ("  [if any reviser]", presence.anyReviseTargetExists),
-            ]
-            for (tag, present) in tags where line.hasSuffix(tag) {
-                line = String(line.dropLast(tag.count))
-                keep = present
-            }
-            if keep {
-                lines.append(line)
-            }
+            lines.append(line)
         }
         return lines.joined(separator: "\n")
     }
@@ -266,6 +248,61 @@ final class MenuBarTreeTests: XCTestCase {
             XCTAssertEqual(items.count, 1, "\(key) is on \(items)")
         }
         XCTAssertEqual(owners["⌘N"], ["File ▸ New Window"])
+    }
+
+    /// #990 (D24, D25): no Plantoir item takes a shortcut the HIG's
+    /// Keyboards table gives to another command — ⇧⌘P is Page Setup, ⇧⌘C
+    /// Show Colors. The ruled keys (Russell, 2026-11-18) sit where they were
+    /// ruled, Rebuild Preview's ⇧⌘Y among them: a Services key such as
+    /// Stickies' ⇧⌘Y is not a standard shortcut, and inside Plantoir the
+    /// app's own item wins over it (Apple's Services Implementation Guide;
+    /// measured in the running app, documentation/09 → "Mac conventions").
+    /// MUST FAIL on `dev` before #990, where Preview held ⇧⌘P and Copy a
+    /// Page ⇧⌘C, and on 23b554773, where Rebuild Preview held ⇧⌘B.
+    func testNoItemTakesAStandardShortcut() throws {
+        var keys: [String: String] = [:]
+        for name in ["File", "Course", "Section", "Classes", "Help"] {
+            let menu: NSMenu = try XCTUnwrap(MenuBarTreeTests.topMenu(named: name))
+            var stack: [NSMenu] = [menu]
+            while let current = stack.popLast() {
+                for item in MenuBarTreeTests.visibleItems(of: current) {
+                    let key: String = MenuBarTreeTests.keyText(item)
+                    if !key.isEmpty && !item.isAlternate {
+                        keys[key] = name + " ▸ " + item.title
+                    }
+                    if let submenu = item.submenu {
+                        stack.append(submenu)
+                    }
+                }
+            }
+        }
+        for standard in ["⇧⌘P", "⇧⌘C"] {
+            XCTAssertNil(keys[standard], "\(standard) is a standard or system shortcut, taken by \(keys[standard] ?? "")")
+        }
+        XCTAssertNil(keys["⇧⌘B"], "⇧⌘B adds Shift to ⌘B, Bold, for an unrelated command; taken by \(keys["⇧⌘B"] ?? "")")
+        XCTAssertEqual(keys["⌘Y"], "Section ▸ " + PreviewStartPage.title(for: AppSettings.shared.previewOpensAt))
+        XCTAssertEqual(keys["⇧⌘Y"], "Section ▸ Rebuild Preview")
+        XCTAssertEqual(keys["⇧⌘K"], "Course ▸ " + CopyPageWording.menuItem)
+        XCTAssertEqual(keys["⇧⌘D"], "Section ▸ Deploy…")
+    }
+
+    /// #990 (Russell's ruling Q10): Set Up an Assistant… is in Revise With
+    /// only, never in the Help menu as well.
+    func testSetUpAnAssistantIsInReviseWithOnly() throws {
+        let help: NSMenu = try XCTUnwrap(MenuBarTreeTests.topMenu(named: "Help"))
+        for item in MenuBarTreeTests.visibleItems(of: help) {
+            XCTAssertNotEqual(item.title, AssistantSetUpWording.menuItem, "not in Help")
+        }
+        for name in ["Course", "Section"] {
+            let menu: NSMenu = try XCTUnwrap(MenuBarTreeTests.topMenu(named: name))
+            var found: Bool = false
+            for item in MenuBarTreeTests.visibleItems(of: menu) where item.title == "Revise With" {
+                let submenu: NSMenu = try XCTUnwrap(item.submenu)
+                let last: NSMenuItem? = MenuBarTreeTests.visibleItems(of: submenu).last
+                found = last?.title == AssistantSetUpWording.menuItem
+            }
+            XCTAssertTrue(found, "\(name) ▸ Revise With ends with Set Up an Assistant…")
+        }
     }
 
     func testOpenInObsidianHasItsKeyOnExactlyOneItem() throws {

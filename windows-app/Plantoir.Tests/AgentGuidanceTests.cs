@@ -1,3 +1,5 @@
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -16,7 +18,7 @@ namespace Plantoir.Tests;
 /// process-wide state.
 /// </summary>
 [Collection(SharedActivityState.Name)]
-public sealed class AgentGuidanceTests : IDisposable
+public sealed partial class AgentGuidanceTests : IDisposable
 {
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "plantoir-guidance-" + Guid.NewGuid().ToString("N")[..8]);
 
@@ -52,7 +54,7 @@ public sealed class AgentGuidanceTests : IDisposable
         text.Replace("{start}", AgentGuidance.SectionStart).Replace("{end}", AgentGuidance.SectionEnd);
 
     private AgentGuidance.Outcome Pass() =>
-        AgentGuidance.Write(GuidanceSource, _folder, AgentGuidanceDeclined.SignatureFor, AgentGuidanceDeclined.Forget);
+        AgentGuidance.Write(GuidanceSource, _folder, AgentGuidanceDeclined.SignatureFor, path => AgentGuidanceDeclined.Forget(path));
 
     [Fact]
     public void EveryRootFileCaseHoldsAsTheContractSays()
@@ -200,11 +202,24 @@ public sealed class AgentGuidanceTests : IDisposable
         var forbidden = ContractLoader.LoadJson("shared-rules.json")["userFacingLabelWords"]!["forbidden"]!.AsArray()
             .Select(w => Regex.Escape(w!.ToString()));
         var machinery = new Regex(@"\b(" + string.Join("|", forbidden) + @")\b", RegexOptions.IgnoreCase);
+        // A sentence this app says in older words would be held by key: it
+        // must still differ, and it is still checked for the machinery. None
+        // is held since #946 brought askFound's GitHub Copilot here (the
+        // mac's #887); the hook stays for the next such sentence.
+        NamedGapLedger.StillNamed(NamedGapLedger.AgentGuidanceWordsSaidDifferently, words.AsObject().Select(pair => pair.Key));
+        int held = 0;
         foreach (var (key, said) in pairs)
         {
-            Assert.Equal(words[key]!.ToString(), said);
             Assert.False(machinery.IsMatch(said), $"{key} names the machinery: {said}");
+            if (NamedGapLedger.Holding(NamedGapLedger.AgentGuidanceWordsSaidDifferently, key) is { } entry)
+            {
+                held++;
+                Assert.False(words[key]!.ToString() == said, NamedGapLedger.ClosedMessage(entry));
+                continue;
+            }
+            Assert.Equal(words[key]!.ToString(), said);
         }
+        Assert.Equal(NamedGapLedger.All.Count(entry => entry.Area == NamedGapLedger.AgentGuidanceWordsSaidDifferently), held);
     }
 
     [Fact]
@@ -437,6 +452,158 @@ public sealed class AgentGuidanceTests : IDisposable
         Assert.Empty(Pass().Pending);
     }
 
+    private static readonly string InUse = new System.ComponentModel.Win32Exception(32).Message;
+    private static readonly string Denied = new System.ComponentModel.Win32Exception(5).Message;
+
+    private string[] Temporaries(string folder) => Directory.GetFiles(folder, "*.tmp");
+
+    /// <summary>#953: a refused read of the Not Now answers never replaces them with one; a refused write says it did not.</summary>
+    [Fact]
+    public void NotNowAnswersAreNeverReplacedByOneAndARefusedWriteSaysSo()
+    {
+        var first = new AgentGuidance.PendingAppend("CLAUDE.md", Path.Combine(_folder, "CLAUDE.md"), "NEW");
+        var second = new AgentGuidance.PendingAppend("AGENTS.md", Path.Combine(_folder, "AGENTS.md"), "NEW");
+        Assert.True(AgentGuidanceDeclined.Remember(first));
+        string stored = AgentGuidanceDeclined.FilePath;
+        byte[] before = File.ReadAllBytes(stored);
+
+        // Held whole: the read is refused, so nothing is written.
+        using (HeldFiles.PausingWith(_ => { }))
+        using (new FileStream(stored, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.False(AgentGuidanceDeclined.Remember(second));
+            Assert.False(AgentGuidanceDeclined.Forget(first.FilePath));
+        }
+        Assert.Equal(before, File.ReadAllBytes(stored));
+        Assert.Equal(AgentGuidance.Signature("NEW"), AgentGuidanceDeclined.SignatureFor(first.FilePath));
+        Assert.Null(AgentGuidanceDeclined.SignatureFor(second.FilePath));
+
+        // The read refused, then the holder lets go before the write: on the
+        // first pause after the read's four, which only a write after the
+        // refused read reaches.
+        int count = 0;
+        var whole = new FileStream(stored, FileMode.Open, FileAccess.Read, FileShare.None);
+        using (HeldFiles.PausingWith(_ => { if (++count == HeldFiles.Pauses.Count + 1) whole.Dispose(); }))
+            Assert.False(AgentGuidanceDeclined.Remember(second));
+        whole.Dispose();
+        Assert.Equal(HeldFiles.Pauses.Count, count);
+        Assert.Equal(before, File.ReadAllBytes(stored));
+
+        // Held by a reader without delete sharing: the read works, the rename is refused past the bound.
+        var pauses = new List<int>();
+        using (HeldFiles.PausingWith(pauses.Add))
+        using (new FileStream(stored, FileMode.Open, FileAccess.Read, FileShare.Read))
+            Assert.False(AgentGuidanceDeclined.Remember(second));
+        Assert.Equal(HeldFiles.Pauses, pauses);
+        Assert.Equal(before, File.ReadAllBytes(stored));
+        Assert.Empty(Temporaries(Path.GetDirectoryName(stored)!));
+
+        // Let go on the first pause: it lands, the first answer kept beside it.
+        var holder = new FileStream(stored, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using (HeldFiles.PausingWith(_ => holder.Dispose()))
+            Assert.True(AgentGuidanceDeclined.Remember(second));
+        Assert.NotNull(AgentGuidanceDeclined.SignatureFor(first.FilePath));
+        Assert.NotNull(AgentGuidanceDeclined.SignatureFor(second.FilePath));
+    }
+
+    /// <summary>#953: Add with AGENTS.md held by an editor past the bound: refused, unchanged, the system's in-use sentence.</summary>
+    [Fact]
+    public void AddOntoAHeldFileIsRefusedInTheSystemsWordsForAHold()
+    {
+        string file = Path.Combine(_folder, "AGENTS.md");
+        File.WriteAllText(file, "Mine.\n", new UTF8Encoding(false));
+        byte[] before = File.ReadAllBytes(file);
+        var pending = new AgentGuidance.PendingAppend("AGENTS.md", file, "NEW");
+        string trail = Path.Combine(_folder + "-state", "activity.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(trail)!);
+        ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            var pauses = new List<int>();
+            using (HeldFiles.PausingWith(pauses.Add))
+            using (new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                Assert.Equal(InUse, AgentGuidance.AppendAfterYes(pending));
+                Assert.Equal(HeldFiles.Pauses, pauses);
+                ToolchainReadiness.Answer(_folder, pending, add: true);
+            }
+            Assert.NotEqual(Denied, InUse);
+            Assert.Equal(before, File.ReadAllBytes(file));
+            Assert.Empty(Temporaries(_folder));
+            string notice = Contract["words"]!["couldNotWrite"]!.ToString()
+                .Replace("{reason}", AgentGuidance.WithoutFinalStop(InUse));
+            Assert.Equal(notice, ToolchainReadiness.GuidanceNoticeFor(_folder));
+            Assert.Contains("AGENTS.md: " + InUse, File.ReadAllText(trail));
+        }
+        finally { ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
+    }
+
+    /// <summary>#953: a read-only file is a permission, refused at once and never said as "in use".</summary>
+    [Fact]
+    public void AReadOnlyFileIsRefusedAtOnceAndNotSaidAsInUse()
+    {
+        string file = Path.Combine(_folder, "AGENTS.md");
+        File.WriteAllText(file, "Mine.\n", new UTF8Encoding(false));
+        byte[] before = File.ReadAllBytes(file);
+        var pending = new AgentGuidance.PendingAppend("AGENTS.md", file, "NEW");
+        var pauses = new List<int>();
+
+        File.SetAttributes(file, FileAttributes.ReadOnly);
+        using (HeldFiles.PausingWith(pauses.Add))
+        {
+            string? reason = AgentGuidance.AppendAfterYes(pending);
+            Assert.NotNull(reason);
+            Assert.NotEqual(InUse, reason);
+        }
+        File.SetAttributes(file, FileAttributes.Normal);
+        Assert.Empty(pauses);
+        Assert.Equal(before, File.ReadAllBytes(file));
+        Assert.Empty(Temporaries(_folder));
+    }
+
+    /// <summary>#953: a deny rule is a permission, refused at once in the system's words for it, never as "in use".</summary>
+    [DenyReplaceBitesFact]
+    public void ADenyRuleIsRefusedAtOnceAndSaidAsAccessDenied()
+    {
+        string file = Path.Combine(_folder, "AGENTS.md");
+        File.WriteAllText(file, "Mine.\n", new UTF8Encoding(false));
+        byte[] before = File.ReadAllBytes(file);
+        var pending = new AgentGuidance.PendingAppend("AGENTS.md", file, "NEW");
+        var pauses = new List<int>();
+
+        // A deny rule: the file may not be deleted (so not replaced), and the folder may not delete it either.
+        var fileDeny = DenyReplaceBitesFactAttribute.FileDeny();
+        var folderDeny = DenyReplaceBitesFactAttribute.FolderDeny();
+        var fileInfo = new FileInfo(file);
+        var folderInfo = new DirectoryInfo(_folder);
+        var fileSecurity = fileInfo.GetAccessControl();
+        fileSecurity.AddAccessRule(fileDeny);
+        fileInfo.SetAccessControl(fileSecurity);
+        var folderSecurity = folderInfo.GetAccessControl();
+        folderSecurity.AddAccessRule(folderDeny);
+        folderInfo.SetAccessControl(folderSecurity);
+        try
+        {
+            using (HeldFiles.PausingWith(pauses.Add))
+            {
+                string? reason = AgentGuidance.AppendAfterYes(pending);
+                Assert.Equal(Denied, reason);
+            }
+            Assert.Empty(pauses);
+        }
+        finally
+        {
+            fileSecurity = fileInfo.GetAccessControl();
+            fileSecurity.RemoveAccessRuleSpecific(fileDeny);
+            fileInfo.SetAccessControl(fileSecurity);
+            folderSecurity = folderInfo.GetAccessControl();
+            folderSecurity.RemoveAccessRuleSpecific(folderDeny);
+            folderInfo.SetAccessControl(folderSecurity);
+        }
+        Assert.Equal(before, File.ReadAllBytes(file));
+        Assert.Empty(Temporaries(_folder));
+    }
+
     [Fact]
     public void NotNowIsRememberedUntilTheWordsChangeOrTheFileGoes()
     {
@@ -564,6 +731,74 @@ public sealed class AgentGuidanceTests : IDisposable
             string target = Path.Combine(to, Path.GetRelativePath(from, file));
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(file, target, overwrite: true);
+        }
+    }
+}
+
+/// <summary>
+/// A fact that needs deny ACEs to stop this account REPLACING a file (the
+/// rename over it that <see cref="AgentGuidance.AppendAfterYes"/> makes):
+/// SKIPPED, saying why, when they do not (over SSH the account's token is an
+/// administrator's, with the backup and restore privileges enabled, and the
+/// rename passes over both rules: measured on the PC, 2026-11-21), the
+/// convention of <see cref="DenyBitesFactAttribute"/>. The probe makes a
+/// temporary folder and file, puts on them the very rules the test uses,
+/// tries the same rename, and removes everything.
+/// </summary>
+public sealed class DenyReplaceBitesFactAttribute : FactAttribute
+{
+    private static readonly Lazy<bool> DenyBites = new(Probe);
+
+    public DenyReplaceBitesFactAttribute()
+    {
+        if (!DenyBites.Value)
+            Skip = "A deny ACE does not stop this account replacing a file (an administrator's token, as over SSH), so "
+                 + "'a deny rule is refused at once and said as Access is denied' cannot be tried on the disk here; "
+                 + "AReadOnlyFileIsRefusedAtOnceAndNotSaidAsInUse covers the refusal at once, and "
+                 + "TheFailureLineIsTheContractsAndTheNoticeHasNoPath the system's sentence for an access-denied error.";
+    }
+
+    /// <summary>On the file: it may not be deleted (so not replaced) nor written.</summary>
+    public static FileSystemAccessRule FileDeny() => new(WindowsIdentity.GetCurrent().User!,
+        FileSystemRights.Delete | FileSystemRights.WriteData, AccessControlType.Deny);
+
+    /// <summary>On the folder: it may not delete the file either.</summary>
+    public static FileSystemAccessRule FolderDeny() => new(WindowsIdentity.GetCurrent().User!,
+        FileSystemRights.DeleteSubdirectoriesAndFiles, InheritanceFlags.None, PropagationFlags.None, AccessControlType.Deny);
+
+    private static bool Probe()
+    {
+        string folder = Directory.CreateTempSubdirectory("deny-replace-probe-").FullName;
+        string path = Path.Combine(folder, "probe.md");
+        string temporary = Path.Combine(folder, "probe.tmp");
+        File.WriteAllText(path, "probe");
+        File.WriteAllText(temporary, "new");
+        var file = new FileInfo(path);
+        var directory = new DirectoryInfo(folder);
+        var fileDeny = FileDeny();
+        var folderDeny = FolderDeny();
+        try
+        {
+            var fileRights = file.GetAccessControl();
+            fileRights.AddAccessRule(fileDeny);
+            file.SetAccessControl(fileRights);
+            var folderRights = directory.GetAccessControl();
+            folderRights.AddAccessRule(folderDeny);
+            directory.SetAccessControl(folderRights);
+            try
+            {
+                File.Move(temporary, path, overwrite: true);
+                return false;
+            }
+            catch (UnauthorizedAccessException) { return true; }
+            catch (IOException) { return true; }
+        }
+        catch { return false; }
+        finally
+        {
+            try { var r = directory.GetAccessControl(); r.RemoveAccessRuleSpecific(folderDeny); directory.SetAccessControl(r); } catch { }
+            try { var r = new FileInfo(path).GetAccessControl(); r.RemoveAccessRuleSpecific(fileDeny); new FileInfo(path).SetAccessControl(r); } catch { }
+            try { Directory.Delete(folder, recursive: true); } catch { }
         }
     }
 }

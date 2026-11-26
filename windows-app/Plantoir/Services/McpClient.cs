@@ -23,7 +23,7 @@ namespace Plantoir.Services;
 /// course lock for free, and that a teacher gets the same answers whichever
 /// assistant they use.
 /// </summary>
-public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposable
+public sealed class McpClient : Plantoir.Core.Assist.IToolServer, Plantoir.Core.Assist.IHearsTheMenu, IAsyncDisposable
 {
     private readonly Process _server;
     private readonly StreamWriter _to;
@@ -191,6 +191,15 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
     /// result's <c>_meta</c>; a tool that says the same thing to both sends
     /// none, and the fall-back below is what that absence means.
     /// </summary>
+    /// <summary>
+    /// The menu the next calls come from (#990), sent in each call's
+    /// <c>_meta</c> while set; the menu's own server reads it.
+    /// </summary>
+    public string? MenuOfTheNextCalls { get; set; }
+
+    /// <summary>The course of the section the next calls are for (#1027), sent in each call's <c>_meta</c> while set.</summary>
+    public string? CourseOfTheNextCalls { get; set; }
+
     public async Task<Plantoir.Core.Assist.AssistToolAnswer> CallTool(
         string name, JsonObject arguments,
         Action<string>? progress = null,
@@ -232,6 +241,14 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         // a teacher who had just been told the assistant was working.
         if (onProgress is not null)
             parameters["_meta"] = new JsonObject { ["progressToken"] = id };
+        if (method == "tools/call" && MenuOfTheNextCalls is { } menu)
+        {
+            var meta = parameters["_meta"] as JsonObject ?? new JsonObject();
+            meta[Plantoir.Core.Assist.AssistWorkspace.MenuMetaKey] = menu;
+            if (CourseOfTheNextCalls is { } course)
+                meta[Plantoir.Core.Assist.AssistWorkspace.CourseMetaKey] = course;
+            parameters["_meta"] = meta;
+        }
 
         var request = new JsonObject
         {

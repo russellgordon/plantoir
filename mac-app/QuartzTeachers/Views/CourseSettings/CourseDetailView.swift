@@ -33,8 +33,9 @@ import SwiftUI
 /// It is never silent: a Save that worked says the form's "Saved ✓" on the
 /// Planning tab; one refused, failed or with something to say takes the
 /// teacher to Settings, where the form shows its own sentence by the field.
-/// Revert is dimmed on Planning, with a line under it saying why: it would
-/// discard edits the teacher cannot see.
+/// Revert is dimmed on Planning, because it would discard edits the teacher
+/// cannot see, and its help tag says so (`PlanningWording.revertOnPlanning`;
+/// a grey line under it until #990).
 ///
 /// **No assistant, no tab.** With neither installed the page is exactly what
 /// it was before #708: no tabs and no word about planning (Russell,
@@ -114,6 +115,8 @@ struct CourseDetailView: View {
                         (tab: CourseDetailTab.planning, title: PlanningWording.tabPlanning),
                     ],
                     selection: tabBinding,
+                    // Named by the window's own title (#993, D16).
+                    name: course.displayCode,
                     identifier: "courseTabs"
                 )
             }
@@ -233,26 +236,28 @@ enum CourseDetailTabs {
     /// nothing SwiftUI keeps for a drawn view. It is offered whenever there
     /// is something unsaved, held back or not, so a held-back Save is
     /// pressed, refused with the form's own reason, and shown on Settings
-    /// rather than dimmed with none (`afterASave`). Revert is dimmed here
-    /// with `PlanningWording.revertOnPlanning` under it: it would throw away
-    /// edits the teacher cannot see.
+    /// rather than dimmed with none (`afterASave`). Revert is dimmed here:
+    /// it would throw away edits the teacher cannot see, and
+    /// `PlanningWording.revertOnPlanning` says so as the item's help tag
+    /// (`revertHelp`). Until #990 it was a grey line under the item; the
+    /// menus hold no text rows since, Russell's ruling Q14.
     static func planningCommands(
         course: Course, session: CourseSettingsSession, showSettings: @escaping () -> Void
     ) -> CourseSettingsCommands {
         let form: CourseSettingsView = CourseSettingsView(course: course, session: session)
         return CourseSettingsCommands(
-            maySave: course.configuration.hasUnsavedChanges,
+            maySave: course.configuration.hasUnsavedChanges && !course.isRenamingAFolder,
             mayRevert: false,
-            revertNote: PlanningWording.revertOnPlanning,
             perform: { (item: SubjectMenuRules.Item) in
-                if item != .saveCourseSettings || !course.configuration.hasUnsavedChanges {
+                if item != .saveCourseSettings || !course.configuration.hasUnsavedChanges || course.isRenamingAFolder {
                     return
                 }
                 form.save()
                 if afterASave(session) == .showsSettings {
                     showSettings()
                 }
-            }
+            },
+            revertHelp: PlanningWording.revertOnPlanning
         )
     }
 }

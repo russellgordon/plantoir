@@ -489,21 +489,34 @@ enum LinksChecklistPublisher {
             }
             return .refused(LinksChecklistWording.nothingLeftToPublish)
         }
+        // ONE step through the door (#899, U3): the pages, the answer, and
+        // the later classes it published kept, all or none. The front page
+        // is not repointed for the checklist (#379, ruling F1).
+        let step: JournaledStep = JournaledStep(
+            course: course, section: sectionNumber, maker: UndoStepMaker.sheet("answerTheLinksChecklist")
+        )
         do {
-            let applied: (change: AssistChange, leftAlone: [String]) = try AssistPublishPlanner.apply(
-                planned.plan, forSection: sectionNumber, in: course, repointsTheFrontPage: false
+            let applied: AssistPublishPlanner.PlannedWrites = try AssistPublishPlanner.planWrites(
+                planned.plan, forSection: sectionNumber, in: course, into: step
             )
             for title in applied.leftAlone where !outcome.declined.contains(title) {
                 outcome.declined.append(title)
             }
+            rememberTheAnswer(offer: offer, leftUnticked: Set(outcome.leftUntickedPlaces),
+                              course: course, sectionNumber: sectionNumber, into: step)
+            keepTheLaterClassesItPublished(
+                outcome.publishedPlaces, course: course, sectionNumber: sectionNumber,
+                today: CalendarDay.today(), into: step
+            )
         } catch {
+            // A page the plan needs could not be read: nothing was written.
             return .refused(AssistToolRefusal.unreadablePage(offer.course).message)
         }
-        rememberTheAnswer(offer: offer, leftUnticked: Set(outcome.leftUntickedPlaces),
-                          course: course, sectionNumber: sectionNumber)
-        keepTheLaterClassesItPublished(
-            outcome.publishedPlaces, course: course, sectionNumber: sectionNumber, today: CalendarDay.today()
-        )
+        do {
+            try step.make()
+        } catch {
+            return .refused(sentence(forRefused: error, of: step, graph: graph, offer: offer, in: course))
+        }
         ActivityTrail.note(
             .pagesPublishedFromLinksChecklist, publishedLine(outcome),
             course: course.code, section: sectionNumber
@@ -525,6 +538,79 @@ enum LinksChecklistPublisher {
         return .published(outcome)
     }
 
+    /// What the sheet says when the door refused the press (the first
+    /// review of U3a, LOW 7). Every refusal wrote nothing (the press is one
+    /// step, all or none), and each is said with the words already used for
+    /// it: a page changed since it was checked is
+    /// `linksChecklist.wording.pageChangedSince`, named as the sheet names a
+    /// page; a file that really cannot be read just now is the
+    /// unreadable-page sentence, as before; a file that could not be put
+    /// back is said as part way; anything else (a full disk, a file in use, a
+    /// list that could not take the step while Undo is live) is the
+    /// runner's "Nothing was changed: …" with Foundation's could-not-be-saved
+    /// sentence for the file (`JournaledStepError`), as a re-date says it.
+    static func sentence(
+        forRefused error: Error, of step: JournaledStep, graph: AssistSectionGraph,
+        offer: LinksChecklistOffer, in course: Course
+    ) -> String {
+        if case JournaledStepError.leftPartWay = error {
+            // A file could not be put back: some of the press went in, and
+            // the earlier content is kept beside its page (the second review
+            // of U3a, MEDIUM a).
+            return AssistWording.publishStoppedPartWay(what: LinksChecklistWording.pagesYouTicked, problem: error.localizedDescription)
+        }
+        guard case JournaledStepError.refused(let refusal, _) = error else {
+            return "Nothing was changed: \(error.localizedDescription)"
+        }
+        switch refusal {
+        case .changedSince(let firstPath, _):
+            if let name = pageName(atStepPath: firstPath, of: step, graph: graph, offer: offer, in: course) {
+                return LinksChecklistWording.pageChangedSince(name: name)
+            }
+        case .cannotTellNow(let path):
+            // "Could not be read" only for a file that really cannot be read
+            // now; a page that is a link, or a folder, cannot be checked and
+            // so is not written, which the could-not-be-saved sentence says
+            // (the second review of U3a, LOW 3).
+            if UndoItem.read(at: stepURL(atStepPath: path, of: step)) == .unreadable {
+                return AssistToolRefusal.unreadablePage(offer.course).message
+            }
+        case .fileIsInUse, .couldNotWrite, .contentMissing, .notReadable:
+            break
+        }
+        return "Nothing was changed: \(error.localizedDescription)"
+    }
+
+    /// The page at a path the door named (inside the working folder, or the
+    /// whole path for a step that cannot be named), as the sheet names it;
+    /// nil when it is not one of the section's pages (the answered record,
+    /// the kept record).
+    static func pageName(
+        atStepPath path: String, of step: JournaledStep, graph: AssistSectionGraph,
+        offer: LinksChecklistOffer, in course: Course
+    ) -> String? {
+        let fileURL: URL = stepURL(atStepPath: path, of: step)
+        let wanted: String = UndoFolderPlaces.canonicalPath(of: fileURL)
+        let pages: [String: AssistSectionPage] = pagesByPlace(graph, in: course)
+        for (place, page) in pages where UndoFolderPlaces.canonicalPath(of: page.fileURL) == wanted {
+            let naming: LinksChecklistNaming = LinksChecklistNaming(
+                graph: graph, pagesByPlace: pages, rows: offer.rows,
+                courseDirectoryURL: course.directoryURL, courseCode: course.code
+            )
+            return naming.name(ofPlace: place)
+        }
+        return nil
+    }
+
+    /// The file at a path the door named: inside the working folder, or the
+    /// whole path for a step that cannot be named.
+    static func stepURL(atStepPath path: String, of step: JournaledStep) -> URL {
+        if !path.hasPrefix("/"), let root = step.workingFolderURL {
+            return root.appendingPathComponent(path)
+        }
+        return URL(fileURLWithPath: path)
+    }
+
     /// A class the teacher published from this checklist is a class they
     /// CHOSE to put up, so one dated after the next class day is recorded as
     /// kept at its date (#475, `file-formats.json` → `laterClassesKept`) —
@@ -532,18 +618,28 @@ enum LinksChecklistPublisher {
     /// go dead, and the next build's checklist would offer it back: the two
     /// questions undoing each other (#457 batch B's review, finding 2).
     static func keepTheLaterClassesItPublished(
-        _ places: [String], course: Course, sectionNumber: Int, today: CalendarDay
+        _ places: [String], course: Course, sectionNumber: Int, today: CalendarDay,
+        into step: JournaledStep? = nil
     ) {
         var published: Set<String> = []
         for place in places {
             published.insert(place)
         }
+        // Read as the step will leave the pages: the classes this press
+        // publishes are not on the disk yet when it is one step (#899, U3).
+        var flagged: [ClassesDatedLater.Flagged] = []
+        if let step {
+            flagged = step.whilePlanning {
+                return ClassesDatedLater.flagged(forSection: sectionNumber, in: course, today: today)
+            }
+        } else {
+            flagged = ClassesDatedLater.flagged(forSection: sectionNumber, in: course, today: today)
+        }
         var kept: [ClassesDatedLater.Flagged] = []
-        for page in ClassesDatedLater.flagged(forSection: sectionNumber, in: course, today: today)
-        where published.contains(page.place) {
+        for page in flagged where published.contains(page.place) {
             kept.append(page)
         }
-        ClassesDatedLater.keep(kept, forSection: sectionNumber, in: course)
+        ClassesDatedLater.keep(kept, forSection: sectionNumber, in: course, into: step)
     }
 
     /// Press Not Now.
@@ -562,9 +658,9 @@ enum LinksChecklistPublisher {
     /// ticked class brought — never a row left only because the row it comes
     /// under was left (#385).
     static func rememberTheAnswer(offer: LinksChecklistOffer, leftUnticked unticked: Set<String>,
-                                  course: Course, sectionNumber: Int) {
+                                  course: Course, sectionNumber: Int, into step: JournaledStep? = nil) {
         let answered: LinksChecklistAnswered = LinksChecklistAnswered(offered: offer.places, leftUnticked: unticked)
-        try? answered.write(courseDirectory: course.directoryURL, section: sectionNumber)
+        try? answered.write(courseDirectory: course.directoryURL, section: sectionNumber, into: step)
     }
 
     static func noteSetAside(course: Course, sectionNumber: Int, notNow: Bool, count: Int, withTheirPage: Int) {

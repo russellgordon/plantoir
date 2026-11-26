@@ -46,7 +46,7 @@ nonisolated enum ClaudeCodeLauncher {
     /// The one throwaway folder for a whole test run, so a test that writes
     /// through one door and reads back through the other still finds it.
     static let supportDirectoryWhileTesting: URL = FileManager.default.temporaryDirectory
-        .appendingPathComponent("plantoir-assist-under-test-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        .appendingPathComponent("plantoir-assist-under-test-" + RealHome.testRunIdentifier, isDirectory: true)
 
     /// The three sentences this door shows a teacher, in one place, because
     /// `contracts/app-rules.json` → `outsideAgents` carries them and a test

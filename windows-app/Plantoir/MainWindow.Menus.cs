@@ -18,7 +18,8 @@ using Row = Plantoir.Core.Models.SubjectMenuRules.Row;
 namespace Plantoir;
 
 /// <summary>
-/// The menu bar (#488, the mac's #457): File, Course, Section, View and Help,
+/// The menu bar (#488, the mac's #457): File, Course, Section, Classes (#990),
+/// View and Help,
 /// every action a teacher can take on a course or a section, each calling the
 /// SAME code as its context-menu and toolbar routes.
 /// </summary>
@@ -26,9 +27,12 @@ namespace Plantoir;
 /// <para><b>Greyed, never hidden.</b> Which items can be used is
 /// <see cref="SubjectMenuRules.Enabled"/> — the contract's rule
 /// (<c>shared-rules.json</c> → <c>subjectMenus</c>), fed by
-/// <see cref="CurrentSituation"/>. The one exception is presence: the Revise
-/// With items for Claude and Codex are LEFT OUT when they are not installed,
-/// decided when the menu is built (<c>outsideAgents.*.hiddenWhenNotInstalled</c>).</para>
+/// <see cref="CurrentSituation"/>. Since #990 that includes presence: the
+/// Revise With items for Claude and Codex are drawn on every PC and DIMMED
+/// when not installed (<c>outsideAgents.hiddenWhenNotInstalled</c> false),
+/// where until then they were left out. No grey line of explanation sits in
+/// the Course or Section menu since #990 either (the mac's ruling Q14): a
+/// menu holds commands.</para>
 ///
 /// <para><b>WinUI's MenuBarItem has no Opening event</b>, so enablement is
 /// applied ahead of time (<see cref="ApplyMenuEnablement"/>) on every change the
@@ -56,7 +60,6 @@ public sealed partial class MainWindow
     private readonly Dictionary<Item, MenuFlyoutItemBase> _ruled = new();
 
     private MenuFlyoutSubItem _openRecentMenu = null!;
-    private MenuFlyoutItem _renameReason = null!;
     private MenuFlyoutItem _checkForUpdatesItem = null!;
     private KeyboardAccelerator _courseObsidianKey = null!;
     private KeyboardAccelerator _sectionObsidianKey = null!;
@@ -90,7 +93,11 @@ public sealed partial class MainWindow
         // ---- Course: with a section selected these act on its course.
         var course = CourseMenu.Items;
         Add(course, "Add Section…", "courseAddSection", Item.AddSection);
-        Add(course, CopyPageWording.Templates["menuItem"], "courseCopyAPage", Item.CopyAPage);
+        // Ctrl+Shift+K (#990, Russell 2026-11-20): the mac's Shift-Command-K.
+        // Taken by nothing else in this app (#990's key census,
+        // documentation/12 → "Menus").
+        Add(course, CopyPageWording.Templates["menuItem"], "courseCopyAPage", Item.CopyAPage,
+            Key(VirtualKey.K, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+K"));
         course.Add(new MenuFlyoutSeparator());
         Add(course, "Save Course Settings", "courseSaveSettings", Item.SaveCourseSettings, Key(VirtualKey.S, VirtualKeyModifiers.Control, "Ctrl+S"));
         Add(course, "Revert Course Settings", "courseRevertSettings", Item.RevertCourseSettings);
@@ -98,18 +105,17 @@ public sealed partial class MainWindow
         // "Rename": no "Course", no ellipsis (mac #491 item 8). It opens a
         // dialog here, but the name is the command's, and a second word for it
         // would be a second command to learn.
+        // Dimmed alone since #990 (the mac's ruling Q14: no grey text rows in
+        // the menus). Until then a dimmed line under it said what held a
+        // rename back (#458/#468); the row's context menu still says it.
         Add(course, "Rename", "courseRename", Item.Rename, Key(VirtualKey.F2, VirtualKeyModifiers.None, "F2"));
-        // Dimmed WITH its reason: what holds a rename back (#458/#468).
-        _renameReason = new MenuFlyoutItem { IsEnabled = false, Visibility = Visibility.Collapsed };
-        AutomationProperties.SetAutomationId(_renameReason, "courseRenameReason");
-        course.Add(_renameReason);
         Add(course, ReferenceCourse.SetSchoolYearMenuItem, "courseSetSchoolYear", Item.SetSchoolYear);
         Add(course, ReferenceCourse.KeepACopyMenuItem, "courseKeepACopy", Item.KeepACopyForReference);
         course.Add(new MenuFlyoutSeparator());
         Add(course, "Back Up Now", "courseBackUpNow", Item.BackUpNow);
         Add(course, "Restore from Backup…", "courseRestoreFromBackup", Item.RestoreFromBackup);
         course.Add(new MenuFlyoutSeparator());
-        AddReviseWith(course, "course", Item.CourseReviseWithClaude, Item.CourseReviseWithCodex, Item.CourseReviseWithLocalAssistant);
+        AddReviseWith(course, "course", "Revise With", Item.CourseReviseWithClaude, Item.CourseReviseWithCodex, Item.CourseReviseWithLocalAssistant);
         var courseObsidian = Add(course, "Open in Obsidian", "courseOpenInObsidian", Item.CourseOpenInObsidian);
         _courseObsidianKey = Key(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+O")!.Value.Make(this, Item.CourseOpenInObsidian);
         courseObsidian.KeyboardAccelerators.Add(_courseObsidianKey);
@@ -120,56 +126,12 @@ public sealed partial class MainWindow
         Add(course, "Delete Archive…", "courseDeleteArchive", Item.DeleteArchive);
         Add(course, "Remove Course…", "courseRemoveCourse", Item.RemoveCourse);
 
-        // ---- Section
-        var section = SectionMenu.Items;
-        Add(section, "Preview", "sectionPreview", Item.Preview, Key(VirtualKey.P, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+P"));
-        // #514: the mac's Option alternate, as a second visible item (a WinUI
-        // menu has no modifier alternates): always titled the opposite of the
-        // first, absent while a preview runs, and the SAME item for the rule
-        // (Item.Preview, re-checked by Invoke) without taking the first's
-        // place in _ruled. No key: Ctrl+Alt+Shift+P is AltGr+Shift+P on many
-        // keyboards, a character a teacher may be typing.
-        _previewAlternate = Add(section, "Preview at Last Viewed", "sectionPreviewAlternate", Item.Preview,
-                                run: PressThePreviewAlternate, rules: false);
-        Add(section, "Deploy…", "sectionDeploy", Item.Deploy, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
-        Add(section, "Open in Browser", "sectionOpenInBrowser", Item.OpenInBrowser);
-        section.Add(new MenuFlyoutSeparator());
-        // The assistant's own functions (#489, the mac's #457 batch B), run
-        // through the tools' own code — never a model, so a teacher who
-        // declined the assistant has every one (MainWindow.Verbs.cs). The
-        // ellipsis items show the plan before anything changes; Rebuild
-        // Preview, Undo Last Change and Add Next Class act at once.
-        Add(section, "Publish Pages…", "sectionPublishPages", Item.PublishPages);
-        Add(section, "Hide Pages…", "sectionHidePages", Item.HidePages);
-        Add(section, "Publish Class for a Date…", "sectionPublishClassForADate", Item.PublishClassForADate);
-        // Ctrl+Shift+B, the mac's Shift+Cmd+B: kept free for it by #488's key census.
-        Add(section, "Rebuild Preview", "sectionRebuildPreview", Item.RebuildPreview,
-            Key(VirtualKey.B, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+B"));
-        // No key: Ctrl+Z belongs to text editing, and a key that took back a
-        // page change from inside a text field would be a surprise nobody
-        // could undo (the mac's reason for no Cmd+Z).
-        Add(section, "Undo Last Change", "sectionUndoLastChange", Item.UndoLastChange);
-        section.Add(new MenuFlyoutSeparator());
-        Add(section, "Add Next Class", "sectionAddNextClass", Item.AddNextClass);
-        Add(section, "Re-date Classes…", "sectionReDateClasses", Item.ReDateClasses);
-        Add(section, "Make Room for Classes…", "sectionMakeRoomForClasses", Item.MakeRoomForClasses);
-        Add(section, "Class Dates…", "sectionClassDates", Item.ClassDates);
-        section.Add(new MenuFlyoutSeparator());
-        Add(section, "Schedule Deploy…", "sectionScheduleDeploy", Item.ScheduleDeploy);
-        Add(section, "Cancel Scheduled Deploy…", "sectionCancelScheduledDeploy", Item.CancelScheduledDeploy);
-        section.Add(new MenuFlyoutSeparator());
-        Add(section, StartOfYearWording.MenuItem, "sectionGetReady", Item.GetReadyForTheStartOfTheYear);
-        Add(section, StartOfYearWording.UndoMenuItem, "sectionUndoGettingReady", Item.UndoGettingReady);
-        Add(section, LinksChecklistWording.MenuItem, "sectionPublishPagesLinksLeadTo", Item.PublishPagesLinksLeadTo);
-        section.Add(new MenuFlyoutSeparator());
-        AddReviseWith(section, "section", Item.SectionReviseWithClaude, Item.SectionReviseWithCodex, Item.SectionReviseWithLocalAssistant);
-        var sectionObsidian = Add(section, "Open in Obsidian", "sectionOpenInObsidian", Item.SectionOpenInObsidian);
-        _sectionObsidianKey = Key(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+O")!.Value.Make(this, Item.SectionOpenInObsidian);
-        _ = sectionObsidian;   // its key is moved onto it by ApplyMenuEnablement while a section is selected
-        Add(section, "Show in File Explorer", "sectionShowInFileExplorer", Item.SectionShowInFinder);
-        Add(section, "Open in Terminal", "sectionOpenInTerminal", Item.SectionNewTerminalAtFolder);
-        section.Add(new MenuFlyoutSeparator());
-        Add(section, "Remove Section…", "sectionRemoveSection", Item.RemoveSection);
+        // ---- Section and Classes (#990, Russell's ruling of 2026-11-20:
+        // grouping A): both drawn from SubjectMenuLayout, the contract's
+        // subjectMenus.layout, a separator between groups and nowhere else.
+        // Every item is drawn and dimmed when it cannot be used, never hidden.
+        BuildLayoutMenu(SectionMenu, SubjectMenuLayout.Menu.Section);
+        BuildLayoutMenu(ClassesMenu, SubjectMenuLayout.Menu.Classes);
 
         // ---- View: the preview's own navigation.
         var view = ViewMenu.Items;
@@ -191,21 +153,21 @@ public sealed partial class MainWindow
         Add(help, "About Plantoir", "helpAbout", null, null, () => About_Click(this, new RoutedEventArgs()));
 
         // Enablement ahead of the flyout: measured to fire before it draws.
-        foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ViewMenu, HelpMenu })
+        foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ClassesMenu, ViewMenu, HelpMenu })
         {
-            title.PointerEntered += (_, _) => ApplyMenuEnablement();
-            title.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, _) => ApplyMenuEnablement()), true);
+            title.PointerEntered += (_, _) => MenuIsOpening();
+            title.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, _) => MenuIsOpening()), true);
         }
-        AppMenuBar.GotFocus += (_, _) => ApplyMenuEnablement();   // opened from the keyboard
+        AppMenuBar.GotFocus += (_, _) => MenuIsOpening();   // opened from the keyboard
         // And when a flyout DRAWS, whatever opened it (the keyboard, UI
         // Automation): its items are Loaded as it opens — measured 3 ms after
         // Tapped — which is still before anything in it can be pressed. The
         // first item of each menu stands for all of them, so a menu opening
         // re-reads the situation once, not once per item.
-        foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ViewMenu })
+        foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ClassesMenu, ViewMenu })
             if (title.Items.FirstOrDefault() is FrameworkElement first)
             {
-                first.Loaded += (_, _) => ApplyMenuEnablement();
+                first.Loaded += (_, _) => MenuIsOpening();
                 // #514: a menu closing, however (Escape, a click outside, an
                 // item chosen) — measured, the first item's Unloaded fires on
                 // every close: Alt released inside it was never seen, so the
@@ -215,6 +177,9 @@ public sealed partial class MainWindow
 
         RebuildOpenRecent();
         OpenRecentList.Changed += OpenRecentChanged;
+        // #990: a missing assistant's Revise items are dimmed, so an answer
+        // that arrives after the window is built greys or ungreys them.
+        OutsideAssistantPresence.Changed += AssistantPresenceChanged;
     }
 
     /// <summary>A key for an item: its key, modifiers and the name the #191 record writes.</summary>
@@ -236,6 +201,82 @@ public sealed partial class MainWindow
     }
 
     private static MenuKey? Key(VirtualKey key, VirtualKeyModifiers modifiers, string name) => new MenuKey(key, modifiers, name);
+
+    /// <summary>
+    /// Section ▸ or Classes ▸, from <see cref="SubjectMenuLayout"/>: its title,
+    /// then each group of entries with a separator before every group but the
+    /// first. An item's words, key and AutomationId are this app's own
+    /// (<see cref="SubjectMenuLayout.TitleHere"/>, <see cref="SubjectMenuLayout.AutomationIdHere"/>).
+    /// </summary>
+    private void BuildLayoutMenu(MenuBarItem menu, SubjectMenuLayout.Menu layout)
+    {
+        // The title follows the selected course (ApplyMenuEnablement): an
+        // ordinary course's until the first refresh.
+        menu.Title = SubjectMenuLayout.Title(layout, ClassNoun.Class);
+        var into = menu.Items;
+        bool first = true;
+        foreach (var group in SubjectMenuLayout.Groups(layout))
+        {
+            if (!first) into.Add(new MenuFlyoutSeparator());
+            first = false;
+            foreach (var entry in group)
+            {
+                switch (entry)
+                {
+                    case SubjectMenuLayout.Entry.OfSubmenu(var submenu):
+                        // Its items in the layout's order: Claude, Codex, the local assistant.
+                        var doors = SubjectMenuLayout.ItemsOf(submenu);
+                        AddReviseWith(into, "section", SubjectMenuLayout.Title(submenu), doors[0], doors[1], doors[2]);
+                        break;
+                    case SubjectMenuLayout.Entry.OfItem(var item):
+                        AddLayoutItem(into, layout, item);
+                        break;
+                }
+            }
+        }
+    }
+
+    /// <summary>An item's words in Section ▸ or Classes ▸; a layout item with none draws its name, and the contract test fails on it.</summary>
+    private static string LayoutTitle(Item item, ClassNoun noun) => SubjectMenuLayout.TitleHere(item, noun) ?? item.ToString();
+
+    /// <summary>One item of Section ▸ or Classes ▸, with its key where it has one.</summary>
+    private void AddLayoutItem(IList<MenuFlyoutItemBase> into, SubjectMenuLayout.Menu layout, Item item)
+    {
+        string id = SubjectMenuLayout.AutomationIdHere(layout, item);
+        switch (item)
+        {
+            case Item.Preview:
+                Add(into, "Preview", id, Item.Preview, Key(VirtualKey.P, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+P"));
+                // #514: the mac's Option alternate, as a second visible item (a WinUI
+                // menu has no modifier alternates): always titled the opposite of the
+                // first, absent while a preview runs, and the SAME item for the rule
+                // (Item.Preview, re-checked by Invoke) without taking the first's
+                // place in _ruled. No key: Ctrl+Alt+Shift+P is AltGr+Shift+P on many
+                // keyboards, a character a teacher may be typing.
+                _previewAlternate = Add(into, "Preview at Last Viewed", "sectionPreviewAlternate", Item.Preview,
+                                        run: PressThePreviewAlternate, rules: false);
+                return;
+            case Item.RebuildPreview:
+                // Ctrl+Shift+B, the mac's Shift+Cmd+B until #990: kept free for it by #488's key census.
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item, Key(VirtualKey.B, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+B"));
+                return;
+            case Item.Deploy:
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
+                return;
+            case Item.SectionOpenInObsidian:
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item);
+                // Its key is moved onto it by ApplyMenuEnablement while a section is selected.
+                _sectionObsidianKey = Key(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+O")!.Value.Make(this, Item.SectionOpenInObsidian);
+                return;
+            default:
+                // No key on the rest. Undo Last Change in particular: Ctrl+Z
+                // belongs to text editing, and a key that took back a page
+                // change from inside a text field would be a surprise nobody
+                // could undo (the mac's reason for no Cmd+Z).
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item);
+                return;
+        }
+    }
 
     /// <param name="rules">False for a second item on an item already ruled
     /// (Section's Preview alternate, #514): it is asked of the rule when it
@@ -265,24 +306,50 @@ public sealed partial class MainWindow
         if (SelectedSectionDetail() is { } detail && !detail.PressPreview(opposite: true)) ApplyMenuEnablement();
     }
 
-    /// <summary>
-    /// Revise With ▸ Claude… / Codex… / Local AI Assistant… (mac #491 item 8's
-    /// titles). Claude and Codex are LEFT OUT when not installed — a fact about
-    /// this computer, decided now, never greyed (subjectMenus.rule); the local
-    /// assistant is always drawn and greyed where it does not apply.
-    /// </summary>
     /// <summary>The local assistant's title inside Revise With ▸ — the menu bar's and every row's.</summary>
     internal const string LocalAssistantMenuItemTitle = "Local AI Assistant…";
 
-    private void AddReviseWith(IList<MenuFlyoutItemBase> into, string prefix, Item claude, Item codex, Item local)
+    /// <summary>
+    /// Revise With ▸ Claude… / Codex… / Local AI Assistant… (mac #491 item 8's
+    /// titles). Since #990 (the mac's D11, Russell's ruling Q9) every item is
+    /// DRAWN on every PC, and one whose assistant this PC does not have is
+    /// DIMMED, not left out: HIG, The menu bar, "Always show the same set of
+    /// menu items… If a menu bar item isn't actionable, disable the action
+    /// instead of hiding it from the menu." Enabled means installed
+    /// (<see cref="IsInstalledHere"/>) AND allowed by the rule, applied in
+    /// <see cref="ApplyMenuEnablement"/>. A row's context menu still HIDES a
+    /// missing assistant (HIG, Context menus: "Hide unavailable menu items,
+    /// don't dim them"; <c>outsideAgents.hiddenInContextMenusWhenNotInstalled</c>).
+    /// Until #990 Claude and Codex were left out of this menu when not installed.
+    /// No Set Up an Assistant… after them: Windows has no set-up yet (#903).
+    /// </summary>
+    private void AddReviseWith(IList<MenuFlyoutItemBase> into, string prefix, string title, Item claude, Item codex, Item local)
     {
-        var sub = new MenuFlyoutSubItem { Text = "Revise With" };
+        var sub = new MenuFlyoutSubItem { Text = title };
         AutomationProperties.SetAutomationId(sub, prefix + "ReviseWith");
-        if (ClaudeCodeLauncher.IsAvailable) Add(sub.Items, ClaudeCodeLauncher.MenuItemTitle, prefix + "ReviseWithClaude", claude);
-        if (CodexLauncher.IsAvailable) Add(sub.Items, CodexLauncher.MenuItemTitle, prefix + "ReviseWithCodex", codex);
+        Add(sub.Items, ClaudeCodeLauncher.MenuItemTitle, prefix + "ReviseWithClaude", claude);
+        Add(sub.Items, CodexLauncher.MenuItemTitle, prefix + "ReviseWithCodex", codex);
         Add(sub.Items, LocalAssistantMenuItemTitle, prefix + "ReviseWithLocalAssistant", local);
         into.Add(sub);
     }
+
+    /// <summary>
+    /// Whether the outside door a Revise With item opens is on this PC, read
+    /// from <see cref="OutsideAssistantPresence"/> (asked at launch and when a
+    /// window comes to the front, never while a menu draws). True for every
+    /// other item. The local assistant is Plantoir's own and runs on every PC
+    /// this app runs on, so it is never dimmed for presence.
+    /// </summary>
+    internal static bool IsInstalledHere(SubjectMenuRules.ReviseTarget door) => door switch
+    {
+        SubjectMenuRules.ReviseTarget.Claude => OutsideAssistantPresence.ClaudeIsInstalled,
+        SubjectMenuRules.ReviseTarget.Codex => OutsideAssistantPresence.CodexIsInstalled,
+        _ => true,
+    };
+
+    /// <summary>What a presence refresh found differs: grey or ungrey the Revise items (raised off the interface thread).</summary>
+    private void AssistantPresenceChanged() =>
+        DispatcherQueue.TryEnqueue(() => { if (!IsClosed) ApplyMenuEnablement(); });
 
     // ---- Running ------------------------------------------------------------
 
@@ -307,7 +374,10 @@ public sealed partial class MainWindow
         // mac's key on a disabled item is — see 12-windows-app.md (L5).
         if (keyName == "F2" && root is not null &&
             FocusManager.GetFocusedElement(root) is TextBox or RichEditBox or PasswordBox or AutoSuggestBox or NumberBox) return;
-        if (item is { } ruled && !SubjectMenuRules.Enabled(CurrentSituation()).Contains(ruled))
+        // #990: an outside door this PC does not have is dimmed in the menu
+        // bar, and asked again here like the rule.
+        if (item is { } ruled && (!SubjectMenuRules.Enabled(CurrentSituation()).Contains(ruled)
+                                  || SubjectMenuRules.OutsideDoorOf(ruled) is { } door && !IsInstalledHere(door)))
         {
             ApplyMenuEnablement();
             return;
@@ -345,16 +415,40 @@ public sealed partial class MainWindow
             case Item.Preview: detail?.PressPreview(opposite: false); return;
             case Item.Deploy: detail?.PressDeploy(); return;
             case Item.OpenInBrowser: detail?.PressOpenInBrowser(); return;
+            case Item.StopShowingDeployedFolder:
+                // #889: every show of the selected section, and a start still under way.
+                if (Workspace.Selection is SidebarSelection.SectionItem(var stopCode, var stopNumber)
+                    && Workspace.WorkspacePath is { } stopFolder
+                    && Workspace.Courses.FirstOrDefault(c => c.Code == stopCode) is { } stopCourse)
+                    DeployedFolderOpening.Stop(stopCourse, stopNumber, stopFolder);
+                ApplyMenuEnablement();
+                return;
             case Item.Back: detail?.PreviewGoBack(); return;
             case Item.Forward: detail?.PreviewGoForward(); return;
             case Item.ReloadPage: detail?.PreviewReload(); return;
             case Item.PublishPages or Item.HidePages or Item.PublishClassForADate or Item.RebuildPreview
-                or Item.UndoLastChange or Item.AddNextClass or Item.ReDateClasses or Item.MakeRoomForClasses
-                or Item.ClassDates:
+                or Item.UndoLastChange or Item.AddClass or Item.ReDateClasses or Item.MakeRoomForClasses
+                or Item.ClassDates or Item.RollOverToANewYear:
                 _ = RunSectionVerb(item);
                 return;
         }
         if (!Sidebar.Perform(item)) App.LogDiagnostic($"menu item {item} has no route yet");
+    }
+
+    /// <summary>
+    /// The section row's Open in Browser (#889), its row already selected: the
+    /// one Open in Browser, so the preview while one shows there, the deployed
+    /// folder otherwise, said on the trail as from the sidebar.
+    /// </summary>
+    internal void OpenInBrowserFromARow(Course course, int section)
+    {
+        if (SelectedSectionDetail() is { HasPreview: true } detail)
+        {
+            detail.PressOpenInBrowser();
+            return;
+        }
+        if (Workspace.WorkspacePath is { } folder)
+            _ = DeployedFolderOpening.OpenAsync(course, section, folder, DeployedFolderFrom.Sidebar, Content?.XamlRoot);
     }
 
     /// <summary>The section window on screen, only when it is the selected section's.</summary>
@@ -410,7 +504,9 @@ public sealed partial class MainWindow
         {
             HasFolder = hasFolder,
             FolderGettingReady = hasFolder && ToolchainReadiness.Refusal(folder) is not null,
-            SheetIsUp = DialogGate.IsOpen(Content?.XamlRoot),
+            // Restore…'s question counts from the press, its zip's reading
+            // before it opens included (#911): the slot is already taken.
+            SheetIsUp = DialogGate.IsOpen(Content?.XamlRoot) || Sidebar.IsAskingWhichRestore,
             Row = row,
             KeptForReference = course is not null && ReferenceCourse.IsKeptForReference(course),
             StructuralHold = folder is not null && course is not null && CourseActivity.BusyReason(folder, course.Code) is not null,
@@ -438,9 +534,32 @@ public sealed partial class MainWindow
             LastChangeIsHere = course is not null && sectionNumber is int changedIn && LastMenuChangeIsIn(course.Code, changedIn),
             VerbIsRunning = folder is not null && course is not null && sectionNumber is int runningIn
                             && AVerbIsRunningOn(folder, course.Code, runningIn),
+            // #889: read now, from the saved settings and the disk (offeredWhen:
+            // a menu opening is one of its events), and this app's shows.
+            // The selected section's view holds the offer as last read off the
+            // window's thread (lane B review, low 3); a menu's opening asks it
+            // to read again. No view, no offer: dimmed.
+            DeployedFolderReady = detail?.DeployedFolderReadyAsLastRead == true,
+            DeployedFolderShown = folder is not null && course is not null && sectionNumber is int shownIn
+                                  && DeployedFolderOpening.IsShown(course, shownIn, folder),
             CanGoBack = detail?.CanGoBack == true,
             CanGoForward = detail?.CanGoForward == true,
         };
+    }
+
+    /// <summary>
+    /// #889 <c>offeredWhen</c>, "when a menu opens", by every route a menu
+    /// opens: the pointer reaching or pressing a title, the keyboard (the bar
+    /// takes the focus), and a flyout drawing however it was opened (UI
+    /// Automation, the keyboard). The selected section's view reads the offer
+    /// off this thread and redraws the menus when it has it (lane B review,
+    /// low 3; #1027's review, low 2: the keyboard route drew the cached
+    /// answer). A read under way coalesces the calls into one more.
+    /// </summary>
+    private void MenuIsOpening()
+    {
+        SelectedSectionDetail()?.ReadTheOfferAgain();
+        ApplyMenuEnablement();
     }
 
     /// <summary>Grey or ungrey every ruled item, and move the keys and titles that follow the selection.</summary>
@@ -455,7 +574,7 @@ public sealed partial class MainWindow
             return;
         }
         var enabled = SubjectMenuRules.Enabled(situation);
-        foreach (var (item, view) in _ruled) view.IsEnabled = enabled.Contains(item);
+        foreach (var (item, view) in _ruled) view.IsEnabled = SubjectMenuRules.EnabledInTheMenuBar(item, enabled, IsInstalledHere);
         // The sidebar's − follows the same rule (#491 item 5).
         Sidebar.RefreshMinusButton(situation);
 
@@ -474,19 +593,37 @@ public sealed partial class MainWindow
             alternate.Visibility = stops ? Visibility.Collapsed : Visibility.Visible;
         }
 
+        // Classes ▸ is titled Meetings while a club is selected (#990,
+        // Russell, 2026-11-20 evening: "in a club the menu itself is titled
+        // Meetings, on both platforms"), Classes otherwise; it greys nothing.
+        var noun = SelectedCourseNoun();
+        SectionMenu.Title = SubjectMenuLayout.Title(SubjectMenuLayout.Menu.Section, noun);
+        ClassesMenu.Title = SubjectMenuLayout.Title(SubjectMenuLayout.Menu.Classes, noun);
+        // And its items say meeting in a club (#1027): only the words change.
+        foreach (var item in Enum.GetValues<Item>())
+            if (SubjectMenuLayout.TitleSayingTheNoun(item, noun) is { } words
+                && _ruled.TryGetValue(item, out var drawn) && drawn is MenuFlyoutItem titled)
+                titled.Text = words;
+
         // Ctrl+Shift+O sits on the ONE Open in Obsidian item that can be live.
         bool onSection = situation.Row == Row.Section;
         MoveKey(_courseObsidianKey, (MenuFlyoutItem)_ruled[Item.CourseOpenInObsidian], !onSection);
         MoveKey(_sectionObsidianKey, (MenuFlyoutItem)_ruled[Item.SectionOpenInObsidian], onSection);
 
-        // What holds a rename back, said under it.
-        string? reason = situation.Row is Row.Course or Row.Section && !situation.KeptForReference && situation.StructuralHold
-                         && Workspace.WorkspacePath is { } folder && Workspace.SelectedCourse is { } course
-            ? CourseActivity.BusyReason(folder, course.Code) : null;
-        _renameReason.Text = reason ?? "";
-        _renameReason.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
-
         _openRecentMenu.IsEnabled = enabled.Contains(Item.OpenRecent);
+    }
+
+    /// <summary>What the selected course (or the selected section's course) calls its class pages; Class with nothing selected.</summary>
+    private ClassNoun SelectedCourseNoun()
+    {
+        string? code = Workspace.Selection switch
+        {
+            SidebarSelection.CourseItem(var c) => c,
+            SidebarSelection.SectionItem(var c, _) => c,
+            _ => null,
+        };
+        var course = code is null ? null : Workspace.Courses.FirstOrDefault(c => c.Code == code);
+        return course?.Configuration.ClassNoun ?? ClassNoun.Class;
     }
 
     private static void MoveKey(KeyboardAccelerator key, MenuFlyoutItem item, bool belongsHere)

@@ -55,6 +55,23 @@
         "why": "#457 batch B. The Section menu saves a copy before EVERY change it makes (the director's ruling on the plan review: per action, so 'the copy made before it is in Backups' is always true), so it clears up after itself as the assistant does: its own five most recent of the course are kept, whatever section each was for. Counted APART from the assistant's: six menu copies and two of the assistant's delete one menu copy and none of the assistant's, so an afternoon of menu changes never pushes the copy an open conversation's Restore button needs off the disk. The teacher's own are never counted."
       },
       {
+        "name": "the Section and Classes menus keep their five most recent between them",
+        "course": "ICS3U",
+        "existing": [
+          "ICS3U_backup_2026-09-01_120000_classes-section1.zip",
+          "ICS3U_backup_2026-09-02_120000_menu-section1.zip",
+          "ICS3U_backup_2026-09-03_120000_classes-section1.zip",
+          "ICS3U_backup_2026-09-04_120000_menu-section1.zip",
+          "ICS3U_backup_2026-09-05_120000_classes-section2.zip",
+          "ICS3U_backup_2026-09-06_120000_menu-section1.zip",
+          "ICS3U_backup_2026-08-01_120000_assistant-section1.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-01_120000_classes-section1.zip"
+        ],
+        "why": "#990: a copy saved before a Classes item is still the menus' copy, counted with the Section menu's: six menu copies between the two menus, so the oldest goes, whichever menu made it. Counting them apart would let ten pile up for one course, which is not what 'the menu clears up after itself' meant."
+      },
+      {
         "name": "a teacher's own backups are never pruned, however many there are",
         "course": "ICS3U",
         "existing": [
@@ -234,7 +251,7 @@
       "note": "Backups that keep each Media file once, in a store shared by the working folder's backups (#785). Russell's ruling, 2026-11-13: every backup Plantoir makes on its own becomes small - the assistant's, the Section menu's, and those saved before adding a class, starting a new year, renaming the unit word, replacing a reference course and Copy a Page - and only a Back Up the teacher presses stays a whole zip. AUTHORED; edit as text. The store's FORMAT is file-formats.json -> sharedMediaStore; this block is the rules. nameCases run the name rule (and that every OLDER Plantoir's parser leaves a small backup unlisted); sweepCases run the rule that decides which store files may be deleted, with nothing asked of a disk (SharedMediaSweepRule.decide on the mac); restoreCases run putting a small backup's Media back through a real store. Piece 785a (2026-11-13) built the store, the sweep and these cases; NOTHING writes a small backup until piece 785b moves the automatic backups onto it, so every backup on disk is still a whole zip and mediaIsAlwaysIncluded above stays true until then.",
       "smallWhenMadeBy": [
         "the assistant (in the window, or an outside assistant's back_up_course)",
-        "the Section menu",
+        "the Section and Classes menus",
         "Plantoir, before adding a class",
         "Plantoir, before getting the course ready for a new year",
         "Plantoir, before renaming the word for a unit",
@@ -3151,9 +3168,47 @@
       {
         "kind": "backup",
         "maker": "menu",
+        "menu": "classes",
+        "name": "ICS3U_backup_2026-08-11_221530_classes-section2.zip",
+        "moment": "2026-08-11 22:15:30",
+        "section": 2,
+        "description": "before a change from the Classes menu to Section 2",
+        "kept": "The Classes menu made this one before a change; the five most recent the Section and Classes menus made are kept.",
+        "why": "#990 (Russell, 2026-11-20: name the real menu). Add Class..., Class Dates..., Re-date Classes..., Make Room for Classes... and Roll Over to a New Year... are in the Classes menu (shared-rules.json -> subjectMenus.layout), so the copy saved before one of them says so: 'classes-section' in the name, and the Classes menu in the Backups list. A copy from a Section item keeps the 'menu-section' name every menu copy had before #990, so a copy made before the split still reads as it was written. Pruned with the Section menu's (backups.pruneCases): the menus keep their five most recent between them. A released app before #990 does not know the piece and leaves the copy unlisted, as zipNames does with any maker it does not know."
+      },
+      {
+        "kind": "backup",
+        "maker": "menu",
+        "menu": "classes",
+        "noun": "meeting",
+        "name": "ICS3U_backup_2026-08-11_221530_classes-section2.zip",
+        "moment": "2026-08-11 22:15:30",
+        "section": 2,
+        "description": "before a change from the Meetings menu to Section 2",
+        "kept": "The Meetings menu made this one before a change; the five most recent the Section and Meetings menus made are kept.",
+        "why": "#990 (Russell, 2026-11-20 evening: in a club the menu itself is titled Meetings, so no sentence a club's teacher reads says 'class'). The same file as the Classes case above, for a course whose class pages are meetings (`noun`, course_config.json -> class_noun): the name does not change, and the Backups list names the menus as that course's menu bar titles them (shared-rules.json -> subjectMenus.layout.titleForAMeeting). The noun is read from the course the backup belongs to when the list is drawn; a backup of a course no longer in the folder is read by its code (a club's code means meetings)."
+      },
+      {
+        "kind": "backup",
+        "maker": "menu",
+        "menu": "section",
+        "noun": "meeting",
         "name": "ICS3U_backup_2026-08-11_221530_menu-section2.zip",
         "moment": "2026-08-11 22:15:30",
         "section": 2,
+        "description": "before a change from the Section menu to Section 2",
+        "kept": "The Section menu made this one before a change; the five most recent the Section and Meetings menus made are kept.",
+        "why": "#990: a Section copy in a club. Section keeps its title in a club; the sentence on how many the two menus keep names Meetings beside it."
+      },
+      {
+        "kind": "backup",
+        "maker": "menu",
+        "menu": "section",
+        "name": "ICS3U_backup_2026-08-11_221530_menu-section2.zip",
+        "moment": "2026-08-11 22:15:30",
+        "section": 2,
+        "description": "before a change from the Section menu to Section 2",
+        "kept": "The Section menu made this one before a change; the five most recent the Section and Classes menus made are kept.",
         "why": "#457 batch B: the copy the Section menu saves before each change it makes (Publish Pages..., Hide Pages... and the rest of the assistant's functions, run from the menu bar). Its own ending, never `_assistant-section<N>`: a teacher who declined the assistant must not see a backup said to be from an assistant chat they never had, and the Backups list says which section the change was made to. Read by both apps; one written by either is listed and restored by the other."
       },
       {

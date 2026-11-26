@@ -1489,27 +1489,8 @@ class CourseConfiguration {
         var attempts: Int = 0
         while true {
             let before: Data? = try? Data(contentsOf: url)
-            var result: WriteResult = WriteResult()
-            var toWrite: [String: Any] = values
-            if let before, before != lastSavedData {
-                let base: [String: Any]? = CourseConfiguration.decodedDictionary(lastSavedData)
-                let onDisk: [String: Any]? = CourseConfiguration.decodedDictionary(before)
-                if let base, let onDisk {
-                    toWrite = CourseConfiguration.merged(mine: values, base: base, onDisk: onDisk, result: &result)
-                }
-            }
-            // Every Save writes the course's name cleaned (#780), whichever
-            // setting the teacher changed, so a name a script or a hand edit
-            // put a control character in is healed by the next Save of
-            // anything. Done here and not when the file is read: a read that
-            // wrote would surprise Obsidian and the other app, and Save is
-            // already writing the file.
-            if let storedName = toWrite["course_name"] as? String {
-                toWrite["course_name"] = CourseName.cleaned(storedName)
-            }
-            // The short label and each section's label too (#822), by the
-            // same rule and for the same reason.
-            CourseConfiguration.cleanLabels(in: &toWrite)
+            let merge: (toWrite: [String: Any], result: WriteResult) = mergedForWriting(over: before)
+            let toWrite: [String: Any] = merge.toWrite
             var data: Data = try JSONSerialization.data(withJSONObject: toWrite, options: options)
             data.append(contentsOf: [0x0A])
 
@@ -1526,8 +1507,241 @@ class CourseConfiguration {
             lastSavedData = data
             values = toWrite
             WorkspaceModel.followWrite(of: self, at: url)
-            return result
+            return merge.result
         }
+    }
+
+    /// What a write puts in the file over `before` (the file as it is now,
+    /// nil when it could not be read): this copy merged per key with what
+    /// changed in the file since this copy read it (#265), the course name
+    /// and labels cleaned. `write(to:)` and `planWrite(to:into:)` both.
+    func mergedForWriting(over before: Data?) -> (toWrite: [String: Any], result: WriteResult) {
+        var result: WriteResult = WriteResult()
+        var toWrite: [String: Any] = values
+        if let before, before != lastSavedData {
+            let base: [String: Any]? = CourseConfiguration.decodedDictionary(lastSavedData)
+            let onDisk: [String: Any]? = CourseConfiguration.decodedDictionary(before)
+            if let base, let onDisk {
+                toWrite = CourseConfiguration.merged(mine: values, base: base, onDisk: onDisk, result: &result)
+            }
+        }
+        // Every Save writes the course's name cleaned (#780), whichever
+        // setting the teacher changed, so a name a script or a hand edit
+        // put a control character in is healed by the next Save of
+        // anything. Done here and not when the file is read: a read that
+        // wrote would surprise Obsidian and the other app, and Save is
+        // already writing the file.
+        if let storedName = toWrite["course_name"] as? String {
+            toWrite["course_name"] = CourseName.cleaned(storedName)
+        }
+        // The short label and each section's label too (#822), by the
+        // same rule and for the same reason.
+        CourseConfiguration.cleanLabels(in: &toWrite)
+        return (toWrite: toWrite, result: result)
+    }
+
+    /// A write planned into a caller's step (#899 U4a), and what this copy
+    /// holds once the step is made (`finishWrite`).
+    struct PlannedWrite {
+
+        // MARK: - Stored properties
+
+        let url: URL
+
+        let result: WriteResult
+
+        /// The settings the file holds once the step is made.
+        let values: [String: Any]
+
+        /// The bytes the file holds once the step is made, as planned.
+        let bytes: Data
+
+        /// The `editJSON` members the step changes, by top-level key, in
+        /// order; empty when the file is written whole (`writeFile`).
+        let memberKeys: [String]
+    }
+
+    /// `write(to:)` PLANNED into `step` instead of written (#899 U4a): the
+    /// same per-key merge (#265) and the same cleaning, and the same
+    /// read-again loop, which is now the step's plan: the file is read,
+    /// merged, and read again, up to three times, until the read the plan
+    /// was built from is still the file. That read is the step's `before`.
+    ///
+    /// Each top-level member whose value the write changes is one
+    /// `editJSON` (a member that was absent has no `before`, so Undo makes
+    /// it absent again, never an empty list; one taken out has no `after`),
+    /// and only those members' bytes change. A file that is missing, is not
+    /// one JSON object, or whose bytes the member rule cannot move (a key
+    /// written twice, a number a double cannot hold) is planned WHOLE, the
+    /// bytes `write(to:)` writes, as a `writeFile`. Nothing is written
+    /// until the caller makes the step; then `finishWrite` makes this copy
+    /// the file, as `write(to:)` does.
+    func planWrite(to url: URL, into step: JournaledStep) throws -> PlannedWrite {
+        let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        // A settings file that is a link is written where the link leads,
+        // the link left a link (the U4a sweep, LOW 2): the door never writes
+        // over a link, so a plan made at the link's own place was refused as
+        // changed since, and the Save could no longer be made.
+        let place: URL = CourseConfiguration.fileALinkLeadsTo(url)
+        var attempts: Int = 0
+        var before: Data? = nil
+        var merge: (toWrite: [String: Any], result: WriteResult) = (toWrite: values, result: WriteResult())
+        while true {
+            before = try? Data(contentsOf: place)
+            merge = mergedForWriting(over: before)
+            let nowOnDisk: Data? = try? Data(contentsOf: place)
+            if nowOnDisk != before && attempts < 3 {
+                attempts += 1
+                continue
+            }
+            break
+        }
+        var whole: Data = try JSONSerialization.data(withJSONObject: merge.toWrite, options: options)
+        whole.append(contentsOf: [0x0A])
+        guard let read = before,
+              let members = CourseConfiguration.memberChanges(from: read, to: merge.toWrite) else {
+            if let read = before {
+                step.editJSON(at: place, read: read, members: [], leaving: whole)
+            } else {
+                step.write(whole, to: place)
+            }
+            return PlannedWrite(url: url, result: merge.result, values: merge.toWrite, bytes: whole, memberKeys: [])
+        }
+        var keys: [String] = []
+        for member in members.changes {
+            keys.append(member.keyPath[0])
+        }
+        step.editJSON(at: place, read: read, members: members.changes, leaving: members.bytes)
+        return PlannedWrite(url: url, result: merge.result, values: merge.toWrite, bytes: members.bytes, memberKeys: keys)
+    }
+
+    /// The file a settings file that is a link leads to, followed link by
+    /// link (as many as the system follows, `MAXSYMLINKS`), or `url` itself
+    /// when it is not a link. The last component only: the folders above
+    /// it are named as the caller named them, so the place stays inside
+    /// the working folder when the link's target is. Every daily action's
+    /// write follows a link the same way (`JournaledStep.placeALinkLeadsTo`,
+    /// U4b2-1), so this reads no state and runs off the main actor too.
+    nonisolated static func fileALinkLeadsTo(_ url: URL) -> URL {
+        var place: URL = url
+        var hops: Int = 0
+        while hops < Int(MAXSYMLINKS) {
+            guard let destination = try? FileManager.default.destinationOfSymbolicLink(atPath: place.path) else {
+                return place
+            }
+            if destination.hasPrefix("/") {
+                place = URL(fileURLWithPath: destination)
+            } else {
+                place = place.deletingLastPathComponent().appendingPathComponent(destination).standardizedFileURL
+            }
+            hops += 1
+        }
+        return place
+    }
+
+    /// Once the caller's step is made: this copy IS the file, and every
+    /// other window's copy of the course follows it, as after `write(to:)`.
+    ///
+    /// The file as it IS once the step is made, read again, not the plan's
+    /// read (U4a review 1, LOW 2): the door moves each member on the file as
+    /// it is at the make, so a setting another program changed between the
+    /// plan and the make is on disk, and in this copy too. Only when the
+    /// file cannot be read back as one object does this copy take what the
+    /// plan said it would hold.
+    func finishWrite(_ planned: PlannedWrite) {
+        if let data = try? Data(contentsOf: planned.url),
+           let dictionary = CourseConfiguration.decodedDictionary(data) {
+            lastSavedData = data
+            values = dictionary
+        } else {
+            lastSavedData = planned.bytes
+            values = planned.values
+        }
+        WorkspaceModel.followWrite(of: self, at: planned.url)
+    }
+
+    /// `write(to:)` as ONE step on the list (#899 U4a): planned, made
+    /// through the door, then finished. A step refused because a member it
+    /// changes was changed by something else between the plan and the make
+    /// (a build's preflight, another window) is planned again from the file
+    /// as it is then, up to three times, as the read-again loop always did;
+    /// any other refusal throws, having written nothing.
+    @discardableResult
+    func writeAsOneStep(to url: URL, madeBy maker: UndoStepMaker) throws -> WriteResult {
+        var attempts: Int = 0
+        while true {
+            let courseFolder: URL = url.deletingLastPathComponent()
+            let step: JournaledStep = JournaledStep(
+                courseCode: courseFolder.lastPathComponent, courseDirectory: courseFolder,
+                section: nil, maker: maker, holds: "course"
+            )
+            let planned: PlannedWrite = try planWrite(to: url, into: step)
+            do {
+                try step.make()
+            } catch JournaledStepError.refused(.changedSince, _) where attempts < 3 {
+                attempts += 1
+                continue
+            }
+            finishWrite(planned)
+            return planned.result
+        }
+    }
+
+    /// The top-level members whose values differ between the file's bytes
+    /// and `wanted`, each as an `editJSON` change, and the bytes the file
+    /// holds once each is moved in turn by the member rule
+    /// (`UndoJSONMember.moved`); nil when the file is not one JSON object,
+    /// a value cannot be held as JSON, or a member cannot be moved exactly.
+    static func memberChanges(
+        from read: Data, to wanted: [String: Any]
+    ) -> (changes: [(keyPath: [String], before: UndoJSON?, after: UndoJSON?)], bytes: Data)? {
+        guard let onDisk = UndoJSONMember.topLevel(of: read),
+              let wantedTree = UndoJSON.from(foundation: wanted) else {
+            return nil
+        }
+        var keys: Set<String> = []
+        for key in onDisk.keys {
+            keys.insert(key)
+        }
+        for key in wanted.keys {
+            keys.insert(key)
+        }
+        var sortedKeys: [String] = []
+        for key in keys {
+            sortedKeys.append(key)
+        }
+        sortedKeys.sort()
+        var changes: [(keyPath: [String], before: UndoJSON?, after: UndoJSON?)] = []
+        var bytes: Data = read
+        for key in sortedKeys {
+            var beforeValue: UndoJSON? = nil
+            if let value = onDisk[key] {
+                guard let converted = UndoJSON.from(foundation: value) else {
+                    return nil
+                }
+                beforeValue = converted
+            }
+            var afterValue: UndoJSON? = nil
+            if let value = wanted[key] {
+                guard let converted = UndoJSON.from(foundation: value) else {
+                    return nil
+                }
+                afterValue = converted
+            }
+            if beforeValue == afterValue {
+                continue
+            }
+            let op: UndoOp = UndoOp.editJSON(path: "course_config.json", keyPath: [key], before: beforeValue, after: afterValue)
+            guard case .file(let moved)? = UndoJSONMember.moved(op, from: .file(bytes), direction: .forward) else {
+                return nil
+            }
+            bytes = moved
+            changes.append((keyPath: [key], before: beforeValue, after: afterValue))
+        }
+        guard let readBack = UndoJSONMember.topLevel(of: bytes), UndoJSON.from(foundation: readBack) == wantedTree else {
+            return nil
+        }
+        return (changes: changes, bytes: bytes)
     }
 
     /// What a write found in the file that this copy had not read.
@@ -1689,6 +1903,57 @@ class CourseConfiguration {
             WorkspaceModel.followWrite(of: self, at: url)
             return
         }
+    }
+
+    /// `recordOnDisk` PLANNED into `step` instead of written (#899 U4b, the
+    /// folder rename): `change` applied to ONE read of the file, the read the
+    /// plan is built from and the step's `before`, and each top-level member
+    /// it changes one `editJSON` (U4a review 1, LOW 1: a `writeFile` below a
+    /// Save's `editJSON` steps is refused by the Save's Undo, by design, so no
+    /// writer of this file plans one but the fallback). A file whose bytes
+    /// the member rule cannot move is planned whole, as `planWrite` plans it.
+    /// Nothing is written until the caller makes the step; then
+    /// `finishRecord` records the change in this copy. Throws, planning
+    /// nothing, when the file cannot be read as one JSON object, as
+    /// `recordOnDisk` does.
+    func planRecordOnDisk(
+        _ change: ([String: Any]) -> [String: Any], at url: URL, into step: JournaledStep
+    ) throws -> PlannedWrite {
+        let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let place: URL = CourseConfiguration.fileALinkLeadsTo(url)
+        let read: Data = try Data(contentsOf: place)
+        guard let onDisk = try JSONSerialization.jsonObject(with: read) as? [String: Any] else {
+            throw CourseConfigurationError.notADictionary
+        }
+        let changed: [String: Any] = change(onDisk)
+        guard let members = CourseConfiguration.memberChanges(from: read, to: changed) else {
+            var whole: Data = try JSONSerialization.data(withJSONObject: changed, options: options)
+            whole.append(contentsOf: [0x0A])
+            step.editJSON(at: place, read: read, members: [], leaving: whole)
+            return PlannedWrite(url: url, result: WriteResult(), values: changed, bytes: whole, memberKeys: [])
+        }
+        var keys: [String] = []
+        for member in members.changes {
+            keys.append(member.keyPath[0])
+        }
+        if !members.changes.isEmpty {
+            step.editJSON(at: place, read: read, members: members.changes, leaving: members.bytes)
+        }
+        return PlannedWrite(url: url, result: WriteResult(), values: changed, bytes: members.bytes, memberKeys: keys)
+    }
+
+    /// Once the caller's step is made: the file is what this copy last
+    /// read (read again, as `finishWrite` reads it), and `change` is
+    /// applied to this copy's values, so every other unsaved edit stays
+    /// unsaved, as `recordOnDisk` leaves them.
+    func finishRecord(_ planned: PlannedWrite, _ change: ([String: Any]) -> [String: Any]) {
+        if let data = try? Data(contentsOf: planned.url), CourseConfiguration.decodedDictionary(data) != nil {
+            lastSavedData = data
+        } else {
+            lastSavedData = planned.bytes
+        }
+        values = change(values)
+        WorkspaceModel.followWrite(of: self, at: planned.url)
     }
 
     /// What Course Settings' Revert button does: the settings as the FILE

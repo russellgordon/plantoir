@@ -25,6 +25,101 @@ enum FolderActions {
         NSWorkspace.shared.activateFileViewerSelecting([folderURL])
     }
 
+    /// Shows these files in their folder, selected: the kept-file alerts'
+    /// Show in Finder (#899 U3c, Russell's ruling of 2026-11-20, night).
+    /// Measured that night on this Mac with Finder not showing hidden
+    /// files: a file whose name starts with a dot is shown, greyed, and
+    /// selected. Finder's settings are never changed.
+    ///
+    /// A kept file that is no longer there is never asked of Finder, which
+    /// would come forward on whatever window it last had and select
+    /// nothing (U3c review 3, LOW 2, measured that night): an alert says it
+    /// is gone (`FrontPageWording.keptGone`), and Finder shows only what is
+    /// still there, if anything is.
+    static func showInFinder(files: [URL]) {
+        let plan: ShowInFinderPlan = FolderActions.showInFinderPlan(files)
+        #if DEBUG
+        if let showInFinderRecorder = FolderActions.showInFinderRecorder {
+            if !plan.gone.isEmpty {
+                FolderActions.goneRecorder?(plan.gone)
+            }
+            if !plan.selected.isEmpty {
+                showInFinderRecorder(plan.selected)
+            }
+            return
+        }
+        #endif
+        if let sentence = plan.alertSentence {
+            let alert: NSAlert = NSAlert()
+            alert.alertStyle = .informational
+            alert.messageText = sentence
+            for title in plan.alertButtons {
+                alert.addButton(withTitle: title)
+            }
+            alert.runModal()
+        }
+        if !plan.selected.isEmpty {
+            NSWorkspace.shared.activateFileViewerSelecting(plan.selected)
+        }
+    }
+
+    /// What Show in Finder does for these files, worked out before any
+    /// window is touched, so the path the app takes (the alert, then
+    /// Finder) is the one a test reads (the U4a sweep: the test read only
+    /// the recorder's branch).
+    struct ShowInFinderPlan: Equatable {
+
+        // MARK: - Stored properties
+
+        /// The names of the kept files that are no longer there.
+        let gone: [String]
+
+        /// The alert's sentence, or nil when every file is there.
+        let alertSentence: String?
+
+        /// The alert's buttons, in order; empty with no alert.
+        let alertButtons: [String]
+
+        /// What Finder is asked to select; empty when nothing is there.
+        let selected: [URL]
+    }
+
+    static func showInFinderPlan(_ files: [URL]) -> ShowInFinderPlan {
+        let found: (there: [URL], gone: [String]) = FolderActions.whatIsStillThere(files)
+        if found.gone.isEmpty {
+            return ShowInFinderPlan(gone: [], alertSentence: nil, alertButtons: [], selected: found.there)
+        }
+        return ShowInFinderPlan(
+            gone: found.gone, alertSentence: FrontPageWording.keptGone(found.gone),
+            alertButtons: ["OK"], selected: found.there
+        )
+    }
+
+    /// Of these files, those still there, and the names of those that are
+    /// not (a link that leads nowhere counts as not there).
+    static func whatIsStillThere(_ files: [URL]) -> (there: [URL], gone: [String]) {
+        var there: [URL] = []
+        var gone: [String] = []
+        for file in files {
+            if FileManager.default.fileExists(atPath: file.path) {
+                there.append(file)
+            } else {
+                gone.append(file.lastPathComponent)
+            }
+        }
+        return (there: there, gone: gone)
+    }
+
+    #if DEBUG
+    /// A test through the real window records what Show in Finder was asked
+    /// to show, rather than bringing Finder to the front
+    /// (`UndoUITestSeam.showInFinderRecord`). Debug builds only.
+    static var showInFinderRecorder: (([URL]) -> Void)?
+
+    /// With the recorder set, what the gone-file alert would name.
+    static var goneRecorder: (([String]) -> Void)?
+    #endif
+
     /// Opens a new Terminal window whose working directory is the folder
     /// (the same behaviour as dropping the folder onto Terminal's icon).
     static func openTerminal(at folderURL: URL) {
@@ -48,9 +143,13 @@ enum FolderActions {
     /// back only the vault named in the link, and the other stays closed.
     /// So every vault that was open is noted first and opened again
     /// afterwards, the asked-for one last so it lands in front.
-    static func openInObsidian(revealing folderURL: URL, vaultURL: URL) {
+    ///
+    /// Answers false when nothing was handed over because Obsidian is running
+    /// and has never seen the course (#995): the caller asks first.
+    @discardableResult
+    static func openInObsidian(revealing folderURL: URL, vaultURL: URL) -> Bool {
         let target: URL = FolderActions.obsidianTarget(forFolder: folderURL, vaultURL: vaultURL)
-        FolderActions.open(target: target, vaultURL: vaultURL)
+        return FolderActions.open(target: target, vaultURL: vaultURL)
     }
 
     /// Opens one PAGE in Obsidian — Course Settings' How I Teach row (#329).
@@ -59,8 +158,9 @@ enum FolderActions {
     /// the page is its own target: `obsidianTarget` is for FOLDERS, and a
     /// page handed to it would be looked for as `<page>/index.md`, not found,
     /// and replaced by the vault — opening the course, not the page.
-    static func openPageInObsidian(_ pageURL: URL, vaultURL: URL) {
-        FolderActions.open(target: FolderActions.pageTarget(pageURL, vaultURL: vaultURL), vaultURL: vaultURL)
+    @discardableResult
+    static func openPageInObsidian(_ pageURL: URL, vaultURL: URL) -> Bool {
+        return FolderActions.open(target: FolderActions.pageTarget(pageURL, vaultURL: vaultURL), vaultURL: vaultURL)
     }
 
     /// What a page's link points at: the page itself.
@@ -70,29 +170,91 @@ enum FolderActions {
 
     /// Opens a file (or a vault) in Obsidian, registering the vault first
     /// when Obsidian has never seen it — the body both doors share.
-    private static func open(target: URL, vaultURL: URL) {
+    ///
+    /// **Never closes Obsidian (#995, D21).** Until #995 a course Obsidian
+    /// had never seen was registered by quitting a running Obsidian here,
+    /// with every vault it had open, and nobody was asked. Now that case
+    /// does nothing at all: the route (`WorkspaceModel.openObsidian`) asks
+    /// first, and on the answer "Close Obsidian and Open" calls
+    /// `closeObsidianAndRegister` below, after which the course IS
+    /// registered and this opens it straight away. The guard here is the
+    /// backstop for the one moment the route cannot see: Obsidian started
+    /// between its check and this call. It answers false then, and the
+    /// route asks the question instead of doing nothing.
+    private static func open(target: URL, vaultURL: URL) -> Bool {
         guard let obsidianLink = FolderActions.obsidianURL(forFolder: target) else {
-            return
+            return true
         }
         let registryData: Data? = try? Data(contentsOf: FolderActions.obsidianRegistryFileURL)
+        let running: Bool = FolderActions.obsidianIsRunning
         if FolderActions.folderIsInRegisteredVault(target.path, registryData: registryData) {
-            if !FolderActions.obsidianIsRunning {
+            if !running {
                 // While Obsidian is closed its saved layout can be improved:
                 // auto-reveal makes the folder highlight when the page opens.
                 FolderActions.enableAutoRevealInLayout(ofVault: vaultURL)
             }
             NSWorkspace.shared.open(obsidianLink)
-            return
+            return true
         }
-        Task { @MainActor in
-            let wereOpen: [String] = FolderActions.openVaultPathsNow
-            await FolderActions.quitObsidianAndWait()
-            FolderActions.seedObsidianDefaultsIfMissing(inVault: vaultURL)
-            FolderActions.enableAutoRevealInLayout(ofVault: vaultURL)
-            FolderActions.registerVault(at: vaultURL)
-            FolderActions.reopenVaults(wereOpen)
-            NSWorkspace.shared.open(obsidianLink)
+        if running {
+            return false
         }
+        // Obsidian is not running, so its list can be written without
+        // closing anything: it reads the list fresh when the link starts it.
+        FolderActions.seedObsidianDefaultsIfMissing(inVault: vaultURL)
+        FolderActions.enableAutoRevealInLayout(ofVault: vaultURL)
+        FolderActions.registerVault(at: vaultURL)
+        NSWorkspace.shared.open(obsidianLink)
+        return true
+    }
+
+    /// The answer "Close Obsidian and Open" (#995): closes Obsidian, adds
+    /// the course to its list while it is closed, and opens again what it
+    /// had open. The caller then opens the course itself, which is
+    /// registered by then. Called ONLY from that answer.
+    ///
+    /// What opens again is every vault Obsidian's list marks open, read
+    /// before the quit — the add-ons' reopen's own rule
+    /// (`ObsidianFigureAddOnsOffer.vaultsOpen`, #495 review B1), so a hidden
+    /// Obsidian's courses come back too and the two questions' "Opens
+    /// again" lines say the same true thing (#995 second review).
+    ///
+    /// If Obsidian is still running after the wait (a question of its own
+    /// on screen), nothing is written under it — it would write its own
+    /// list back over ours — and nothing is handed to it either: it does
+    /// not know the course, so a link would only show its own error. The
+    /// route notes that on the trail. Answers whether Obsidian closed. The
+    /// steps are replaceable so a test can drive the rule without an
+    /// Obsidian; the defaults are the real thing.
+    static func closeObsidianAndRegister(
+        vaultURL: URL,
+        vaultsMarkedOpen: () -> [String] = {
+            return ObsidianFigureAddOnsOffer.vaultsOpen(
+                obsidianRunning: FolderActions.obsidianIsRunning,
+                registryData: try? Data(contentsOf: FolderActions.obsidianRegistryFileURL)
+            )
+        },
+        quit: () async -> Void = { await FolderActions.quitObsidianAndWait() },
+        stillRunning: () -> Bool = { return FolderActions.obsidianIsRunning },
+        register: (URL) -> Void = { vault in FolderActions.registerWithDefaults(vaultURL: vault) },
+        reopen: ([String]) -> Void = { paths in FolderActions.reopenVaults(paths) }
+    ) async -> Bool {
+        let wereOpen: [String] = vaultsMarkedOpen()
+        await quit()
+        if stillRunning() {
+            return false
+        }
+        register(vaultURL)
+        reopen(wereOpen)
+        return true
+    }
+
+    /// Seeds the defaults, turns on auto-reveal and adds the vault to the
+    /// list: the writes that may happen only while Obsidian is closed.
+    static func registerWithDefaults(vaultURL: URL) {
+        FolderActions.seedObsidianDefaultsIfMissing(inVault: vaultURL)
+        FolderActions.enableAutoRevealInLayout(ofVault: vaultURL)
+        FolderActions.registerVault(at: vaultURL)
     }
 
     /// Whether Obsidian is running right now.

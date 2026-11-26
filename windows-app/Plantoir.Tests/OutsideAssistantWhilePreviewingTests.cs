@@ -91,7 +91,7 @@ public class OutsideAssistantWhilePreviewingTests : IDisposable
             "rebuild" => OutsideChangeGate.Refusal("rebuild_preview", Arguments(), workspace)
                          ?? await tools.RebuildPreview(Course, 1, progress, default),
             "deploy" => OutsideChangeGate.Refusal("deploy_section", Arguments(), workspace)
-                        ?? await tools.DeploySection(Course, 1, progress, default),
+                        ?? (await tools.DeploySection(Course, 1, progress, default)).Detail(),
             var other => throw new InvalidOperationException($"{name}: a case asking for {other}"),
         };
 

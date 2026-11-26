@@ -182,8 +182,12 @@ final class UndoShadowPublishTests: XCTestCase {
     /// The trail lines name codes and counts, never a page.
     func testTheTrailLinesSayWhatHappened() {
         XCTAssertEqual(
-            UndoTrail.couldNotRecordLine(action: "publishPages", course: "ICS3U", section: 1, mode: .shadow, why: "the list was busy"),
+            UndoTrail.couldNotRecordLine(action: "publishPages", course: "ICS3U", section: 1, change: .wentAhead, why: "the list was busy"),
             "ICS3U/1 · the undo list could not record publishPages: the list was busy. The change went ahead (the list is not in use yet)."
+        )
+        XCTAssertEqual(
+            UndoTrail.couldNotRecordLine(action: "publishPages", course: "ICS3U", section: 1, change: .nothingWasChanged, why: "a file it writes cannot be named in a step"),
+            "ICS3U/1 · the undo list could not record publishPages: a file it writes cannot be named in a step. Nothing was changed."
         )
         XCTAssertEqual(
             UndoTrail.rolledBackLine(course: "ICS3U", section: 1, phase: .begin, files: 2),
@@ -193,5 +197,93 @@ final class UndoShadowPublishTests: XCTestCase {
             UndoTrail.interruptedLine(course: "ICS3U", section: 1, phase: .begin, putBack: 2, inTheWay: 1),
             "ICS3U/1 · the undo list put back 2 files left part way by a change that stopped, found 1 file changed by hand since, and cleared the list"
         )
+    }
+
+    /// U3c's two lines are exactly the examples the contract's
+    /// `activityTrail.mustRecord` rows give for them (read, never retyped).
+    func testTheKeptOriginalAndLeftNewestLinesAreTheContractsExamples() throws {
+        let rules: [String: Any] = try UndoContractReplay.contract("shared-rules.json")
+        let trail: [String: Any] = rules["activityTrail"] as? [String: Any] ?? [:]
+        var examples: [String: String] = [:]
+        for row in trail["mustRecord"] as? [[String: Any]] ?? [] {
+            if let event = row["event"] as? String, let line = row["line"] as? String {
+                examples[event] = line
+            }
+        }
+        XCTAssertEqual(
+            UndoTrail.couldNotPutBackLine(
+                course: "ICS3U", section: 1, phase: .begin, leftPartWay: 1,
+                keptOriginals: [".A.md.plantoir-undo-4-apply-orig"]
+            ),
+            examples[ActivityTrail.Event.undoCouldNotPutBack.rawValue]
+        )
+        XCTAssertEqual(
+            UndoTrail.leftNewestLine(
+                course: "ICS3U", section: 1, isUndo: true,
+                refusal: .fileIsInUse(path: "courses/ICS3U/Section 1/Classes/A.md")
+            ),
+            examples[ActivityTrail.Event.undoRefusedForAChangeLeftPartWay.rawValue]
+        )
+        XCTAssertEqual(
+            UndoTrail.keptAnOriginalLine(
+                course: "ICS3U", section: 1, phase: .begin,
+                keptOriginals: [".A.md.plantoir-undo-4-apply-orig"]
+            ),
+            examples[ActivityTrail.Event.undoKeptAnOriginal.rawValue]
+        )
+        XCTAssertEqual(
+            UndoTrail.keptWhatItReplacedLine(
+                course: "ICS3U", section: 1, isUndo: true,
+                keptOriginals: [".A.md.plantoir-undo-4-undo-orig"]
+            ),
+            examples[ActivityTrail.Event.undoKeptWhatItReplaced.rawValue]
+        )
+    }
+
+    /// A kept original whose bytes are exactly what the list recorded is
+    /// said as kept because the list no longer holds a copy of it, never as
+    /// differing from what the list recorded: the reason the contract's row
+    /// carries (the first review of U3c, LOW 2). After a Redo, the line says
+    /// nothing is withheld or cleared, since nothing is (the second review,
+    /// LOW 1, and Russell's ruling of 2026-11-20, night).
+    func testTheKeptLinesSayWhatIsTrueInEachCase() throws {
+        let rules: [String: Any] = try UndoContractReplay.contract("shared-rules.json")
+        let trail: [String: Any] = rules["activityTrail"] as? [String: Any] ?? [:]
+        var carries: [String: String] = [:]
+        for row in trail["mustRecord"] as? [[String: Any]] ?? [] {
+            if let event = row["event"] as? String, let said = row["carries"] as? String {
+                carries[event] = said
+            }
+        }
+        let recorded: String = UndoTrail.keptAnOriginalLine(
+            course: "ICS3U", section: 1, phase: .begin,
+            keptOriginals: [".A.md.plantoir-undo-4-apply-orig"],
+            noLongerInTheList: [".A.md.plantoir-undo-4-apply-orig"]
+        )
+        XCTAssertFalse(recorded.contains("differs"), recorded)
+        let reason: String = "because the list no longer holds a copy of it"
+        XCTAssertTrue(recorded.hasSuffix(", " + reason + "."), recorded)
+        XCTAssertTrue(carries[ActivityTrail.Event.undoKeptAnOriginal.rawValue]?.contains(reason) == true)
+        let afterARedo: String = UndoTrail.keptWhatItReplacedLine(
+            course: "ICS3U", section: 1, isUndo: false,
+            keptOriginals: [".A.md.plantoir-undo-4-redo-orig"]
+        )
+        XCTAssertTrue(afterARedo.hasPrefix("ICS3U/1 · Redo put back “A.md”"), afterARedo)
+        // Nothing is withheld or cleared at the move (Russell's ruling of
+        // 2026-11-20, night; the second review of U3c, LOW 1), so the line
+        // never says so; a kept original the list would not take is named
+        // as what the page holds now (the second review's MEDIUM).
+        XCTAssertFalse(afterARedo.contains("not offered"), afterARedo)
+        XCTAssertFalse(afterARedo.contains("cleared"), afterARedo)
+        XCTAssertTrue(afterARedo.contains("the next Undo or Redo of this change uses it."), afterARedo)
+        let holdingNow: String = UndoTrail.keptWhatItReplacedLine(
+            course: "ICS3U", section: 1, isUndo: true,
+            keptOriginals: [], keptOfWhatItHoldsNow: [".A.md.plantoir-undo-4-apply-orig"]
+        )
+        XCTAssertTrue(
+            holdingNow.hasSuffix(" What “A.md” holds now is kept beside it as the hidden file “.A.md.plantoir-undo-4-apply-orig”."),
+            holdingNow
+        )
+        XCTAssertTrue(holdingNow.hasPrefix("ICS3U/1 · Undo put back “A.md”"), holdingNow)
     }
 }

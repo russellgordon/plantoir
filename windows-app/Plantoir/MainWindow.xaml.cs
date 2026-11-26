@@ -282,6 +282,12 @@ public sealed partial class MainWindow : Window
             // own task — and the quit question was asked before Closed.
             try { (DetailHost.Content as SectionDetailView)?.LetGoAsTheWindowCloses(); }
             catch (Exception ex) { App.LogDiagnostic($"MainWindow.Closed: the section view could not let go: {ex.Message}"); }
+            // Then whatever this window still holds (#928 review 2, L10): a
+            // row a replaced view left behind, whose Unloaded never ran, would
+            // otherwise outlive its window and refuse every other window's
+            // preview of that section until relaunch.
+            try { LetGoOfThePreviewsThisWindowStillHolds(); }
+            catch (Exception ex) { App.LogDiagnostic($"MainWindow.Closed: a preview lease could not be let go: {ex.Message}"); }
             SectionMenuActivity.Changed -= ActivityChanged;
             AssistActivity.Changed -= ActivityChanged;
             DropVerbs();   // this window's menu server stops; its undo list goes with it (#489)
@@ -292,6 +298,7 @@ public sealed partial class MainWindow : Window
             SectionProblems.Changed -= ProblemsChanged;
             SectionProblems.MarkerArrived -= ProblemsMarkerArrived;
             OpenRecentList.Changed -= OpenRecentChanged;   // static too (#488)
+            OutsideAssistantPresence.Changed -= AssistantPresenceChanged;   // static too (#990)
             Workspace.UnregisterWindow();
         };
 
@@ -299,6 +306,18 @@ public sealed partial class MainWindow : Window
         // shown — one callback registered once, rather than a refresh call
         // threaded through every place DetailHost.Content is assigned.
         DetailHost.RegisterPropertyChangedCallback(ContentPresenter.ContentProperty, (_, _) => TrackDetailForMenus());
+
+        // Restore…'s question greys every Restore… from the press until the
+        // answer (#911), and a one-section restore's zip greys them again
+        // while it runs: the menu bar, and the backup pane's button, which is
+        // drawn again with the button greyed or not (keyboard focus carried
+        // across, ShowBackupPane).
+        Sidebar.RestoreAvailabilityChanged += (_, _) =>
+        {
+            if (IsClosed) return;
+            if (Workspace.Selection is SidebarSelection.BackupEntry) ShowDetailForSelection();
+            ApplyMenuEnablement();
+        };
 
         Workspace.PropertyChanged += (_, args) =>
         {
@@ -518,7 +537,9 @@ public sealed partial class MainWindow : Window
     /// The quit question (#231; <c>quittingWhileWorkIsUnderWay</c>). Only when
     /// closing THIS window quits the app, only for the teacher's own quit, and
     /// only for a publish or a preview being BUILT — never a preview merely
-    /// open. Keep Working is the default: Return without reading keeps the work.
+    /// open. No button is the default (#987, <c>buttons.default</c> is null):
+    /// Enter pressed without reading does nothing, and Escape is Cancel, which
+    /// keeps working. Until #987 Keep Working was the default.
     ///
     /// <para>Then, since #484 (Russell's ruling 2026-10-15, the mac's #476): a
     /// close that quits while the tools are being COPIED into a folder keeps
@@ -526,7 +547,7 @@ public sealed partial class MainWindow : Window
     /// copy has finished, and then quits. Ended part-way, the copy leaves
     /// <c>.toolchain\</c> half old and half new for a scheduled run or a
     /// launcher typed at a prompt to build from. The question comes FIRST, so
-    /// Keep Working still leaves everything as it was; Quit Anyway skips only
+    /// Cancel still leaves everything as it was; Quit Anyway skips only
     /// the question, never the wait (the plan review's H1). Never while
     /// Windows is ending the session: it ends the process at sign-out whatever
     /// the window does, and holding the close only shows "this app is
@@ -536,11 +557,18 @@ public sealed partial class MainWindow : Window
     private async void AskBeforeQuittingThroughWork(Microsoft.UI.Windowing.AppWindow sender,
                                                     Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
     {
+        // One pass of this close (#928, the review's M1): the quit goes ahead
+        // in ONE place (pass.GoAhead) and is taken back in ONE place, the
+        // pass's end. A pass that does not say the close went through, was
+        // handed to the next pass, or was no quit at all takes the quit back
+        // (and lets held copies go), so no way out that leaves the window up
+        // can leave Preview starting nothing.
+        using var pass = Plantoir.Core.Models.QuitGoingAhead.Shared.BeginPass(whenTakenBack: LetHeldCopiesGo, window: this);
         try
         {
             // A second close while this one waits does nothing new.
-            if (_waitingForCopies) { args.Cancel = true; return; }
-            if (!App.ClosingThisQuits(this)) return;
+            if (_waitingForCopies) { args.Cancel = true; pass.NotAQuit(); return; }
+            if (!App.ClosingThisQuits(this)) { pass.NotAQuit(); return; }
 
             if (!_quitConfirmed)
             {
@@ -567,9 +595,11 @@ public sealed partial class MainWindow : Window
                             Content = message,
                             PrimaryButtonText = QuitConfirmation.QuitAnyway,
                             CloseButtonText = QuitConfirmation.KeepWorking,
-                            DefaultButton = ContentDialogButton.Close,
                             XamlRoot = Content.XamlRoot,
                         };
+                        // quittingWhileWorkIsUnderWay.buttons: default null, escape keepWorking (#987).
+                        // No default, and the focus starts on Cancel, so Enter never quits (#979).
+                        DialogButtons.AskWithNoDefault(dialog);
                         AutomationProperties.SetAutomationId(dialog, "quitQuestionDialog");
                         quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
                     }
@@ -577,22 +607,29 @@ public sealed partial class MainWindow : Window
                     ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
                     if (!quit)
                     {
-                        // Asked again after the wait (a preview began meanwhile)
-                        // and the teacher kept working: the copies held back
-                        // for that quit go ahead, and a later close waits again
-                        // (the batch 4 review's M1).
-                        LetHeldCopiesGo();
+                        // Kept working, on the first pass or when asked again
+                        // after the wait (a preview began meanwhile): the pass
+                        // ends taking the quit back, and the copies held back
+                        // for it go ahead (the batch 4 review's M1).
                         return;
                     }
                     _quitConfirmed = true;
+                    pass.HandOnToTheNextPass();
                     Close();   // comes back through here, past the question, to the wait
                     return;
                 }
             }
 
+            // Past the question: the quit goes ahead (#928). A preview start
+            // parked behind an old stop, or a repair's Preview Again, starts
+            // nothing from here on.
+            pass.GoAhead();
             if (!ToolchainReadiness.ClosingWaitsForTheCopy(closingQuits: true, ToolchainReadiness.AnyCopyIsWriting,
                                                            Services.SessionEnding.IsEnding, _copiesWaitedFor))
+            {
+                pass.TheCloseGoesThrough();
                 return;
+            }
 
             // Cancelled synchronously, before any await, or the close goes ahead.
             args.Cancel = true;
@@ -608,8 +645,9 @@ public sealed partial class MainWindow : Window
             _waitingForCopies = false;   // before Close(), or the close below cancels itself (the review's H2)
             App.LogDiagnostic("closing: the tools copy has finished");
             // A window opened while this one waited: this close no longer
-            // quits, so copies held back for the quit go ahead after all.
-            if (!App.ClosingThisQuits(this)) LetHeldCopiesGo();
+            // quits, so the pass ends taking the quit back and the copies held
+            // back for it go ahead after all. Otherwise the next pass decides.
+            if (App.ClosingThisQuits(this)) pass.HandOnToTheNextPass();
             Close();
         }
         catch (Exception ex)
@@ -618,12 +656,12 @@ public sealed partial class MainWindow : Window
             // Whatever failed, the window is still up: a hold left set would
             // keep every later copy waiting for the life of the process.
             _waitingForCopies = false;
-            LetHeldCopiesGo();
+            pass.TakeBack();
         }
     }
 
     /// <summary>
-    /// A close that waited for the copy did not quit after all (Keep Working
+    /// A close that waited for the copy did not quit after all (Cancel
     /// when asked again, another window opened meanwhile, or the handler
     /// failed): release the copies its wait held back, and let a later close
     /// wait again. Without this the hold stays set for the life of the process
@@ -1055,25 +1093,6 @@ public sealed partial class MainWindow : Window
     private bool ThisWindowIsShowing(string folderPath) =>
         WorkingFolder.IsTheSame(Workspace.WorkspacePath, folderPath);
 
-    public bool IsSectionBusy(string folder, string courseCode, int section)
-    {
-        // Busy, to the caller asking before a DEPLOY, means "a deploy is
-        // already on its way" — not "a preview is up". The Deploy path stops a
-        // running preview itself and waits for it (deploy-during-preview
-        // port, mac commit "Allow Deploy button to stop active preview
-        // before publishing"), so reporting a preview as busy here made the
-        // assistant refuse — and say so — while the deploy went ahead.
-        // Preparing counts too (2C's implementation review, L-1): a deploy
-        // between its press and its runner starting is already on its way,
-        // and a second one would only be refused by the window.
-        //
-        // Asked of the SECTION's run, by the caller's folder (#728), never of
-        // the view on screen: until #728 this read whatever section the pane
-        // showed and ignored its arguments, so a section deploying while the
-        // teacher looked at another read as idle.
-        return SectionDeployRun.UnderWay(SectionRuns.Find(folder, courseCode, section), folder, courseCode, section);
-    }
-
     /// <summary>
     /// Stop a section's preview, for the assistant — the first half of
     /// stop, edit, start again. No Activate: a stop is not the moment to
@@ -1135,6 +1154,22 @@ public sealed partial class MainWindow : Window
                 App.LogDiagnostic($"StopPreviewFor exception: {ex}");
             }
         });
+    }
+
+    /// <summary>
+    /// The window is closing (L10): each preview lease it still holds is swept
+    /// as a stop sweeps (registered first, so a start elsewhere waits for it),
+    /// then released by reference. The current view let go just before, so
+    /// these are only rows views replaced in this window left behind.
+    /// </summary>
+    private void LetGoOfThePreviewsThisWindowStillHolds()
+    {
+        foreach (PreviewLeases.Lease left in PreviewLeases.HeldBy(this))
+        {
+            App.LogDiagnostic($"MainWindow.Closed: let go of the preview of {left.CourseCode} Section {left.SectionNumber} a replaced view left behind");
+            PreviewStopper.StopSectionProcesses(left.FolderPath, left.CourseCode, left.SectionNumber);
+            PreviewLeases.Release(left);
+        }
     }
 
     /// <param name="sectionFolder">
@@ -1321,6 +1356,7 @@ public sealed partial class MainWindow : Window
 
     public void ShowDetailForSelection()
     {
+        if (Workspace.Selection is not SidebarSelection.BackupEntry) ForgetRestoreFocus();
         switch (Workspace.Selection)
         {
             case SidebarSelection.SectionItem(var code, var number)
@@ -1365,11 +1401,7 @@ public sealed partial class MainWindow : Window
                 break;
             case SidebarSelection.BackupEntry(var backupId)
                 when Workspace.BackupItems.FirstOrDefault(b => b.Id == backupId) is { } backup:
-                DetailHost.Content = EmptyState(backup.Title,
-                    $"{backup.Subtitle}. Restoring puts {backup.CourseCode} back to exactly this " +
-                    "moment — the current version is archived first, and the backup is kept.",
-                    "Restore…", () => Sidebar.ConfirmRestoreBackup(backup),
-                    "Delete Backup…", () => Sidebar.ConfirmDeleteBackup(backup));
+                ShowBackupPane(backup);
                 break;
             case null when Workspace.Courses.Count == 0:
                 DetailHost.Content = EmptyState("No Courses Yet",
@@ -1396,8 +1428,67 @@ public sealed partial class MainWindow : Window
     /// to do (the mac's own archived and
     /// backup panes, `Restore…` prominent and `Delete …` plain).
     /// </summary>
+    /// <summary>The backup pane's Restore… button as last drawn, and the keyboard focus it held when it was greyed (#911, review 3's LOW).</summary>
+    private Button? _backupRestoreButton;
+    private string? _restoreFocusBackupId;
+    private FocusState _restoreFocus = FocusState.Unfocused;
+
+    private void ForgetRestoreFocus()
+    {
+        _restoreFocusBackupId = null;
+        _restoreFocus = FocusState.Unfocused;
+    }
+
+    /// <summary>
+    /// Draws a backup's pane. It is drawn again whenever every Restore…
+    /// greys or ungreys (a question asked or answered, a restore's zip
+    /// started or finished), and a replaced or greyed button takes the
+    /// keyboard focus with it, so a teacher who pressed Restore… from the
+    /// keyboard would come back to nothing focused. So the focus the old
+    /// button held is kept for this backup while the button is greyed and
+    /// given to the new button, in the same FocusState, once it is enabled
+    /// and in the tree (its Loaded event). Choosing any other row forgets it.
+    /// </summary>
+    private void ShowBackupPane(BackupItem backup)
+    {
+        if (_restoreFocusBackupId != backup.Id) ForgetRestoreFocus();
+        if (_backupRestoreButton is { } old && old.FocusState != FocusState.Unfocused
+            && DetailHost.Content is DependencyObject shown && IsUnder(old, shown))
+        {
+            _restoreFocusBackupId = backup.Id;
+            _restoreFocus = old.FocusState;
+        }
+        bool enabled = !Sidebar.RestoreWaits(backup.CourseCode);
+        DetailHost.Content = EmptyState(backup.Title,
+            $"{backup.SubtitleFor(Workspace.ClassNounOf(backup.CourseCode))}. Restoring puts {backup.CourseCode} back to exactly this " +
+            "moment — the current version is archived first, and the backup is kept.",
+            "Restore…", () => Sidebar.ConfirmRestoreBackup(backup),
+            "Delete Backup…", () => Sidebar.ConfirmDeleteBackup(backup),
+            actionEnabled: enabled,
+            actionMade: made => _backupRestoreButton = made);
+        if (enabled && _restoreFocus != FocusState.Unfocused && _backupRestoreButton is { } restore)
+        {
+            FocusState give = _restoreFocus;
+            ForgetRestoreFocus();
+            void GiveFocus(object sender, RoutedEventArgs args)
+            {
+                restore.Loaded -= GiveFocus;
+                restore.Focus(give);
+            }
+            restore.Loaded += GiveFocus;
+        }
+    }
+
+    private static bool IsUnder(DependencyObject element, DependencyObject root)
+    {
+        for (DependencyObject? at = element; at is not null; at = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(at))
+            if (ReferenceEquals(at, root)) return true;
+        return false;
+    }
+
     private static UIElement EmptyState(string title, string description, string? actionLabel, Action? action,
-                                        string? secondLabel = null, Action? secondAction = null)
+                                        string? secondLabel = null, Action? secondAction = null,
+                                        bool actionEnabled = true, Action<Button>? actionMade = null)
     {
         var panel = new StackPanel
         {
@@ -1428,8 +1519,10 @@ public sealed partial class MainWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Style = Application.Current.Resources["AccentButtonStyle"] as Style,
                 Margin = new Thickness(0, 8, 0, 0),
+                IsEnabled = actionEnabled,
             };
             button.Click += (_, _) => action();
+            actionMade?.Invoke(button);
             if (secondLabel is not null && secondAction is not null)
             {
                 var row = new StackPanel
@@ -1564,11 +1657,12 @@ public sealed partial class MainWindow : Window
             Content = new ScrollViewer { Content = body, MaxHeight = 440 },
             PrimaryButtonText = CloudSyncWording.UseAnywayButton,
             CloseButtonText = CloudSyncWording.ChooseDifferentFolderButton,
-            // Neither button is the default: this is the one moment the choice
-            // is free, and a Return pressed out of habit must not decide it.
-            DefaultButton = ContentDialogButton.None,
             XamlRoot = Content.XamlRoot,
         };
+        // Neither button is the default: this is the one moment the choice
+        // is free, and a Return pressed out of habit must not decide it. The
+        // focus starts on Choose a Different Folder, so Enter is that (#979).
+        DialogButtons.AskWithNoDefault(dialog);
         AutomationProperties.SetAutomationId(dialog, "syncedFolderChoice");
         ContentDialogResult answer;
         try { answer = await dialog.ShowAsync(); }

@@ -30,6 +30,8 @@ final class MenuVoiceTests: XCTestCase {
         ("couldNotUndo", "couldNotUndoFromTheMenu"),
         ("undoIsStillAvailable", "undoIsStillAvailableFromTheMenu"),
         ("nothingToUndo", "nothingToUndoFromTheMenu"),
+        // #1027: the same sentence naming a club's menus.
+        ("nothingToUndo", "nothingToUndoFromTheMeetingsMenu"),
         ("changedWhileSavingACopy", "changedWhileSavingACopyFromTheMenu"),
         ("pagesWhoseSettingsCannotBeAddedTo", "pagesWhoseSettingsCannotBeAddedToFromTheMenu"),
         ("pagesWhoseSettingsCannotBeAddedToNamingSeveral", "pagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral"),
@@ -45,7 +47,7 @@ final class MenuVoiceTests: XCTestCase {
         ("pagesAChangeCouldNotFinishNamingSeveral", "pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"),
         // #897: Section ▸ Duplicate as Next Class…'s copy that cannot be made hidden.
         ("theCopyCouldNotBeMadeHidden", "theCopyCouldNotBeMadeHiddenFromTheMenu"),
-        // #897 piece B: Section ▸ Roll Over to a New Year…'s marker that cannot be moved.
+        // #897 piece B: Classes ▸ Roll Over to a New Year…'s marker that cannot be moved.
         ("rolloverCouldNotStartANewWebsite", "rolloverCouldNotStartANewWebsiteFromTheMenu"),
     ]
 
@@ -108,7 +110,7 @@ final class MenuVoiceTests: XCTestCase {
             ))
             let undone: AssistToolOutcome = await made.runner.run(call: SectionVerbs.undoLastChange())
             if surface == .menu {
-                XCTAssertEqual(nothing.summary, AssistWording.nothingToUndoFromTheMenu)
+                XCTAssertEqual(nothing.summary, AssistWording.nothingToUndoFromTheMenu(noun: .class))
                 XCTAssertTrue(undone.summary.hasPrefix("Undone."), undone.summary)
                 XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(nothing.summary))
                 XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(undone.summary), undone.summary)

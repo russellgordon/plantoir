@@ -29,8 +29,10 @@ as LF.
     python3 scripts/make_undo_traces.py --check    # exit 1 if it is stale
     PLANTOIR_UNDO_FUZZ=<seed> python3 scripts/make_undo_traces.py --print
 """
+import functools
 import hashlib
 import json
+import math
 import os
 import random
 import sys
@@ -43,6 +45,13 @@ LONGEST = 40
 STEPS_KEPT = 50
 DAYS_KEPT = 30
 CONTRACT = Path(__file__).resolve().parent.parent / "contracts" / "undo-traces.json"
+# U3: each daily page action's step, recorded by the Mac from the real action
+# code (UndoActionStepsTests writes it; never typed by hand), from which the
+# action traces below are made: ACTION_TRACES_PER_STEP traces per step.
+ACTION_STEPS = Path(__file__).resolve().parent.parent / "contracts" / "undo-action-steps.json"
+ACTION_TRACES_PER_STEP = 6
+ACTION_SHORTEST = 2
+ACTION_LONGEST = 12
 
 # --------------------------------------------------------------------------
 # The fixture: one section's pages, each a shape the line model must handle.
@@ -359,6 +368,10 @@ def setting_entry(key, line, text):
 
 def op_state(op, current):
     """UndoCheck.state: 'before', 'after' or 'neither'. current is text or None."""
+    if op["kind"] == "replaceText":
+        return replace_text_state(op, None if current is None else current.encode("utf-8"))
+    if op["kind"] == "editJSON":
+        return edit_json_state(op, None if current is None else current.encode("utf-8"))
     if op["kind"] == "writeFile":
         current_sha = None if current is None else sha(current)
         if current_sha == op["beforeSha"]:
@@ -376,21 +389,768 @@ def op_state(op, current):
     return "neither"
 
 
-def plan(ops, backward, pages_by_path, content_missing=False):
-    """UndoCheck.plan: ('ready', {path: new text or None}), ('changedSince',
-    first, others), or ('contentMissing', path) when a whole-file op needs a
-    blob and the list's content is gone (`content_missing`)."""
+# --------------------------------------------------------------------------
+# The kinds U2 defines (file-formats.json -> undoJournal.opKinds): the
+# reference for undo.checkCases and undo.listingCases. Content only.
+# --------------------------------------------------------------------------
+
+def listing_text(tree):
+    """A folder's listing (opKinds.createTree): one line per item inside,
+    `folder <path>` or `file <sha256> <path>`, in the order of the paths'
+    UTF-8 bytes, each ending in a line feed. tree: {"folders": [...],
+    "files": {path: text}}."""
+    entries = []
+    ignored = ".DS_Store"   # the Finder's own record, never listed
+    for folder in tree.get("folders", []):
+        if folder.split("/")[-1] == ignored:
+            continue
+        entries.append((folder.encode("utf-8"), "folder " + folder + "\n"))
+    for path, text in tree.get("files", {}).items():
+        if path.split("/")[-1] == ignored:
+            continue
+        entries.append((path.encode("utf-8"), "file " + sha(text) + " " + path + "\n"))
+    entries.sort()
+    return "".join(line for _, line in entries)
+
+
+def listing_sha(tree):
+    return sha(listing_text(tree))
+
+
+def occurrences(needle, haystack):
+    found = []
+    if not needle or len(needle) > len(haystack):
+        return found
+    for start in range(len(haystack) - len(needle) + 1):
+        if haystack[start:start + len(needle)] == needle:
+            found.append(start)
+    return found
+
+
+def hunk_place(window, other, data):
+    """A window is found when it occurs exactly once and every occurrence
+    of the other window lies inside that one (opKinds.replaceText)."""
+    mine = occurrences(window, data)
+    if len(mine) != 1:
+        return None
+    start, end = mine[0], mine[0] + len(window)
+    for other_start in occurrences(other, data):
+        if other_start < start or other_start + len(other) > end:
+            return None
+    return start
+
+
+def replace_text_state(op, data):
+    if data is None:
+        return "neither"
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return "neither"
+    before = (op["contextBefore"] + op["before"] + op["contextAfter"]).encode("utf-8")
+    after = (op["contextBefore"] + op["after"] + op["contextAfter"]).encode("utf-8")
+    if hunk_place(before, after, data) is not None:
+        return "before"
+    if hunk_place(after, before, data) is not None:
+        return "after"
+    return "neither"
+
+
+ABSENT_MEMBER = object()
+
+
+def json_equal(first, second):
+    """Compared as JSON: true is never 1, numbers by value, strings code
+    point for code point, objects by members, arrays in order."""
+    if isinstance(first, bool) or isinstance(second, bool):
+        return isinstance(first, bool) and isinstance(second, bool) and first == second
+    if first is None or second is None:
+        return first is None and second is None
+    if isinstance(first, (int, float)) and isinstance(second, (int, float)):
+        return float(first) == float(second)
+    if isinstance(first, str) and isinstance(second, str):
+        return first == second
+    if isinstance(first, list) and isinstance(second, list):
+        return len(first) == len(second) and all(json_equal(a, b) for a, b in zip(first, second))
+    if isinstance(first, dict) and isinstance(second, dict):
+        return first.keys() == second.keys() and all(json_equal(first[k], second[k]) for k in first)
+    return False
+
+
+def edit_json_state(op, data):
+    if data is None:
+        return "neither"
+    top = _mac_read(data)
+    if not isinstance(top, dict):
+        return "neither"
+    current = top
+    for part in op["keyPath"]:
+        if not isinstance(current, dict):
+            return "neither"
+        if part not in current:
+            current = ABSENT_MEMBER
+            break
+        current = current[part]
+
+    # What the model is not measured to read as the mac's Foundation reads
+    # it (#899 W6 review 2): cannot tell, as on Windows.
+    if not _path_measured(op["keyPath"], top) or (
+            current is not ABSENT_MEMBER and not _measured(current)) or any(
+            side in op and not _measured(op[side]) for side in ("before", "after")):
+        return "cannotTell"
+
+    # A whole number beyond 2^53, in the file or the record, cannot be
+    # compared exactly through a double: cannot tell (the third hard review).
+    if (current is not ABSENT_MEMBER and not _exact(current)) or any(
+            side in op and not _exact(op[side]) for side in ("before", "after")):
+        return "cannotTell"
+    def matches(side):
+        if side not in op:
+            return current is ABSENT_MEMBER
+        return current is not ABSENT_MEMBER and json_equal(current, op[side])
+
+    if matches("before"):
+        return "before"
+    if matches("after"):
+        return "after"
+    return "neither"
+
+
+def _skip(data, at):
+    while at < len(data) and data[at] in b" \t\n\r":
+        at += 1
+    return at
+
+
+def _scan_string(data, at):
+    if at >= len(data) or data[at] != 0x22:
+        return None
+    index = at + 1
+    while index < len(data):
+        if data[index] == 0x5C:
+            index += 2
+            continue
+        if data[index] == 0x22:
+            return index + 1, json.loads(data[at:index + 1].decode("utf-8"))
+        index += 1
+    return None
+
+
+def _scan_value(data, at):
+    if at >= len(data):
+        return None
+    first = data[at]
+    if first == 0x22:
+        found = _scan_string(data, at)
+        return found[0] if found else None
+    if first in (0x7B, 0x5B):
+        depth = 0
+        index = at
+        while index < len(data):
+            byte = data[index]
+            if byte == 0x22:
+                found = _scan_string(data, index)
+                if not found:
+                    return None
+                index = found[0]
+                continue
+            if byte in (0x7B, 0x5B):
+                depth += 1
+            elif byte in (0x7D, 0x5D):
+                depth -= 1
+                if depth == 0:
+                    return index + 1
+            index += 1
+        return None
+    index = at
+    while index < len(data) and data[index] not in b" \t\n\r,}]":
+        index += 1
+    return index if index > at else None
+
+
+def _scan_object(data, at):
+    """[(name, nameStart, colonBytes, valueStart, valueEnd, leadBytes)], close."""
+    if at >= len(data) or data[at] != 0x7B:
+        return None
+    members = []
+    index = at + 1
+    lead_start = index
+    while True:
+        index = _skip(data, index)
+        if index >= len(data):
+            return None
+        if data[index] == 0x7D:
+            return members, index
+        lead = data[lead_start:index]
+        found = _scan_string(data, index)
+        if not found:
+            return None
+        name_end, name = found
+        colon = _skip(data, name_end)
+        if colon >= len(data) or data[colon] != 0x3A:
+            return None
+        value_start = _skip(data, colon + 1)
+        value_end = _scan_value(data, value_start)
+        if value_end is None:
+            return None
+        members.append((name, index, data[name_end:value_start], value_start, value_end, lead))
+        index = _skip(data, value_end)
+        if index >= len(data):
+            return None
+        if data[index] == 0x2C:
+            index += 1
+            lead_start = index
+            continue
+        if data[index] == 0x7D:
+            return members, index
+        return None
+
+
+def _exact(value):
+    """A double holds every number exactly as written: no whole number
+    beyond 2^53 (the second hard review of U2b)."""
+    if isinstance(value, bool):
+        return True
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and math.isinf(value):
+            return False
+        return not (float(value).is_integer() and abs(value) >= 9007199254740992)
+    if isinstance(value, list):
+        return all(_exact(element) for element in value)
+    if isinstance(value, dict):
+        return all(_exact(element) for element in value.values())
+    return True
+
+
+# What the mac's Foundation does with an editJSON value, as far as it is
+# MEASURED (macOS 26.7.3, 2026-11-20, through the mac's own code; the same
+# rules as Windows' UndoJson and UndoMacKeyOrder). Anything not measured is
+# refused, never guessed at (#899 W6 review 2).
+
+class _Unmeasured(float):
+    """A number a file spells in a way not measured to read as the mac reads it."""
+
+
+_PUNCTUATION = " _-,;:!?.'\"()[]{}@*/\\&#%`^+<=>|~$"
+
+
+# undo.numberSpellingRule (measured through the mac's reader, macOS 26.7.3,
+# 2026-11-20, #899 W6 review 3): the most characters the mac reads after a
+# number's e or E, its sign and leading zeros included (1e0005, 1e+005 and
+# 1e-999 are read; 1e00005, 1e+0005, 1e-0001 and 0e99999 make the file one it
+# cannot read), and the most digits read as it reads them, with an exponent
+# and without. Windows' UndoJson holds the same three.
+MAC_EXPONENT_CHARACTERS_AT_MOST = 4
+MEASURED_DIGITS_WITH_AN_EXPONENT = 17
+MEASURED_DIGITS_WITHOUT_AN_EXPONENT = 38
+
+
+def _exponent_read_by_the_mac(spelling):
+    """A spelling with no exponent, or at most MAC_EXPONENT_CHARACTERS_AT_MOST
+    characters after its e or E. A file holding any other is not JSON."""
+    marker = max(spelling.find("e"), spelling.find("E"))
+    if marker < 0:
+        return True
+    characters_after_it = len(spelling) - marker - 1
+    return characters_after_it <= MAC_EXPONENT_CHARACTERS_AT_MOST
+
+
+def _spelling_measured(spelling):
+    """At most 17 digits with an exponent, 38 without, counted from the
+    first digit that is not a leading zero of the integer part."""
+    unsigned = spelling[1:] if spelling.startswith("-") else spelling
+    marker = max(unsigned.find("e"), unsigned.find("E"))
+    mantissa = unsigned[:marker] if marker >= 0 else unsigned
+    whole, _, fraction = mantissa.partition(".")
+    digits = len(whole.lstrip("0")) + len(fraction)
+    if marker >= 0:
+        return digits <= MEASURED_DIGITS_WITH_AN_EXPONENT
+    return digits <= MEASURED_DIGITS_WITHOUT_AN_EXPONENT
+
+
+def _read_number(spelling):
+    """The double the mac's reader takes from a measured spelling: a fixed
+    spelling with a point and more than 17 digits is a decimal number, its
+    digits summed in 16-bit pieces and divided by ten once per place; minus
+    infinity beyond the range below zero; refused (not JSON) above it, and
+    for an exponent the mac does not read."""
+    if not _exponent_read_by_the_mac(spelling):
+        raise ValueError("an exponent the mac does not read")
+    nearest = float(spelling)
+    if not _spelling_measured(spelling):
+        return _Unmeasured(0.0 if math.isinf(nearest) else nearest)
+    if math.isinf(nearest):
+        if nearest < 0:
+            return nearest
+        raise ValueError("beyond a double's range")
+    if "e" in spelling.lower() or "." not in spelling:
+        return int(spelling) if "." not in spelling and "e" not in spelling.lower() else nearest
+    negative = spelling.startswith("-")
+    unsigned = spelling[1:] if negative else spelling
+    whole, _, fraction = unsigned.partition(".")
+    whole = whole.lstrip("0")
+    if len(whole) + len(fraction) <= 17:
+        return nearest
+    mantissa = int(whole + fraction)
+    exponent = -len(fraction)
+    while mantissa != 0 and mantissa % 10 == 0:
+        mantissa //= 10
+        exponent += 1
+    pieces = []
+    while mantissa != 0:
+        pieces.append(mantissa & 0xFFFF)
+        mantissa >>= 16
+    read = 0.0
+    for piece in reversed(pieces):
+        read = read * 65536 + piece
+    for _ in range(-exponent):
+        read /= 10
+    for _ in range(exponent):
+        read *= 10
+    return -read if negative else read
+
+
+def _refuse_constant(name):
+    raise ValueError("not JSON: " + name)
+
+
+def _holds_half_a_pair(value):
+    if isinstance(value, str):
+        for character in value:
+            if 0xD800 <= ord(character) <= 0xDFFF:
+                return True
+        return False
+    if isinstance(value, list):
+        for element in value:
+            if _holds_half_a_pair(element):
+                return True
+        return False
+    if isinstance(value, dict):
+        for key, element in value.items():
+            if _holds_half_a_pair(key) or _holds_half_a_pair(element):
+                return True
+        return False
+    return False
+
+
+def _mac_read(data):
+    """The file as the mac's reader reads it, or None where it cannot (not
+    UTF-8, not JSON, a number above a double's range, half a surrogate pair)."""
+    try:
+        value = json.loads(data.decode("utf-8"), parse_float=_read_number, parse_int=_read_number,
+                           parse_constant=_refuse_constant)
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if _holds_half_a_pair(value):
+        return None
+    return value
+
+
+def _measured_key(key):
+    for character in key:
+        if not 0x20 <= ord(character) <= 0x7E:
+            return False
+    return True
+
+
+def _measured(value):
+    """Every key printable ASCII, no text starting with a byte-order mark,
+    every number read as measured."""
+    if isinstance(value, _Unmeasured):
+        return False
+    if isinstance(value, str):
+        return not value.startswith("\ufeff")
+    if isinstance(value, list):
+        for element in value:
+            if not _measured(element):
+                return False
+        return True
+    if isinstance(value, dict):
+        for key, element in value.items():
+            if not _measured_key(key) or not _measured(element):
+                return False
+        return True
+    return True
+
+
+def _numbers_measured(value):
+    if isinstance(value, _Unmeasured):
+        return False
+    if isinstance(value, list):
+        for element in value:
+            if not _numbers_measured(element):
+                return False
+        return True
+    if isinstance(value, dict):
+        for element in value.values():
+            if not _numbers_measured(element):
+                return False
+        return True
+    return True
+
+
+def _path_measured(key_path, top):
+    """Each part, and every key of each object on the way, printable ASCII;
+    and the file holding only numbers read as measured."""
+    if not _numbers_measured(top):
+        return False
+    current = top
+    for part in key_path:
+        if not _measured_key(part):
+            return False
+        if not isinstance(current, dict):
+            return True
+        for key in current:
+            if not _measured_key(key):
+                return False
+        if part not in current:
+            return True
+        current = current[part]
+    return True
+
+
+def _key_pieces(key):
+    pieces = []
+    index = 0
+    while index < len(key):
+        character = key[index]
+        if character.isdigit() and character.isascii():
+            end = index
+            while end < len(key) and key[end].isdigit() and key[end].isascii():
+                end += 1
+            run = key[index:end]
+            without_zeros = run.lstrip("0")
+            pieces.append((1, "%010d" % len(without_zeros) + without_zeros, len(run) - len(without_zeros)))
+            index = end
+            continue
+        if character in _PUNCTUATION:
+            pieces.append((0, "%02d" % _PUNCTUATION.index(character), 0))
+        elif "a" <= character <= "z":
+            pieces.append((2, character, 0))
+        elif "A" <= character <= "Z":
+            pieces.append((2, character.lower(), 1))
+        else:
+            pieces.append((3, "%06d" % ord(character), 0))
+        index += 1
+    return pieces
+
+
+def _ordinal(text):
+    return text.encode("utf-16-le")
+
+
+def _mac_key_order(first, second):
+    """Windows' UndoMacKeyOrder: the mac's order for printable ASCII keys."""
+    one, other = _key_pieces(first), _key_pieces(second)
+    shared = min(len(one), len(other))
+    for index in range(shared):
+        if one[index][0] != other[index][0]:
+            return -1 if one[index][0] < other[index][0] else 1
+        if one[index][1] != other[index][1]:
+            return -1 if one[index][1] < other[index][1] else 1
+    if len(one) != len(other):
+        return -1 if len(one) < len(other) else 1
+    for index in range(shared):
+        if one[index][2] != other[index][2]:
+            return -1 if one[index][2] < other[index][2] else 1
+    if first == second:
+        return 0
+    return -1 if _ordinal(first) < _ordinal(second) else 1
+
+
+def _spell_number(value):
+    if float(value).is_integer():
+        return str(int(value))
+    return "%.17g" % value
+
+
+def _spelled(value):
+    if value is None:
+        return "null"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, (int, float)):
+        return _spell_number(value)
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, list):
+        parts = []
+        for element in value:
+            parts.append(_spelled(element))
+        return "[" + ",".join(parts) + "]"
+    names = sorted(value, key=functools.cmp_to_key(_mac_key_order))
+    parts = []
+    for name in names:
+        parts.append(json.dumps(name, ensure_ascii=False) + ":" + _spelled(value[name]))
+    return "{" + ",".join(parts) + "}"
+
+
+def _spell(value):
+    if not _exact(value) or not _measured(value):
+        return None
+    return _spelled(value).encode("utf-8")
+
+
+def _setting(key_path, value, tree, wanted):
+    """The tree with the member set (or taken out), or None when a part on
+    the way is missing or not an object."""
+    if not isinstance(tree, dict):
+        return None
+    copy = dict(tree)
+    first = key_path[0]
+    if len(key_path) == 1:
+        if wanted:
+            copy[first] = value
+        else:
+            copy.pop(first, None)
+        return copy
+    if first not in copy:
+        return None
+    inner = _setting(key_path[1:], value, copy[first], wanted)
+    if inner is None:
+        return None
+    copy[first] = inner
+    return copy
+
+
+def json_bytes_moved(op, backward, data):
+    """opKinds.editJSON's move: only the member's bytes change (the hard
+    review of U2b, LOW a), and the result must read back, as the mac reads
+    it, as the file with that one member changed. None when it cannot be
+    done safely."""
+    top = _mac_read(data)
+    if not isinstance(top, dict) or not _path_measured(op["keyPath"], top):
+        return None
+    wanted_key = "before" if backward else "after"
+    expected = _setting(op["keyPath"], op.get(wanted_key), top, wanted_key in op)
+    if expected is None:
+        return None
+    moved = _json_bytes_moved(op, wanted_key, data)
+    if moved is None or moved is data:
+        return moved
+    read_back = _mac_read(moved)
+    if read_back is None or not json_equal(read_back, expected):
+        return None
+    return moved
+
+
+def _json_bytes_moved(op, wanted_key, data):
+    key_path = op["keyPath"]
+    start = _skip(data, 0)
+    for depth, part in enumerate(key_path):
+        scanned = _scan_object(data, start)
+        if scanned is None:
+            return None
+        members, close = scanned
+        found = [member for member in members if member[0] == part]
+        if len(found) > 1:
+            return None
+        last = depth == len(key_path) - 1
+        if not found:
+            if not last:
+                return None
+            if wanted_key not in op:
+                return data
+            value = _spell(op[wanted_key])
+            name = _spell(part)
+            if value is None:
+                return None
+            if members:
+                tail = members[-1]
+                insert = b"," + tail[5] + name + tail[2] + value
+                at = tail[4]
+            else:
+                insert = name + b": " + value
+                at = close
+            return data[:at] + insert + data[at:]
+        member = found[0]
+        if not last:
+            start = member[3]
+            continue
+        if wanted_key in op:
+            spelled = _spell(op[wanted_key])
+            if spelled is None:
+                return None
+            return data[:member[3]] + spelled + data[member[4]:]
+        position = members.index(member)
+        if position + 1 < len(members):
+            return data[:member[1]] + data[members[position + 1][1]:]
+        if position > 0:
+            return data[:members[position - 1][4]] + data[member[4]:]
+        inside = _skip(data, start + 1)
+        return data[:inside] + data[member[4]:]
+    return None
+
+
+def tree_reading(item):
+    """An item spec of the cases: absent, a file, or a folder (listing)."""
+    if item is None or item.get("absent"):
+        return ("absent",)
+    if "tree" in item:
+        if item["tree"].get("links"):
+            return ("other",)
+        return ("tree", listing_sha(item["tree"]))
+    if "link" in item:
+        return ("other",)
+    if "treeSha" in item:
+        return ("tree", item["treeSha"])
+    if item.get("folder"):
+        return ("tree", listing_sha({}))
+    return ("file", sha(item["text"]) if "text" in item else None)
+
+
+def move_state(op, at_from, at_to, listed_as=None):
+    """opKinds.move, judged as a PAIR (#897 piece B, seam 1). `listed_as`
+    (checkCasesHow's listedAs, U4b2-9) is the spelling the folder lists a
+    capitalisation-only move's one item under: at `from` or `to` it is the
+    pair as given; any other spelling is neither side (UndoCheck.wholeState's
+    `.another`), whatever the item holds."""
+    if listed_as is not None and is_case_only_move(op) and listed_as not in (op["from"], op["to"]):
+        return "neither"
+    def side(item):
+        reading = tree_reading(item)
+        if reading[0] == "absent":
+            return "free"
+        if "sha" in op:
+            return "holds" if reading == ("file", op["sha"]) else "else"
+        return "holds" if reading == ("tree", op["listingSha"]) else "else"
+    source, destination = side(at_from), side(at_to)
+    if source == "free" and destination == "holds":
+        return "after"
+    if source == "holds" and destination == "free":
+        return "before"
+    return "neither"
+
+
+def tree_state(op, item):
+    reading = tree_reading(item)
+    if reading[0] in ("file", "other"):
+        return "neither"
+    present = reading[0] == "tree"
+    if present and reading[1] != op["listingSha"]:
+        return "neither"
+    if op["kind"] == "createTree":
+        return "after" if present else "before"
+    return "before" if present else "after"
+
+
+def external_state(op, current):
+    if current.get("unreadable"):
+        return "neither"
+    absent = current.get("absent", False)
+
+    def matches(side):
+        if side not in op:
+            return absent
+        return not absent and json_equal(current["preference"], op[side])
+
+    if matches("before"):
+        return "before"
+    if matches("after"):
+        return "after"
+    return "neither"
+
+
+def plan(ops, backward, pages_by_path, content_missing=False, available=None, used=None, leaves_apart=False):
+    """UndoCheck.plan: ('ready', {path: new text or None}, left_apart),
+    ('changedSince', first, others), or ('contentMissing', path) when a
+    whole-file op needs a blob and the list's content is gone
+    (`content_missing`). `available(path, text)` says whether a text the
+    list's content no longer holds can still be had (written back since, or
+    a kept original beside the page whose hash matches: Russell's ruling of
+    2026-11-20, 15:20); each such use is added to `used` as (path, text
+    taken, text the page held, the other text). With `leaves_apart` (an
+    Undo or a Redo, never the making of a step), a `moveApart` found changed
+    since is left where it is and named in left_apart, and the rest goes
+    ahead (U3b, Russell's ruling of 2026-11-19 on Q3), as is an external op
+    on a scheduledDeploy. The step's moveApart ops (a section's website
+    records) go as a GROUP: when any one is changed since, every one not
+    already where it is wanted is left apart (the director's decision of
+    2026-11-20, on #899). A `setAside` (a leftover no deploy reads) stands
+    apart ON ITS OWN, never one of that group (the review of U3b's fixes,
+    LOW 3). A move, a moveApart or a setAside needs no blob (it is a
+    rename, judged by its hash), so no kept original is ever looked for
+    for one (the merge of U3b and U3c)."""
     ordered = list(reversed(ops)) if backward else list(ops)
+    # U4b (opKinds.wholeOps' order): an edit named inside a move's new place,
+    # after the move, is carried by it. Forward it is judged where the file
+    # is before the move and made after it; backward it is taken back first,
+    # and the move is judged as if it were.
+    carriers = carried_edits(ops)
+    moving_now = set()
+    group_stays_apart = leaves_apart and any(
+        op["kind"] == "moveApart" and whole_state(op, pages_by_path) == "neither" for op in ordered
+    )
     original = {}
     working = {}
     in_the_way = []
+    whole_changes = {}
+    left_apart = []
+    wanted_from = "after" if backward else "before"
+    linked = pages_by_path.get(LINKED_OUTSIDE, set())
     for op in ordered:
+        kind = op["kind"]
+        if kind == "recompute":
+            continue
+        places = [op[key] for key in ("path", "from", "to") if key in op]
+        leading_out = None
+        for place in places:
+            if leading_out is None and any(place == folder or place.startswith(folder + "/") for folder in linked):
+                leading_out = place
+        if leading_out is not None:
+            # A place that now leads outside the working folder through a
+            # link: a change since, nothing moved (the second hard review of
+            # U2b, MEDIUM 2). Named by the first of the op's places, in the
+            # order path, from, to, that leads out, never the other side of
+            # a move (U4b2-2).
+            if leading_out not in in_the_way:
+                in_the_way.append(leading_out)
+            continue
+        if kind in WHOLE_KINDS:
+            # Judged whole against what is there (opKinds.wholeOps).
+            seen = pages_by_path
+            carries = any(carrier is op for carrier in carriers.values())
+            if backward and carries:
+                seen = dict(pages_by_path)
+                for path, carrier in carriers.items():
+                    if carrier is op and path in working:
+                        if working[path] is None:
+                            seen.pop(path, None)
+                        else:
+                            seen[path] = working[path]
+            state = whole_state(op, seen)
+            place = op.get("path") or op.get("from") or op.get("target")
+            if group_stays_apart and kind == "moveApart" and state in ("neither", wanted_from):
+                left_apart.append(place)
+                continue
+            if state == "neither":
+                if leaves_apart and stands_apart(op):
+                    left_apart.append(place)
+                    continue
+                if place not in in_the_way:
+                    in_the_way.append(place)
+                continue
+            if state != wanted_from:
+                continue
+            if content_missing and kind in ("createTree", "removeTree"):
+                # A tree is never made or taken out unless the list holds
+                # everything needed to make it (the hard review of U2b, HIGH 2).
+                return ("contentMissing", place)
+            if carries and not backward:
+                moving_now.add(op["to"])
+            whole_changes.update(whole_moved(op, backward, seen))
+            continue
         path = op["path"]
         if path not in original:
-            original[path] = pages_by_path.get(path)
+            read_path = path
+            carrier = carriers.get(path)
+            if carrier is not None and carrier["to"] in moving_now:
+                read_path = place_before_the_move(path, carrier)
+            original[path] = pages_by_path.get(read_path)
             working[path] = original[path]
         state = op_state(op, working[path])
-        wanted_from = "after" if backward else "before"
         if state == "neither":
             if path not in in_the_way:
                 in_the_way.append(path)
@@ -400,19 +1160,368 @@ def plan(ops, backward, pages_by_path, content_missing=False):
         if op["kind"] == "writeFile":
             target = op["beforeText"] if backward else op["afterText"]
             if content_missing and target is not None:
-                return ("contentMissing", path)
+                if available is None or not available(path, target):
+                    return ("contentMissing", path)
+                if used is not None:
+                    other = op["afterText"] if backward else op["beforeText"]
+                    used.append((path, target, working[path], other))
             working[path] = target
+        elif kind == "replaceText":
+            moved = hunk_moved(op, backward, working[path])
+            if moved is None:
+                if path not in in_the_way:
+                    in_the_way.append(path)
+                continue
+            working[path] = moved
+        elif kind == "editJSON":
+            moved = json_moved(op, backward, working[path])
+            if moved is None:
+                if path not in in_the_way:
+                    in_the_way.append(path)
+                continue
+            working[path] = moved
         else:
             source = op["after"] if backward else op["before"]
             target = op["before"] if backward else op["after"]
             working[path] = moving(op, source, target, working[path])
     if in_the_way:
         return ("changedSince", in_the_way[0], len(in_the_way) - 1)
-    changes = {}
+    file_changes = {}
     for path in original:
         if original[path] != working[path]:
-            changes[path] = working[path]
-    return ("ready", changes)
+            file_changes[path] = working[path]
+    # Forward, a carried edit goes in after its move; backward, before it.
+    changes = {}
+    if backward:
+        changes.update(file_changes)
+        changes.update(whole_changes)
+    else:
+        changes.update(whole_changes)
+        changes.update(file_changes)
+    return ("ready", changes, left_apart)
+
+
+EDIT_KINDS = ("writeFile", "editLine", "replaceText", "editJSON")
+
+
+def part_inside(place, path):
+    """UndoOp.partInside (U4b2-9): the part of `path` inside `place`,
+    spelled as `path` spells it ("" for the place itself), or None when it
+    is neither the place nor inside it. Part by part, without regard to
+    case: the ONE comparison for "at or inside" (places overlapping, a
+    move carrying an edit, a carried page's place before the move)."""
+    place_parts, path_parts = place.split("/"), path.split("/")
+    if len(path_parts) < len(place_parts):
+        return None
+    for mine, theirs in zip(place_parts, path_parts):
+        if mine.lower() != theirs.lower():
+            return None
+    return "/".join(path_parts[len(place_parts):])
+
+
+def places_overlap(first, second):
+    """UndoOp.placesOverlap: the same place, or one a folder holding the
+    other, by part_inside."""
+    return part_inside(first, second) is not None or part_inside(second, first) is not None
+
+
+def place_before_the_move(path, move):
+    """UndoOp.placeBeforeTheMove: a path inside a move's `to`, at the same
+    place under its `from`."""
+    inside = part_inside(move["to"], path)
+    if inside is None:
+        return path
+    return move["from"] + "/" + inside if inside else move["from"]
+
+
+def move_carries(move, edit):
+    """UndoOp.moveCarries: an edit of the file a move moved, or of a file
+    inside the folder it moved, named at the new place and nothing inside
+    the old one (U4b, opKinds.wholeOps). At or inside `to` is part_inside,
+    without regard to case (U4b2-9)."""
+    if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
+        return False
+    if part_inside(move["to"], edit["path"]) is None:
+        return False
+    if is_case_only_move(move):
+        # One place under two spellings: named at the new one. Only the
+        # moved item's own part is compared as spelled (review 1 of
+        # U4b2-9, L3).
+        depth = len(move["from"].split("/"))
+        return edit["path"].split("/")[depth - 1] != move["from"].split("/")[depth - 1]
+    return not places_overlap(move["from"], edit["path"])
+
+
+def is_case_only_move(op):
+    """UndoOp.isCaseOnlyMove (U4b): a move whose from and to are spelled
+    alike but for case, in their last part only. The model's pages are
+    keyed as spelled, as on a case-sensitive volume, where the ordinary
+    pair rule gives the answers the spelling a case-insensitive folder
+    lists gives."""
+    if op.get("kind") != "move":
+        return False
+    source, destination = op.get("from"), op.get("to")
+    if not isinstance(source, str) or not isinstance(destination, str) or source == destination:
+        return False
+    if source.lower() != destination.lower():
+        return False
+    return source.rsplit("/", 1)[0] == destination.rsplit("/", 1)[0] if "/" in source else "/" not in destination
+
+
+def carried_edits(ops):
+    """Each edit's path a move of the step carries (the edit after the
+    move), with that move."""
+    found = {}
+    for index, move in enumerate(ops):
+        for edit in ops[index + 1:]:
+            if move_carries(move, edit):
+                found[edit["path"]] = move
+    return found
+
+
+def swap_groups(ops, backward):
+    """The order a swap makes a step's changes in (UndoCheck.plan's targets),
+    one group of ops per target: forward, each move that carries edits
+    first, then each file in the order the ops first name it, then every
+    other whole op; backward, each file in the reversed ops' order, then
+    every whole op, reversed (U4b, opKinds.wholeOps' order)."""
+    ordered = list(reversed(ops)) if backward else list(ops)
+    carriers = carried_edits(ops)
+    carrying = [op for op in ordered if any(carrier is op for carrier in carriers.values())]
+    leading = [] if backward else [[op] for op in carrying]
+    files, by_path, wholes = [], {}, []
+    for op in ordered:
+        if op["kind"] == "recompute" or any(group[0] is op for group in leading):
+            continue
+        if op["kind"] in WHOLE_KINDS:
+            wholes.append([op])
+            continue
+        if op["path"] not in by_path:
+            by_path[op["path"]] = []
+            files.append(by_path[op["path"]])
+        by_path[op["path"]].append(op)
+    return leading + files + wholes
+
+
+def stopped_part_way(ops, backward, pages, swapped):
+    """What a step's swap leaves when its process is killed before the
+    target numbered `swapped` (None: every target in): each group made in
+    turn, judged and moved on its own."""
+    pages = dict(pages)
+    groups = swap_groups(ops, backward)
+    for group in groups[:len(groups) if swapped is None else swapped]:
+        result = plan(group, backward, pages)
+        assert result[0] == "ready", result
+        for path, text in result[1].items():
+            if text is None:
+                pages.pop(path, None)
+            else:
+                pages[path] = text
+    return pages
+
+
+def move_is_at_its_old_place(move, pages):
+    """Nothing at a move's `to` and something at its `from`."""
+    def there(place):
+        return pages.get(place) is not None or folder_of_pages(pages, place) is not None
+    return not there(move["to"]) and there(move["from"])
+
+
+def recovery_states(ops, pages):
+    """UndoRecovery.fileStates: where each place of a step stands now. An
+    edit a move carries is read where its folder is now, and the move is
+    judged as if the step's edits inside it were taken back (U4b). The
+    model holds no staged files, so it cannot show the swap's own kept
+    originals inside the folder being left out: only the Swift replay
+    shows that."""
+    carriers = carried_edits(ops)
+    states = {}
+    for op in ops:
+        kind = op["kind"]
+        if kind == "recompute":
+            continue
+        if kind in WHOLE_KINDS:
+            place = op.get("path") or op.get("from") or op.get("target")
+            seen = pages
+            if any(carrier is op for carrier in carriers.values()):
+                old_place = move_is_at_its_old_place(op, pages)
+                seen = dict(pages)
+                for path, carrier in carriers.items():
+                    if carrier is not op:
+                        continue
+                    side = place_before_the_move(path, carrier) if old_place else path
+                    edits = [dict(edit, path=side) for edit in ops if edit.get("path") == path]
+                    taken_back = plan(edits, True, seen)
+                    if taken_back[0] == "ready" and side in taken_back[1]:
+                        seen[side] = taken_back[1][side]
+            states[place] = whole_state(op, seen)
+            continue
+        path = op["path"]
+        read_path = path
+        carrier = carriers.get(path)
+        if carrier is not None and move_is_at_its_old_place(carrier, pages):
+            read_path = place_before_the_move(path, carrier)
+        state = op_state(op, pages.get(read_path))
+        earlier = states.get(path)
+        states[path] = state if earlier in (None, state) else "neither"
+    return states
+
+
+def recover(ops, pages, started_from_before):
+    """UndoRecovery.settle, live: nothing took effect, completed, or what
+    took effect put back, judged by content alone; anything neither is in
+    the way. Answers (outcome, pages)."""
+    start, end = ("before", "after") if started_from_before else ("after", "before")
+    states = recovery_states(ops, pages)
+    if any(state == "neither" for state in states.values()):
+        return ("interrupted", pages)
+    if all(state == start for state in states.values()):
+        return ("nothingTookEffect", pages)
+    if all(state == end for state in states.values()):
+        return ("completed", pages)
+    at_end = [op for op in ops if op["kind"] != "recompute"
+              and states.get(op.get("path") or op.get("from") or op.get("target")) == end]
+    result = plan(at_end, started_from_before, pages)
+    if result[0] != "ready":
+        return ("interrupted", pages)
+    pages = dict(pages)
+    for path, text in result[1].items():
+        if text is None:
+            pages.pop(path, None)
+        else:
+            pages[path] = text
+    return ("rolledBack", pages)
+
+
+def folder_of_pages(pages, place):
+    """A folder the model holds as its files (U4b): the files under `place`
+    as a tree, or None when it holds none."""
+    prefix = place + "/"
+    files = {}
+    folders = set()
+    for path, value in pages.items():
+        if isinstance(path, str) and path.startswith(prefix) and value is not None and not isinstance(value, tuple):
+            inside = path[len(prefix):]
+            files[inside] = value
+            parts = inside.split("/")[:-1]
+            for depth in range(1, len(parts) + 1):
+                folders.add("/".join(parts[:depth]))
+    if not files:
+        return None
+    return {"folders": sorted(folders), "files": files}
+
+
+WHOLE_KINDS = ("move", "moveApart", "setAside", "createTree", "removeTree", "external")
+SCHEDULED_DEPLOY = "scheduledDeploy:"
+
+
+def stands_apart(op):
+    """UndoOp.standsApart: a moveApart, a setAside, or an external op on a
+    deploy set for later."""
+    if op["kind"] in ("moveApart", "setAside"):
+        return True
+    return op["kind"] == "external" and op.get("target", "").startswith(SCHEDULED_DEPLOY)
+
+
+def set_or_leave_apart(model, result):
+    """The swap of an Undo or a Redo (UndoSwap.swap's leaveApart): a deploy
+    set for later that cannot be set now (launchd refuses it, or the write
+    is off the main thread: `refuses_schedules`) is left as it is and named
+    after what the check left apart; the rest goes in."""
+    changes = {}
+    left_apart = list(result[2])
+    model.starts_at_the_next_login = []
+    for path, text in result[1].items():
+        if model.refuses_schedules and path.startswith(SCHEDULED_DEPLOY):
+            left_apart.append(path)
+            continue
+        if model.schedules_start_at_the_next_login and path.startswith(SCHEDULED_DEPLOY) and text is not None:
+            # Back on disk, not started now: it starts at the next login,
+            # named so, never as left apart (the re-review of U3b's fixes,
+            # LOW 2; UndoExternalWrite.startsAtTheNextLogin).
+            model.starts_at_the_next_login.append(path)
+        changes[path] = text
+    return changes, left_apart
+LINKED_OUTSIDE = "\0linkedOutside"
+# What a deploy after a rollover onto a new website writes in the place the
+# marker left (an action trace's `deploy` call, U3b).
+DEPLOYED_MARKER = "{\"site_id\": \"this-year\"}"
+
+
+def page_item(value):
+    """A model page as an item spec: text, a tree (("tree", listing sha)),
+    a preference value, or absent (None)."""
+    if value is None:
+        return {"absent": True}
+    if isinstance(value, tuple) and value[0] == "tree":
+        return {"treeSha": value[1]}
+    return {"text": value}
+
+
+def whole_state(op, pages):
+    kind = op["kind"]
+    if kind in ("move", "moveApart", "setAside"):
+        def side(place):
+            if pages.get(place) is None and "listingSha" in op:
+                tree = folder_of_pages(pages, place)
+                if tree is not None:
+                    return {"tree": tree}
+            return page_item(pages.get(place))
+        return move_state(op, side(op["from"]), side(op["to"]))
+    if kind in ("createTree", "removeTree"):
+        return tree_state(op, page_item(pages.get(op["path"])))
+    target = op["target"]
+    if target in pages:
+        return external_state(op, {"preference": pages[target]})
+    return external_state(op, {"absent": True})
+
+
+def whole_moved(op, backward, pages):
+    kind = op["kind"]
+    if kind in ("move", "moveApart", "setAside"):
+        source, destination = (op["to"], op["from"]) if backward else (op["from"], op["to"])
+        if pages.get(source) is None and "listingSha" in op:
+            # A folder held as its files: each one moves (U4b).
+            moved = {}
+            prefix = source + "/"
+            for path, value in pages.items():
+                if isinstance(path, str) and path.startswith(prefix):
+                    moved[path] = None
+            for path, value in pages.items():
+                if isinstance(path, str) and path.startswith(prefix):
+                    moved[destination + path[len(source):]] = value
+            return moved
+        return {destination: pages.get(source), source: None}
+    if kind in ("createTree", "removeTree"):
+        makes = (kind == "createTree") != backward
+        return {op["path"]: ("tree", op["listingSha"]) if makes else None}
+    wanted = "before" if backward else "after"
+    return {op["target"]: op[wanted] if wanted in op else None}
+
+
+def hunk_moved(op, backward, text):
+    if text is None:
+        return None
+    data = text.encode("utf-8")
+    before = (op["contextBefore"] + op["before"] + op["contextAfter"]).encode("utf-8")
+    after = (op["contextBefore"] + op["after"] + op["contextAfter"]).encode("utf-8")
+    source, target = (after, before) if backward else (before, after)
+    start = hunk_place(source, target, data)
+    if start is None:
+        return None
+    return (data[:start] + target + data[start + len(source):]).decode("utf-8")
+
+
+def json_moved(op, backward, text):
+    """The member moved by the member rule (json_bytes_moved): only its own
+    bytes change, as on both apps, so an action trace's settings file
+    (U4a, Course Settings) hashes the same after an Undo on every side."""
+    if text is None:
+        return None
+    moved = json_bytes_moved(op, backward, text.encode("utf-8"))
+    if moved is None:
+        return None
+    return moved.decode("utf-8")
 
 
 # --------------------------------------------------------------------------
@@ -441,6 +1550,25 @@ class Model:
         self.newest_written = None
         self.unreachable = set()   # working folders that cannot be reached
         self.content_removed = False   # the list's content/ was taken away
+        # U3c: texts written back into the list after its content was taken
+        # away, the kept originals beside each page ({path: [text, ...]}),
+        # whether the list takes new content, and how many 'undo kept what
+        # it replaced' lines were written.
+        self.stored = set()
+        self.kept = {}
+        self.content_cannot_be_stored = False
+        # The second review of U3c: texts whose blob alone is gone from the
+        # list, and texts the list will not take again.
+        self.removed_texts = set()
+        self.unstorable_texts = set()
+        self.kept_what_it_replaced_lines = 0
+        self.kept_unreadable = False   # every kept original cannot be read now
+        self.maintainer_registered = True   # UndoMaintainers has a runner
+        self.linked_outside = set()   # folders replaced by a link to outside
+        self.rederived = 0   # how many times a recompute's runner ran
+        self.refuses_schedules = False   # every write to a scheduledDeploy fails
+        self.schedules_start_at_the_next_login = False   # a scheduledDeploy set back is not started now
+        self.starts_at_the_next_login = []   # what the last undo or redo named so
 
     # -- the fold -----------------------------------------------------
 
@@ -567,6 +1695,67 @@ class Model:
         self.write_line()
         return self.highest
 
+    def ops_step(self, ops):
+        """JournaledWrite.perform(ops:): written down, then planned forward
+        from the pages as a Redo is, then made."""
+        seq = self.begin(ops)
+        result = plan(ops, False, self.pages)
+        if result[0] != "ready":
+            self.finish(seq, phase="failed")
+            return result
+        self.write(result[1])
+        self.finish(seq)
+        return ("applied", seq)
+
+    def files_step(self, changes, recomputes, moves=(), members=(), trees=()):
+        """JournaledWrite.perform(UndoStepDraft): one action's files, each
+        before and after, as ops (lines where they reproduce the change,
+        otherwise the whole file), in the order the action planned them,
+        the recompute ops last. ('applied', seq, ops) or ('changedNothing',)."""
+        ops = []
+        for path, before, after in changes:
+            if before == after:
+                continue
+            # U4a: a JSON file planned member by member is its editJSON ops,
+            # in the order recorded.
+            file_members = [member for member in members if member["path"] == path]
+            if file_members:
+                for member in file_members:
+                    op = {"kind": "editJSON", "path": path, "keyPath": member["keyPath"]}
+                    for side in ("before", "after"):
+                        if side in member:
+                            op[side] = member[side]
+                    ops.append(op)
+                continue
+            ops.extend(ops_for_change(path, before, after))
+        for moved in moves:
+            # U3b: each file moved, after the files (JournaledStep's order).
+            ops.append({"kind": "moveApart" if moved.get("standsApart") else "move",
+                        "from": moved["from"], "to": moved["to"], "sha": sha(moved["content"])})
+        for tree in trees:
+            # U4a: each folder made, after the moves (JournaledStep's order).
+            ops.append({"kind": "createTree", "path": tree["path"], "listingSha": listing_sha(tree)})
+        if not ops:
+            return ("changedNothing",)
+        for kept in recomputes:
+            ops.append({"kind": "recompute", "path": kept["path"], "maintainer": kept["maintainer"],
+                        "section": kept.get("section")})
+        seq = self.begin(ops)
+        for path, before, after in changes:
+            if after is None:
+                self.pages.pop(path, None)
+            else:
+                self.pages[path] = after
+        for moved in moves:
+            self.pages[moved["to"]] = self.pages.pop(moved["from"])
+        for tree in trees:
+            self.pages[tree["path"]] = ("tree", listing_sha(tree))
+        self.finish(seq)
+        return ("applied", seq, ops)
+
+    def holds_a_recompute(self, step):
+        return any(op["kind"] == "recompute" for op in step["ops"])
+
     def step(self, edits, days_ago=0, pages_key=None):
         """edits: [(path, key, line)] -> ('applied', seq) or ('changedNothing',)."""
         ops = []
@@ -657,7 +1846,16 @@ class Model:
             return ("notAvailable",)
         if self.folder_of(undo) in self.unreachable:
             return ("notAvailable",)
-        result = plan(undo["ops"], True, self.pages, self.content_removed)
+        if self.holds_a_recompute(undo) and not self.maintainer_registered:
+            return ("notAvailable",)
+        used = []
+        result = plan(undo["ops"], True, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_missing(),
+                      self.available, used, leaves_apart=True)
+        used = self.taken_from_kept_originals(used)
+        if result[0] == "contentMissing" and self.kept_unreadable and self.kept.get(result[1]):
+            # A kept original that cannot be read may be the one: cannot
+            # tell now, the list kept (the first review of U3c, LOW 5).
+            return ("cannotTellNow", result[1])
         if result[0] == "contentMissing" and not UNDO_REFUSED_FOR_MISSING_CONTENT_CLEARS:
             return result
         if result[0] in ("changedSince", "contentMissing"):
@@ -665,12 +1863,24 @@ class Model:
                 self.clear()
                 self.prune()
             return result
+        changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
-            self.write(result[1])
+            not_whole = self.store_what_kept_originals_give(used)
+            if self.store_what_the_other_direction_needs(undo["ops"], True, used):
+                not_whole = True
+            self.write(changes)
+            if self.holds_a_recompute(undo):
+                self.rederived += 1
             undo["phase"] = "undone"
             self.write_line()
+            self.tidy_kept_copies()
+            self.remove_superseded_kept_copies()
+            if not_whole:
+                # The Redo stays offered, resting on what is kept beside the
+                # page (Russell's ruling of 2026-11-20, night).
+                self.kept_what_it_replaced_lines += 1
             self.prune()
-        return ("undone", undo["seq"])
+        return ("undone", undo["seq"], left_apart)
 
     def redo(self, dry=False):
         _, candidate, _ = self.offer()
@@ -682,7 +1892,12 @@ class Model:
             return ("notAvailable",)
         if self.folder_of(candidate) in self.unreachable:
             return ("notAvailable",)
-        result = plan(candidate["ops"], False, self.pages, self.content_removed)
+        if self.holds_a_recompute(candidate) and not self.maintainer_registered:
+            return ("notAvailable",)
+        used = []
+        result = plan(candidate["ops"], False, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_missing(),
+                      self.available, used, leaves_apart=True)
+        used = self.taken_from_kept_originals(used)
         if result[0] in ("changedSince", "contentMissing"):
             if not dry:
                 # Ruling 20: refused once, then only the redo branch goes.
@@ -691,12 +1906,119 @@ class Model:
                         step["phase"] = "dropped"
                 self.write_line()
             return result
+        changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
-            self.write(result[1])
+            not_whole = self.store_what_kept_originals_give(used)
+            if self.store_what_the_other_direction_needs(candidate["ops"], False, used):
+                not_whole = True
+            self.write(changes)
+            if self.holds_a_recompute(candidate):
+                self.rederived += 1
             candidate["phase"] = "done"
             self.write_line()
+            self.tidy_kept_copies()
+            self.remove_superseded_kept_copies()
+            if not_whole:
+                # Its Undo stays offered, resting on what is kept beside the
+                # page; cleared only if it is refused then (Russell's ruling
+                # of 2026-11-20, night).
+                self.kept_what_it_replaced_lines += 1
             self.prune()
-        return ("redone", candidate["seq"])
+        return ("redone", candidate["seq"], left_apart)
+
+    def content_missing(self):
+        """Whether any content the list held is gone: all of it, or one blob."""
+        return self.content_removed or bool(self.removed_texts)
+
+    def in_the_list(self, text):
+        """Whether the list's content holds this text now."""
+        if text in self.stored:
+            return True
+        return not self.content_removed and text not in self.removed_texts
+
+    def storable(self, text):
+        """Whether the list would take this text now."""
+        return not self.content_cannot_be_stored and text not in self.unstorable_texts
+
+    def available(self, path, text):
+        """Content the step needs: in the list, written back since, or a
+        kept original beside its page that can be read now."""
+        if self.in_the_list(text):
+            return True
+        return not self.kept_unreadable and text in self.kept.get(path, [])
+
+    def taken_from_kept_originals(self, used):
+        """Of the plan's uses, those the list itself could not give: only
+        those are taken from a kept original."""
+        return [use for use in used if not self.in_the_list(use[1])]
+
+    def store_what_kept_originals_give(self, used):
+        """Before the swap (the first review of U3c, MEDIUM): the kept
+        original's text, and what the page held as the other direction's
+        text when it is exactly that, written back into the list. True when
+        anything could not be: what the page held is then kept beside it,
+        and a kept original whose own text the list would not take stays
+        (the second review's MEDIUM: `tidy_kept_copies` keeps it)."""
+        not_whole = False
+        for path, taken, outgoing, other in used:
+            if self.storable(taken):
+                self.stored.add(taken)
+            else:
+                not_whole = True
+            if other is None or self.in_the_list(other):
+                continue
+            if outgoing == other and self.storable(outgoing):
+                self.stored.add(outgoing)
+                continue
+            not_whole = True
+            self.kept.setdefault(path, []).append(outgoing)
+        return not_whole
+
+    def store_what_the_other_direction_needs(self, ops, backward, used):
+        """Before the swap (U4a, the U3c review 3 LOW 3 fix): each page a
+        whole-file op moves from the list, whose outgoing text the other
+        direction needs and the list lacks, has that text written into the
+        list; when the list will not take it, it is kept beside the page
+        instead, unless a kept copy there already holds it. True when
+        anything is kept beside a page."""
+        taken_from_kept = set(use[0] for use in used)
+        kept_any = False
+        for op in ops:
+            if op["kind"] != "writeFile" or op["path"] in taken_from_kept:
+                continue
+            path = op["path"]
+            other = op["afterText"] if backward else op["beforeText"]
+            if other is None or self.in_the_list(other) or self.pages.get(path) != other:
+                continue
+            if self.storable(other):
+                self.stored.add(other)
+                continue
+            if other in self.kept.get(path, []):
+                continue
+            self.kept.setdefault(path, []).append(other)
+            kept_any = True
+        return kept_any
+
+    def remove_superseded_kept_copies(self):
+        """UndoRecovery.removeSupersededKeptCopies (U3c review 3, LOW 1):
+        after each move, the kept copies beside a page thinned to one per
+        content, so Undo and Redo again and again never pile them up."""
+        for path in list(self.kept):
+            one_of_each = []
+            for text in self.kept[path]:
+                if text not in one_of_each:
+                    one_of_each.append(text)
+            self.kept[path] = one_of_each
+
+    def tidy_kept_copies(self):
+        """A kept original whose page holds the same text is a copy: gone,
+        unless the list does not hold that text (the second review of U3c,
+        MEDIUM)."""
+        for path in list(self.kept):
+            self.kept[path] = [text for text in self.kept[path]
+                               if text != self.pages.get(path) or not self.in_the_list(text)]
+            if not self.kept[path]:
+                del self.kept[path]
 
     def write(self, changes):
         for path, text in changes.items():
@@ -711,6 +2033,9 @@ class Model:
     def hand_edit_path(self, kind, path):
         text = self.pages.get(path)
         if text is None:
+            return False
+        if not isinstance(text, str) and kind != "deletePage":
+            # A folder (U4a, Add folder's tree): only removing it changes it.
             return False
         if kind == "body":
             self.pages[path] = text + "A line the teacher wrote in Obsidian.\n"
@@ -779,6 +2104,22 @@ def one_trace(rng, number):
                 call["page"] = page_named(outcome[1])
                 call["others"] = outcome[2]
                 call["droppedTheRedo"] = True
+        elif roll < 0.86:
+            # U2: a page moved aside to the section's Archive folder, one
+            # `move` judged as a pair (opKinds.move), through the door that
+            # plans a step forward.
+            present = [page_id for page_id in PAGE_IDS
+                       if model.pages.get(PATHS[page_id]) is not None
+                       and model.pages.get(archived(PATHS[page_id])) is None]
+            if not present:
+                continue
+            page_id = rng.choice(present)
+            source = PATHS[page_id]
+            outcome = model.ops_step([{"kind": "move", "from": source, "to": archived(source),
+                                       "sha": sha(model.pages[source])}])
+            call = {"call": "move", "page": page_id, "to": archived(source), "expect": outcome[0]}
+            if outcome[0] == "applied":
+                call["seq"] = outcome[1]
         elif roll < 0.95:
             kind = rng.choice(["body", "body", "otherKey", "sameLine", "deletePage"] if rng.random() < 0.2
                               else ["body", "body", "otherKey", "sameLine"])
@@ -787,7 +2128,7 @@ def one_trace(rng, number):
             if isinstance(candidate, dict) and rng.random() < 0.5:
                 # Half the time, a page the next Redo would change, so the
                 # traces hold refused redos (ruling 20) as well as undos.
-                page_id = page_named(rng.choice([op["path"] for op in candidate["ops"]]))
+                page_id = page_named(rng.choice([op.get("path") or op.get("from") for op in candidate["ops"]]))
                 kind = "sameLine"
                 redo_next = rng.random() < 0.5
             if not model.hand_edit(kind, page_id):
@@ -806,6 +2147,8 @@ def one_trace(rng, number):
         call = {"call": "undo", "expect": outcome[0]}
         if outcome[0] == "undone":
             call["seq"] = outcome[1]
+            if outcome[2]:
+                call["leftApart"] = outcome[2]
         if outcome[0] == "changedSince":
             call["page"] = page_named(outcome[1])
             call["others"] = outcome[2]
@@ -820,6 +2163,8 @@ def one_trace(rng, number):
         call = {"call": "redo", "expect": outcome[0]}
         if outcome[0] == "redone":
             call["seq"] = outcome[1]
+            if outcome[2]:
+                call["leftApart"] = outcome[2]
         if outcome[0] == "changedSince":
             call["page"] = page_named(outcome[1])
             call["others"] = outcome[2]
@@ -831,6 +2176,147 @@ def one_trace(rng, number):
     hand_edited = any(call["call"] == "handEdit" for call in calls)
     return {"name": "trace-%03d" % number, "handEdits": hand_edited, "calls": calls,
             "afterUndoingAll": undone_to, "final": final_hashes(model)}
+
+
+def read_action_steps(path=None):
+    """The recorded steps, or [] before the Mac has recorded any."""
+    source = ACTION_STEPS if path is None else path
+    if not source.exists():
+        return []
+    document = json.loads(source.read_bytes().decode("utf-8"))
+    return document.get("steps", [])
+
+
+def action_trace(rng, recorded, number):
+    """One trace of a recorded action step: the step made from the files it
+    names (their befores, an empty list), then undos, redos, hand edits of
+    its files and notes, then the closing undos and redos."""
+    files = recorded["files"]
+    paths = [entry["path"] for entry in files]
+    moves = recorded.get("moves", [])
+    members = recorded.get("members", [])
+    trees = recorded.get("trees", [])
+    paths.extend(tree["path"] for tree in trees)
+    pages = {}
+    for entry in files:
+        if entry["before"] is not None:
+            pages[entry["path"]] = entry["before"]
+    for moved in moves:
+        pages[moved["from"]] = moved["content"]
+        paths.extend([moved["from"], moved["to"]])
+    apart = [moved for moved in moves if moved.get("standsApart")]
+    model = Model(pages=dict(pages))
+    calls = []
+    changes = [(entry["path"], entry["before"], entry["after"]) for entry in files]
+    outcome = model.files_step(changes, recorded.get("recomputes", []), moves, members, trees)
+    call = {"call": "action", "step": recorded["name"], "expect": outcome[0]}
+    if outcome[0] == "applied":
+        call["seq"] = outcome[1]
+        call["ops"] = [op["kind"] for op in outcome[2]]
+    call.update(model.summary())
+    calls.append(call)
+
+    length = rng.randint(ACTION_SHORTEST, ACTION_LONGEST)
+    attempts = 0
+    while len(calls) < length and attempts < length * 20:
+        attempts += 1
+        roll = rng.random()
+        if apart and roll >= 0.65 and roll < 0.75:
+            # U3b: a deploy writes a new marker in the place a rollover's
+            # marker left (when it is free), and nothing to the list.
+            place = apart[0]["from"]
+            if model.pages.get(place) is not None:
+                continue
+            model.pages[place] = DEPLOYED_MARKER
+            call = {"call": "deploy", "path": place, "text": DEPLOYED_MARKER}
+            call.update(model.summary())
+            calls.append(call)
+            continue
+        if roll < 0.35:
+            outcome = model.undo()
+            call = {"call": "undo", "expect": outcome[0]}
+            if outcome[0] == "undone":
+                call["seq"] = outcome[1]
+                if outcome[2]:
+                    call["leftApart"] = outcome[2]
+            if outcome[0] == "changedSince":
+                call["path"] = outcome[1]
+                call["others"] = outcome[2]
+                call["clearedTheList"] = True
+        elif roll < 0.65:
+            outcome = model.redo()
+            call = {"call": "redo", "expect": outcome[0]}
+            if outcome[0] == "redone":
+                call["seq"] = outcome[1]
+                if outcome[2]:
+                    call["leftApart"] = outcome[2]
+            if outcome[0] == "changedSince":
+                call["path"] = outcome[1]
+                call["others"] = outcome[2]
+                call["droppedTheRedo"] = True
+        elif roll < 0.90:
+            kind = rng.choice(["body", "body", "otherKey", "sameLine", "deletePage"])
+            path = rng.choice(paths)
+            if not model.hand_edit_path(kind, path):
+                continue
+            call = {"call": "handEdit", "kind": kind, "path": path}
+        else:
+            model.note()
+            call = {"call": "note"}
+        call.update(model.summary())
+        calls.append(call)
+
+    while True:
+        outcome = model.undo()
+        call = {"call": "undo", "expect": outcome[0]}
+        if outcome[0] == "undone":
+            call["seq"] = outcome[1]
+            if outcome[2]:
+                call["leftApart"] = outcome[2]
+        if outcome[0] == "changedSince":
+            call["path"] = outcome[1]
+            call["others"] = outcome[2]
+            call["clearedTheList"] = True
+        call.update(model.summary())
+        calls.append(call)
+        if outcome[0] != "undone":
+            break
+    undone_to = path_hashes(model, paths)
+    while True:
+        outcome = model.redo()
+        call = {"call": "redo", "expect": outcome[0]}
+        if outcome[0] == "redone":
+            call["seq"] = outcome[1]
+            if outcome[2]:
+                call["leftApart"] = outcome[2]
+        if outcome[0] == "changedSince":
+            call["path"] = outcome[1]
+            call["others"] = outcome[2]
+            call["droppedTheRedo"] = True
+        call.update(model.summary())
+        calls.append(call)
+        if outcome[0] != "redone":
+            break
+    hand_edited = any(call["call"] == "handEdit" for call in calls)
+    return {"name": "action-%03d" % number, "step": recorded["name"], "handEdits": hand_edited,
+            "calls": calls, "afterUndoingAll": undone_to, "final": path_hashes(model, paths)}
+
+
+def path_hashes(model, paths):
+    """Each path's SHA-256 (null: absent); a folder's is its listing's."""
+    result = {}
+    for path in paths:
+        text = model.pages.get(path)
+        if isinstance(text, tuple):
+            result[path] = text[1]
+        else:
+            result[path] = None if text is None else sha(text)
+    return result
+
+
+def archived(path):
+    """Where a `move` call puts a fixture page: the section's Archive folder."""
+    return path.replace("/Classes/", "/Archive/", 1)
 
 
 def page_named(path):
@@ -848,16 +2334,25 @@ def final_hashes(model):
     return result
 
 
-def generate(seed=SEED, count=TRACE_COUNT):
+def generate(seed=SEED, count=TRACE_COUNT, steps=None):
     rng = random.Random(seed)
     traces = [one_trace(rng, number + 1) for number in range(count)]
+    if steps is None:
+        steps = read_action_steps()
+    action_rng = random.Random(seed * 1000 + 3)
+    action_traces = []
+    for recorded in steps:
+        for _ in range(ACTION_TRACES_PER_STEP):
+            action_traces.append(action_trace(action_rng, recorded, len(action_traces) + 1))
     return {
-        "note": "Generated by scripts/make_undo_traces.py (seed %d) - never edited by hand; run it again instead, and commit what it writes. Each trace starts from `fixture` in an empty working folder with an empty list; write each page from utf8Hex, its exact bytes (`text` is the same page for reading, but at least one JSON reader, Foundation's, drops a byte-order mark inside a string). A `step` sets each named page's top-level `key` to the exact `line` with JournaledWrite.settingEntry's rule (the entry replaced when the key is there once, inserted after the opening fence when it is not, a block made when the page has none, the page left alone when the key is there twice or the page is gone), and is recorded through the app's own door. `expect` is what the call must come to; `head` and `redo` are the step numbers the folded list must answer after it (null: none). `afterUndoingAll` is every page's SHA-256 (null: absent) once the closing run of undos has stopped; `final` the same after the closing run of redos. A `note` call appends one neutral note line (file-formats.json -> undoJournal.events.note: its seq the highest in the journal, with keys a reader does not know) and must change nothing. A refused undo clears the list (clearedTheList); a refused redo drops only the redo branch (droppedTheRedo, ruling 20). A trace with no hand edits must end its undos exactly at the fixture. Rules: contracts/shared-rules.json -> undo." % seed,
+        "note": "Generated by scripts/make_undo_traces.py (seed %d) - never edited by hand; run it again instead, and commit what it writes. Each trace starts from `fixture` in an empty working folder with an empty list; write each page from utf8Hex, its exact bytes (`text` is the same page for reading, but at least one JSON reader, Foundation's, drops a byte-order mark inside a string). A `step` sets each named page's top-level `key` to the exact `line` with JournaledWrite.settingEntry's rule (the entry replaced when the key is there once, inserted after the opening fence when it is not, a block made when the page has none, the page left alone when the key is there twice or the page is gone), and is recorded through the app's own door. `expect` is what the call must come to; `head` and `redo` are the step numbers the folded list must answer after it (null: none). `afterUndoingAll` is every page's SHA-256 (null: absent) once the closing run of undos has stopped; `final` the same after the closing run of redos. A `note` call appends one neutral note line (file-formats.json -> undoJournal.events.note: its seq the highest in the journal, with keys a reader does not know) and must change nothing. A `move` call (U2) moves the named page to `to`, in the section's Archive folder, as one `move` op (file-formats.json -> undoJournal.opKinds.move: from the page's path, its `sha` the SHA-256 of the page's bytes now) made through the door that plans a step's ops forward (the mac's JournaledWrite.perform(ops:)); a step or hand edit naming a page that is not at its path leaves it alone. A refused undo clears the list (clearedTheList); a refused redo drops only the redo branch (droppedTheRedo, ruling 20). A trace with no hand edits must end its undos exactly at the fixture. Rules: contracts/shared-rules.json -> undo." % seed,
         "seed": seed,
         "fixture": [{"page": page_id, "path": path, "text": text, "utf8Hex": text.encode("utf-8").hex(), "shape": shape}
                     for page_id, path, text, shape in FIXTURE],
         "fixtureHashes": {page_id: sha(START[page_id]) for page_id in PAGE_IDS},
         "traces": traces,
+        "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A step recorded with `members` (U4a, Course Settings) has each file they name made as those editJSON ops, in the order recorded, instead of the door's rule (the member moved by the member rule's bytes, undo-json-cases.json -> editJSONCases); one recorded with `trees` (U4a, Add folder) also makes each folder as one `createTree` (its listing and every file's bytes in the list), after the moves; a folder is hashed as its listing's SHA-256 in `afterUndoingAll` and `final`, and only a `deletePage` hand edit changes one. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
+        "actionTraces": action_traces,
     }
 
 
@@ -885,6 +2380,23 @@ def render(document):
         lines.append("    }")
         traces.append("\n".join(lines))
     out.append(",\n".join(traces))
+    out.append("  ],")
+    out.append('  "actionNote": %s,' % json.dumps(document["actionNote"], ensure_ascii=False))
+    out.append('  "actionTraces": [')
+    action_traces = []
+    for trace in document["actionTraces"]:
+        lines = ["    {"]
+        lines.append('      "name": %s,' % json.dumps(trace["name"]))
+        lines.append('      "step": %s,' % json.dumps(trace["step"]))
+        lines.append('      "handEdits": %s,' % json.dumps(trace["handEdits"]))
+        lines.append('      "calls": [')
+        lines.append(",\n".join("        " + json.dumps(call, ensure_ascii=False) for call in trace["calls"]))
+        lines.append("      ],")
+        lines.append('      "afterUndoingAll": %s,' % json.dumps(trace["afterUndoingAll"], ensure_ascii=False))
+        lines.append('      "final": %s' % json.dumps(trace["final"], ensure_ascii=False))
+        lines.append("    }")
+        action_traces.append("\n".join(lines))
+    out.append(",\n".join(action_traces))
     out.append("  ]")
     out.append("}")
     return ("\n".join(out) + "\n").encode("utf-8")
@@ -907,7 +2419,8 @@ def main(arguments):
         print("PLANTOIR_UNDO_FUZZ is set: use --print, so the committed traces stay the seeded ones.")
         return 2
     CONTRACT.write_bytes(data)
-    print("wrote %s (%d traces, %d bytes)" % (CONTRACT.name, len(generate(seed)["traces"]), len(data)))
+    made = generate(seed)
+    print("wrote %s (%d traces, %d action traces, %d bytes)" % (CONTRACT.name, len(made["traces"]), len(made["actionTraces"]), len(data)))
     return 0
 
 

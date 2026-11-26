@@ -30,7 +30,7 @@ The offer appears when you open in Obsidian a course that has such diagrams or g
 - {{control:addOnsNotNow}} adds nothing. Plantoir does not ask again until the next time it is started.
 - {{control:addOnsDontAskAgain}} is a checkbox. Tick it before you press {{control:addOnsNotNow}}, and Plantoir does not make the offer again.
 
-If Obsidian is open at that moment, the offer says so. It lists what adding them does under {{control:addOnsCloses}}, {{control:addOnsOpensAgain}} and {{control:addOnsKept}}. Obsidian closes, with every course that is open in it. Only this course opens again. Everything you have written is kept.
+If Obsidian is open at that moment, the offer says so. Its first button then reads {{control:addOnsCloseObsidianAndAddThem}}. The offer lists what adding them does under {{control:addOnsCloses}}, {{control:addOnsOpensAgain}} and {{control:addOnsKept}}. Obsidian closes, with every course that is open in it. It opens again with this course and everything else it had open. Everything you have written is kept.
 
 ## Change your answer in Settings
 

@@ -91,7 +91,7 @@ public static class NextClassPlanner
     public static DateOnly Date(int position, IReadOnlyList<DateOnly> dates, string courseCode, int sectionNumber)
     {
         if (dates.Count == 0)
-            throw new AssistRefusal($"I don’t know when {courseCode} Section {sectionNumber} meets, so I can’t date a new class. {AssistWording.MayIAskForYourDates}");
+            throw new AssistRefusal(AssistWording.CannotDateANewClassWithoutDates(courseCode, sectionNumber));
 
         if (position < dates.Count)
             return dates[position];

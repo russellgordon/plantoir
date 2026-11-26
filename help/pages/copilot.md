@@ -29,14 +29,14 @@ description: What is particular to GitHub Copilot when you open it from Plantoir
 ---
 GitHub Copilot is one of the three outside assistants Plantoir works with. Plantoir opens GitHub Copilot's command-line tool, which runs in a terminal window. This page says what is particular to it.
 
-You install the tool and sign in to it yourself, with your own GitHub account. Plantoir needs no assistant: see [About the assistants (optional)](page:assistants).
+You sign in to the tool yourself, with your own GitHub account. You can install it yourself, or ask Plantoir to set it up: choose {{menu:reviseWithSetUpAnAssistant}}, and see [Set up an assistant's command-line tool](page:set-up-assistant). Plantoir needs no assistant: see [About the assistants (optional)](page:assistants).
 
 ## Where it appears
 
-Once GitHub's program is installed, GitHub Copilot is listed after Claude and Codex in three places.
+GitHub Copilot is listed after Claude and Codex in three places. Until GitHub's program is installed, its menu bar item and its {{control:problemsTab}} button are dimmed. It is left out of the right-click menus and the {{control:courseDetailPlanningTab}} tab.
 
-- **Revise With.** {{menu:courseReviseWithCopilot}} in the menu bar, and {{menu:sectionReviseWithCopilot}} for a section. See [Revise a course with Claude or Codex](page:revise-with).
-- **The {{control:problemsTab}} tab of a section.** {{control:fixWithGitHubCopilotButton}} is under the table. See [Fix a problem with Claude or Codex](page:fix-with).
+- **Revise With.** {{menu:courseReviseWithCopilot}} in the menu bar, and {{menu:sectionReviseWithCopilot}} for a section. See [Revise a course with Claude Code, Codex or GitHub Copilot](page:revise-with).
+- **The {{control:problemsTab}} tab of a section.** {{control:fixWithGitHubCopilotButton}} is under the table. See [Fix a problem with Claude Code, Codex or GitHub Copilot](page:fix-with).
 - **The {{control:courseDetailPlanningTab}} tab of a course.** {{control:planAUnitWithGitHubCopilotButton}} is there until the course has a plan. See [Plan a unit](page:plan-a-unit).
 
 Plantoir writes the name in full, GitHub Copilot, so that it is not taken for another product with a similar name.
@@ -79,7 +79,7 @@ One case is known on a Mac. Homebrew has two packages that install a program nam
 - **There is no GitHub Copilot item.** GitHub's program was not found on this {{machine}}. Check that the program you installed is GitHub's own.
 - **You have only now installed it.** Plantoir looks again each time you come back to it from another app, so a program installed a moment ago shows without quitting Plantoir.
 - **The window says that GitHub Copilot stopped.** It reads:
-  {{say:app-rules#outsideAgents.agents[2].stoppedAtOnce.sentence}}
+  {{say:app-rules#outsideAgents.agents[2].stoppedAtOnce.sentence ~ GitHub Copilot stopped as soon}}
   To open it on its own, start GitHub Copilot yourself, outside Plantoir.
 - **An alert titled {{control:outsideAssistantGitHubCopilotDidNotOpenTitle}} appears.** Plantoir could not start the session. If GitHub Copilot was updated or moved recently, quitting Plantoir and opening it again may be enough.
 - **The session opens, but GitHub Copilot cannot use Plantoir.** There are three known causes. A school account's administrator may not have turned on GitHub Copilot's command-line tool. A school's policy may stop it from working with other programs. Or you once turned Plantoir off inside GitHub Copilot, and it has stayed off. For the first two, ask the person who manages your school's GitHub account. For the third, turn Plantoir on again inside GitHub Copilot.

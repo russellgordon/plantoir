@@ -73,10 +73,12 @@ public static class ClassesDatedLater
     /// read from disk: its class pages and the kept record. Empty for a course
     /// kept for reference, which is never deployed.
     /// </summary>
-    public static IReadOnlyList<Page> FlaggedIn(Course course, int section, DateOnly today)
+    /// <param name="readPage">How a page is read; the disk by default. An action planning through an Undo step reads each page, and the kept record (<paramref name="readRecord"/>), as the step will leave it (#899 W7a).</param>
+    public static IReadOnlyList<Page> FlaggedIn(Course course, int section, DateOnly today,
+                                                Func<string, string>? readPage = null, Func<string, string?>? readRecord = null)
     {
         if (ReferenceCourse.IsKeptForReference(course)) return Array.Empty<Page>();
-        return Flagged(ClassPages(course, section), today, LaterClassesKept.Read(course.DirectoryPath, section));
+        return Flagged(ClassPages(course, section, readPage), today, LaterClassesKept.Read(course.DirectoryPath, section, readRecord));
     }
 
     /// <summary>
@@ -109,8 +111,8 @@ public static class ClassesDatedLater
     /// The counts the "ran from a menu" line of the hide at Deploy carries —
     /// the mac's words (<c>SectionDetailVerbs.swift</c>), not the contract's.
     /// </summary>
-    public static string UntickedAtDeployCounts(int count) =>
-        count == 1 ? "1 class dated later, unticked at Deploy" : $"{count} classes dated later, unticked at Deploy";
+    public static string UntickedAtDeployCounts(int count, ClassNoun noun = ClassNoun.Class) =>
+        AssistWording.UntickedAtDeployCounts(count, noun);
 
     /// <summary>
     /// The section's class pages, read from disk: the folders the shared
@@ -118,7 +120,7 @@ public static class ClassesDatedLater
     /// <c>AssistWorkspace.ClassPages</c> makes — with each page's visibility
     /// as the built site reads it and its date as written.
     /// </summary>
-    public static IReadOnlyList<Page> ClassPages(Course course, int section)
+    public static IReadOnlyList<Page> ClassPages(Course course, int section, Func<string, string>? readPage = null)
     {
         var found = new List<Page>();
         var folders = ClassFolderRule.Names(course.Configuration.ClassFolder, course.Configuration.PerSectionFolders);
@@ -130,7 +132,7 @@ public static class ClassesDatedLater
             {
                 if (string.Equals(Path.GetFileName(path), "index.md", StringComparison.OrdinalIgnoreCase)) continue;
                 string text;
-                try { text = File.ReadAllText(path); }
+                try { text = readPage is null ? File.ReadAllText(path) : readPage(path); }
                 catch { continue; }
                 bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, path);
                 found.Add(new Page(

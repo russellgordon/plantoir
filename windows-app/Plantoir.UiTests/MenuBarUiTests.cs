@@ -241,3 +241,291 @@ public class OpenRecentUiTests
         MenuBar.Close();
     }
 }
+
+/// <summary>
+/// #990 (Russell's ruling of 2026-11-20, grouping A) through the real window:
+/// the menu bar reads File · Course · Section · Classes · View · Help, and the
+/// Section and Classes menus draw <c>SubjectMenuLayout</c> (the contract's
+/// <c>subjectMenus.layout</c>) line for line, a separator between groups and
+/// nowhere else; every item is DRAWN and dimmed where the rule greys it,
+/// never hidden; and Copy a Page answers its ruled key, Ctrl+Shift+K.
+/// </summary>
+[Collection("drives the real app")]
+public class SectionAndClassesUiTests
+{
+    private const string Separator = "----";
+
+    /// <summary>The gaps between items, in pixels, of the menu last read.</summary>
+    private static string LastGaps = "";
+
+    /// <summary>What a menu should read, by AutomationId, from the layout.</summary>
+    private static List<string> Expected(Plantoir.Core.Models.SubjectMenuLayout.Menu menu)
+    {
+        var lines = new List<string>();
+        bool first = true;
+        foreach (var group in Plantoir.Core.Models.SubjectMenuLayout.Groups(menu))
+        {
+            if (!first) lines.Add(Separator);
+            first = false;
+            foreach (var entry in group)
+            {
+                switch (entry)
+                {
+                    case Plantoir.Core.Models.SubjectMenuLayout.Entry.OfSubmenu:
+                        lines.Add("sectionReviseWith");
+                        break;
+                    case Plantoir.Core.Models.SubjectMenuLayout.Entry.OfItem(var item):
+                        lines.Add(Plantoir.Core.Models.SubjectMenuLayout.AutomationIdHere(menu, item));
+                        // #514's second visible Preview item, drawn under it while no preview runs.
+                        if (item == Plantoir.Core.Models.SubjectMenuRules.Item.Preview) lines.Add("sectionPreviewAlternate");
+                        break;
+                }
+            }
+        }
+        return lines;
+    }
+
+    /// <summary>
+    /// Open a menu and read its lines in order: each item's AutomationId, and
+    /// a separator as "----". A <c>MenuFlyoutSeparator</c> has no UI Automation
+    /// element at all, so the separator cannot be read as an element: measured
+    /// in the VM on 2026-11-20 (#990 review), the RAW view under the open
+    /// flyout's <c>MenuFlyout</c> and its <c>Popup</c> holds the
+    /// <c>MenuFlyoutItem</c>s and their text and nothing else (WinUI gives the
+    /// separator no automation peer). So it is read where it is drawn, from
+    /// the gaps between items compared with EACH OTHER, never with a number of
+    /// pixels (<see cref="SeparatorGaps"/>): at any scaling every gap inside a
+    /// group is the same drawn spacing and every gap across a separator is that
+    /// spacing plus the separator, so the gaps fall into two sets. The groups
+    /// themselves are pinned without pixels by
+    /// <c>SubjectMenuLayoutContractTests</c>, against the lists the window
+    /// draws from.
+    /// </summary>
+    private static List<(string Line, AutomationElement? Element)> Read(DrivenApp app, string menu, string anyItemId)
+    {
+        MenuBar.Open(app, menu, anyItemId);
+        var first = app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId(anyItemId))!;
+        var items = new List<(string Id, AutomationElement Element, System.Drawing.Rectangle Box)>();
+        foreach (var child in first.Parent.FindAllChildren(cf => cf.ByControlType(ControlType.MenuItem)))
+        {
+            string id;
+            try { id = child.AutomationId; } catch { continue; }
+            items.Add((id, child, child.BoundingRectangle));
+        }
+        items.Sort((one, other) => one.Box.Top.CompareTo(other.Box.Top));
+        var gaps = new List<int>();
+        for (int index = 1; index < items.Count; index++) gaps.Add(items[index].Box.Top - items[index - 1].Box.Bottom);
+        LastGaps = string.Join(", ", gaps);
+        var across = SeparatorGaps(gaps);
+        var lines = new List<(string, AutomationElement?)>();
+        for (int index = 0; index < items.Count; index++)
+        {
+            if (index > 0 && across.Contains(index - 1)) lines.Add((Separator, null));
+            lines.Add((items[index].Id, items[index].Element));
+        }
+        return lines;
+    }
+
+    /// <summary>
+    /// Which gaps hold a separator, read from the gaps alone, at any scaling.
+    /// Sorted, the gaps are split where two neighbouring values differ the
+    /// most: below that jump are the gaps inside a group, above it the gaps
+    /// across a separator. The split counts only when it is unambiguous: the
+    /// jump must be wider than the spread inside either set (the spread being
+    /// the device-pixel rounding of one drawn spacing), or the test fails
+    /// saying it cannot tell the two apart, rather than guess. Gaps that are
+    /// all of ONE kind fail too (#990 review 3, low 2): gaps that span no more
+    /// than <see cref="OneSpacingSpan"/> can all be one spacing rounded to
+    /// device pixels, so whether they are all separators or none cannot be
+    /// read from them (4 and 5 with no separator, 7 and 8 with every gap one;
+    /// all equal likewise). Every menu read this way has both kinds. A missing
+    /// or extra separator then shows as a line out of place against the
+    /// layout, which is the assertion that fails.
+    /// </summary>
+    internal static HashSet<int> SeparatorGaps(IReadOnlyList<int> gaps)
+    {
+        var across = new HashSet<int>();
+        if (gaps.Count == 0) return across;
+        if (gaps.Max() - gaps.Min() <= OneSpacingSpan)
+            throw new Xunit.Sdk.XunitException(
+                $"the menu's gaps are all of one kind, so whether they are all separators or none cannot be read: {string.Join(", ", gaps)}");
+        var sorted = gaps.Distinct().OrderBy(gap => gap).ToList();
+        int widest = 0, splitAbove = 0;
+        for (int index = 1; index < sorted.Count; index++)
+            if (sorted[index] - sorted[index - 1] > widest) { widest = sorted[index] - sorted[index - 1]; splitAbove = sorted[index - 1]; }
+        var inside = gaps.Where(gap => gap <= splitAbove).ToList();
+        var between = gaps.Where(gap => gap > splitAbove).ToList();
+        int spread = Math.Max(inside.Max() - inside.Min(), between.Max() - between.Min());
+        if (widest <= spread)
+            throw new Xunit.Sdk.XunitException(
+                $"the menu's gaps do not fall into two clear sets, so its separators cannot be read: {string.Join(", ", gaps)}");
+        for (int index = 0; index < gaps.Count; index++)
+            if (gaps[index] > splitAbove) across.Add(index);
+        return across;
+    }
+
+    /// <summary>
+    /// The most the gaps of ONE drawn spacing differ once rounded to device
+    /// pixels: each gap is the difference of two rounded edges, and the rule
+    /// tests already take 7 and 9 as one spacing at a larger scaling (2
+    /// pixels apart), so gaps spanning no more than this may all be one kind.
+    /// Derived from that reading, not adjusted until a test passed.
+    /// </summary>
+    internal const int OneSpacingSpan = 2;
+
+    /// <summary>
+    /// With <c>PLANTOIR_UI_CAPTURE_DIR</c> set, a picture of the screen with the
+    /// menu open, for the hand-back (#990's captures); otherwise nothing.
+    /// </summary>
+    private static void CaptureIfAsked(DrivenApp app, string menu, string anyItemId, string fileName)
+    {
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_CAPTURE_DIR") is not { Length: > 0 } folder) return;
+        Directory.CreateDirectory(folder);
+        MenuBar.Open(app, menu, anyItemId);
+        FlaUI.Core.Capturing.Capture.Screen().ToFile(Path.Combine(folder, fileName));
+        MenuBar.Close();
+    }
+
+    /// <summary>The app's own menu bar's titles, in order (not the title bar's System menu).</summary>
+    private static string MenuBarTitles(DrivenApp app) =>
+        string.Join(", ", app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))
+            .Where(e => e.Parent?.ControlType == ControlType.MenuBar && e.Name != "System").Select(e => e.Name));
+
+    /// <summary>Whether the menu bar comes to read <paramref name="expected"/>, waited for as every element here is.</summary>
+    private static bool MenuBarComesToRead(DrivenApp app, string expected) =>
+        Retry.WhileFalse(() => MenuBarTitles(app) == expected, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result;
+
+    /// <summary>
+    /// Russell's ruling on #990 (2026-11-20 evening): "in a club the menu
+    /// itself is titled Meetings, on both platforms, so no sentence a club's
+    /// teacher reads says 'class'." The title follows the selected course
+    /// live (<c>subjectMenus.layout.titleForAMeeting</c>): a course reads
+    /// Classes, a club (its pages called meetings) reads Meetings with the
+    /// same items, and back. MUST FAIL with the title set once when the menu
+    /// is built.
+    /// </summary>
+    [UiFact]
+    public void TheClassesMenuIsTitledMeetingsWhileAClubIsSelected()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBothAndAClub);
+        const string ForACourse = "File, Course, Section, Classes, View, Help";
+        const string ForAClub = "File, Course, Section, Meetings, View, Help";
+
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
+        Assert.True(MenuBarComesToRead(app, ForACourse), $"a course's menu bar reads {MenuBarTitles(app)}");
+
+        app.ClickMiddleOf(app.Find("sidebar-" + CourseFixtures.Club, "the club's row"));
+        Assert.True(MenuBarComesToRead(app, ForAClub), $"a club's menu bar reads {MenuBarTitles(app)}");
+        var meetings = MenuBar.Open(app, "Meetings", "classesClassDates");
+        Assert.Equal(Expected(Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes).Where(line => line != Separator).OrderBy(id => id),
+                     meetings.Keys.OrderBy(id => id));
+        // #1027: its items say meeting too (subjectMenus.layout.itemTitles),
+        // and none says class. MUST FAIL with the items' words set once.
+        foreach (var (id, element) in meetings)
+        {
+            var item = Enum.GetValues<Plantoir.Core.Models.SubjectMenuRules.Item>()
+                .Single(i => Plantoir.Core.Models.SubjectMenuLayout.MenuContaining(i) == Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes
+                             && Plantoir.Core.Models.SubjectMenuLayout.AutomationIdHere(Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes, i) == id);
+            Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(item, Plantoir.Core.Models.ClassNoun.Meeting), element.Name);
+            Assert.DoesNotMatch(@"\b[Cc]lass(es)?\b", element.Name);
+        }
+        MenuBar.Close();
+        var section = MenuBar.Open(app, "Section", "sectionPublishPages");
+        Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(Plantoir.Core.Models.SubjectMenuRules.Item.PublishClassForADate, Plantoir.Core.Models.ClassNoun.Meeting),
+                     section["sectionPublishClassForADate"].Name);
+        MenuBar.Close();
+        CaptureIfAsked(app, "Meetings", "classesClassDates", "windows-meetings-menu.png");
+
+        // #1027's review, MEDIUM 1: Meeting Dates… opens the Class Dates
+        // dialog, and its purpose line, as RENDERED, says meeting
+        // (classDatesPurposeForAMeeting). MUST FAIL with the dialog's line
+        // written in the ordinary noun.
+        app.SelectSection(CourseFixtures.Club, 1);
+        EndToEnd.PressMenuBarItem(app, "Meetings", "classesClassDates");
+        var dates = MenuBar.Dialog(app, "Meetings > Meeting Dates…");
+        string purpose = Plantoir.Core.Assist.AssistWording.ClassDatesPurposeForAMeeting();
+        Assert.True(Retry.WhileFalse(() => dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Any(text => text.Properties.Name.ValueOrDefault == purpose),
+                                     TimeSpan.FromSeconds(10)).Result,
+                    "the Meeting Dates dialog does not show its purpose line in the club's noun: " +
+                    string.Join(" | ", dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(text => text.Properties.Name.ValueOrDefault ?? "")));
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_CAPTURE_DIR") is { Length: > 0 } captures)
+            FlaUI.Core.Capturing.Capture.Screen().ToFile(Path.Combine(captures, "windows-meeting-dates-dialog.png"));
+        MenuBar.CloseDialog(app);
+        Assert.Contains("Meetings ▸ Meeting Dates…", MenuBar.Trail(app));
+
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
+        Assert.True(MenuBarComesToRead(app, ForACourse), $"back on a course the menu bar reads {MenuBarTitles(app)}");
+    }
+
+    [UiFact]
+    public void TheMenusDrawTheLayout_EveryItemDrawnAndDimmedWhereTheRuleGreysIt()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+
+        // The menu bar's order, Classes after Section: the app's own bar, not
+        // the window's title-bar System menu, which UI Automation also shows
+        // as a menu bar.
+        var titles = app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))
+            .Where(e => e.Parent?.ControlType == ControlType.MenuBar && e.Name != "System").Select(e => e.Name).ToList();
+        Assert.Equal(new[] { "File", "Course", "Section", "Classes", "View", "Help" }, titles);
+
+        // A COURSE row selected: the rule greys every Section and Classes item,
+        // and every one is still drawn, in the layout's order and groups.
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
+        foreach (var (menu, title, anyId) in new[]
+                 {
+                     (Plantoir.Core.Models.SubjectMenuLayout.Menu.Section, "Section", "sectionPublishPages"),
+                     (Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes, "Classes", "classesClassDates"),
+                 })
+        {
+            var lines = Read(app, title, anyId);
+            var drawn = lines.Select(l => l.Line).ToList();
+            Assert.True(Expected(menu).SequenceEqual(drawn),
+                $"{title}: expected {string.Join(", ", Expected(menu))}\n drawn {string.Join(", ", drawn)}\n gaps {LastGaps}");
+            var live = lines.Where(l => l.Element is not null && l.Line != "sectionReviseWith" && l.Element.IsEnabled)
+                            .Select(l => l.Line).ToList();
+            Assert.True(live.Count == 0, $"{title} items live on a course row: {string.Join(", ", live)}");
+            foreach (var (line, element) in lines)
+            {
+                if (element is null || line is "sectionReviseWith" or "sectionPreview" or "sectionPreviewAlternate") continue;
+                var item = Enum.GetValues<Plantoir.Core.Models.SubjectMenuRules.Item>()
+                    .Single(i => Plantoir.Core.Models.SubjectMenuLayout.MenuContaining(i) == menu
+                                 && Plantoir.Core.Models.SubjectMenuLayout.AutomationIdHere(menu, i) == line);
+                Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(item, Plantoir.Core.Models.ClassNoun.Class), element.Name);
+            }
+            MenuBar.Close();
+        }
+
+        // A SECTION row selected: the Classes items come live, and Remove
+        // Section reads without an ellipsis.
+        app.SelectSection("ICS3U", 1);
+        CaptureIfAsked(app, "Section", "sectionPublishPages", "windows-section-menu.png");
+        CaptureIfAsked(app, "Classes", "classesClassDates", "windows-classes-menu.png");
+        var classes = MenuBar.Open(app, "Classes", "classesClassDates");
+        Assert.True(classes["classesClassDates"].IsEnabled, "Classes > Class Dates… was greyed on a live section");
+        Assert.True(classes["classesReDateClasses"].IsEnabled, "Classes > Re-date Classes… was greyed on a live section");
+        MenuBar.Close();
+        var section = MenuBar.Open(app, "Section", "sectionRemoveSection");
+        Assert.Equal("Remove Section", section["sectionRemoveSection"].Name);
+        Assert.Equal("Remove Scheduled Deploy", section["sectionCancelScheduledDeploy"].Name);
+        MenuBar.Close();
+
+        // Classes > Class Dates… opens the section's class dates, as the row's menu does.
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesClassDates");
+        Assert.NotNull(MenuBar.Dialog(app, "Classes > Class Dates…"));
+        MenuBar.CloseDialog(app);
+        Assert.Contains("Classes ▸ Class Dates…", MenuBar.Trail(app));
+    }
+
+    /// <summary>#990: Copy a Page from This Course… answers Ctrl+Shift+K (the mac's Shift-Command-K).</summary>
+    [UiFact]
+    public void CopyAPageAnswersCtrlShiftK()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
+        app.Window.Focus();
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_K);
+        Assert.NotNull(MenuBar.Dialog(app, "Ctrl+Shift+K"));
+        EndToEnd.CloseCopyAPage(app);
+    }
+}

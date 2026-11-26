@@ -372,6 +372,8 @@ public sealed partial class CourseSettingsView : UserControl
 
         var field = new TextBox { Text = interruptedTarget ?? oldName };
         AutomationProperties.SetAutomationId(field, "renameField");
+        // The mac's name for the list editor's rename field (#1012, #1020).
+        AutomationProperties.SetName(field, "New name");
         var explanation = new TextBlock { Text = SpecialNames.RenameExplanation, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
         var problem = new TextBlock
         {
@@ -828,6 +830,9 @@ public sealed partial class CourseSettingsView : UserControl
             FontFamily = new FontFamily("Consolas"),
             PlaceholderText = "For example: This site is licensed under <a href=\"…\">CC BY 4.0</a>.",
         };
+        // Named by its section's heading, as the mac's footer box is (#1012, #1020).
+        AutomationProperties.SetName(footerBox, "Footer");
+        AutomationProperties.SetAutomationId(footerBox, "footerEditor");
         footerBox.TextChanged += (_, _) => { Config.FooterHtml = footerBox.Text; MarkChanged(); };
         Form.Children.Add(footerBox);
 
@@ -880,9 +885,11 @@ public sealed partial class CourseSettingsView : UserControl
             howITeachProblem.Text = problem ?? "";
             howITeachProblem.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             howITeachButton.Content = HowITeachSettingsRow.ButtonFor(_course.DirectoryPath);
+            // Through the window's route and its closing question (#1003): a
+            // course Obsidian has never seen is added only once the teacher
+            // agrees to close Obsidian.
             if (page is not null)
-                _ = FolderActions.OpenInObsidian(_course.DirectoryPath, _course.DirectoryPath,
-                    BundledToolchain.SupportPath("obsidian_defaults/.obsidian"), page);
+                _window.SidebarPane.OpenHowITeachPageInObsidian(_course, page);
         };
         howITeachRow.Children.RemoveAt(1);
         howITeachRow.Children.Add(howITeachButton);
@@ -1182,7 +1189,14 @@ public sealed partial class CourseSettingsView : UserControl
         // Counts this copy's unsaved exclusion changes and says so on the
         // trail before the file is read back (#348): the click lines stay,
         // and this one says they were taken back.
-        CourseSettingsExclusions.Revert(Config, _course.Code, _course.ConfigFilePath);
+        // Refused (#874: the file could not be read just now): the edits stay
+        // in the form, and the line a Save's failure uses says so and why.
+        if (!CourseSettingsExclusions.Revert(Config, _course.Code, _course.ConfigFilePath, out string? notReverted))
+        {
+            SaveStatus.Text = notReverted ?? "";
+            SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+            return;
+        }
         BuildForm();
         RefreshDirtyState();
         HeaderName.Text = Config.CourseName;
@@ -1314,7 +1328,7 @@ public sealed partial class CourseSettingsView : UserControl
             SettingsSavedLine.PrintingSnapshot? printingBefore = null;
             try
             {
-                var onDisk = CourseConfiguration.FromBytes(File.ReadAllBytes(_course.ConfigFilePath));
+                var onDisk = CourseConfiguration.Load(_course.ConfigFilePath);
                 before = onDisk.AllDeployDestinations;
                 printingBefore = SettingsSavedLine.PrintingSnapshot.From(onDisk);
             }

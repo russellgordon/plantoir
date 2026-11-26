@@ -24,6 +24,10 @@ struct CourseSettingsView: View {
     @State var ownSession: CourseSettingsSession = CourseSettingsSession()
 
     @State var isShowingFoldersHelp: Bool = false
+
+    /// The renames this page owns, one per folder list that renames
+    /// (#899 U4b2-8): halted while they only plan when the page goes away.
+    @State var renames: CourseSettingsRenames = CourseSettingsRenames()
     @State var isRenamingUnitWord: Bool = false
 
     /// Counts the times this window has become key, so the page is drawn
@@ -35,6 +39,12 @@ struct CourseSettingsView: View {
 
     /// Whether this window is key, read only to notice it BECOMING key.
     @Environment(\.controlActiveState) var controlActiveState: ControlActiveState
+
+    /// The window's model: How I Teach opens through its Obsidian route
+    /// (#995). Optional because the form is also built outside any window
+    /// (`CourseDetailView.planningCommands`, and tests), where a required
+    /// environment object stops the process; in a window there always is one.
+    @Environment(WorkspaceModel.self) var workspace: WorkspaceModel?
 
 
     // MARK: - Body
@@ -54,11 +64,18 @@ struct CourseSettingsView: View {
                 Section {
                     TextField("Course name", text: $configuration.courseName)
                         .borderedTextField()
+                        // The visible title, said explicitly: in the grouped
+                        // form VoiceOver read only the value (#993, D40).
+                        .accessibilityLabel(Text("Course name"))
                         .accessibilityIdentifier("courseNameField")
 
                     if configuration.isClub {
                         TextField("Short label beside emoji (clubs, ≤ 12 characters)", text: $configuration.customShortName)
                             .borderedTextField()
+                            // Its title shows only as a placeholder, which
+                            // assistive apps do not read as the field's
+                            // name (#993, the second review).
+                            .accessibilityLabel(Text("Short label beside emoji"))
                             .accessibilityIdentifier("customShortNameField")
                     }
 
@@ -75,6 +92,7 @@ struct CourseSettingsView: View {
                     }
 
                     Toggle("Show page read-time estimates to students", isOn: $configuration.showReadingTime)
+                        .accessibilityLabel(Text("Show page read-time estimates to students"))
                         .accessibilityIdentifier("readingTimeToggle")
 
                     // The map is drawn from this site's own links to the
@@ -82,9 +100,11 @@ struct CourseSettingsView: View {
                     // it — so the second switch is off and unavailable
                     // whenever the first one is off.
                     Toggle("Include the curriculum coverage map", isOn: $configuration.includesCurriculumCoverage)
+                        .accessibilityLabel(Text("Include the curriculum coverage map"))
                         .accessibilityIdentifier("coverageToggle")
                     Toggle("Explain the map on the page", isOn: $configuration.includesCoverageNotes)
                         .disabled(!configuration.includesCurriculumCoverage)
+                        .accessibilityLabel(Text("Explain the map on the page"))
                         .accessibilityIdentifier("coverageNotesToggle")
 
                     Picker("Sidebar folders expand when clicking", selection: $configuration.expandOnFolderClick) {
@@ -209,12 +229,12 @@ struct CourseSettingsView: View {
                                 sectionNumbers: course.configuration.sectionNumbers
                             )
                         },
-                        onRename: { oldName, newName in
-                            return await renameFolder(oldName, to: newName, scope: .shared)
-                        },
+                        onRename: renameFromTheSheet(scope: .shared),
+                        renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
-                        }
+                        },
+                        renameRun: renames.sharedFolders
                     )
                     // Which of those hold curriculum expectations, each with a
                     // coverage map of its own (#128) — offered, never decided
@@ -270,12 +290,12 @@ struct CourseSettingsView: View {
                                 sectionNumbers: course.configuration.sectionNumbers
                             )
                         },
-                        onRename: { oldName, newName in
-                            return await renameFolder(oldName, to: newName, scope: .perSection)
-                        },
+                        onRename: renameFromTheSheet(scope: .perSection),
+                        renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .perSection)
-                        }
+                        },
+                        renameRun: renames.perSectionFolders
                     )
                     StringListEditorView(
                         title: "Per-section files",
@@ -344,6 +364,8 @@ struct CourseSettingsView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
+                        // Decorative: the sentence beside it says it all (#993, D20).
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(saveNotice.sentences, id: \.self) { sentence in
                             Text(sentence)
@@ -399,13 +421,20 @@ struct CourseSettingsView: View {
                 // it explains (#373). It used to be said only under
                 // Deploying, screens away from a section's settings.
                 if let saveProblem {
-                    Text(saveProblem)
-                        .foregroundStyle(.red)
+                    StatusColour.blocking.sentence(saveProblem)
                         .font(.callout)
-                } else if saveIsHeldBack, let holdingProblem {
-                    Text(CourseSettingsWording.saveHeldBack(reason: holdingProblem.sentence))
-                        .font(.callout)
+                } else if course.isRenamingAFolder && course.configuration.hasUnsavedChanges {
+                    // Save is disabled while a Rename folder of this course
+                    // runs, in any window (#899 U4b): said beside it, as a
+                    // destination problem is.
+                    Text(CourseActivity.availableOnceTheFolderIsRenamed)
                         .foregroundStyle(.secondary)
+                        .font(.callout)
+                        .accessibilityIdentifier("saveWaitsForTheRename")
+                } else if saveIsHeldBack, let holdingProblem {
+                    // It stops Save, so the stopping red and its symbol (#994).
+                    StatusColour.blocking.sentence(CourseSettingsWording.saveHeldBack(reason: holdingProblem.sentence))
+                        .font(.callout)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("saveHeldBackReason")
                 }
@@ -441,11 +470,24 @@ struct CourseSettingsView: View {
         // Open in Obsidian is in the course page's toolbar
         // (`CourseDetailView`), so it is there on both tabs (#708).
         .navigationSubtitle(course.configuration.courseName)
+        // The page going away (Settings left for Planning, the course
+        // closed or switched, the window closed) halts a rename that only
+        // plans (#899 U4b2-8, review 1's M1). Here, on the page, which is
+        // not drawn lazily, never on a list inside the grouped form.
+        .onDisappear {
+            renames.pageIsGoingAway()
+        }
         .onAppear {
             // The file may have moved on since this window read it: a build
             // adds folders it discovers, and another window on the same
             // folder may have saved. Never over unsaved edits (issue #265).
             course.configuration.reloadIfNothingUnsaved(url: course.configFileURL)
+        }
+        .task {
+            // Start the How I Teach Page… makes a step on the main actor:
+            // the list is read off it while the settings are open (#899,
+            // ruling 8 on U1's third round; the first review of U3a, LOW 6).
+            await JournaledStep.readTheListAhead()
         }
         .onChange(of: controlActiveState) { oldState, newState in
             if newState == .key {
@@ -523,9 +565,8 @@ struct CourseSettingsView: View {
             ExampleCaption(HowITeachButtonWording.caption)
                 .accessibilityIdentifier("howITeachCaption")
             if let howITeachProblem {
-                Text(howITeachProblem)
+                StatusColour.blocking.sentence(howITeachProblem)
                     .font(.caption)
-                    .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("howITeachProblem")
             }
@@ -582,6 +623,12 @@ struct CourseSettingsView: View {
     }
 
     var saveIsEnabled: Bool {
+        // Not while a Rename folder is under way (#899 U4b): the rename's
+        // step changes the settings file, and a Save between its plan and
+        // its swap would be refused or would race it.
+        if course.isRenamingAFolder {
+            return false
+        }
         return SaveEnablement.saveIsEnabled(
             hasUnsavedChanges: course.configuration.hasUnsavedChanges, holdingProblem: holdingProblem
         )
@@ -716,7 +763,9 @@ struct CourseSettingsView: View {
         howITeachProblem = nil
         do {
             let page: (url: URL, created: Bool) = try HowITeachPage.startOrFind(for: course)
-            FolderActions.openPageInObsidian(page.url, vaultURL: course.directoryURL)
+            // Through the route's question (#995): a course Obsidian has never
+            // seen is added only once the teacher agrees to close Obsidian.
+            workspace?.openHowITeachPageInObsidian(page.url, course: course)
             if page.created {
                 marksWalkGeneration += 1
             }
@@ -752,6 +801,13 @@ struct CourseSettingsView: View {
     }
 
     func save() {
+        if course.isRenamingAFolder {
+            // Every control that saves is disabled meanwhile, in every
+            // window; this is the same rule for any path that reaches here
+            // anyway, said beside Save.
+            saveProblem = CourseActivity.folderRenameIsUnderWay(course: course.displayCode)
+            return
+        }
         saveProblem = nil
         if let holdingProblem {
             saveProblem = holdingProblem.sentence
@@ -766,7 +822,11 @@ struct CourseSettingsView: View {
             if let onDisk {
                 hiddenBefore = onDisk.hiddenItems
             }
-            let result: CourseConfiguration.WriteResult = try course.configuration.write(to: course.configFileURL)
+            // ONE step on the list, whatever it changes: one `editJSON` per
+            // setting it changes (#899 U4a). Revert writes nothing.
+            let result: CourseConfiguration.WriteResult = try course.configuration.writeAsOneStep(
+                to: course.configFileURL, madeBy: UndoStepMaker.sheet("saveCourseSettings")
+            )
             let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
                 folderPath: workingFolderPath,
                 courseCode: course.code,
@@ -1047,6 +1107,17 @@ struct CourseSettingsView: View {
         case .perSection:
             namesInScope = course.configuration.perSectionFolders
         }
+        // A rename of this course under way in any window (#899 U4b): the
+        // sheet's Rename is disabled, and says why.
+        if course.isRenamingAFolder {
+            return CourseActivity.folderRenameIsUnderWay(course: course.displayCode)
+        }
+        // A copy of the course being zipped (#351), a backup or the archive
+        // before a removal or restore: the same, naming the copy (part
+        // seven's review, L1).
+        if CourseActivity.courseIsBeingCopied(folderPath: course.workingFolderPath, courseCode: course.code) {
+            return AssistWording.courseIsBeingCopiedFromTheMenu(course: course.displayCode)
+        }
         // `finishing` is settled once when the sheet opens, not here: it
         // touches the filesystem, and this runs on every keystroke.
         return SpecialFolderRenamer.problem(
@@ -1055,19 +1126,56 @@ struct CourseSettingsView: View {
         )
     }
 
-    /// Renames the folder on disk and rewrites the configuration keys that
-    /// named it, in that order.
-    ///
-    /// Disk first on purpose: if the move fails, nothing has been written and
-    /// the course is exactly as it was. The other way round would leave a
-    /// configuration naming a folder that is not there — which is the state
-    /// this whole feature exists to make impossible.
+    /// What a rename sheet's Rename runs (#899 U4b2-7): `renameFolder`,
+    /// awaited inline, never in a fresh task, so that the sheet's Cancel,
+    /// its going away and a quit reach the plan through `FolderRenameRun`.
+    /// Named, so the sheet-chain test runs the very closure the sheet is
+    /// handed.
+    func renameFromTheSheet(scope: FolderScope) -> (_ oldName: String, _ newName: String) async -> RenameResult {
+        return { oldName, newName in
+            return await renameFolder(oldName, to: newName, scope: scope)
+        }
+    }
+
+    /// Whether this course's rename has begun its check and swap, after
+    /// which it can no longer be halted (#899 U4b).
+    func renameSwapHasBegun() -> Bool {
+        return CourseActivity.folderRenameIsSwapping(
+            folderPath: course.workingFolderPath, courseCode: course.code
+        )
+    }
+
+    /// Renames the folder on disk, relinks the pages that named it and
+    /// rewrites the configuration keys that named it, as ONE step through
+    /// the door (#899 U4b, key `renameFolder`): every folder's move, every
+    /// page's relink and one `editJSON` per settings member it changes, all
+    /// of them or none. A rename that is refused writes nothing and says so.
+    /// The old order (disk first, settings after) could leave the folder
+    /// moved and the settings not knowing as an ordinary outcome; now that is
+    /// left only when a refused step cannot all be put back, which is said
+    /// (`renamedOnlyInPart`, `stoppedPartWay`) and written on the trail.
     func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) async -> RenameResult {
-        let outcome: FolderRenameOutcome
-        // OFF the main thread. The move is quick; reading every page in the
-        // course to rewrite links is not, on an iCloud-backed vault where an
-        // evicted file downloads on read. The configuration write below stays
-        // on the main actor, because it touches the observable model.
+        // One rename at a time per course FOLDER, from any window, and no
+        // Save meanwhile (U4b part six's review, M2): the claim is recorded in
+        // `CourseActivity`, which every window and ⌘Q read, so a second
+        // rename can neither overwrite nor clear this one's record. Every
+        // control that starts either is disabled while it is held, so this
+        // refusal is reached only by a path that is not a control.
+        guard let claim = CourseActivity.beginFolderRename(
+            folderPath: course.workingFolderPath, courseCode: course.code
+        ) else {
+            return .failed(CourseActivity.folderRenameIsUnderWay(course: course.displayCode))
+        }
+        defer {
+            CourseActivity.endFolderRename(claim)
+        }
+        // Nor while a copy of the course is being zipped (#351): a removal
+        // or restore waiting on that zip would take a course half renamed.
+        // Said as the other busy refusals are, naming the copy (part seven's
+        // review, L1); the sheet's Rename is disabled with it beforehand.
+        if CourseActivity.courseIsBeingCopied(folderPath: course.workingFolderPath, courseCode: course.code) {
+            return .failed(AssistWording.courseIsBeingCopiedFromTheMenu(course: course.displayCode))
+        }
         let courseDirectory: URL = course.directoryURL
         let sectionNumbers: [Int] = course.configuration.sectionNumbers
         // Read BEFORE the move, while the folder still has its old name: which
@@ -1075,48 +1183,151 @@ struct CourseSettingsView: View {
         // is a curriculum folder whose name must be written down (#128).
         let curriculumWithPages: [String] = CurriculumFolderRule.foldersWithPages(for: course)
         let curriculumWithLetterFirstPages: [String] = CurriculumFolderRule.foldersWithLetterFirstPages(for: course)
-        do {
-            outcome = try await Task.detached(priority: .userInitiated) {
-                return try SpecialFolderRenamer.rename(
+        let change: ([String: Any]) -> [String: Any] = { values in
+            return SpecialFolderRenamer.renaming(
+                oldName, to: newName, scope: scope, in: values, foldersWithPages: curriculumWithPages,
+                foldersWithLetterFirstPages: curriculumWithLetterFirstPages
+            )
+        }
+        var attempts: Int = 0
+        // The rename record is this run's only while this run is unfinished,
+        // and an earlier run's record (another folder's interrupted rename,
+        // or the one this run finishes) is never cleared by a refusal (the
+        // final sweep, L4; U4b2-3). Read once, before the loop writes it.
+        var record: RenameRecordClaim = RenameRecordClaim(
+            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory,
+            changesTheSettings: true
+        )
+        var outcome: FolderRenameOutcome = FolderRenameOutcome(foldersMoved: 0, pagesRelinked: 0)
+        while true {
+            // The walk OFF the main thread: reading every page in the course
+            // to find the links is not quick on an iCloud-backed vault, where
+            // an evicted file downloads on read. Nothing is written by it.
+            // Cancel gives the course back at once (part seven's review, M1):
+            // the walk is told to stop, and this does not wait for it, so the
+            // claim below ends now even if a read is stuck inside the system.
+            let planned: FolderRenamePlan
+            do {
+                planned = try await SpecialFolderRenamer.planHaltingAtCancel(
                     oldName, to: newName, scope: scope,
                     courseDirectory: courseDirectory,
                     sectionNumbers: sectionNumbers
                 )
-            }.value
-        } catch {
-            return .failed(error.localizedDescription)
-        }
-        do {
-            try course.configuration.recordOnDisk({ values in
-                return SpecialFolderRenamer.renaming(
-                    oldName, to: newName, scope: scope, in: values, foldersWithPages: curriculumWithPages,
-                    foldersWithLetterFirstPages: curriculumWithLetterFirstPages
-                )
-            }, at: course.configFileURL)
-        } catch {
-            // Recorded BEFORE returning, and that ordering is the point: this
-            // is the one outcome the trail exists for. The folder has moved
-            // and the settings do not know, which is the state somebody will
-            // be asked to explain later — and it was the one case with no line
-            // at all, because the note used to sit after this block.
-            ActivityTrail.note(
-                .folderRenamed,
-                "renamed the folder " + oldName + " to " + newName + " in " + course.code
-                + " but could not write it to this course's settings — "
-                + error.localizedDescription
+            } catch is CancellationError {
+                // Halted at Cancel while planning: nothing was written and no
+                // record was made. The sheet has gone; this is said to no one.
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: CancellationError().localizedDescription
+                ))
+            } catch let refused as JournaledStepError {
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: refused.localizedDescription
+                ))
+            } catch {
+                return .failed(error.localizedDescription)
+            }
+            let step: JournaledStep = JournaledStep(
+                course: course, section: nil, maker: UndoStepMaker.sheet("renameFolder"), holds: "course"
             )
-            // The folder HAS moved, so this is not "the rename failed" — it is
-            // a rename whose bookkeeping did not land, and saying otherwise
-            // would send the teacher looking for a folder under its old name.
-            return .failed(
-                "“\(oldName)” was renamed to “\(newName)”, but Plantoir could not write the "
-                + "change to this course's settings: \(error.localizedDescription)"
-            )
+            SpecialFolderRenamer.apply(planned, to: step)
+            let plannedSettings: CourseConfiguration.PlannedWrite
+            do {
+                plannedSettings = try course.configuration.planRecordOnDisk(change, at: course.configFileURL, into: step)
+            } catch {
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: error.localizedDescription
+                ))
+            }
+            // Halted at Cancel while it was only planning (the plan writes
+            // nothing): nothing is made. Asked here, on the main actor, in the
+            // same turn as the swap is marked begun, so a Cancel lands either
+            // before this (and halts it) or after (and is disabled). The swap
+            // also refuses a claim no longer held: an ended claim is never
+            // taken up again; and it refuses once a quit is going ahead, so
+            // the quit's wait never misses a swap (U4b2-7 review 1, M1).
+            if Task.isCancelled || !FolderRenameRun.swapBegins(claim) {
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: CancellationError().localizedDescription
+                ))
+            }
+            // Recorded BEFORE the step is made, so that a rename killed part
+            // way can be recognised and finished: with the switch off, recovery
+            // records and repairs nothing (`interruptedRenameTarget`).
+            if !planned.moves.isEmpty {
+                record.renameIsStarting(moving: planned.moves, sectionNumbers: sectionNumbers)
+            }
+            do {
+                // The check and the swap read and hash every file in each
+                // moved folder: OFF the main actor, so the window stays live
+                // (U4b part four's review, M1). The list's one lock is held
+                // only while the step is begun and finished; the check and
+                // the swap run outside it, so what keeps another step of this
+                // course out meanwhile is this rename's claim in
+                // `CourseActivity` (every Save, rename and structural act of
+                // the course, in every window, is refused while it is held)
+                // and, for anything else, the swap's content checks.
+                try await SpecialFolderRenamer.make(step)
+            } catch JournaledStepError.refused(.changedSince, _) where attempts < 3 {
+                // A page or a setting the step changes was changed between the
+                // plan and the make (a build's preflight, Obsidian): planned
+                // again from the disk as it is then, as Save does.
+                // Nothing was changed (a refusal comes only once everything
+                // is put back), so the record goes before the re-plan, which
+                // may itself be refused (part four's review, L2); the next
+                // make writes it again. Put back as it was before this run.
+                record.nothingWasChanged()
+                attempts += 1
+                continue
+            } catch let partWay as JournaledStepError {
+                if case .leftPartWay(_, _, let keptOriginals) = partWay {
+                    // Said as the disk is: each of this rename's folders at its
+                    // new name is named there (part four's review, L1),
+                    // whether this run moved it or an earlier, interrupted run
+                    // of it did (U4b2-5: a run finishing a rename moves
+                    // nothing), and a folder that was never this rename's is
+                    // not (review 1, M1). A place that cannot be read, or that
+                    // an earlier run whose record did not say may have moved,
+                    // is told on the trail and, when nothing is known at the
+                    // new name, on the sheet (U4b2-6).
+                    // Each part-way ending leaves its line on the trail BEFORE
+                    // it returns (the final sweep, M1): these are the states
+                    // somebody will be asked to explain next week. The record
+                    // stays, as a stopped rename's does.
+                    let left: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
+                        renaming: oldName, to: newName, scope: scope,
+                        courseDirectory: courseDirectory, sectionNumbers: sectionNumbers,
+                        planned: planned.moves, earlierRecord: record.earlierRecord
+                    )
+                    let ending: (line: String, sentence: String) = SpecialFolderRenamer.partWayEnding(
+                        renaming: oldName, to: newName, course: course.code, scope: scope, left: left,
+                        keptBeside: keptOriginals.count, said: partWay.localizedDescription
+                    )
+                    ActivityTrail.note(.folderRenamed, ending.line)
+                    return .failed(ending.sentence)
+                }
+                if case .stoppedByATest = partWay {
+                    // A process that died here leaves its record, as a kill does.
+                    return .failed(SpecialFolderRenamer.nothingWasChanged(
+                        renaming: oldName, said: partWay.localizedDescription
+                    ))
+                }
+                record.stepWasNotMade(partWay)
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: partWay.localizedDescription
+                ))
+            } catch {
+                record.nothingWasChanged()
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: error.localizedDescription
+                ))
+            }
+            course.configuration.finishRecord(plannedSettings, change)
+            outcome = planned.outcome
+            break
         }
-        // The configuration is written, so the rename is whole and the record
-        // of it having started can go. Anything that leaves this record behind
-        // is, by definition, a rename that did not finish.
-        SpecialFolderRenamer.clearRenameRecord(courseDirectory: course.directoryURL)
+        // The step is made, so the rename is whole: its record goes, and an
+        // earlier run's record of another folder is left as it was.
+        record.renameIsWhole()
         ActivityTrail.note(
             .folderRenamed,
             "renamed the folder " + oldName + " to " + newName + " in " + course.code
@@ -1202,28 +1413,26 @@ struct CourseSettingsView: View {
     /// a folder added later behaved unlike every folder made with the course.
     /// The pages are the course creator's own (`FolderScaffold`), written only
     /// into a folder this call has just made and never over a file.
-    func createFoldersOnDisk(named name: String, scope: FolderScope) -> FolderScaffold.Outcome {
+    ///
+    /// `created` is the pages' `created` moment, now unless a test fixes it
+    /// (the recorded action step, `undo-action-steps.json`).
+    func createFoldersOnDisk(
+        named name: String, scope: FolderScope, created: String = SectionAdder.timestamp()
+    ) -> FolderScaffold.Outcome {
         let sectionNumbers: [Int] = course.configuration.sectionNumbers
         let locations: [URL] = SpecialFolderRenamer.folderLocations(
             named: name, scope: scope,
             courseDirectory: course.directoryURL,
             sectionNumbers: sectionNumbers
         )
+        // Re-adding a name whose folder is already there is the common case
+        // and is not worth a word.
         var newFolders: [URL] = []
         for location in locations {
             if FileManager.default.fileExists(atPath: location.path) {
                 continue
             }
-            do {
-                try FileManager.default.createDirectory(at: location, withIntermediateDirectories: true)
-                newFolders.append(location)
-            } catch {
-                // Re-adding a name whose folder is already there is the common
-                // case and is not worth a word; a genuine failure shows up as
-                // the folder simply not being there, which the build's own
-                // checks already report in the teacher's own terms.
-                continue
-            }
+            newFolders.append(location)
         }
         if newFolders.isEmpty {
             return FolderScaffold.Outcome()
@@ -1233,10 +1442,26 @@ struct CourseSettingsView: View {
             scope: scope,
             sectionNumbers: sectionNumbers,
             curriculumPageNames: FolderScaffold.curriculumPageNames(for: course),
-            created: SectionAdder.timestamp(),
+            created: created,
             template: FolderScaffold.bundledTemplate()
         )
-        return FolderScaffold.writePages(pages, intoNewFolders: newFolders, courseDirectory: course.directoryURL)
+        // ONE step on the list (#899 U4a): each folder made whole with its
+        // two pages, as one `createTree`, all of them or none. The list's own
+        // change is Save's, in Save's step. A genuine failure makes nothing,
+        // and shows up as the folder simply not being there, which the
+        // build's own checks already report in the teacher's own terms.
+        let step: JournaledStep = JournaledStep(
+            course: course, section: nil, maker: UndoStepMaker.sheet("addFolder"), holds: "course"
+        )
+        let outcome: FolderScaffold.Outcome = FolderScaffold.planPages(
+            pages, intoNewFolders: newFolders, courseDirectory: course.directoryURL, into: step
+        )
+        do {
+            try step.make()
+        } catch {
+            return FolderScaffold.Outcome()
+        }
+        return outcome
     }
 
     // MARK: - What a removal or an untick may do

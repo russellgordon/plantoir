@@ -124,24 +124,20 @@ internal sealed class SectionVerbDialog
             // Closed at the plan, by Cancel or by Escape: nothing ran, and
             // the trail says so.
             if (_stage is Stage.Plan)
-                SectionVerbs.NoteCancelled(MenuPath(_item), _course.Code, _section, Counts());
+                SectionVerbs.NoteCancelled(MenuPath(_item, _course.Configuration.ClassNoun), _course.Code, _section, Counts());
         };
     }
 
-    /// <summary>Where an item is in the menus, the way the trail says it.</summary>
-    internal static string MenuPath(Item item) => item switch
-    {
-        Item.PublishPages => "Section ▸ Publish Pages…",
-        Item.HidePages => "Section ▸ Hide Pages…",
-        Item.PublishClassForADate => "Section ▸ Publish Class for a Date…",
-        Item.RebuildPreview => "Section ▸ Rebuild Preview",
-        Item.UndoLastChange => "Section ▸ Undo Last Change",
-        Item.AddNextClass => "Section ▸ Add Next Class",
-        Item.ReDateClasses => "Section ▸ Re-date Classes…",
-        Item.MakeRoomForClasses => "Section ▸ Make Room for Classes…",
-        Item.ClassDates => "Section ▸ Class Dates…",
-        _ => item.ToString(),
-    };
+    /// <summary>
+    /// Where an item is in the menus, the way the trail says it: the menu that
+    /// holds it, from <see cref="SubjectMenuLayout"/> (#990: Section or
+    /// Classes), under the title the course's menu bar gives it (Meetings ▸
+    /// in a club), and the words it is drawn with there.
+    /// </summary>
+    internal static string MenuPath(Item item, ClassNoun noun) =>
+        SubjectMenuLayout.MenuContaining(item) is not null && SubjectMenuLayout.TitleHere(item, noun) is { } title
+            ? SubjectMenuLayout.Path(item, title, noun)
+            : item.ToString();
 
     // ---- Opening it, per item ---------------------------------------------------
 
@@ -258,6 +254,194 @@ internal sealed class SectionVerbDialog
         return view.Show();
     }
 
+    // ---- Classes ▸ Add Class… (#927, the mac's #897 piece A) ---------------------
+
+    /// <summary>Add Class…'s way, chosen in the dialog; null for every other item.</summary>
+    private SubjectMenuRules.AddClassWay? _way;
+    private SubjectMenuRules.AddClassFacts _addClassFacts = new();
+    private readonly List<(string Path, string Title, ListViewItem Row)> _sourceRows = new();
+    private ListView? _sources;
+    private StackPanel? _copyPart;
+
+    /// <summary>How many classes the copy list shows before it scrolls: the mac's sheet shows 7.</summary>
+    internal const int SourceRowsShown = 7;
+
+    /// <summary>
+    /// Add Class…: how the class is added, one radio line per way in the
+    /// contract's order, a way this section cannot use drawn greyed (never
+    /// left out) with the reason lines under the ways
+    /// (<c>subjectMenus.addClassSheet</c>), the first usable way chosen. The
+    /// next class and a new unit add at once (Add); a copy is picked from a
+    /// searchable list of this section's class pages, then its plan, then
+    /// Duplicate. The facts are read now, when it opens, never when the menu
+    /// is drawn. No confirmation beyond this: each way can be undone.
+    /// </summary>
+    public static Task ChooseHowToAddAClass(XamlRoot root, SectionVerbs verbs, Course course, int section)
+    {
+        var noun = course.Configuration.ClassNoun;
+        string sectionText = section.ToString();
+        var view = new SectionVerbDialog(root, verbs, course, section, Item.AddClass,
+                                         AddClassWords.Title(course.Code, sectionText, noun));
+        view._addClassFacts = SectionVerbs.AddClassFacts(course, section);
+        var ways = SubjectMenuRules.AddClassWays(view._addClassFacts);
+        view._way = ways.Count > 0 ? ways[0] : null;
+        string unit = SectionVerbs.UnitWordInASentence(course.Configuration.Naming);
+
+        var panel = new StackPanel { Spacing = 12, MinWidth = 460 };
+        panel.Children.Add(Words(AddClassWords.HowToAdd(noun)));
+        var choices = new RadioButtons { MaxColumns = 1 };
+        AutomationProperties.SetName(choices, AddClassWords.HowToAdd(noun));
+        AutomationProperties.SetAutomationId(choices, "sectionVerbAddClassWay");
+        foreach (var way in Enum.GetValues<SubjectMenuRules.AddClassWay>())
+        {
+            string label = AddClassWords.Label(SubjectMenuRules.Label(way, view._addClassFacts), noun, unit);
+            var radio = new RadioButton
+            {
+                Content = label,
+                Tag = way,
+                IsEnabled = ways.Contains(way),
+                IsChecked = view._way == way,
+            };
+            AutomationProperties.SetAutomationId(radio, "sectionVerbAddClassWay-" + Camel(way.ToString()));
+            radio.Checked += (_, _) =>
+            {
+                view._way = way;
+                view.UpdateAddClassButton();
+            };
+            choices.Items.Add(radio);
+        }
+        panel.Children.Add(choices);
+        foreach (var line in SubjectMenuRules.ReasonLines(view._addClassFacts))
+        {
+            var reason = Words(AddClassWords.Reason(line, noun, unit));
+            if (Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out var grey) && grey is Brush secondary)
+                reason.Foreground = secondary;
+            AutomationProperties.SetAutomationId(reason, "sectionVerbAddClassGreyed-" + Camel(line.ToString()));
+            panel.Children.Add(reason);
+        }
+
+        // The copy's list: this section's class pages, Page and Date, one chosen.
+        var reader = Reader(verbs.Folder);
+        List<string> pages;
+        try { pages = reader.ClassPages(course, section); }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"Add Class… could not list the classes: {ex.Message}");
+            pages = new List<string>();
+        }
+        if (pages.Count > 0)
+        {
+            view._copyPart = new StackPanel { Spacing = 8 };
+            view._copyPart.Children.Add(Words(AddClassWords.PickClassToDuplicate(noun)));
+            var find = new TextBox { PlaceholderText = AssistWording.MenuFindAPage };
+            AutomationProperties.SetName(find, AssistWording.MenuFindAPage);
+            AutomationProperties.SetAutomationId(find, "sectionVerbFind");
+            view._copyPart.Children.Add(find);
+            var list = new ListView
+            {
+                SelectionMode = ListViewSelectionMode.Single,
+                BorderThickness = new Thickness(PageTableLayout.TableBorder),
+                CornerRadius = new CornerRadius(4),
+                Height = Math.Min(pages.Count, SourceRowsShown) * PlanTableLayout.RowPitch + 2 * PageTableLayout.TableBorder,
+            };
+            if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out var stroke) && stroke is Brush brush)
+                list.BorderBrush = brush;
+            AutomationProperties.SetName(list, AddClassWords.PickClassToDuplicate(noun));
+            AutomationProperties.SetAutomationId(list, "sectionVerbSourceTable");
+            for (int index = 0; index < pages.Count; index++)
+            {
+                string page = pages[index];
+                string title = System.IO.Path.GetFileNameWithoutExtension(page);
+                string day = AssistWorkspace.DateOf(course, section, page) is { } date ? AssistWording.LaterClassesDay(date) : "";
+                var grid = new Grid { ColumnSpacing = PageTableLayout.ColumnSpacing };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(PageTableLayout.PickDate) });
+                var name = new TextBlock { Text = title, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+                ToolTipService.SetToolTip(name, title);
+                var when = new TextBlock { Text = day, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(when, 1);
+                grid.Children.Add(name);
+                grid.Children.Add(when);
+                var row = new ListViewItem
+                {
+                    Content = grid,
+                    MinHeight = PlanTableLayout.RowPitch,
+                    Padding = new Thickness(PageTableLayout.RowPadding, 0, PageTableLayout.RowPadding, 0),
+                };
+                AutomationProperties.SetAutomationId(row, $"sectionVerbSource{index}");
+                AutomationProperties.SetName(row, day.Length > 0 ? $"{title}, {day}" : title);
+                view._sourceRows.Add((SectionVerbs.CoursePath(course.DirectoryPath, page), title, row));
+                list.Items.Add(row);
+            }
+            list.SelectionChanged += (_, _) => view.UpdateAddClassButton();
+            find.TextChanged += (_, _) =>
+            {
+                // A chosen class the search hides is let go, so Continue never
+                // copies a row the teacher cannot see.
+                string wanted = find.Text.Trim();
+                var chosen = list.SelectedItem;
+                list.Items.Clear();
+                foreach (var (_, title, row) in view._sourceRows)
+                    if (wanted.Length == 0 || title.Contains(wanted, StringComparison.CurrentCultureIgnoreCase))
+                        list.Items.Add(row);
+                if (chosen is not null && list.Items.Contains(chosen)) list.SelectedItem = chosen;
+                view.UpdateAddClassButton();
+            };
+            view._sources = list;
+            view._copyPart.Children.Add(list);
+            panel.Children.Add(view._copyPart);
+        }
+        view.ShowChoosing(panel);
+        view.UpdateAddClassButton();
+        return view.Show();
+    }
+
+    private static string Camel(string name) => char.ToLowerInvariant(name[0]) + name[1..];
+
+    /// <summary>The source the copy list has chosen, by its place in the course; null for none.</summary>
+    private string? ChosenSource()
+    {
+        if (_sources?.SelectedItem is not ListViewItem chosen) return null;
+        foreach (var (path, _, row) in _sourceRows)
+            if (ReferenceEquals(row, chosen)) return path;
+        return null;
+    }
+
+    /// <summary>
+    /// The button and the copy list follow the way: Add for a way that adds at
+    /// once, Continue for a copy (a plan follows), live only when the way can
+    /// be used and, for a copy, a class is chosen. The list shows for a copy only.
+    /// </summary>
+    private void UpdateAddClassButton()
+    {
+        if (_item != Item.AddClass || _stage != Stage.Choose) return;
+        bool copy = _way == SubjectMenuRules.AddClassWay.AsACopyOfAClass;
+        if (_copyPart is not null) _copyPart.Visibility = copy ? Visibility.Visible : Visibility.Collapsed;
+        _dialog.PrimaryButtonText = copy ? AssistWording.MenuContinueButton : AssistWording.MenuAddButton;
+        bool usable = _way is { } way && SubjectMenuRules.AddClassWays(_addClassFacts).Contains(way);
+        DialogButtons.EnablePrimary(_dialog, usable && (!copy || ChosenSource() is not null));
+    }
+
+    /// <summary>Add Class…'s button at Choose: the change at once, or the copy's plan.</summary>
+    private async Task AdvanceAddClass()
+    {
+        string code = _course.Code;
+        switch (_way)
+        {
+            case SubjectMenuRules.AddClassWay.NextInThisUnit:
+                await RunChange(SectionVerbs.AddNextClass(code, _section));
+                break;
+            case SubjectMenuRules.AddClassWay.InANewUnit:
+                await RunChange(SectionVerbs.AddNextClassInANewUnit(code, _section));
+                break;
+            case SubjectMenuRules.AddClassWay.AsACopyOfAClass when ChosenSource() is { } source:
+                _verbButton = AssistWording.MenuDuplicateButton;
+                _pendingCall = SectionVerbs.DuplicateAsNextClass(code, _section, source, plan: false);
+                await RunPlan(SectionVerbs.DuplicateAsNextClass(code, _section, source, plan: true));
+                break;
+        }
+    }
+
     /// <summary>Re-date Classes…: straight to the plan.</summary>
     public static Task PlanReDate(XamlRoot root, SectionVerbs verbs, Course course, int section)
     {
@@ -273,7 +457,128 @@ internal sealed class SectionVerbDialog
         return planning;
     }
 
-    /// <summary>Undo Last Change and Add Next Class: no plan; the dialog shows working, then what was done.</summary>
+    // ---- Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece B) -------
+
+    /// <summary>The website rule's answer for this section, read when the dialog opened; null for every other item.</summary>
+    private RollOverFromTheMenu.Website? _rollOverWebsite;
+
+    /// <summary>The answer chosen to the website question; none to begin with (the question guesses neither).</summary>
+    private string? _rollOverAnswer;
+
+    /// <summary>
+    /// Narrator's name for the two answers' group: the mac's
+    /// <c>AccessibilityNames.rollOverWebsite</c> (#993's D18), which no
+    /// contract carries.
+    /// </summary>
+    private const string RollOverWebsiteGroupName = "Website";
+
+    /// <summary>What a rollover's call carries, or null while the question is unanswered.</summary>
+    private string? RollOverSent() =>
+        _rollOverWebsite is { } website ? RollOverFromTheMenu.WebsiteSent(website, _rollOverAnswer) : null;
+
+    /// <summary>
+    /// Roll Over to a New Year…: the intro, the dates on file (and a line when
+    /// they have all passed), then the website: the window's own question over
+    /// two choices with NOTHING chosen where the section has a website, or one
+    /// line saying why there is no question (<c>subjectMenus.rollOverSheet</c>).
+    /// Continue stays dimmed until there is an answer to send; then the plan,
+    /// then Roll Over. The mac's <c>rollOverChoosing</c>.
+    /// </summary>
+    public static Task ChooseHowToRollOver(XamlRoot root, SectionVerbs verbs, Course course, int section)
+    {
+        var noun = course.Configuration.ClassNoun;
+        var view = new SectionVerbDialog(root, verbs, course, section, Item.RollOverToANewYear,
+                                         AssistWording.MenuRollOverTitle(course.Code, section.ToString()));
+        view._verbButton = AssistWording.MenuRollOverButton;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var website = RollOverFromTheMenu.WebsiteFor(verbs.Folder, course, section, today.Year);
+        view._rollOverWebsite = website;
+
+        var panel = new StackPanel { Spacing = 12, MinWidth = 420, MaxWidth = 560 };
+        panel.Children.Add(Words(RollOverWords.Intro(noun)));
+        var remembered = TimetableMemory.Read(verbs.Folder, course.Code, section, today, recording: false);
+        var dates = remembered?.Dates.OrderBy(day => day).ToList() ?? new List<DateOnly>();
+        if (dates.Count > 0)
+        {
+            var datesLine = Words(RollOverWords.Dates(RollOverFromTheMenu.DayAsWritten(dates[0]),
+                                                      RollOverFromTheMenu.DayAsWritten(dates[^1]), noun));
+            AutomationProperties.SetAutomationId(datesLine, "sectionVerbRollOverDates");
+            panel.Children.Add(datesLine);
+            if (RollOverFromTheMenu.DatesAreOld(dates[^1], today))
+            {
+                var old = Secondary(Words(RollOverWords.DatesAreOld(noun)));
+                AutomationProperties.SetAutomationId(old, "sectionVerbRollOverDatesAreOld");
+                panel.Children.Add(old);
+            }
+        }
+
+        if (website == RollOverFromTheMenu.Website.Asked)
+        {
+            panel.Children.Add(Words(AssistWording.RolloverWebsiteQuestion));
+            // In the question's own order: a new website, or the same one.
+            // Two RadioButtons of one group, neither checked: a RadioButtons
+            // control would be the same, and these give each answer its own id.
+            var choices = new StackPanel { Spacing = 4 };
+            AutomationProperties.SetName(choices, RollOverWebsiteGroupName);
+            AutomationProperties.SetAutomationId(choices, "sectionVerbRollOverWebsite");
+            foreach (var (answer, label) in new[]
+                     {
+                         (RollOverFromTheMenu.StartANewWebsite, AssistWording.MenuRollOverNewWebsite),
+                         (RollOverFromTheMenu.KeepTheSameWebsite, AssistWording.MenuRollOverKeepWebsite),
+                     })
+            {
+                var radio = new RadioButton { Content = label, GroupName = "rollOverWebsite", IsChecked = false };
+                AutomationProperties.SetName(radio, label);
+                AutomationProperties.SetAutomationId(radio, "sectionVerbRollOverWebsite-" + answer);
+                radio.Checked += (_, _) =>
+                {
+                    view._rollOverAnswer = answer;
+                    view.UpdateRollOverButton();
+                };
+                choices.Children.Add(radio);
+            }
+            panel.Children.Add(choices);
+        }
+        else
+        {
+            string why = website switch
+            {
+                RollOverFromTheMenu.Website.NotDeployedYet => AssistWording.MenuRollOverNotDeployedYet,
+                RollOverFromTheMenu.Website.DeploysToAFolder => AssistWording.MenuRollOverDeploysToAFolder,
+                _ => AssistWording.MenuRollOverANewWebsiteWouldReuseItsAddress,
+            };
+            var line = Secondary(Words(why));
+            AutomationProperties.SetAutomationId(line, "sectionVerbRollOverNoQuestion");
+            panel.Children.Add(line);
+        }
+
+        view._planCall = () =>
+        {
+            string sent = view.RollOverSent()!;
+            view._pendingCall = SectionVerbs.RollOver(course.Code, section, sent, plan: false);
+            return SectionVerbs.RollOver(course.Code, section, sent, plan: true);
+        };
+        view.ShowChoosing(panel);
+        view.UpdateRollOverButton();
+        return view.Show();
+    }
+
+    /// <summary>Continue is live only once the call has a website to send.</summary>
+    private void UpdateRollOverButton()
+    {
+        if (_item != Item.RollOverToANewYear || _stage != Stage.Choose) return;
+        DialogButtons.EnablePrimary(_dialog, RollOverSent() is not null);
+    }
+
+    /// <summary>A line in the secondary text colour, as the mac's <c>.foregroundStyle(.secondary)</c>.</summary>
+    private static TextBlock Secondary(TextBlock words)
+    {
+        if (Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out var grey) && grey is Brush secondary)
+            words.Foreground = secondary;
+        return words;
+    }
+
+    /// <summary>Undo Last Change: no plan; the dialog shows working, then what was done.</summary>
     public static Task RunAtOnce(XamlRoot root, SectionVerbs verbs, Course course, int section, Item item,
                                  JsonObject call, string title)
     {
@@ -813,14 +1118,16 @@ internal sealed class SectionVerbDialog
         // Publish Pages… asks nothing about classes dated after the next class
         // (#726, the mac's #694; classesDatedLater.neverAskedFrom): publishing
         // changes only the preview, and the question is put at Deploy.
-        if (_stage == Stage.Choose && _planCall is not null) await RunPlan(_planCall());
+        if (_stage == Stage.Choose && _item == Item.AddClass) await AdvanceAddClass();
+        else if (_stage == Stage.Choose && _planCall is not null) await RunPlan(_planCall());
         else if (_stage == Stage.Plan && _pendingCall is not null) await RunChange(_pendingCall);
     }
 
     private async Task RunPlan(JsonObject planCall)
     {
         ShowWorking(AssistWording.MenuWorking);
-        var answer = await _verbs.Perform(planCall, MenuPath(_item), _course.Code, _section, Counts());
+        var answer = await _verbs.Perform(planCall, MenuPath(_item, _course.Configuration.ClassNoun), _course.Code, _section,
+                                          SubjectMenuLayout.MenuContaining(_item), Counts());
         if (answer.IsPlan)
         {
             // The table when the menu's server sent one (#548); the text card
@@ -830,7 +1137,7 @@ internal sealed class SectionVerbDialog
             return;
         }
         // A plan twin that refused: its sentence and OK, nothing to approve.
-        SectionVerbs.NoteRan(MenuPath(_item), "changed nothing", _course.Code, _section, Counts());
+        SectionVerbs.NoteRan(MenuPath(_item, _course.Configuration.ClassNoun), "changed nothing", _course.Code, _section, Counts());
         ShowResult(answer.Summary);
     }
 
@@ -844,7 +1151,8 @@ internal sealed class SectionVerbDialog
     {
         ShowWorking(AssistWording.MenuWorking);
         string savingACopy = AssistWording.MenuSavingACopy(_course.Code);
-        var answer = await _verbs.Perform(call, MenuPath(_item), _course.Code, _section, Counts(),
+        var answer = await _verbs.Perform(call, MenuPath(_item, _course.Configuration.ClassNoun), _course.Code, _section,
+            SubjectMenuLayout.MenuContaining(_item), Counts(),
             progress: note => _dialog.DispatcherQueue?.TryEnqueue(() =>
             {
                 if (_stage == Stage.Working && _workingWords is not null)
@@ -874,7 +1182,7 @@ internal sealed class SectionVerbDialog
                                            new[] { page.Folder, day }, Ticked: false));
         }
         var table = new TickTable("sectionVerbPickerTable",
-                                  publishing ? AssistWording.MenuPickPagesToPublish : AssistWording.MenuPickPagesToHide,
+                                  publishing ? PickPagesToPublish(_course) : AssistWording.MenuPickPagesToHide,
                                   new[] { AssistWording.MenuPlanFolderColumn, AssistWording.MenuPickDateColumn },
                                   new[] { PageTableLayout.PickFolder, PageTableLayout.PickDate }, offers);
         for (int i = 0; i < pages.Count; i++) _rows.Add((pages[i], table.Rows[i].Box));
@@ -893,7 +1201,7 @@ internal sealed class SectionVerbDialog
                                   || pages[row.Index].Folder.Contains(wanted, StringComparison.CurrentCultureIgnoreCase));
         };
         var panel = new StackPanel { Spacing = 12, MinWidth = 460 };
-        panel.Children.Add(Words(publishing ? AssistWording.MenuPickPagesToPublish : AssistWording.MenuPickPagesToHide));
+        panel.Children.Add(Words(publishing ? PickPagesToPublish(_course) : AssistWording.MenuPickPagesToHide));
         panel.Children.Add(find);
         panel.Children.Add(table.Panel);
         // The table's height is counted from EVERY page offered, never the
@@ -918,11 +1226,20 @@ internal sealed class SectionVerbDialog
 
     private List<string> Ticked() => _rows.Where(row => row.Box.IsChecked == true).Select(row => row.Page.Name).ToList();
 
+    /// <summary>Publish Pages…' sentence above the ticks, in the course's noun (#1027).</summary>
+    internal static string PickPagesToPublish(Course course) =>
+        course.Configuration.ClassNoun == ClassNoun.Meeting
+            ? AssistWording.MenuPickPagesToPublishForAMeeting
+            : AssistWording.MenuPickPagesToPublish;
+
     /// <summary>The trail line's counts — never a title.</summary>
     private string? Counts() => _item switch
     {
         Item.PublishPages or Item.HidePages => Ticked().Count == 1 ? "1 page ticked" : $"{Ticked().Count} pages ticked",
         Item.MakeRoomForClasses when _howMany is not null => (int)_howMany.Value == 1 ? "room for 1" : $"room for {(int)_howMany.Value}",
+        Item.AddClass when _way is { } way => SectionVerbs.AddClassCounts(way, _course.Configuration.ClassNoun),
+        Item.RollOverToANewYear when _rollOverWebsite is { } website && RollOverSent() is { } sent
+            => RollOverFromTheMenu.Counts(website, sent),
         _ => null,
     };
 }

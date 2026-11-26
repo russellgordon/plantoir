@@ -44,6 +44,37 @@ nonisolated struct UndoStepDraft: Sendable {
     let recomputes: [UndoOp]
 }
 
+/// A step given as its ops, for the kinds U2 defines: everything about the
+/// step but its number, and the content its ops need from the list.
+nonisolated struct UndoOpsDraft: Sendable {
+
+    // MARK: - Stored properties
+
+    let action: UndoAction
+
+    let madeBy: String
+
+    /// The working folder's root (the folder holding `courses/`), or nil
+    /// for a step none of whose ops names a path.
+    let workingFolderURL: URL?
+
+    let workingFolderPath: String?
+
+    let course: String?
+
+    let section: Int?
+
+    let actionClass: String?
+
+    let holds: String?
+
+    let ops: [UndoOp]
+
+    /// Every blob the ops name that holds content (a tree's listing and
+    /// files, a whole file's bytes), stored before the begin.
+    let blobs: [Data]
+}
+
 /// How the door went.
 nonisolated enum JournaledWriteOutcome: Equatable, Sendable {
 
@@ -56,8 +87,20 @@ nonisolated enum JournaledWriteOutcome: Equatable, Sendable {
     /// Live mode, and the list could not be written: nothing was changed.
     case couldNotRecordTheStep
 
+    /// Live mode, and a step that keeps a file true by a rule was left part
+    /// way by a process that died, on the same course: it must be settled
+    /// and re-derived first (`performAndRederive`, `undoNewestAndRederive`),
+    /// so this door changes nothing (the third hard review of U2b, LOW 1).
+    case anotherChangeIsUnderWay
+
     /// Something was in the way, and nothing was changed.
     case refused(UndoRefusal)
+
+    /// Refused part way: a swap could not be reversed, so a page holds the
+    /// new content while its original is kept beside it (`keptOriginals`,
+    /// staged names in the page's own folder). The step is left in flight
+    /// for recovery; the teacher is told only part was changed.
+    case leftPartWay(UndoRefusal, keptOriginals: [String])
 
     /// Nothing to change.
     case changedNothing
@@ -77,6 +120,20 @@ nonisolated enum UndoRefusal: Equatable, Sendable {
     /// A file could not be swapped in, and the swaps already made were
     /// reversed (`undo.wording.fileIsInUse`).
     case fileIsInUse(path: String)
+
+    /// A file it must read is there and could not be read just now (no
+    /// permission, a disk error, a cloud file not downloaded): cannot tell
+    /// whether it was changed, so refused for now and never a reason to
+    /// clear the list (the director's ruling on U2b's review).
+    case cannotTellNow(path: String)
+
+    /// A new content could not be written beside its page: the disk is
+    /// full, or the folder will not take a new file (read-only, no
+    /// permission). Nothing was swapped and nothing of the step is left
+    /// beside any page (`undo.rule.stagedThenSwapped`; the Fable sweep of
+    /// U1, F1). Never `fileIsInUse`, which would tell the teacher a file is
+    /// open somewhere when it is not.
+    case couldNotWrite(path: String)
 
     /// Content the step needs is missing from the list.
     case contentMissing(path: String)
@@ -169,17 +226,27 @@ nonisolated enum JournaledWrite {
         let seq: Int
         do {
             seq = try begin(draft, ops: ops, in: journal, mode: mode)
+        } catch UndoJournalError.notTheNewestStep where mode == .live {
+            return .anotherChangeIsUnderWay
         } catch {
-            UndoTrailHook.couldNotRecord(draft: draft, mode: mode, problem: error)
             if mode == .live {
+                UndoTrailHook.couldNotRecord(draft: draft, change: .nothingWasChanged, problem: error)
                 return .couldNotRecordTheStep
             }
-            // Shadow: the change goes ahead exactly as it would have.
-            switch UndoSwap.swap(targets, label: "shadow") {
+            // Shadow: the change goes ahead exactly as it would have, all
+            // of it or none, its staged names noted so a kill part way
+            // leaves nothing of Plantoir's in the course for long. The trail
+            // line says what then happened (the U3 sweep, finding 2).
+            switch UndoShadowStaging.swap(targets, noting: journal) {
             case .swapped:
+                UndoTrailHook.couldNotRecord(draft: draft, change: .wentAhead, problem: error)
                 return .appliedWithoutARecord
             case .refused(let refusal):
+                UndoTrailHook.couldNotRecord(draft: draft, change: .nothingWasChanged, problem: error)
                 return .refused(refusal)
+            case .notPutBack(let refusal, let keptOriginals):
+                UndoTrailHook.couldNotRecord(draft: draft, change: .stoppedPartWay, problem: error)
+                return .leftPartWay(refusal, keptOriginals: keptOriginals)
             case .stoppedByATest:
                 return .stoppedByATest
             }
@@ -189,10 +256,15 @@ nonisolated enum JournaledWrite {
             return .stoppedByATest
         }
 
-        switch UndoSwap.swap(targets, label: "\(seq)-apply") {
+        switch UndoSwap.swap(targets, label: "\(seq)-apply", root: draft.workingFolderURL) {
         case .refused(let refusal):
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             return .refused(refusal)
+        case .notPutBack(let refusal, let keptOriginals):
+            // Left IN FLIGHT, never `failed`: a page may be new with its
+            // original beside it, so recovery settles it from the content
+            // once this process is gone (`undo.rule.recovery`).
+            return .leftPartWay(refusal, keptOriginals: keptOriginals)
         case .stoppedByATest:
             return .stoppedByATest
         case .swapped:
@@ -220,6 +292,9 @@ nonisolated enum JournaledWrite {
         let wait: Double = mode == .live ? UndoSwitch.lockWaitSeconds : UndoSwitch.shadowLockWaitSeconds
         return try journal.withLock(waitingAtMost: wait, inShadow: mode == .shadow) { writer in
             UndoRecovery.run(writer, mode: mode, trySwapsNow: false, resolveRoot: UndoReach.root)
+            if mode == .live, let waiting = UndoRecovery.deadStepThatKeepsAFileTrue(writer, course: draft.course) {
+                throw UndoJournalError.notTheNewestStep(waiting)
+            }
             var wholeFilePaths: Set<String> = []
             for op in ops where op.knownKind == .writeFile {
                 if let path = op.path {
@@ -276,11 +351,14 @@ nonisolated enum JournaledWrite {
                     JournaledWrite.dropTheRedoBranch(below: seq, writer)
                 }
                 try writer.append(closing)
+                // Recovery before the prune, in this hold (the Windows
+                // recovery review's 14).
+                UndoRecovery.run(writer, mode: mode, trySwapsNow: false, resolveRoot: UndoReach.root)
                 UndoPruning.prune(writer, mode: mode)
             }
         } catch {
             UndoFoldCache.keepPendingClosing(closing, for: journal.folderURL)
-            UndoTrailHook.couldNotFinish(seq: seq, problem: error)
+            UndoTrailHook.couldNotFinish(seq: seq, event: event, problem: error)
         }
     }
 
@@ -288,6 +366,224 @@ nonisolated enum JournaledWrite {
     static func dropTheRedoBranch(below seq: Int, _ writer: UndoJournalWriter) {
         for record in writer.fold.stepsOnTheList where record.phase == .undone && record.step.seq < seq {
             try? writer.append(UndoEventLine(seq: record.step.seq, event: .dropped, reason: "newStep"))
+        }
+    }
+
+    // MARK: - A step given as ops (U2's kinds)
+
+    /// Records a step given as its ops (any kind this version defines),
+    /// then makes it: the begin is on the disk first, with every blob the
+    /// ops need; then the ops are planned FORWARD from what is on the disk,
+    /// exactly as a Redo plans them, so a step is made by the same check
+    /// and the same staged swap that later undoes and redoes it; then
+    /// `applied`. Refused (and closed `failed`) when anything is not as the
+    /// step expects. The kinds U1 writes keep `perform`, which works their
+    /// ops out from the files' before and after.
+    ///
+    /// U2 adds the door; the actions that will use it (a rollover's marker
+    /// moves, New Course's tree, a preference) are wired by U3 and U4, and
+    /// how a shadow step of these kinds is recorded beside an action's own
+    /// writes is settled there. Here a list that cannot be written refuses
+    /// the step before anything changes, in either mode.
+    static func perform(
+        ops draft: UndoOpsDraft,
+        in journal: UndoJournal,
+        mode: UndoMode,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) -> JournaledWriteOutcome {
+        var hasContentOp: Bool = false
+        for op in draft.ops where op.knownKind != .recompute {
+            hasContentOp = true
+        }
+        if !hasContentOp {
+            return .changedNothing
+        }
+        // Nothing changes until the step is one every reader can undo: it
+        // reads back readable (every shape and the wholeOps rule), every
+        // path stays inside the working folder through its links, and every
+        // blob it names is given or already held, with the right hash (the
+        // hard review of U2b, HIGH 1).
+        switch JournaledWrite.vet(draft, in: journal) {
+        case .acceptable:
+            break
+        case .refused:
+            return .refused(.notReadable)
+        case .listUnreadable:
+            return .couldNotRecordTheStep
+        }
+        let seq: Int
+        do {
+            seq = try beginOps(draft, in: journal, mode: mode, places: places)
+        } catch UndoJournalError.notTheNewestStep where mode == .live {
+            return .anotherChangeIsUnderWay
+        } catch {
+            return .couldNotRecordTheStep
+        }
+        if UndoKillPoints.stopsHere(.afterBegin) {
+            return .stoppedByATest
+        }
+        let root: URL = draft.workingFolderURL ?? URL(fileURLWithPath: "/", isDirectory: true)
+        let plan: UndoPlan = UndoCheck.plan(draft.ops, direction: .forward, root: root, journal: journal, places: places)
+        guard case .ready(let targets, let recomputes, _) = plan else {
+            finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
+            if case .refused(let refusal) = plan {
+                return .refused(refusal)
+            }
+            // Content the step needs is in the list and cannot be read just
+            // now: nothing was changed, and the step is not made.
+            return .couldNotRecordTheStep
+        }
+        switch UndoSwap.swap(targets, label: "\(seq)-apply", places: places, root: draft.workingFolderURL) {
+        case .refused(let refusal):
+            finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
+            return .refused(refusal)
+        case .notPutBack(let refusal, let keptOriginals):
+            // Left IN FLIGHT, never `failed`: a page may be new with its
+            // original beside it, so recovery settles it from the content
+            // once this process is gone (`undo.rule.recovery`).
+            return .leftPartWay(refusal, keptOriginals: keptOriginals)
+        case .stoppedByATest:
+            return .stoppedByATest
+        case .swapped:
+            break
+        }
+        if UndoKillPoints.stopsHere(.beforeApplied) {
+            return .stoppedByATest
+        }
+        // Re-derived by the caller once this answers
+        // (`performAndRederive(ops:)`), outside the lock.
+        _ = recomputes
+        finish(seq: seq, with: .applied, phase: nil, reason: nil, in: journal, mode: mode)
+        return .applied(seq: seq)
+    }
+
+    /// What the door found when it vetted a step before writing anything.
+    enum Vetting: Equatable {
+        case acceptable
+        case refused
+        case listUnreadable
+    }
+
+    /// The checks `perform(ops:)` makes before the begin line.
+    static func vet(_ draft: UndoOpsDraft, in journal: UndoJournal) -> Vetting {
+        // 1. Read back as a reader of this version reads it.
+        var folder: UndoWorkingFolder? = nil
+        if let url = draft.workingFolderURL {
+            folder = UndoWorkingFolder(id: "00000000-0000-0000-0000-000000000000", pathAtTheTime: url.path)
+        }
+        let step: UndoStep = UndoStep(
+            seq: 1, madeAt: UndoMoment.text(journal.now()), action: draft.action, madeBy: draft.madeBy,
+            workingFolder: folder, course: draft.course, section: draft.section,
+            actionClass: draft.actionClass, holds: draft.holds, ops: draft.ops
+        )
+        guard let encoded = try? JSONEncoder().encode(step),
+              let readBack = try? JSONDecoder().decode(UndoStep.self, from: encoded),
+              readBack.isReadable else {
+            return .refused
+        }
+        // 2. Every path inside the working folder, its links resolved.
+        for op in readBack.ops {
+            for path in op.pathsNamed {
+                guard let root = draft.workingFolderURL, UndoPlaces.staysInside(root, path) else {
+                    return .refused
+                }
+            }
+        }
+        // 3. Every blob it names, given or already held, hashing to its name.
+        var given: [String: Data] = [:]
+        for blob in draft.blobs {
+            given[UndoHash.sha256(of: blob)] = blob
+        }
+        func content(_ name: String) throws -> Data? {
+            if let data = given[name] {
+                return data
+            }
+            return try journal.blobContent(sha: name)
+        }
+        do {
+            for op in readBack.ops {
+                for name in op.namedBlobs where try content(name) == nil {
+                    return .refused
+                }
+                if op.knownKind == .createTree || op.knownKind == .removeTree, let listingSha = op.listingSha {
+                    guard let data = try content(listingSha), let listing = UndoTreeListing.parse(data) else {
+                        return .refused
+                    }
+                    for file in listing.files where !(op.blobs ?? []).contains(file.sha) {
+                        return .refused
+                    }
+                }
+            }
+        } catch {
+            return .listUnreadable
+        }
+        return .acceptable
+    }
+
+    /// `perform(ops:)`, then the re-derivation of the step's `recompute`
+    /// files, awaited outside the lock (`UndoMaintainers`). In shadow too:
+    /// the door made the change itself, so it keeps the files a rule keeps
+    /// true itself (the hard review of U2b, LOW c).
+    @concurrent
+    static func performAndRederive(
+        ops draft: UndoOpsDraft,
+        in journal: UndoJournal,
+        mode: UndoMode,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) async -> JournaledWriteOutcome {
+        // A step that died part way and keeps a file true by a rule is
+        // settled AND re-derived first: the recovery inside the begin below
+        // leaves such a step for this one (the second hard review, MEDIUM 1).
+        if mode == .live {
+            await UndoRecovery.recoverAndRederive(journal, resolveRoot: { folder in UndoReach.root(for: folder) }, places: places)
+        }
+        let outcome: JournaledWriteOutcome = perform(ops: draft, in: journal, mode: mode, places: places)
+        if case .applied = outcome, let root = draft.workingFolderURL {
+            await UndoMaintainers.rederive(draft.ops, root: root)
+        } else if case .appliedWithoutARecord = outcome, let root = draft.workingFolderURL {
+            await UndoMaintainers.rederive(draft.ops, root: root)
+        }
+        return outcome
+    }
+
+    /// Phase one for a step given as ops: the same as `begin`, with the
+    /// draft's own blobs stored and no working folder when none is needed.
+    static func beginOps(
+        _ draft: UndoOpsDraft,
+        in journal: UndoJournal,
+        mode: UndoMode,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) throws -> Int {
+        var folder: UndoWorkingFolder? = nil
+        if let url = draft.workingFolderURL {
+            let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: url)
+            folder = UndoWorkingFolder(id: folderID, pathAtTheTime: draft.workingFolderPath ?? url.path)
+        }
+        let wait: Double = mode == .live ? UndoSwitch.lockWaitSeconds : UndoSwitch.shadowLockWaitSeconds
+        return try journal.withLock(waitingAtMost: wait, inShadow: mode == .shadow) { writer in
+            UndoRecovery.run(writer, mode: mode, trySwapsNow: false, resolveRoot: UndoReach.root, places: places)
+            if mode == .live, let waiting = UndoRecovery.deadStepThatKeepsAFileTrue(writer, course: draft.course) {
+                throw UndoJournalError.notTheNewestStep(waiting)
+            }
+            for blob in draft.blobs {
+                try writer.writeBlob(blob)
+            }
+            let seq: Int = writer.fold.highestSeq + 1
+            let step: UndoStep = UndoStep(
+                seq: seq,
+                madeAt: UndoMoment.text(journal.now()),
+                action: draft.action,
+                madeBy: draft.madeBy,
+                workingFolder: folder,
+                course: draft.course,
+                section: draft.section,
+                actionClass: draft.actionClass,
+                holds: draft.holds,
+                ops: draft.ops
+            )
+            try writer.append(UndoEventLine(seq: seq, event: .begin, step: step, process: journal.process))
+            try writer.sync()
+            return seq
         }
     }
 
@@ -309,7 +605,7 @@ nonisolated enum JournaledWrite {
             let seq: Int = try begin(draft, ops: ops, in: journal, mode: .shadow)
             return UndoShadowTicket(seq: seq, draft: draft)
         } catch {
-            UndoTrailHook.couldNotRecord(draft: draft, mode: .shadow, problem: error)
+            UndoTrailHook.couldNotRecord(draft: draft, change: .wentAhead, problem: error)
             return nil
         }
     }
@@ -343,7 +639,7 @@ nonisolated enum JournaledWrite {
         }
         finish(seq: ticket.seq, with: .failed, phase: .begin, reason: "differedFromTheRecord", in: journal, mode: .shadow)
         UndoTrailHook.couldNotRecord(
-            draft: ticket.draft, mode: .shadow, problem: UndoShadowMismatch.differedFromTheRecord
+            draft: ticket.draft, change: .wentAhead, problem: UndoShadowMismatch.differedFromTheRecord
         )
     }
 
@@ -790,6 +1086,12 @@ nonisolated enum UndoKillPoint: Equatable, Sendable {
     case beforeUndone
     case afterRedoing
     case beforeRedone
+    /// A swap that took a folder out has renamed it to its `-gone` name
+    /// and has not finished deleting it.
+    case whileDeletingAFolder
+    /// Recovery has tidied what a dead process left (a folder put back or
+    /// kept under a visible name) and has written nothing to the list yet.
+    case afterRecoveryTidied
 }
 
 nonisolated enum UndoKillPoints {
@@ -807,6 +1109,46 @@ nonisolated enum UndoKillPoints {
     /// reversed and the file is named.
     nonisolated(unsafe) static var fileInUseAtSwap: ((Int) -> Bool)?
 
+    /// Answers true to make the staging write at this index fail as a full
+    /// disk does: the staged file is CREATED, then writing into it fails
+    /// (measured by the Fable sweep of U1 on a 3 MB disk image: the file is
+    /// left at 0 bytes). Set only by tests.
+    nonisolated(unsafe) static var stagingWriteFailsAt: ((Int) -> Bool)?
+
+    /// Answers true to make a read of the list fail as a failing disk or a
+    /// network home that drops mid-read does (`UndoFileReads`). Set only by
+    /// tests.
+    nonisolated(unsafe) static var readOfTheListFails: (() -> Bool)?
+
+    /// Answers true to make opening this file of the list (a segment, a
+    /// blob, or a working folder's identifier file) fail as a failing disk,
+    /// a permission or too many open files does (`UndoFileReads.openFile`):
+    /// never as a file that is gone. Set only by tests.
+    nonisolated(unsafe) static var openFails: ((URL) -> Bool)?
+
+    /// Answers an error number to make keeping the original at this index
+    /// fail as the copy a volume without hard links falls back to does
+    /// (`UndoSwap.keep`); nil lets it go ahead. Set only by tests.
+    nonisolated(unsafe) static var keepingTheOriginalFails: ((Int) -> Int32?)?
+
+    /// Called with a file's index and the name its original is about to be
+    /// kept under, after that name was found free and before the original
+    /// is kept there: a test puts a file at that name, as another Mac
+    /// syncing the folder could in that instant (the first review of U3c,
+    /// LOW 4). Set only by tests.
+    nonisolated(unsafe) static var beforeKeepingTheOriginal: ((Int, URL) -> Void)?
+
+    /// Called with a file's index and place just after its original is kept
+    /// and before the new content is renamed in: a test edits the file IN
+    /// PLACE there, as another program racing the swap would. Set only by
+    /// tests.
+    nonisolated(unsafe) static var beforeTheRename: ((Int, URL) -> Void)?
+
+    /// Answers true to make putting a file back fail at this index while a
+    /// swap is being reversed, as a file another program holds does on
+    /// Windows. Set only by tests.
+    nonisolated(unsafe) static var putBackFailsAt: ((Int) -> Bool)?
+
     // MARK: - Functions
 
     static func stopsHere(_ point: UndoKillPoint) -> Bool {
@@ -817,6 +1159,24 @@ nonisolated enum UndoKillPoints {
     }
 }
 
+/// What became of a change the list could not record, as the
+/// `undo could not record a step` line says it: written only once that is
+/// known, never before the write that can still refuse (the U3 sweep,
+/// finding 2: the line said "The change went ahead" before a shadow swap
+/// that refused, always for a page that is a link).
+nonisolated enum UndoUnrecordedChange: Equatable, Sendable {
+    /// Made, all of it, without a record (switch off).
+    case wentAhead
+    /// Refused before anything changed.
+    case nothingWasChanged
+    /// Refused part way: some files hold the new content, what each held
+    /// before kept beside it.
+    case stoppedPartWay
+    /// Made and recorded, but its closing line could not be written now;
+    /// it is written at this process's next lock.
+    case madeButNotClosed
+}
+
 /// How the list reaches the activity trail. The core leaves it empty so it
 /// compiles on its own; the app sets it (`UndoTrail.install()`).
 nonisolated enum UndoTrailHook {
@@ -824,8 +1184,9 @@ nonisolated enum UndoTrailHook {
     // MARK: - Stored properties
 
     /// A step could not be written down: the action's key, the course and
-    /// section, the mode, and a word for why. Never page text.
-    nonisolated(unsafe) static var couldNotRecordLine: ((_ action: String, _ course: String, _ section: Int?, _ mode: UndoMode, _ why: String) -> Void)?
+    /// section, what became of the change, and a word for why. Never page
+    /// text.
+    nonisolated(unsafe) static var couldNotRecordLine: ((_ action: String, _ course: String, _ section: Int?, _ change: UndoUnrecordedChange, _ why: String) -> Void)?
 
     /// Recovery or a failed swap put files back: the course and section,
     /// what it ended, and how many files.
@@ -836,14 +1197,83 @@ nonisolated enum UndoTrailHook {
     /// back and how many were in the way. The list was cleared.
     nonisolated(unsafe) static var interruptedLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ putBack: Int, _ inTheWay: Int) -> Void)?
 
+    /// Recovery could not put back a step left part way, because content it
+    /// needs is gone from the list and no kept original beside its page
+    /// matches: the course and section, what it ended, how many files were
+    /// left part way, and the hidden name of every kept original still
+    /// beside its page (never removed: the only copy of what it held). The
+    /// list was cleared.
+    nonisolated(unsafe) static var couldNotPutBackLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ leftPartWay: Int, _ keptOriginals: [String]) -> Void)?
+
+    /// Recovery settled a step left part way (made, nothing taken effect, or
+    /// put back) and kept beside a page a kept original that the list does
+    /// not hold, such as an edit another program made as the swap went in:
+    /// the course and section, what it ended, and each kept original's
+    /// hidden name. Never removed: the only copy of what it holds.
+    /// `noLongerInTheList` names those whose bytes are exactly what the list
+    /// recorded for the page, kept because the list no longer holds that
+    /// content (its blob gone, or the list would not take it); every other
+    /// one differs from what the list recorded (the first review of U3c,
+    /// LOW 2).
+    nonisolated(unsafe) static var keptAnOriginalLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ keptOriginals: [String], _ noLongerInTheList: [String]) -> Void)?
+
+    /// An Undo (`isUndo`) or a Redo put a page back from its kept original
+    /// and the list would not take all it needs for the step: the course
+    /// and section, the hidden name what each page held a moment before is
+    /// kept under beside it (`keptOriginals`, the first review of U3c,
+    /// MEDIUM), and the hidden name of each kept original it put back whose
+    /// bytes the list would not take, which stays beside its page
+    /// (`keptOfWhatItHoldsNow`, the second review's MEDIUM). The step stays
+    /// on the list with both directions offered: the next Undo or Redo of it
+    /// uses those files (Russell's ruling of 2026-11-20, night). Every kept
+    /// file is given by its path in the working folder (its page's folder
+    /// plus its hidden name), and `putBackFromAKeptOriginal` names pages by
+    /// their paths, so two pages with the same name in two folders are told
+    /// apart (the part-two review of U4b, LOW 4). `pagesOfTheStep` is every
+    /// page the step changes, by path, so a named page that shares its file
+    /// name with any of them is named by its path (U4b2-4 review 1, LOW 1).
+    nonisolated(unsafe) static var keptWhatItReplacedLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ keptOriginals: [String], _ keptOfWhatItHoldsNow: [String], _ putBackFromAKeptOriginal: [String], _ pagesOfTheStep: [String]) -> Void)?
+
+    /// An Undo (`isUndo`) or a Redo was refused because the newest step is
+    /// a gone process's that recovery has just tried and left: the course
+    /// and section, and the refusal, which names the file. The list is kept.
+    nonisolated(unsafe) static var leftNewestLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ refusal: UndoRefusal) -> Void)?
+
+    /// Recovery found a teacher's folder set aside by a dead process and is
+    /// about to put it back in its place though it changed while aside
+    /// (with what changed; `keptAs` nil), or to keep it under the visible
+    /// name `keptAs` beside its place because something else now holds
+    /// that place. The course and section, its place, its hidden name.
+    nonisolated(unsafe) static var foundAFolderSetAsideLine: ((_ course: String, _ section: Int?, _ place: String, _ hiddenName: String, _ keptAs: String?, _ changes: String) -> Void)?
+
     // MARK: - Functions
 
-    static func couldNotRecord(draft: UndoStepDraft, mode: UndoMode, problem: Error) {
-        couldNotRecordLine?(draft.action.key, draft.course, draft.section, mode, UndoTrailHook.word(for: problem))
+    static func couldNotRecord(draft: UndoStepDraft, change: UndoUnrecordedChange, problem: Error) {
+        couldNotRecordLine?(draft.action.key, draft.course, draft.section, change, UndoTrailHook.word(for: problem))
     }
 
-    static func couldNotFinish(seq: Int, problem: Error) {
-        couldNotRecordLine?("step \(seq)", "", nil, UndoSwitch.currentMode, UndoTrailHook.word(for: problem))
+    /// The closing line of a step could not be written: a step that took
+    /// effect was made (its closing is written at the next lock); one that
+    /// failed changed nothing.
+    static func couldNotFinish(seq: Int, event: UndoEventKind, problem: Error) {
+        let change: UndoUnrecordedChange = event == .failed ? .nothingWasChanged : .madeButNotClosed
+        couldNotRecordLine?("step \(seq)", "", nil, change, UndoTrailHook.word(for: problem))
+    }
+
+    /// The line for a change made without a record, by how the write went.
+    static func couldNotRecord(
+        action: String, course: String, section: Int?, why: String, after outcome: () throws -> Void
+    ) throws {
+        do {
+            try outcome()
+        } catch JournaledStepError.leftPartWay(let refusal, let fileName, let keptOriginals) {
+            couldNotRecordLine?(action, course, section, .stoppedPartWay, why)
+            throw JournaledStepError.leftPartWay(refusal, fileName: fileName, keptOriginals: keptOriginals)
+        } catch {
+            couldNotRecordLine?(action, course, section, .nothingWasChanged, why)
+            throw error
+        }
+        couldNotRecordLine?(action, course, section, .wentAhead, why)
     }
 
     /// A word for a problem, never its description (which can carry a path).
@@ -856,6 +1286,8 @@ nonisolated enum UndoTrailHook {
                 return "the list could not be written"
             case .couldNotSync:
                 return "the list could not be saved to the disk"
+            case .couldNotRead:
+                return "the list could not be read"
             case .couldNotEncode:
                 return "the step could not be written as a line"
             case .notTheNewestStep:
@@ -868,5 +1300,156 @@ nonisolated enum UndoTrailHook {
             return "what was written differed from what was recorded"
         }
         return "the list could not be written"
+    }
+}
+
+/// The staged names of a swap made in SHADOW without the list: the door's
+/// fallback when the list cannot take the step (`JournaledWrite.perform`),
+/// and `JournaledStep.writePlainly` for a step that cannot be named. No
+/// `begin` names their files, so recovery's tidy of a closed step cannot
+/// find them (the first review of U3a, LOW 8). Each swap has a label of its
+/// own (`shadow-<pid>-<id>`), and before staging its targets are noted in
+/// `shadow-staged/` in the list's folder under this process. The note goes
+/// when the swap has finished or was refused whole; it stays when the swap
+/// was stopped or could not be put back. A note whose process is gone is
+/// tidied by the next recovery (under the lock, before every step) and the
+/// next read ahead: its `-new` files are removed, and so is a kept `-orig`
+/// whose page holds the same bytes; a kept original that differs from its
+/// page is the only copy of what the page held and stays beside it (the
+/// second review of U3a, MEDIUM c). The teacher's files are left exactly as
+/// the process left them, as shadow recovery leaves them
+/// (`undo.rule.recovery`).
+///
+/// When the list's folder cannot take the note (the list unwritable, the
+/// disk full), the swap still goes ahead untracked, as the action must, and
+/// what a kill leaves of it is not found again. A note is a few hundred
+/// bytes and is written once per such swap, which is rare: a step that
+/// cannot be named, or a list that could not take it.
+nonisolated enum UndoShadowStaging {
+
+    // MARK: - Stored properties
+
+    /// The start of every such swap's label: its staged names end
+    /// `-shadow-<pid>-<id>-new` and `-orig`.
+    static let labelPrefix: String = "shadow"
+
+    /// The folder in the list's folder that holds the notes.
+    static let folderName: String = "shadow-staged"
+
+    // MARK: - Types
+
+    /// One swap's targets and label, under the process that made it.
+    struct Note: Codable, Equatable {
+
+        // MARK: - Stored properties
+
+        let process: UndoProcess
+
+        /// The swap's own label (the second review of U3a, LOW 2: one label
+        /// shared by every process let a dead process's note remove a LIVE
+        /// process's staged or kept files for the same page).
+        let label: String
+
+        /// Each target's absolute path.
+        let targets: [String]
+    }
+
+    // MARK: - Functions
+
+    /// A label no other swap has: this process and a fresh id.
+    static func newLabel(for journal: UndoJournal) -> String {
+        let id: String = String(UUID().uuidString.prefix(8)).lowercased()
+        return "\(labelPrefix)-\(journal.process.pid)-\(id)"
+    }
+
+    /// `UndoSwap.swap` under a label of its own, noted first. A swap a test
+    /// stopped keeps its note, as a process that died there would; so does
+    /// one that could not be put back (`notPutBack`, the second review of
+    /// U3a, MEDIUM c), so its leftovers are found once this process is gone,
+    /// and the kept originals among them are kept (`tidyLeftovers`).
+    /// `places` are where an external op of the swap is set (U3b's
+    /// rollover, a step with moves and a deploy set for later).
+    static func swap(
+        _ targets: [UndoSwapTarget], noting journal: UndoJournal, places: UndoExternalPlaces = UndoAppPreferences()
+    ) -> UndoSwapResult {
+        let label: String = newLabel(for: journal)
+        let noteURL: URL? = writeNote(for: targets, label: label, in: journal)
+        let result: UndoSwapResult = UndoSwap.swap(targets, label: label, places: places)
+        switch result {
+        case .stoppedByATest, .notPutBack:
+            return result
+        case .swapped, .refused:
+            if let noteURL {
+                try? FileManager.default.removeItem(at: noteURL)
+            }
+            return result
+        }
+    }
+
+    /// The note's place, or nil when it could not be written.
+    static func writeNote(for targets: [UndoSwapTarget], label: String, in journal: UndoJournal) -> URL? {
+        var paths: [String] = []
+        for target in targets {
+            paths.append(target.url.standardizedFileURL.path)
+        }
+        let folder: URL = journal.folderURL.appendingPathComponent(folderName, isDirectory: true)
+        let noteURL: URL = folder.appendingPathComponent("\(label).json")
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let data: Data = try JSONEncoder().encode(Note(process: journal.process, label: label, targets: paths))
+            try data.write(to: noteURL, options: .atomic)
+            return noteURL
+        } catch {
+            return nil
+        }
+    }
+
+    /// Removes the staged files every note of a process that is gone names,
+    /// then the note, keeping a kept original that is the only copy of its
+    /// page's earlier content. A note whose staged file could not be removed
+    /// (held, made immutable) is kept for the next tidy. Returns how many
+    /// staged files were removed.
+    @discardableResult
+    static func tidyLeftovers(of journal: UndoJournal) -> Int {
+        let folder: URL = journal.folderURL.appendingPathComponent(folderName, isDirectory: true)
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            return 0
+        }
+        var removed: Int = 0
+        for name in names where name.hasSuffix(".json") {
+            let noteURL: URL = folder.appendingPathComponent(name)
+            guard let data = try? Data(contentsOf: noteURL),
+                  let note = try? JSONDecoder().decode(Note.self, from: data) else {
+                continue
+            }
+            if journal.processIsAlive(note.process) {
+                continue
+            }
+            var everyOneGone: Bool = true
+            for path in note.targets {
+                let target: URL = URL(fileURLWithPath: path)
+                for role in ["new", "orig"] {
+                    let stagedURL: URL = UndoSwap.besideURL(for: target, label: note.label, role: role)
+                    if UndoItem.read(at: stagedURL) == .absent {
+                        continue
+                    }
+                    // A kept original that differs from its page is the only
+                    // copy of what the page held: kept, never tidied away
+                    // (the second review of U3a, MEDIUM c).
+                    if role == "orig" && !UndoSwap.isACopyOfItsPlace(stagedURL, place: target) {
+                        continue
+                    }
+                    if UndoSwap.removeStaged(stagedURL) {
+                        removed += 1
+                    } else {
+                        everyOneGone = false
+                    }
+                }
+            }
+            if everyOneGone {
+                try? FileManager.default.removeItem(at: noteURL)
+            }
+        }
+        return removed
     }
 }

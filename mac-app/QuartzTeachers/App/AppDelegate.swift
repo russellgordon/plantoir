@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Nothing for a teacher, nothing in a UI-tested app, nothing in a
         // release build — see `UnitTestHostWindows`.
         UnitTestHostWindows.installIfThisIsTheUnitTestHost()
+        // Before AppKit restores any window, so its word that restoration
+        // has finished is heard: restored windows wait for it before they
+        // look for their folders by frame (#998, `LaunchRestoration`).
+        LaunchRestoration.shared.startListening()
         // Before any window exists, so before AppKit's first frame save: a
         // run a test drives puts AppKit's own preference keys back (#361).
         // HERE and not in `QuartzTeachersApp.init` — see
@@ -140,6 +144,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// shrinks to nothing.
     nonisolated func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         return MainActor.assumeIsolated {
+            // A second request while a quit is already going ahead (U4b2-8,
+            // U4b2-7 review 2's LOW-b) asks nothing and starts nothing: the
+            // first quit's own answer ends the app.
+            if let answer = AppDelegate.answerWhileAQuitGoesAhead() {
+                return answer
+            }
             // Why this quit is happening, read FIRST (#560): the Apple
             // event's quit reason is only there while this request is being
             // handled, so read inside the `.terminateLater` wait below it
@@ -180,9 +190,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // launcher to build from. Bounded by the copy itself (seconds
             // on this Mac; a minute on a slow one), and the window stays up
             // with its banner saying what is happening.
-            if ToolchainReadiness.shared.anyCopyIsRunning {
+            //
+            // A Rename folder under way (#899 U4b) is waited for the same
+            // way, for the same reason: it used to hold the main thread, and
+            // off the main actor a quit would leave some sections' folders
+            // moved, some pages relinked and the settings naming the old
+            // folder. Bounded by the rename itself; its sheet keeps its
+            // spinner, and a window closed meanwhile does not end it. Only
+            // a rename whose swap has begun is waited for: one still
+            // planning has written nothing, and the quit halts it, as
+            // Cancel would (U4b2-7).
+            if AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans() {
                 Task { @MainActor in
-                    await ToolchainReadiness.shared.waitForAllCopies()
+                    await AppDelegate.waitForWorkUnderWay()
                     if AppDelegate.finishTerminating() == .terminateNow {
                         NSApp.reply(toApplicationShouldTerminate: true)
                     }
@@ -191,6 +211,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return AppDelegate.finishTerminating()
         }
+    }
+
+    /// The answer to a quit request that arrives while an earlier quit is
+    /// already going ahead (U4b2-8): `.terminateLater`, asking nothing,
+    /// halting nothing more and waiting for nothing new. Nil when no quit
+    /// is going ahead, and the request is answered as every quit is.
+    ///
+    /// AppKit can ask again during a `.terminateLater` wait: Apple's
+    /// documentation of `NSApplication.TerminateReply.terminateLater` says
+    /// Cocoa then runs the run loop in `NSModalPanelRunLoopMode` until
+    /// `reply(toApplicationShouldTerminate:)`, a mode in which a sheet takes
+    /// input, and nowhere says `terminate(_:)` is ignored meanwhile; so a
+    /// second ⌘Q, or a log out, may reach the delegate. Asked again, the
+    /// work-under-way question could be answered "keep working" and the
+    /// request refused with `.terminateCancel` while the first quit, with
+    /// `FolderRenameRun.quitIsGoingAhead` set and every Rename disabled,
+    /// still replies yes later. `.terminateLater` refuses nothing: the
+    /// first quit's reply (or the set-aside update's) ends the process,
+    /// whichever request AppKit is waiting on. The latch is set only once
+    /// a quit has gone ahead, and nothing clears it, so it is the one
+    /// test of "a quit is already going ahead".
+    static func answerWhileAQuitGoesAhead() -> NSApplication.TerminateReply? {
+        if FolderRenameRun.quitIsGoingAhead {
+            return .terminateLater
+        }
+        return nil
+    }
+
+    /// Whether a quit going ahead must first wait (`.terminateLater`) for
+    /// work that may never be cut short: a copy of a folder's tools (#476)
+    /// or a Rename folder (#899 U4b). Neither asks a question; both finish.
+    static func quitWaitsForWorkUnderWay(toolchainCopying: Bool, renamingAFolder: Bool) -> Bool {
+        return toolchainCopying || renamingAFolder
+    }
+
+    /// A quit going ahead, before it decides whether to wait (#899
+    /// U4b2-7): every Rename folder still only planning is halted, the
+    /// same way its sheet's Cancel halts it, so the course is given back
+    /// and nothing waits for it; then whether a tools copy or a rename
+    /// whose swap has begun must be waited for. No question either way.
+    /// One function, so the quit's own decision is what the test runs.
+    ///
+    /// The quit is going ahead from here: `FolderRenameRun.quitIsGoingAhead`
+    /// is set in this same turn, so no rename starts and none begins its
+    /// swap while the quit waits (review 1, M1); a swap already begun is
+    /// waited for.
+    static func quitWaitsAfterHaltingWhatOnlyPlans() -> Bool {
+        FolderRenameRun.quitIsGoingAhead = true
+        FolderRenameRun.haltEveryRunStillPlanning()
+        return quitWaitsForWorkUnderWay(
+            toolchainCopying: ToolchainReadiness.shared.anyCopyIsRunning,
+            renamingAFolder: CourseActivity.anyFolderRenameSwapIsUnderWay
+        )
+    }
+
+    /// What a quit that answered `.terminateLater` waits for before it
+    /// finishes: every tools copy (#476) and every Rename folder whose swap
+    /// has begun (#899 U4b, U4b2-7) to end, each an event, never a time. One function, so the quit's own
+    /// wait is what the test runs (U4b part seven's review, L6).
+    static func waitForWorkUnderWay() async {
+        await ToolchainReadiness.shared.waitForAllCopies()
+        await CourseActivity.waitForEveryFolderRenameSwap()
     }
 
     /// The trail's last word from this process (#560), written as late as
@@ -341,24 +423,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if WorkspaceModel.isRunningTests {
             return .quitAnyway
         }
-        let alert: NSAlert = NSAlert()
-        alert.messageText = QuitConfirmation.question(about: workUnderWay)
-        alert.informativeText = QuitConfirmation.explanation()
-        alert.alertStyle = .warning
-        // The titles AND their meanings come from one ordered list, because
-        // `NSAlert` reports a POSITION and nothing else: two `addButton`
-        // calls written out here could be reordered in one line and would
-        // then swap what each answer means, so Keep Working would quit.
-        let buttons: [QuitConfirmation.Button] = QuitConfirmation.buttons(
-            onlySettingUp: QuitConfirmation.onlySettingUpNow()
-        )
-        for button in buttons {
-            alert.addButton(withTitle: button.title)
-        }
+        let alert: NSAlert = quitAlert(about: workUnderWay)
         let response: NSApplication.ModalResponse = alert.runModal()
         return QuitConfirmation.choice(
             atButtonIndex: response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
         )
+    }
+}
+
+extension AppDelegate {
+
+    /// The quit question itself, built but not shown, so `QuitAlertKeysTests`
+    /// can press its keys on a sheet (#987).
+    ///
+    /// The titles, their meanings AND their keys come from one ordered list,
+    /// because `NSAlert` reports a POSITION and nothing else: two
+    /// `addButton` calls written out here could be reordered in one line and
+    /// would then swap what each answer means, so Cancel would quit. NSAlert
+    /// gives its first button Return on its own, so each button's key is set
+    /// from the list after it is added: Quit Anyway none, Cancel Escape.
+    @MainActor
+    static func quitAlert(about workUnderWay: String) -> NSAlert {
+        let alert: NSAlert = NSAlert()
+        alert.messageText = QuitConfirmation.question(about: workUnderWay)
+        alert.informativeText = QuitConfirmation.explanation()
+        alert.alertStyle = .warning
+        for button in QuitConfirmation.buttonsInOrder {
+            let added: NSButton = alert.addButton(withTitle: button.title)
+            added.keyEquivalent = button.keyEquivalent
+        }
+        return alert
     }
 }
 

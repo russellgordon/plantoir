@@ -145,7 +145,7 @@ class RealRepositoryTests(unittest.TestCase):
 
         completed = subprocess.run(
             [node, str(script), str(web / "assets" / "search-index.js"), str(web / "assets" / "search.js")] + queries,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8",
         )
         self.assertEqual(completed.returncode, 0, completed.stdout)
         return json.loads(completed.stdout)
@@ -254,7 +254,7 @@ class RealRepositoryTests(unittest.TestCase):
         )
         code, output = run_build(["--check", "--help-dir", str(copy), "--repo", str(REPO)])
         self.assertEqual(code, 0, output)
-        self.assertIn("Help: 86 pages written, ", output)
+        self.assertIn("Help: 90 pages written, ", output)
 
     def test_the_real_web_copy_is_not_ready_to_go_live(self) -> None:
         # RETIRED AT THE CUT: true until every page is written and every picture taken (CF);
@@ -298,7 +298,7 @@ class ScriptRuleTests(unittest.TestCase):
 
             completed = subprocess.run(
                 [sys.executable, "-I", "-B", str(HELP_DIR / "build_help.py"), "--check"],
-                cwd=elsewhere, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+                cwd=elsewhere, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8",
                 env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
             )
             self.assertEqual(completed.returncode, 0, completed.stdout)
@@ -314,7 +314,7 @@ class ScriptRuleTests(unittest.TestCase):
         environment.pop("PYTHONDONTWRITEBYTECODE", None)
         completed = subprocess.run(
             [sys.executable, str(HELP_DIR / "build_help.py"), "--check"],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environment,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8", env=environment,
         )
         self.assertEqual(completed.returncode, 0, completed.stdout)
         found = []

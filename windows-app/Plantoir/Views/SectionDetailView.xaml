@@ -136,6 +136,18 @@
                         AutomationProperties.AutomationId="scheduledPublishNoticeDismiss" />
             </InfoBar.ActionButton>
         </InfoBar>
+        <!-- #889 (the mac's #850): while this app shows the section's
+             deployed folder in the browser, one line with Stop; if the folder
+             goes away while shown, stoppedFolderGone with Dismiss. Text and
+             the button's words are set in code from DeployedFolderWording. -->
+        <InfoBar x:Name="DeployedFolderNotice" Margin="12,8,12,0"
+                 IsOpen="False" IsClosable="False" Severity="Informational"
+                 AutomationProperties.AutomationId="deployedFolderNotice">
+            <InfoBar.ActionButton>
+                <Button x:Name="DeployedFolderNoticeButton" Click="DeployedFolderNoticeButton_Click"
+                        AutomationProperties.AutomationId="deployedFolderNoticeButton" />
+            </InfoBar.ActionButton>
+        </InfoBar>
         </StackPanel>
 
         <!-- Website | Problems (#734, the mac's #717), only while the section's

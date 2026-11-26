@@ -97,6 +97,156 @@ public class SectionVerbsUiTests
         Assert.Contains($"{Code}/1 · Section ▸ Undo Last Change — took the last change back", MenuBar.Trail(app));
     }
 
+    /// <summary>With <c>PLANTOIR_UI_CAPTURE_DIR</c> set, a picture of the screen for the hand-back; otherwise nothing.</summary>
+    private static void CaptureIfAsked(string fileName)
+    {
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_CAPTURE_DIR") is not { Length: > 0 } folder) return;
+        Directory.CreateDirectory(folder);
+        FlaUI.Core.Capturing.Capture.Screen().ToFile(Path.Combine(folder, fileName));
+    }
+
+    private static DrivenApp ACourseWithTwoClasses()
+    {
+        var app = new DrivenApp(courses =>
+        {
+            EndToEnd.WriteCourse(courses, Code, "Section Menu Course", new[] { "Concepts" });
+            EndToEnd.WritePage(Path.Combine(courses, Code, "section1", "All Classes", "Unit 1, Day 1.md"),
+                               "title: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400", "The first lesson.");
+            EndToEnd.WritePage(Path.Combine(courses, Code, "section1", "All Classes", "Unit 1, Day 2.md"),
+                               "title: Unit 1, Day 2\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400", "The second lesson.");
+        });
+        var dates = new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 10), new DateOnly(2026, 9, 14), new DateOnly(2026, 9, 16) };
+        Assert.True(Plantoir.Core.Assist.TimetableMemory.Write(app.WorkspacePath, Code, 1, dates, "test", new DateOnly(2026, 9, 1)));
+        app.SelectSection(Code, 1);
+        return app;
+    }
+
+    /// <summary>
+    /// #927 (the mac's #897 piece A), end to end through the window and its
+    /// own <c>plantoir-mcp</c>: Classes ▸ Add Class… opens the dialog with the
+    /// three ways, the first chosen, and Add adds the next class in this unit,
+    /// hidden. #990's "name the real menu": the copy saved first is the
+    /// Classes menu's (<c>_classes-section1</c>) and the trail says
+    /// "Classes ▸ Add Class…" with the way. MUST FAIL with Add Next Class in
+    /// the menu (no classesAddClass) or the way left out of the trail's counts.
+    /// </summary>
+    [UiFact]
+    public void AddClassAddsTheNextClassInThisUnit_AndSavesTheClassesMenusCopy()
+    {
+        using var app = ACourseWithTwoClasses();
+
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesAddClass");
+        var next = WaitFor(app, "sectionVerbAddClassWay-nextInThisUnit", "the first way");
+        Assert.True(next.AsRadioButton().IsChecked, "the first way was not chosen when the dialog opened");
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.MenuAddClassNextInThisUnit, next.Name);
+        Assert.True(WaitFor(app, "sectionVerbAddClassWay-inANewUnit", "the second way").IsEnabled);
+        Assert.True(WaitFor(app, "sectionVerbAddClassWay-asACopyOfAClass", "the third way").IsEnabled);
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.MenuAddButton,
+                     MenuBar.Dialog(app, "Add Class…").FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))?.Name);
+        CaptureIfAsked("windows-add-class-dialog.png");
+        Press(app, "PrimaryButton", "Add Class… (Add)");
+        var result = WaitFor(app, "sectionVerbResult", "what Add Class… did");
+        _output.WriteLine("result: " + result.Name);
+        MenuBar.CloseDialog(app);
+
+        Assert.Contains("publish: false", File.ReadAllText(Page(app, "Unit 1, Day 3")));
+        string backups = Path.Combine(app.WorkspacePath, "courses", "_backups", Code);
+        Assert.Single(Directory.GetFiles(backups, $"{Code}_backup_*_classes-section1.zip"));
+        Assert.Empty(MenuCopies(app));
+        Assert.Contains($"{Code}/1 · the Classes menu backed up the course as ", MenuBar.Trail(app));
+        Assert.Contains($"{Code}/1 · Classes ▸ Add Class… — carried out, the next class in this unit", MenuBar.Trail(app));
+    }
+
+    /// <summary>
+    /// #927, as a copy: the copy list (Page and Date), a class chosen,
+    /// Continue, the plan, Duplicate. The copy is the section's NEXT class,
+    /// hidden however the source was, and nothing else moves
+    /// (<c>class-planning.json</c> → <c>duplicatingAsTheNextClass</c>). MUST
+    /// FAIL with the copy put after its source (the assistant's duplicate).
+    /// </summary>
+    [UiFact]
+    public void AddClassAsACopyMakesTheNextClassHidden_AndMovesNothingElse()
+    {
+        using var app = ACourseWithTwoClasses();
+        string second = File.ReadAllText(Page(app, "Unit 1, Day 2"));
+
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesAddClass");
+        WaitFor(app, "sectionVerbAddClassWay-asACopyOfAClass", "the copy's way").AsRadioButton().IsChecked = true;
+        var source = WaitFor(app, "sectionVerbSource0", "the first class to copy");
+        Assert.StartsWith("Unit 1, Day 1", source.Name);
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.MenuContinueButton,
+                     MenuBar.Dialog(app, "Add Class…").FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))?.Name);
+        source.AsListBoxItem().Select();
+        CaptureIfAsked("windows-add-class-copy.png");
+        Press(app, "PrimaryButton", "Add Class… (Continue)");
+        var plan = WaitFor(app, "sectionVerbPlan", "the copy's plan");
+        Assert.Contains("“Unit 1, Day 1” would be copied to “Unit 1, Day 3”, dated 2026-09-14.", plan.Name);
+        CaptureIfAsked("windows-add-class-copy-plan.png");
+        Press(app, "PrimaryButton", "Add Class… (Duplicate)");
+        var result = WaitFor(app, "sectionVerbResult", "what the copy did");
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.DuplicatedFromTheMenu("Unit 1, Day 1", "Unit 1, Day 3", "2026-09-14"), result.Name);
+        MenuBar.CloseDialog(app);
+
+        string copy = File.ReadAllText(Page(app, "Unit 1, Day 3"));
+        Assert.Contains("The first lesson.", copy);
+        Assert.Contains("publish: false", copy);
+        Assert.Equal(second, File.ReadAllText(Page(app, "Unit 1, Day 2")));
+        Assert.Contains($"{Code}/1 · Classes ▸ Add Class… — carried out, as a copy of a class", MenuBar.Trail(app));
+    }
+
+    /// <summary>
+    /// #954 (the mac's #897 piece B), end to end: Classes ▸ Roll Over to a New
+    /// Year… on a deployed section shows the dates on file, says they have
+    /// passed, and asks the website question with NOTHING chosen and Continue
+    /// dimmed; Keep, Continue, the plan's own website and record lines, Roll
+    /// Over: the second class re-dated, a copy saved first (the Classes
+    /// menu's), the marker kept, the trail's counts saying which way the
+    /// website went. MUST FAIL with an answer chosen when the dialog
+    /// opens, or Continue live before one is.
+    /// </summary>
+    [UiFact]
+    public void RollOverAsksAboutTheWebsiteWithNothingChosen_ThenKeepsIt()
+    {
+        using var app = ACourseWithTwoClasses();
+        string marker = Path.Combine(app.WorkspacePath, "courses", Code, ".netlify_sites", "section1.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(marker)!);
+        File.WriteAllText(marker, """{"name": "uiverb-s1-2025-gordon"}""");
+
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesRollOverToANewYear");
+        var startNew = WaitFor(app, "sectionVerbRollOverWebsite-new", "the new-website answer");
+        var keep = WaitFor(app, "sectionVerbRollOverWebsite-same", "the keep-the-website answer");
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.MenuRollOverNewWebsite, startNew.Name);
+        Assert.False(startNew.AsRadioButton().IsChecked, "an answer was chosen when the dialog opened");
+        Assert.False(keep.AsRadioButton().IsChecked, "an answer was chosen when the dialog opened");
+        WaitFor(app, "sectionVerbRollOverDatesAreOld", "the line saying the dates have passed");
+        var dialog = MenuBar.Dialog(app, "Roll Over to a New Year…");
+        var primary = dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"));
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.MenuContinueButton, primary?.Name);
+        Assert.False(primary!.IsEnabled, "Continue was live before the website question had an answer");
+        CaptureIfAsked("windows-roll-over-dialog.png");
+
+        keep.AsRadioButton().IsChecked = true;
+        Press(app, "PrimaryButton", "Roll Over to a New Year… (Continue)");
+        var plan = WaitFor(app, "sectionVerbPlan", "the rollover's plan");
+        Assert.Contains(Plantoir.Core.Assist.AssistWording.MenuRollOverPlanKeepsTheWebsite, plan.Name);
+        Assert.Contains(Plantoir.Core.Assist.AssistWording.MenuRollOverPlanSetsTheRecordAside, plan.Name);
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.MenuRollOverButton,
+                     MenuBar.Dialog(app, "Roll Over (plan)").FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))?.Name);
+        CaptureIfAsked("windows-roll-over-plan.png");
+        Press(app, "PrimaryButton", "Roll Over to a New Year… (Roll Over)");
+        var result = WaitFor(app, "sectionVerbResult", "what the rollover did");
+        _output.WriteLine("result: " + result.Name);
+        Assert.Contains(Plantoir.Core.Assist.AssistWording.RolloverKeptTheSameWebsite, result.Name);
+        MenuBar.CloseDialog(app);
+
+        Assert.True(File.Exists(marker), "keeping the website moved its marker");
+        string backups = Path.Combine(app.WorkspacePath, "courses", "_backups", Code);
+        Assert.Single(Directory.GetFiles(backups, $"{Code}_backup_*_classes-section1.zip"));
+        string trail = MenuBar.Trail(app);
+        Assert.Contains($"{Code}/1 · Classes ▸ Roll Over to a New Year… — ", trail);
+        Assert.Contains("website: kept", trail);
+    }
+
     [UiFact]
     public void RebuildPreviewRebuildsAServingPreview()
     {

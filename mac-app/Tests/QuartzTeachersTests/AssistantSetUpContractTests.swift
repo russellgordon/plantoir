@@ -103,7 +103,9 @@ final class AssistantSetUpContractTests: XCTestCase {
     func testTheItemsAndLimitsAreTheContracts() throws {
         let block: [String: Any] = try AssistantSetUpContractTests.setUpBlock()
         XCTAssertEqual(block["menuItem"] as? String, AssistantSetUpWording.menuItem)
-        XCTAssertEqual(block["helpMenuItem"] as? String, AssistantSetUpWording.helpMenuItem)
+        // #990 (Russell's ruling Q10): Revise With ▸ only, so the Help
+        // menu's copy is gone from the contract too.
+        XCTAssertNil(block["helpMenuItem"], "Set Up an Assistant… is in Revise With only")
         XCTAssertEqual(block["helpAnchor"] as? String, AssistantSetUp.helpAnchor)
         let minutes: Int = try XCTUnwrap(block["longestRunMinutes"] as? Int)
         XCTAssertEqual(Int64(minutes), SetUpRunner.longestRunMinutes)
@@ -194,18 +196,14 @@ final class AssistantSetUpContractTests: XCTestCase {
         XCTAssertEqual(words["settingUpOne"], QuitConfirmation.settingUpOne)
         XCTAssertEqual(words["settingUpSeveral"], QuitConfirmation.settingUpSeveral)
         XCTAssertEqual(words["message"], QuitConfirmation.settingUpMessage)
-        // Its own first button (Russell, 2026-11-13 evening), by meaning and title.
+        // The same buttons as every quit question since #987: Cancel
+        // (keepWorking) and Quit Anyway, by meaning and title. The set-up
+        // question had its own first button, Finish Setting Up, until then.
         let buttons: [String: Any] = try XCTUnwrap(quit["buttons"] as? [String: Any])
         let titles: [String: String] = try XCTUnwrap(buttons["titles"] as? [String: String])
         XCTAssertEqual(titles["keepWorking"], QuitConfirmation.keepWorkingButton)
         XCTAssertEqual(titles["quitAnyway"], QuitConfirmation.quitAnywayButton)
-        let byQuestion: [String: String] = try XCTUnwrap(buttons["firstButtonByQuestion"] as? [String: String])
-        XCTAssertEqual(byQuestion["whileAnAssistantIsSetUp"], QuitConfirmation.finishSettingUpButton)
-        let setUpButtons: [QuitConfirmation.Button] = QuitConfirmation.buttons(onlySettingUp: true)
-        XCTAssertEqual(setUpButtons[0].title, QuitConfirmation.finishSettingUpButton)
-        XCTAssertEqual(setUpButtons[0].choice, .keepWorking)
-        XCTAssertEqual(setUpButtons[1].choice, .quitAnyway)
-        XCTAssertEqual(QuitConfirmation.buttons(onlySettingUp: false)[0].title, QuitConfirmation.keepWorkingButton)
+        XCTAssertNil(buttons["firstButtonByQuestion"], "no question has buttons of its own since #987")
         XCTAssertEqual(
             QuitConfirmation.workUnderWay(publishes: [], previews: [], setUps: ["Codex"]),
             "setting up Codex"

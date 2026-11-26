@@ -292,6 +292,54 @@ public static class ActivityTrail
         /// them; without it the trail shows six changes and then nothing.
         /// </summary>
         SectionRestored,
+
+        /// <summary>
+        /// Undo's recovery settled a step whose work stopped part way (#899
+        /// W3, <c>undo.rule.recovery</c>): it put back what had taken effect,
+        /// or found a file changed by hand since and cleared the list. Counts
+        /// only, never page text. Written only while the list is live (in
+        /// shadow recovery never writes into a working folder).
+        /// </summary>
+        UndoRolledBack,
+        /// <summary>
+        /// Undo's recovery found a teacher's folder a stopped step had set
+        /// aside (#899 W6, U2b's kinds): being put back in its place though it
+        /// changed while aside, with what changed, or kept under a visible
+        /// name beside its place because something else holds that place,
+        /// both named. Written just before the rename. Never page text.
+        /// </summary>
+        UndoFoundAFolderSetAside,
+        /// <summary>
+        /// Undo's recovery closed a step that stopped part way and could not
+        /// be put back (what it needs is no longer in the list, and no kept
+        /// original matches), and cleared the list: naming each kept original
+        /// left beside its page, read after the tidy (#899 W4c, the mac's U3c).
+        /// </summary>
+        UndoCouldNotPutBack,
+        /// <summary>
+        /// Undo's recovery settled a step and left a kept original beside a
+        /// page because it is the only copy of what it holds, each with its
+        /// page, its hidden name and why (#899 W4c). Never page text.
+        /// </summary>
+        UndoKeptWhatAPageHeld,
+        /// <summary>
+        /// An Undo or Redo put a page back from what was kept beside it, and
+        /// the list would not take all the step needs, so what it could not
+        /// keep stays beside the page, named (#899 W4c). Never page text.
+        /// </summary>
+        UndoKeptWhatItReplaced,
+        /// <summary>
+        /// An Undo or Redo refused because the newest step is one recovery
+        /// has just tried and left part way (a file in use, a page it cannot
+        /// read now), naming the file; the list kept (#899 W4c, W3's LOW 4).
+        /// </summary>
+        UndoRefusedForAChangeLeftPartWay,
+        /// <summary>
+        /// The list could not take a daily action's step, or a file it writes
+        /// cannot be named in one: the action's key, the course and section, a
+        /// word for why, and what became of the change (#899 W7a). Never page text.
+        /// </summary>
+        UndoCouldNotRecordAStep,
         /// <summary>
         /// A whole course was put back, from one of its backups (Restore…) or
         /// from Archived: the code it shows, its folder, the zip's FILE NAME,
@@ -508,6 +556,25 @@ public static class ActivityTrail
         /// it was quiet and which of the things was true.
         /// </summary>
         PreviewDidNotAppear,
+        /// <summary>
+        /// A preview start asked for while the same window's own start was
+        /// still waiting for a stop or still building did nothing (#928, the
+        /// mac's #812). Carries the course and the section.
+        /// </summary>
+        PreviewAlreadyStarting,
+        /// <summary>
+        /// A repair's Preview Again started nothing: its page went away or
+        /// Plantoir was quitting before the old preview had stopped, or a later
+        /// Preview Again took its place (#928, the mac's #813). Carries which.
+        /// </summary>
+        PreviewAgainAbandoned,
+        /// <summary>
+        /// A preview's run never started (#928, #1022 item 1, the mac's #812
+        /// review): the sentence the teacher was shown under "Cannot Preview
+        /// Yet", then what they were not shown (the launcher's file, or the
+        /// system's description of the error).
+        /// </summary>
+        PreviewCouldNotStart,
         /// <summary>
         /// deploy.py made a section's Cloudflare Pages project again because it
         /// was gone from the account (#395). Carries the project and the
@@ -745,6 +812,21 @@ public static class ActivityTrail
         ObsidianReopenedForAddOns,
         /// <summary>File ▸ Settings ▸ Obsidian turned the add-ons on or off — the only way back from "Don't ask again".</summary>
         ObsidianAddOnsSettingChanged,
+        /// <summary>
+        /// "Stop the deploy?" or "Stop this share?" was turned off by its
+        /// "Don't ask again" box with the stop, or on or off in File ▸
+        /// Settings ▸ Deploying ▸ Stopping (#1009, the mac's #988). While one
+        /// is off Escape stops that task at once, so "Escape stopped my deploy
+        /// without asking" is answered here. Words: <c>stopQuestions.trail</c>.
+        /// </summary>
+        StopQuestionSettingChanged,
+        /// <summary>
+        /// "Close Obsidian to open {course}?" was answered (#1003, the mac's
+        /// #995): the course and what came of it - opened after closing
+        /// Obsidian, Cancel, nothing to close by then, Obsidian did not close,
+        /// or it closed and the course could not be added to its list.
+        /// </summary>
+        ObsidianClosingAsked,
 
         // ---- Open in Obsidian opens the page the preview shows (#681; the mac's #518) ----
         /// <summary>
@@ -803,6 +885,26 @@ public static class ActivityTrail
         /// "why was this morning's deploy slow?" days later.
         /// </summary>
         SiteBuiltAgainBeforeDeploying,
+        /// <summary>
+        /// A one-section restore moved a file and then could not move every
+        /// file back, so the section may hold some files from the backup and
+        /// some as they were (#911, the mac's #897 C): the course, the section
+        /// and where the set-aside files are kept, as a path inside the
+        /// working folder. Never a page. <see cref="SectionRestoreStoppedPartWayLine"/>.
+        /// </summary>
+        SectionRestoreStoppedPartWay,
+        /// <summary>
+        /// #889 (the mac's #850): a section's deployed folder was opened in
+        /// the web browser, from where (the result, the Section menu, the
+        /// toolbar, the sidebar), whether it was already shown and whether its
+        /// address moved. Counts only, never a path or an address
+        /// (<see cref="Plantoir.Core.Models.DeployedFolderTrail"/>).
+        /// </summary>
+        DeployedFolderOpenedInTheWebBrowser,
+        /// <summary>#889: a deployed folder is no longer shown, and why (Stop, quitting, the folder gone, it stopped on its own), with counts.</summary>
+        DeployedFolderNoLongerShown,
+        /// <summary>#889: a deployed folder could not be opened, and why, in a few words.</summary>
+        DeployedFolderCouldNotBeOpened,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -869,6 +971,13 @@ public static class ActivityTrail
         Event.HowITeachPageWritten => "How I Teach page written",
         Event.HowITeachPageKeptOff => "How I Teach page kept off the website",
         Event.SectionRestored => "section restored",
+        Event.UndoRolledBack => "undo rolled back",
+        Event.UndoFoundAFolderSetAside => "undo found a folder set aside",
+        Event.UndoCouldNotPutBack => "undo could not put back a change that stopped",
+        Event.UndoKeptWhatAPageHeld => "undo kept what a page held",
+        Event.UndoKeptWhatItReplaced => "undo kept what it replaced",
+        Event.UndoRefusedForAChangeLeftPartWay => "undo refused for a change left part way",
+        Event.UndoCouldNotRecordAStep => "undo could not record a step",
         Event.CourseRestoredFromABackup => "course restored from a backup",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
@@ -898,6 +1007,9 @@ public static class ActivityTrail
         Event.ClassCopyNotMade => "class copy not made",
         Event.WordForAUnitRenamed => "word for a unit renamed",
         Event.PreviewDidNotAppear => "preview did not appear",
+        Event.PreviewAlreadyStarting => "preview already starting",
+        Event.PreviewAgainAbandoned => "preview again abandoned",
+        Event.PreviewCouldNotStart => "preview could not start",
         Event.CloudflareProjectMadeAgain => "cloudflare project made again",
         Event.CourseKeptForReference => "course kept for reference",
         Event.CourseCouldNotBeKeptForReference => "course could not be kept for reference",
@@ -938,12 +1050,18 @@ public static class ActivityTrail
         Event.ObsidianAddOnsAdded => "obsidian add-ons added",
         Event.ObsidianReopenedForAddOns => "obsidian reopened for add-ons",
         Event.ObsidianAddOnsSettingChanged => "obsidian add-ons setting changed",
+        Event.StopQuestionSettingChanged => "stop question setting changed",
+        Event.ObsidianClosingAsked => "asked to close Obsidian to open a course",
         Event.PageOpenedInObsidian => "page opened in Obsidian",
         Event.SwiftGotReady => "Swift got ready on this computer",
         Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",
         Event.ProblemsChanged => "problems changed",
         Event.AskedAnAssistantToFixProblems => "asked an assistant to fix problems",
         Event.SiteBuiltAgainBeforeDeploying => "site built again before deploying",
+        Event.SectionRestoreStoppedPartWay => "section restore stopped part way",
+        Event.DeployedFolderOpenedInTheWebBrowser => "deployed folder opened in the web browser",
+        Event.DeployedFolderNoLongerShown => "deployed folder no longer shown",
+        Event.DeployedFolderCouldNotBeOpened => "deployed folder could not be opened",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
@@ -985,25 +1103,181 @@ public static class ActivityTrail
     public static void Note(Event @event, string what, DateTime? moment = null)
     {
         DateTime when = moment ?? DateTime.Now;
-        string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{DateText.Stamp(when)} · {safeWhat}";
-        Append(entry);
+        Append(SafeTrailLine($"{DateText.Stamp(when)} · {what}", keepingLineBreaks: false));
     }
 
+    /// <summary>A line about one course: <see cref="Place"/> puts the course,
+    /// and the section when one was named, in front of <paramref name="what"/>.</summary>
     public static void Note(Event @event, string what, string course, int section, DateTime? moment = null)
     {
         DateTime when = moment ?? DateTime.Now;
-        string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{DateText.Stamp(when)} · {course}/{section} · {safeWhat}";
-        Append(entry);
+        Append(SafeTrailLine($"{DateText.Stamp(when)} · {Place(course, section)}{what}", keepingLineBreaks: false));
     }
 
+    /// <summary>
+    /// The assistant's question: a stamped line naming the course, then the
+    /// teacher's sentence on ONE line behind <see cref="PromptPrefix"/>
+    /// (<c>courseNameCharacters.trailLines.promptCases</c>, #821). The
+    /// sentence is put on one line before it goes behind the prefix, so a
+    /// sentence on two lines can no longer put its second line on the trail
+    /// with no prefix, where a report sent with the prompts left out still
+    /// carried it. The record's own line break between its two lines stays.
+    /// </summary>
     public static void NotePrompt(string prompt, string course, int section, DateTime? moment = null)
     {
-        DateTime when = moment ?? DateTime.Now;
-        string safePrompt = LogRedactor.Redacting(prompt.Trim());
-        string entry = $"{DateText.Stamp(when)} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
-        Append(entry);
+        Append(PromptRecord(prompt, course, section, moment ?? DateTime.Now));
+    }
+
+    /// <summary>
+    /// The record <see cref="NotePrompt"/> writes, without writing it. Each of
+    /// its two lines goes through <see cref="SafeTrailLine"/> on its RAW text
+    /// (<c>trailLines.order</c>: redact, clean, redact again), never cleaned
+    /// first: cleaning the sentence before redacting it turned a NUL inside a
+    /// token into a space and wrote the token's tail (lane E review 1, M1).
+    /// The joined record is then put through once more, keeping its one line
+    /// break; redacting again changes nothing (<c>redactedAgainCases</c>).
+    /// </summary>
+    public static string PromptRecord(string prompt, string course, int section, DateTime moment)
+    {
+        string head = SafeTrailLine($"{DateText.Stamp(moment)} · {Place(course, section)}asked a question", keepingLineBreaks: false);
+        string asked = PromptPrefix + SafeTrailLine(prompt, keepingLineBreaks: false).Trim();
+        return SafeTrailLine(head + "\n" + asked, keepingLineBreaks: true);
+    }
+
+    /// <summary>
+    /// What goes in front of a line about one course: <c>ICS3U/2 · </c> for a
+    /// section, <c>ICS3U · </c> when no section was named, and nothing when
+    /// there is no course either (<c>shared-rules.json</c> →
+    /// <c>activityTrail.lineShape.placeCases</c>, #946, the mac's #879 and its
+    /// <c>ActivityTrail.place</c>). A section is numbered from 1, so 0 or less
+    /// is "none was named": a line that names no section used to be written
+    /// <c>ICS3U/0</c>, a section that does not exist. Every trail line about
+    /// a course gets its place here, from the window, the headless door and
+    /// the built-in assistant alike; no caller builds its own.
+    /// </summary>
+    public static string Place(string course, int section)
+    {
+        string trimmedCourse = course.Trim();
+        if (trimmedCourse.Length == 0) return "";
+        if (section <= 0) return $"{trimmedCourse} · ";
+        return $"{trimmedCourse}/{section} · ";
+    }
+
+    /// <summary>
+    /// <paramref name="line"/> as the trail may hold it: one line (unless
+    /// <paramref name="keepingLineBreaks"/>) and redacted
+    /// (<c>courseNameCharacters.trailLines.order</c>, #821, the mac's
+    /// <c>ProblemReportStore.safeTrailLine</c>). Every line this file writes
+    /// goes through here and nowhere else.
+    ///
+    /// <para>A line with nothing to clean is redacted once, as it always was.
+    /// A line that holds a control is redacted, cleaned, and redacted again.
+    /// The first pass takes a secret with a control INSIDE it whole (the
+    /// redactor's <c>\S+</c> reads a NUL, an ESC or a DEL as part of the
+    /// value; cleaning first turned it into a space and the tail was written:
+    /// <c>Bearer abc123</c> NUL <c>SECRETTAIL</c>). The second pass takes a
+    /// secret a control was HIDING (a NUL after <c>Bearer</c>, an isolate
+    /// inside <c>CLOUDFLARE_API_TOKEN</c>, an override before an email's
+    /// <c>@</c>). Each order alone leaks one shape; both together leak
+    /// neither, and redacting twice changes nothing
+    /// (<c>problemReportRedaction.redactedAgainCases</c>).</para>
+    ///
+    /// <para><b>Not caught by any order</b> (<c>trailLines.knownLimits</c>,
+    /// written down so nobody believes the trail catches them, and not
+    /// tested as passing): a rule that matches a run of particular
+    /// characters (an email, a Netlify token, an account ID, the
+    /// 40-character run) cut short by a control in the middle of the value,
+    /// and <c>labelledSecret</c> / <c>bearerHeader</c> when that control is
+    /// white space to the redactor (tab, LF, CR, VT, FF, U+0085, U+2028,
+    /// U+2029).</para>
+    /// </summary>
+    public static string SafeTrailLine(string line, bool keepingLineBreaks)
+    {
+        string cleanedLine = OneLineText.Cleaned(line, keepingLineBreaks);
+        if (cleanedLine == line) return LogRedactor.Redacting(line);
+        string redactedOnce = LogRedactor.Redacting(line);
+        string cleanedAfterRedacting = OneLineText.Cleaned(redactedOnce, keepingLineBreaks);
+        return LogRedactor.Redacting(cleanedAfterRedacting);
+    }
+
+    // ---- The headless path's task lines (#774) ------------------------------
+
+    /// <summary>
+    /// <c>task started</c>'s words, as the window's <c>ScriptRunner</c> writes
+    /// them: "started preview.ps1 COMP 1 --build-only". The arguments are
+    /// written as they are and redacted with the whole line on the way in
+    /// (<see cref="SafeTrailLine"/>), so <c>--account</c> and any token never
+    /// reach the file. Shared with <c>plantoir-mcp.exe</c>'s
+    /// <c>LauncherRunner</c>, which has no <c>ScriptRunner</c> (ConPTY and a
+    /// window's synchronisation context), so the headless door and the window
+    /// say the same sentence.
+    /// </summary>
+    public static string TaskStartedWords(string launcherFile, IReadOnlyList<string> arguments) =>
+        arguments.Count > 0 ? $"started {launcherFile} {string.Join(" ", arguments)}" : $"started {launcherFile}";
+
+    /// <summary><c>task finished</c>'s words: "finished deploy.ps1 — succeeded after 12s".</summary>
+    public static string TaskFinishedWords(string launcherFile, string outcome, TimeSpan? elapsed) =>
+        $"finished {launcherFile} — {outcome}{(elapsed is { } took ? DurationWords(took) : "")}";
+
+    /// <summary>How long a task took, in the window's words: " after 12s", " after 3m 4s".</summary>
+    public static string DurationWords(TimeSpan elapsed) =>
+        elapsed.TotalSeconds < 60
+            ? $" after {Math.Max(1, (int)elapsed.TotalSeconds)}s"
+            : $" after {(int)elapsed.TotalMinutes}m {elapsed.Seconds}s";
+
+    /// <summary>
+    /// Exit 3: a launcher run with <c>--non-interactive</c> reached a question
+    /// and refused rather than wait for an answer nobody could give
+    /// (<c>activityTrail.mustRecord</c> → "task finished" → <c>why</c>, #378).
+    /// The headless path always runs its launchers that way.
+    /// </summary>
+    public const string StoppedAtAQuestionNobodyCouldAnswer = "stopped at a question nobody was there to answer (exit 3)";
+
+    /// <summary>A headless run whose caller stopped waiting for it (the assistant's call was cancelled): the launcher was ended part way.</summary>
+    public const string StoppedBeforeItFinished = "stopped before it finished";
+
+    /// <summary>The outcome of a headless run that exited: exit 3 in its own words, any other exit in the window's.</summary>
+    public static string HeadlessOutcome(int exitCode) =>
+        exitCode == 3
+            ? StoppedAtAQuestionNobodyCouldAnswer
+            : ScriptRunner.FinishedOutcome(exitCode, wasStoppedByUser: false, wasCancelled: false, wasClosedForADeploy: false);
+
+    /// <summary>
+    /// The course and section a launcher's arguments name: every launcher
+    /// takes the course code first and the section number second
+    /// (<c>PreviewCommand.BuildOnlyArguments</c>, <c>DeployCommand.Arguments</c>).
+    /// No course when the first argument is a flag; section 0 (none, for
+    /// <see cref="Place"/>) when the second is not a number.
+    /// </summary>
+    public static (string Course, int Section) PlaceOfLauncherArguments(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count == 0 || arguments[0].StartsWith('-')) return ("", 0);
+        int section = 0;
+        if (arguments.Count > 1)
+            int.TryParse(arguments[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out section);
+        return (arguments[0], section);
+    }
+
+    /// <summary>The words for <c>section restore stopped part way</c>: the mac's <c>sectionRestoreStoppedPartWayLine</c> word for word.</summary>
+    public static string SectionRestoreStoppedPartWayLine(string keptAt) =>
+        "a section restore stopped part way and could not move every file back; the section may hold " +
+        "some files from the backup and some as they were; the files set aside are kept in " + keptAt;
+
+    /// <summary>
+    /// The words for <c>section restored</c> from Restore from Backup…'s
+    /// "Restore Section N" (#911, the mac's <c>restoredOneSectionFromTheMenuLine</c>
+    /// word for word): the backup's file name, the archive made of the whole
+    /// course first, and counts of shared pages hidden and not saved, never which.
+    /// </summary>
+    public static string RestoredOneSectionFromTheMenuLine(string backupFileName, string? archiveFileName, int pagesMadeSinceHidden, int pagesNotSaved)
+    {
+        string line = $"put the section back from {backupFileName}, from Restore from Backup…";
+        if (archiveFileName is not null) line += $"; the course as it was is in Archived as {archiveFileName}";
+        if (pagesMadeSinceHidden == 1) line += "; 1 shared page made since the backup is now hidden from this section";
+        else if (pagesMadeSinceHidden > 1) line += $"; {pagesMadeSinceHidden} shared pages made since the backup are now hidden from this section";
+        if (pagesNotSaved == 1) line += "; 1 shared page could not be saved and is as it was";
+        else if (pagesNotSaved > 1) line += $"; {pagesNotSaved} shared pages could not be saved and are as they were";
+        return line;
     }
 
     /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
@@ -1082,7 +1356,7 @@ public static class ActivityTrail
 
     /// <summary>A line written with its own wait for the writers' lock; true when it was written.</summary>
     private static bool Note(Event @event, string what, TimeSpan lockWait, bool capsThisProcess) =>
-        Append($"{DateText.Stamp(DateTime.Now)} · {LogRedactor.Redacting(what)}", lockWait, capsThisProcess);
+        Append(SafeTrailLine($"{DateText.Stamp(DateTime.Now)} · {what}", keepingLineBreaks: false), lockWait, capsThisProcess);
 
     /// <summary>The close line's words; the contract's <c>line</c> is this with reason "quit by the teacher".</summary>
     public static string ClosedLine(QuitConfirmation.ClosingReason reason, int processId) =>

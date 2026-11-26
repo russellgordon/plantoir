@@ -28,6 +28,30 @@ public sealed partial class SidebarPane
     /// Rename unselected (its field lost focus to the selection change) does
     /// not arise here.
     /// </summary>
+    /// <summary>
+    /// Open in Browser and Stop Showing Deployed Folder on a section row (#889,
+    /// the mac's #850), drawn only when they apply, as this menu's rule is:
+    /// Open in Browser while the deployed folder can be opened, Stop while it
+    /// is shown, read when the menu is drawn, which is when it opens. A group
+    /// of their own, after a separator (the mac's D43: they have no icon, and
+    /// Open in Obsidian has one). The row is selected first and its window
+    /// acts, so the one Open in Browser opens the preview there if one shows.
+    /// </summary>
+    private void AddDeployedFolderItems(MenuFlyout menu, Course course, int number, SidebarSelection row)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        bool offered = DeployedFolderOpening.Offer(course, number, folder).Decision.Kind == DeployedFolderOffer.Kind.Offered;
+        bool shown = DeployedFolderOpening.IsShown(course, number, folder);
+        if (!offered && !shown) return;
+        menu.Items.Add(new MenuFlyoutSeparator());
+        if (offered)
+            menu.Items.Add(MenuItem(DeployedFolderWording.MenuItem, "",
+                Selecting(row, () => _window.OpenInBrowserFromARow(course, number))));
+        if (shown)
+            menu.Items.Add(MenuItem(DeployedFolderWording.StopMenuItem, "",
+                Selecting(row, () => DeployedFolderOpening.Stop(course, number, folder))));
+    }
+
     private Action Selecting(SidebarSelection selection, Action action) => () =>
     {
         SelectRow(selection);
@@ -118,10 +142,26 @@ public sealed partial class SidebarPane
         // Obsidian's add-ons for diagrams and graphs (#581): scanned, offered,
         // added or asked to reopen BEFORE Obsidian opens - all decided in
         // Plantoir.Core's route; this window only shows its two questions.
-        var (report, finished) = new ObsidianOpenRoute(new ObsidianWorld(ShowDialogSafelyAsync)).Press(course, reveal, answer, section);
+        var (report, finished) = ObsidianRoute().Press(course, reveal, answer, section);
         _ = Finishing(finished, null, answer);
         return report;
     }
+
+    /// <summary>
+    /// The route every open in this window takes, its questions shown over
+    /// this window (#581; since #1003 also the closing question and its
+    /// alert, so no door here closes Obsidian unasked).
+    /// </summary>
+    private ObsidianOpenRoute ObsidianRoute() => new ObsidianOpenRoute(new ObsidianWorld(ShowDialogSafelyAsync));
+
+    /// <summary>
+    /// Course Settings' How I Teach row (#360): the PAGE, through the closing
+    /// question like every other open (#1003, the mac's
+    /// <c>openHowITeachPageInObsidian</c>), without the add-ons scan or a
+    /// reference course's note, which that row never had.
+    /// </summary>
+    public void OpenHowITeachPageInObsidian(Course course, string page) =>
+        _ = Finishing(ObsidianRoute().OpenWithoutTheScanAsync(course, course.DirectoryPath, page), null, null);
 
     /// <summary>
     /// Waits for a press's route so a fault is logged rather than lost, and

@@ -76,7 +76,7 @@ public class AssistantReadsSettingsAtTheCallTests : IDisposable
         var tools = new PlantoirTools(new AssistWorkspace(_folder, launcher));
         var openedConfiguration = Workspace.DiscoverCourses(_folder).Single().Configuration;
         var agent = new AssistAgent(new ScriptModel(), new CannedTools(), new JsonArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             DestinationProvider = () =>
                 DeployCommand.EveryDestinationByTypeAtTheCall(_folder, "ICS3U", openedConfiguration),
         };
@@ -230,7 +230,7 @@ public class AssistantReadsSettingsAtTheCallTests : IDisposable
     public void TheCardTheAnswerAndTheInstructionsNeverAskForACable()
     {
         WriteCourse("ICS3U", new[] { 1 }, "local_folder", _savedFolder);
-        var agent = new AssistAgent(new ScriptModel(), new CannedTools(), new JsonArray(), "ICS3U", 1);
+        var agent = new AssistAgent(new ScriptModel(), new CannedTools(), new JsonArray(), "ICS3U", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class };
         string card = agent.AskFirst("deploy at 6:30", "schedule_deploy",
             new JsonObject { ["course"] = "ICS3U", ["section"] = 1, ["when"] = "2030-09-09 06:30" })[0].Text;
 

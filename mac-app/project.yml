@@ -325,6 +325,9 @@ targets:
     settings:
       base:
         SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+        # #978: lets the sandboxed runner remove the preferences folder a
+        # state-folder launch makes in /private/tmp (UITestFolders).
+        CODE_SIGN_ENTITLEMENTS: Tests/QuartzTeachersUITests/QuartzTeachersUITests.entitlements
 
 schemes:
   Plantoir:

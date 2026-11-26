@@ -127,6 +127,13 @@ struct StringListEditorView: View {
     /// the network takes, once per page.
     var onRename: ((_ oldName: String, _ newName: String) async -> RenameResult)? = nil
 
+    /// Whether the rename under way has begun its check and swap, after
+    /// which halting it would leave it part way (#899 U4b). Until then it is
+    /// only planning, which writes nothing, so Cancel halts it (the HIG's
+    /// progress indicators: let people halt processing when it is feasible).
+    /// Nil: Cancel is disabled for the whole rename.
+    var renameCanNoLongerBeHalted: (() -> Bool)? = nil
+
     /// Something to tell the teacher after the list changed. Returning nil
     /// says nothing.
     var noticeAfterChange: ((_ name: String, _ change: ListChange) -> String?)? = nil
@@ -137,7 +144,13 @@ struct StringListEditorView: View {
     @State var pendingRename: PendingRename? = nil
     @State var proposedName: String = ""
     @State var renameFailure: String? = nil
-    @State var isRenaming: Bool = false
+    /// The rename under way and the one rule for halting it (#899
+    /// U4b2-7): Cancel, the sheet going away and a quit all halt it there.
+    /// Course Settings hands in the run its page owns
+    /// (`CourseSettingsRenames`, U4b2-8), so that the page going away halts
+    /// it: this list's own appearance never does, since a lazily drawn row
+    /// leaving the visible area is not the rename being left.
+    @State var renameRun: FolderRenameRun = FolderRenameRun()
     @State var notice: String? = nil
     @State var selectedRowID: String? = nil
     @State var isAddingItem: Bool = false
@@ -165,6 +178,15 @@ struct StringListEditorView: View {
     }
 
     /// The label for the add control, keyed to the list's kind.
+    /// The add field's name for VoiceOver (#1012): the words of its prompt
+    /// ("Type new folder name here").
+    var addFieldName: String {
+        if hidesMarkdownExtension {
+            return "New file name"
+        }
+        return "New folder name"
+    }
+
     var addLabel: String {
         if hidesMarkdownExtension {
             return "Add new file…"
@@ -246,7 +268,7 @@ struct StringListEditorView: View {
 
             // **Said in place, deliberately NOT in an alert.** This used to be
             // a second `.alert` on this same view, and it crashed the app: a
-            // SwiftUI view presents one thing at a time, and `performRename`
+            // SwiftUI view presents one thing at a time, and `reportRename`
             // dismissed the rename SHEET and raised the alert in the same
             // breath — `AppKitDialogBridge.updateExistingAlert` reconciling an
             // alert while `NSSheetMoveHelper closeSheet` was still animating,
@@ -273,16 +295,23 @@ struct StringListEditorView: View {
             presenting: pendingRemoval
         ) { removal in
             Button("Remove", role: .destructive) {
-                removeItem(named: removal.item)
+                takeOutOfTheList(named: removal.item)
             }
             Button("Cancel", role: .cancel) {
                 pendingRemoval = nil
             }
+            .keyboardShortcut(.cancelAction)
         } message: { removal in
             Text(removal.message)
         }
         .sheet(item: $pendingRename) { rename in
             renameSheet(for: rename.item, interruptedTarget: rename.interruptedRenameTarget)
+                // However the sheet goes, a rename still only planning goes
+                // with it (U4b part seven's review, M1); one whose swap has
+                // begun is never halted.
+                .onDisappear {
+                    haltARenameStillPlanning()
+                }
         }
     }
 
@@ -345,6 +374,7 @@ struct StringListEditorView: View {
                 requestRemoval(of: selectedItem)
             }
         }
+        .accessibilityLabel(Text(title))
         .accessibilityIdentifier("table-\(title)")
     }
 
@@ -402,10 +432,13 @@ struct StringListEditorView: View {
                         isAddingItem = false
                     }
                 }
+                // The popover shows only the prompt, so the field is named
+                // by its words (#1012).
+                .accessibilityLabel(Text(addFieldName))
                 .accessibilityIdentifier("addField-\(title)")
             HStack {
                 Spacer()
-                Button("Cancel") {
+                Button("Cancel", role: .cancel) {
                     isAddingItem = false
                 }
                 .keyboardShortcut(.cancelAction)
@@ -437,45 +470,65 @@ struct StringListEditorView: View {
         let finishing: Bool = interruptedTarget?.caseInsensitiveCompare(
             proposedName.trimmingCharacters(in: .whitespaces)
         ) == .orderedSame
-        let problem: String? = renameProblem?(item, proposedName, finishing)
+        // Not asked while this sheet's own rename runs: that rename is the
+        // one a problem would otherwise name as under way.
+        let isRenaming: Bool = renameRun.isRenaming
+        let problem: String? = isRenaming ? nil : renameProblem?(item, proposedName, finishing)
+        let cancelIsDisabled: Bool = !renameRun.canBeHalted
         VStack(alignment: .leading, spacing: 12) {
             TextField("New name", text: $proposedName)
                 .borderedTextField()
+                // Its placeholder's words (#1012): the sheet prints no
+                // label of its own.
+                .accessibilityLabel(Text("New name"))
                 .accessibilityIdentifier("renameField")
+                .disabled(isRenaming)
                 .onSubmit {
-                    Task { await performRename(of: item, finishing: finishing) }
+                    startRename(of: item, finishing: finishing)
                 }
             Text(SpecialNames.renameFolderExplanation)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let sentence = renameFailure ?? problem {
-                Text(sentence)
+                StatusColour.blocking.sentence(sentence)
                     .font(.callout)
-                    .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("renameProblem")
             }
             HStack {
                 Spacer()
-                Button("Cancel") {
-                    pendingRename = nil
+                // Halts a rename that is only planning (it writes nothing);
+                // disabled, visibly, once its check and swap begin (#899
+                // U4b): its folders, pages and settings go in all or none,
+                // and halting it part way is the one thing it must never do
+                // (the HIG's progress indicators: let people halt processing
+                // when it is feasible, without negative side effects).
+                Button("Cancel", role: .cancel) {
+                    cancelRename()
                 }
                 .keyboardShortcut(.cancelAction)
+                .disabled(cancelIsDisabled)
                 if isRenaming {
+                    // A spinner, in the one place the sheet's work is shown:
+                    // the rename's length cannot be measured ahead.
                     ProgressView()
                         .controlSize(.small)
                         .padding(.trailing, 4)
+                        .accessibilityLabel(Text(CourseActivity.renamingSpinnerLabel))
                 }
                 Button("Rename") {
-                    Task { await performRename(of: item, finishing: finishing) }
+                    startRename(of: item, finishing: finishing)
                 }
-                .defaultButton(isEnabled: problem == nil && !isRenaming)
+                // Disabled too once a quit is going ahead (review 1, L1):
+                // a rename the quit halted cannot be pressed again.
+                .defaultButton(isEnabled: problem == nil && renameRun.canStart)
             }
         }
         .padding([.horizontal, .bottom], 20)
         .sheetTitle(SpecialNames.renameFolderTitle(for: item))
         .frame(width: 420)
+        .interactiveDismissDisabled(isRenaming)
     }
 
     // MARK: - Functions
@@ -590,7 +643,7 @@ struct StringListEditorView: View {
             pendingRemoval = removal
             return removal
         case .ordinary:
-            removeItem(named: item)
+            takeOutOfTheList(named: item)
             return nil
         }
     }
@@ -622,7 +675,10 @@ struct StringListEditorView: View {
         )
     }
 
-    func removeItem(named name: String) {
+    /// Takes the name out of the list in memory; nothing is written until
+    /// Save (named so after #899 U4a, when the writer scan counted its old
+    /// name, `removeItem(named:)`, as a file removal).
+    func takeOutOfTheList(named name: String) {
         var result: [String] = []
         for item in items {
             if item != name {
@@ -635,24 +691,48 @@ struct StringListEditorView: View {
         notice = noticeAfterChange?(name, .removed)
     }
 
-    /// Hands the rename to the caller and reports what came back.
+    /// Starts the rename in its run, so Cancel can halt it while it plans.
     ///
     /// The list itself is NOT edited here. The caller renames the folder on
     /// disk and rewrites the configuration in one step, and this view's
     /// `items` binding reads that configuration — so editing the array here
     /// too would put the rename in twice, and would put it in even when the
     /// filesystem refused.
-    func performRename(of item: String, finishing: Bool) async {
-        guard let onRename, !isRenaming else {
+    func startRename(of item: String, finishing: Bool) {
+        guard let onRename, renameRun.canStart else {
             return
         }
         if renameProblem?(item, proposedName, finishing) != nil {
             return
         }
         let newName: String = proposedName.trimmingCharacters(in: .whitespaces)
-        isRenaming = true
-        defer { isRenaming = false }
-        switch await onRename(item, newName) {
+        renameRun.start(
+            renaming: item, to: newName, using: onRename,
+            canNoLongerBeHalted: renameCanNoLongerBeHalted
+        ) { result in
+            reportRename(result)
+        }
+    }
+
+    /// Closes the sheet; a rename still planning is halted with it, and one
+    /// whose swap has begun is never halted (the button is disabled then;
+    /// this is the same rule for a press that lands as it greys).
+    func cancelRename() {
+        if renameRun.haltIfStillPlanning() {
+            pendingRename = nil
+        }
+    }
+
+    /// Cancels the rename if it is still only planning: its plan stops, and
+    /// the course is given back at once (U4b part seven's review, M1). Never
+    /// once its check and swap have begun.
+    func haltARenameStillPlanning() {
+        renameRun.haltIfStillPlanning()
+    }
+
+    /// Says what a rename that was not halted came back with.
+    func reportRename(_ result: RenameResult) {
+        switch result {
         case .renamed(let sentence):
             pendingRename = nil
             renameFailure = nil

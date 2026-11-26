@@ -38,7 +38,7 @@ final class OneSectionRestoreOrderTests: XCTestCase {
 
     private func menuBackup(of course: Course, root: URL) async throws -> BackupItem {
         let url: URL = try await CourseArchiver.backUpCourse(
-            course, coursesDirectoryURL: root.appendingPathComponent("courses"), madeBy: .menu(sectionNumber: 1)
+            course, coursesDirectoryURL: root.appendingPathComponent("courses"), madeBy: .menu(sectionNumber: 1, inMenu: .section)
         )
         return try XCTUnwrap(BackupItem.from(fileURL: url, courseCode: "ICS3U"))
     }
@@ -180,7 +180,7 @@ final class OneSectionRestoreOrderTests: XCTestCase {
     func testASectionMissingFromTheBackupIsRefusedBeforeTheArchive() async throws {
         let (root, workspace, course, _) = try makeWorkspace()
         let url: URL = try await CourseArchiver.backUpCourse(
-            course, coursesDirectoryURL: root.appendingPathComponent("courses"), madeBy: .menu(sectionNumber: 2)
+            course, coursesDirectoryURL: root.appendingPathComponent("courses"), madeBy: .menu(sectionNumber: 2, inMenu: .section)
         )
         let item: BackupItem = try XCTUnwrap(BackupItem.from(fileURL: url, courseCode: "ICS3U"))
         // Section 2 is added after the backup.

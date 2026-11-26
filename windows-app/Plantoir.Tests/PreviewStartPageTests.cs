@@ -203,6 +203,68 @@ public class LastViewedPagesTests : IDisposable
         try { Directory.Delete(_folder, true); } catch { }
     }
 
+    private string[] Temporaries() => Directory.GetFiles(_folder, "*.tmp");
+
+    /// <summary>#953: a reader without delete sharing holds the file through one Remember.</summary>
+    [Fact]
+    public void ARememberRefusedByAHeldFileSaysSoAndLeavesTheFileAsItWas()
+    {
+        Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "A"));
+        byte[] before = File.ReadAllBytes(LastViewedPages.FilePath);
+        var pauses = new List<int>();
+        using (HeldFiles.PausingWith(pauses.Add))
+        using (new FileStream(LastViewedPages.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            Assert.False(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "B"));
+        Assert.Equal(HeldFiles.Pauses, pauses);
+        Assert.Equal(before, File.ReadAllBytes(LastViewedPages.FilePath));
+        Assert.Empty(Temporaries());
+
+        var holder = new FileStream(LastViewedPages.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using (HeldFiles.PausingWith(_ => holder.Dispose()))
+            Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "B"));
+        Assert.Equal("B", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        Assert.Empty(Temporaries());
+    }
+
+    /// <summary>#953: a read refused (held whole) is never followed by a write that keeps only the new page.</summary>
+    [Fact]
+    public void ARefusedReadNeverReplacesTheListWithOneEntry()
+    {
+        Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "A"));
+        Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 2, "B"));
+        using (HeldFiles.PausingWith(_ => { }))
+        using (new FileStream(LastViewedPages.FilePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.False(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 3, "C"));
+            Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        }
+        Assert.Equal("A", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        Assert.Equal("B", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 2));
+        Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 3));
+
+        // The window the issue names: the read is refused, then the holder
+        // lets go before the write. It lets go on the first pause AFTER the
+        // read's four, which only a write that follows the refused read ever
+        // reaches, so that write would land and keep only the new page.
+        int pauses = 0;
+        var holder = new FileStream(LastViewedPages.FilePath, FileMode.Open, FileAccess.Read, FileShare.None);
+        using (HeldFiles.PausingWith(_ => { if (++pauses == HeldFiles.Pauses.Count + 1) holder.Dispose(); }))
+            Assert.False(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 3, "C"));
+        holder.Dispose();
+        Assert.Equal(HeldFiles.Pauses.Count, pauses);
+        Assert.Equal("A", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        Assert.Equal("B", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 2));
+    }
+
+    [Fact]
+    public void AFileThatIsNotValidJsonReadsAsNothingRememberedAndIsReplaced()
+    {
+        File.WriteAllText(LastViewedPages.FilePath, "{ not json");
+        Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "A"));
+        Assert.Equal("A", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+    }
+
     [Fact]
     public void APageIsRememberedPerFolderCourseAndSection()
     {
@@ -250,16 +312,53 @@ public class LastViewedPagesTests : IDisposable
         Assert.Empty(Directory.GetFiles(_folder, "*.tmp"));
     }
 
+    /// <remarks>
+    /// #916: this wrote all 503 entries through <see cref="LastViewedPages.Remember"/>
+    /// and ignored what each call returned. One write in 503 refused on a busy
+    /// PC (the rename onto the file, while something else holds it: a scanner
+    /// reading the file just written is the usual one) leaves one entry fewer,
+    /// so only P1 and P2 are pushed out and P3 survives — exactly the
+    /// <c>Actual: "P3"</c> one gate met at the second assertion, and what this
+    /// test fails with when a write is forced to fail (measured 2026-11-14 by
+    /// holding the file open for one call). The time stamps were never the
+    /// cause: each is a minute apart and injected. So the 500 that are already
+    /// remembered are SEEDED into the file in one write by the test, oldest
+    /// first, which also proves the order is read from the stamps rather than
+    /// from the file; only the three that push the oldest out go through
+    /// <see cref="LastViewedPages.Remember"/>, and each must say it wrote.
+    /// </remarks>
     [Fact]
     public void OnlyTheNewestAreKept()
     {
         var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        for (int section = 1; section <= LastViewedPages.Keep + 3; section++)
-            LastViewedPages.Remember(@"C:\Courses", "ICS3U", section, "P" + section, start.AddMinutes(section));
+        var seeded = new List<object>();
+        for (int section = 1; section <= LastViewedPages.Keep; section++)
+            seeded.Add(new { folder = @"C:\Courses", course = "ICS3U", section, path = "P" + section,
+                             noted = start.AddMinutes(section).ToString("yyyy-MM-ddTHH:mm:ssZ") });
+        File.WriteAllText(LastViewedPages.FilePath, Newtonsoft.Json.JsonConvert.SerializeObject(new { pages = seeded }));
+        Assert.Equal("P1", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+
+        for (int section = LastViewedPages.Keep + 1; section <= LastViewedPages.Keep + 3; section++)
+            Assert.True(RememberWithRetries(@"C:\Courses", "ICS3U", section, "P" + section, start.AddMinutes(section)),
+                $"Remembering section {section} wrote nothing, five times over; the eviction below cannot be judged without it.");
         Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
         Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 3));
         Assert.Equal("P4", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 4));
         Assert.Equal("P503", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", LastViewedPages.Keep + 3));
+    }
+
+    /// <summary>
+    /// A write refused for a moment is tried again, up to five times: this test
+    /// is about which entries are KEPT, not about a busy disk (#916).
+    /// </summary>
+    private static bool RememberWithRetries(string folder, string course, int section, string path, DateTime now)
+    {
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            if (LastViewedPages.Remember(folder, course, section, path, now)) return true;
+            Thread.Sleep(200);
+        }
+        return false;
     }
 }
 

@@ -1,0 +1,38 @@
+U4b2-9 must-fail log (#899). Fix committed (cb5f5c8fc) before every sabotage; each restored with git checkout, git status clean after.
+
+S0 red first (before the one comparison; only partInside added, unused): run-red1.log
+  UndoOpKindsTests.swift:127 testAnEditSpelledWithOtherCapitalsUnderACarryingMoveIsUndoneAndRedone: ["courses/TST1O/media/.a.md.plantoir-undo-1-undo-orig"] is not equal to [] - the Undo leaves nothing of its own
+  UndoOpKindsTests.swift:131 same test: ["courses/TST1O/renamed/.a.md.plantoir-undo-1-undo-orig"] is not equal to [] - the Redo leaves nothing of its own
+
+S1 the spelling rule out of wholeState (`if op.isCaseOnlyMove && false, let spelled`): run-mf1.log, testCheckCases and testStackCases RED
+  checkCases '...lists it as `to`, holding the content: as the step left it': undo is changedSince, not canUndo; redo is changedSince, not alreadyRedone
+  checkCases '...lists it as `from`, holding the content: as before': undo is changedSince, not alreadyBack; redo is changedSince, not canRedo
+  checkCases 'move of a folder ... lists it as `to`, holding the content: as the step left it' (NEW, replaces '...holding something else'): undo is changedSince, not canUndo; redo is changedSince, not alreadyRedone
+  stackCases 'U4b, a capitalisation-only rename (Media to media) ...': the last call came to nothingToUndo, not undone
+  stackCases 'U4b, a capitalisation-only rename: undone and redone ...': the last call came to nothingToRedo, not redone
+  stackCases 'U4b, ... spelled MEDIA by hand since ...': the last call came to nothingToUndo, not changedSince (the step is never made without the rule)
+  NOT red, by construction: checkCases '...lists it under a third spelling, holding the content: changed since' (without the rule both spellings read the one item: neither, the same answer .another gives); pinned by S2.
+
+S2 `.another` folded into `.from` in wholeState (`case .to, .from, .another:`): run-mf2.log RED
+  checkCases '...lists it under a third spelling, holding the content: changed since': undo is alreadyBack, not changedSince; redo is canRedo, not changedSince
+  stackCases '...spelled MEDIA by hand since...': the last call came to undone, not changedSince; the folder renamed in its capitals is MEDIA, old, not MEDIA, new (so the old MEDIA row DOES pin .another in the plan: the swap's own case-only check never runs, the move being judged already back)
+
+S3 the comparisons split again (ownFilesInside and followTheMove also require hasPrefix as spelled): run-mf3.log RED
+  UndoOpKindsTests.swift:127 and :131, the two lines of S0
+
+S4 Python, is_case_only_move always False: run-mf4-python.log, FAILED (failures=7): all seven case-only rows
+  the four case-only checkCases (as `to`; as `from`; folder as `to`; third spelling) and the three U4b capitalisation-only stackCases
+
+S5 riding lows, four independent sabotages in one build (each read by its own test only): run-mf5-lows.log RED
+  CourseActivity.renamingSpinnerLabel "Renaming…": UndoSweepFindingsTests testTheRenameUnderWaySentencesAreTheContracts ("Renaming…" is not equal to "Renaming") and testTheUndoLinesSentencesAreTheContracts
+  LinksChecklistWording.pagesYouTicked "the pages you checked": LinksChecklistTests testTheWordingIsTheContractsWording - pagesYouTicked
+  SpecialFolderRenamer writer with .withoutEscapingSlashes: SpecialFolderRenamerTests testTheMacWritesTheContractsExampleByteForByte (bytes differ)
+  the replay's prefix folder counted as already read-only: stackCases 'U4b2-4: two pages named index.md in two sections ...': ... content sits in the prefix folder an earlier call made read-only
+
+RED 5 of 5 sabotage runs (plus S0 red first); by row: every case-only row RED under at least one sabotage aimed at it.
+
+Review 1 LOWs (fix 68e2bea8f), red first by the code before each fix: run-r1-red.log
+  L1 testAnEditSpelledWithOtherCapitalsBelowTheMovesToIsUndoneAndRedone: refused(changedSince(firstPath: "courses/TST1O/renamed", others: 0), clearedTheList: true) is not undone
+  L2 testTheWriterJudgesACarriedPlaceByTheOneComparison: placeOnDiskNow gave .../Renamed/a.md; namedPath "courses/TST1O/Renamed/a.md" is not "courses/TST1O/renamed/a.md"
+  L3 testACaseOnlyMoveTellsItsSidesApartByTheFoldersOwnPart: XCTAssertFalse failed - named at the from spelling of the folder; Python test_a_case_only_move_tells_its_sides_apart_by_the_folders_own_part FAIL on the old model
+  L4 Python model's .another folded into from (move_state of the item at to): run-r1-mf-python.log FAIL the third-spelling row; restored, OK

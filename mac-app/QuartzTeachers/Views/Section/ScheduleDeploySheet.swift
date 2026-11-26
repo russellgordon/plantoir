@@ -62,6 +62,8 @@ struct ScheduleDeploySheet: View {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
+                        // Decorative: the sentence beside it says it all (#993, D20).
+                        .accessibilityHidden(true)
                     Text(notice)
                         .font(.callout)
                         .fixedSize(horizontal: false, vertical: true)
@@ -82,6 +84,8 @@ struct ScheduleDeploySheet: View {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
+                        // Decorative: the sentence beside it says it all (#993, D20).
+                        .accessibilityHidden(true)
                     Text(netlifyNote)
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -94,9 +98,19 @@ struct ScheduleDeploySheet: View {
             Divider()
 
             ScrollView {
-                Text(shown.plan?.description ?? shown.unreadable ?? "")
+                // A plan that cannot be scheduled stops the teacher going
+                // ahead (Schedule is greyed), so it is said in the stopping
+                // red with its symbol (#994).
+                // Selectable, so the symbol sits beside the words and is not
+                // copied with them.
+                Group {
+                    if shown.plan?.isSchedulable == true {
+                        Text(shown.plan?.description ?? shown.unreadable ?? "")
+                    } else {
+                        StatusLine(kind: .blocking, words: shown.plan?.description ?? shown.unreadable ?? "")
+                    }
+                }
                     .font(.callout)
-                    .foregroundStyle(shown.plan?.isSchedulable == true ? Color.primary : Color.orange)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
                     .accessibilityIdentifier("scheduleDeployPlan")
@@ -104,9 +118,8 @@ struct ScheduleDeploySheet: View {
             .frame(minHeight: 160)
 
             if let failure {
-                Text(failure)
+                StatusColour.blocking.sentence(failure)
                     .font(.callout)
-                    .foregroundStyle(.red)
                     .accessibilityIdentifier("scheduleDeployFailure")
             }
 
@@ -115,6 +128,7 @@ struct ScheduleDeploySheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("scheduleDeployCancelButton")
 
                 Button("Schedule") {

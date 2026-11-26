@@ -148,7 +148,8 @@ final class LinksChecklistTests: XCTestCase {
             "needsAPreviewFirst": LinksChecklistWording.needsAPreviewFirst(course: "{course}", section: "{section}"),
             "nothingLeftToPublish": LinksChecklistWording.nothingLeftToPublish,
             "pageChangedSince": LinksChecklistWording.pageChangedSince(name: "{name}"),
-            "published": LinksChecklistWording.published(count: "{count}", pages: "{pages}")
+            "published": LinksChecklistWording.published(count: "{count}", pages: "{pages}"),
+            "pagesYouTicked": LinksChecklistWording.pagesYouTicked
         ]
         for (key, sentence) in ours {
             XCTAssertEqual(sentence, wording[key], key)

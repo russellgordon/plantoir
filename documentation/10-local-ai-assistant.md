@@ -4384,9 +4384,9 @@ the menus already did in full, 8 in part, and 3 gaps. Where each gap went:
 
 | Gap | Where it is now |
 |---|---|
-| Starting a new unit ("Start a new unit for the next class") | Section ▸ Add Class…, in a new unit (#897, [09 → "Add Class…"](09-mac-app.md#add-class-the-next-class-a-new-unit-or-a-copy-897)) |
-| Duplicating a class as the next one | Section ▸ Add Class…, as a copy of a class: at the END, by file, hidden; the window's own duplicate still lands after its source |
-| The rollover's website question | Section ▸ Roll Over to a New Year… (#897 piece B, [09 → "Roll Over to a New Year…"](09-mac-app.md#roll-over-to-a-new-year-the-rollovers-website-question-in-a-sheet-897-piece-b)): the same call, the question in a sheet with nothing chosen, asked only where there is a website a new one would not replace; refused when the copy of the course saved first cannot be made; one undo entry from the menu, which never deletes a kept marker, the window's two unchanged |
+| Starting a new unit ("Start a new unit for the next class") | Classes ▸ Add Class… (Section ▸ until #990), in a new unit (#897, [09 → "Add Class…"](09-mac-app.md#add-class-the-next-class-a-new-unit-or-a-copy-897)) |
+| Duplicating a class as the next one | Classes ▸ Add Class…, as a copy of a class: at the END, by file, hidden; the window's own duplicate still lands after its source |
+| The rollover's website question | Classes ▸ Roll Over to a New Year… (#897 piece B, [09 → "Roll Over to a New Year…"](09-mac-app.md#roll-over-to-a-new-year-the-rollovers-website-question-in-a-sheet-897-piece-b)): the same call, the question in a sheet with nothing chosen, asked only where there is a website a new one would not replace; refused when the copy of the course saved first cannot be made; one undo entry from the menu, which never deletes a kept marker, the window's two unchanged |
 
 Four were accepted as they are, unasked: one list of every page with its
 state, what a given page links to, a text list of what students see now, and
@@ -4449,15 +4449,48 @@ EVERY path that writes files without adding an entry, each pinned in
   whose every write failed says "changed nothing" (ruling L5);
 - **a partial undo**;
 - **a publish or hide that wrote pages and then stopped part way** (#412),
-  the page list and the whole unit: `AssistPublishPlanner.apply` throws
+  the page list and the whole unit: `AssistPublishPlanner.apply` threw
   `StoppedAfterWriting` only when at least one file was written, keeping the
   error's own words;
 - **Re-date Classes… that stopped part way** (ruling M3):
-  `SectionReDatePlanner.apply` writes page by page and now throws its own
-  `StoppedAfterWriting` with the pages written. The teacher is told
+  `SectionReDatePlanner.apply` wrote page by page and threw its own
+  `StoppedAfterWriting` with the pages written. The teacher was told
   `publishStoppedPartWay` ("Only part of the section's class dates was
   changed…") with the pages already re-dated listed — never "Nothing was
   changed", which it said until then although pages were written.
+
+**Since #899's U3 neither of those two can happen**: a publish, a whole unit
+and a re-date are each ONE step through the undo journal's door, staged and
+swapped in together or not at all (documentation 09, "U3: every daily page
+action through the door"). A page that cannot be written now writes
+nothing, so the menu's line says "changed nothing". A re-date says "Nothing
+was changed: …" with the file in the way, and so, since U3a's second
+round, does a publish, a hide and a whole unit: `publishStoppedPartWay`
+("Only part of … was changed") was true only while the write went page by
+page (the first review of U3a, MEDIUM 1). Since U3a's third round it is
+said on the Mac in ONE case, where it is true: a swap refused after some
+pages went in whose reversal could not put one back
+(`JournaledStepError.leftPartWay`), so a page holds the new content and
+what it held before is kept beside it under a hidden name the sentence
+names (the second review of U3a, MEDIUM a; documentation 09, "The third
+round"). Every action's "Nothing was …" catch says it through the runner's
+`saidWhenTheStepStopped`, which also counts the write as one with no new
+undo entry. `AssistWording` is unchanged; Windows still writes page by
+page. Where nothing was written ("Nothing was …") no Restore Section
+pointer is added: there is nothing to put back. On the part-way answer it
+IS added, as for any `publishStoppedPartWay` (in the in-app assistant when
+this conversation saved a copy; the menu's backup sentence on the menu),
+because the copy does put the section's pages back, except for the How I
+Teach page: it belongs to the course and is saved under a stand-in
+section, and Restore Section does not put it back, so its part-way answer
+is the sentence alone (`aSectionsCopyPutsItBack: false`; the third review
+of U3a, LOW 4; `PublishStoppedPartWayTests.testHowITeachLeftPartWayAddsNoRestorePointer`).
+`SectionVerbsEndingTests`' three tests for these paths pin
+this (`testAPublishThatCannotWriteEveryPageWritesNone`,
+`testAWholeUnitThatCannotWriteEveryPageWritesNone`,
+`testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`), and
+`PublishStoppedPartWayTests` pins the page list, the whole unit and an
+outside assistant. `StoppedAfterWriting` is kept and no longer thrown.
 
 A first write that fails is still "changed nothing", and "Nothing was
 changed". Until #531 the depth alone decided, so each of these was written as
@@ -4479,9 +4512,7 @@ assistant's own duplicate is unchanged.)
 **On Windows since #550 (2026-10-16).** The same endings, and the same five
 paths, each pinned. The undo ending comes from the depth the menu's server
 sends plus its `changed` flag, never from the sentence; it used to count
-"is put back", which the partial sentence also contains. Re-date Classes… that
-stops part way says `publishStoppedPartWay` with the pages already re-dated,
-on both `re_date_classes` and `roll_over_section`, each through its own
+"is put back", which the partial sentence also contains. Re-date Classes… is all or none since #899 W7b1: it says "Nothing was changed: …", or, when a page was left holding its new date with its earlier content kept beside it, `publishStoppedPartWay` naming each kept file, on both `re_date_classes` and `roll_over_section`, each through its own
 `catch (AssistRefusal)`. Before, both let the `IOException` escape as the
 SDK's generic protocol error. A first write
 that fails says the mac's "Nothing was changed: …", and that now includes a
@@ -8068,9 +8099,11 @@ ran `/mcp disable plantoir` gets sessions with no Plantoir tools, which
 
 **Where a teacher without Copilot is sent.** Russell, 2026-11-13: wherever
 Plantoir offers Copilot to a teacher who does not have it, it links Help's
-`github-education` page (#839). This door is hidden while Copilot is not
-installed, so it offers Copilot to nobody who lacks it; the first such offer
-is #855's set-up item. The anchors are recorded in
+`github-education` page (#839). Since #990 the door is drawn in the menu
+bar's Revise With on every Mac and dimmed while Copilot is not installed (a
+row's context menu still leaves it out); a dimmed item cannot be chosen, so
+it offers Copilot to nobody who lacks it. The offer is #855's set-up item,
+at the end of Revise With only since #990. The anchors are recorded in
 `outsideAgents.agents[copilot].helpAnchors`.
 
 **What #855 builds on.** `CopilotLauncher.findCopilot()` and
@@ -9687,9 +9720,10 @@ teacher there and never to share or deploy a plan itself.
 **What it is.** Settings ▸ Other Assistants lists GitHub Copilot, Claude Code
 and Codex (in that order: GitHub's plans page says every plan includes
 Copilot), each with what is true of it now and one next step. It is reached
-three ways (ruling 3): the pane's own tab, Help ▸ Set Up an Assistant…, and
-Revise With ▸ Set Up an Assistant…, last in every Revise With submenu.
-The two menu items open the pane and set up nothing themselves. **Revise With
+two ways since #990: the pane's own tab, and Revise With ▸ Set Up an
+Assistant…, last in every Revise With submenu (ruling 3 made it three, with
+Help ▸ Set Up an Assistant…, which Russell's ruling Q10 of the HIG review
+removed). The menu item opens the pane and sets up nothing itself. **Revise With
 is now always drawn** (ruling, 2026-11-13): a teacher with no assistant at all
 sees it holding the one set-up item. Until #855 a teacher with none saw no
 sign that any existed (`outsideAgents.hiddenWhenNotInstalledWhy`, rewritten).
@@ -9835,10 +9869,11 @@ ends its whole process group outright, unless the set-up has already been
 reaped (its number may by then belong to something else). `stop()`'s later outright end is a
 task a quitting app never lives to run; measured with a stand-in that
 ignores the request to end: after `stop()` it was still running 1 s later,
-after `stopNow()` it was gone. The question has its own first button,
-Finish Setting Up (Russell, 2026-11-13 evening;
-`quittingWhileWorkIsUnderWay.buttons.firstButtonByQuestion`), which still
-means Keep Working; Quit Anyway is unchanged.
+after `stopNow()` it was gone. The question had its own first button,
+Finish Setting Up (Russell, 2026-11-13 evening), until #987: since then
+both quit questions say Cancel, which answers Escape and keeps working, and
+no button is the default (`quittingWhileWorkIsUnderWay.buttons.titlesWhy`);
+Quit Anyway is unchanged.
 
 **The menu item is "Set Up an Assistant…" in Revise With and in Help**
 (Russell, 2026-11-13 evening): "Another" read wrongly when none is set up;

@@ -66,8 +66,12 @@ public static partial class AssistWording
     /// Undo Last Change with nothing to undo — greyed in the menu, so this is
     /// said only when the change went away between drawing the menu and the click.
     /// </summary>
-    public const string NothingToUndoFromTheMenu =
-        "Nothing has been changed from the Section menu in this window yet, so there is nothing to undo. Anything older is in Plantoir's Backups list.";
+    /// <remarks>It names the menus as the selected section's course titles them (#1027): "the Section or Meetings menu" in a club, the contract's <c>nothingToUndoFromTheMeetingsMenu</c>. The window sends the course in the call's <c>_meta</c> (<see cref="AssistWorkspace.CourseMetaKey"/>).</remarks>
+    public static string NothingToUndoFromTheMenu(Plantoir.Core.Models.ClassNoun noun) =>
+        $"Nothing has been changed from the {Plantoir.Core.Models.SubjectMenuLayout.EitherMenu(noun)} menu in this window yet, so there is nothing to undo. Anything older is in Plantoir's Backups list.";
+
+    /// <summary>The same, in a club: "the Section or Meetings menu" (the contract's <c>nothingToUndoFromTheMeetingsMenu</c>, #1027).</summary>
+    public static string NothingToUndoFromTheMeetingsMenu => NothingToUndoFromTheMenu(Plantoir.Core.Models.ClassNoun.Meeting);
 
     /// <summary>The section changed while its copy was being saved, so the plan no longer fits.</summary>
     public static string ChangedWhileSavingACopyFromTheMenu(string course, string section) =>
@@ -134,10 +138,17 @@ public static partial class AssistWording
 
     /// <summary>
     /// The in-app assistant's change to a section the Section menu is changing
-    /// right now: refused before anything is backed up or written.
+    /// right now: refused before anything is backed up or written. It names
+    /// both menus by the titles the course's menu bar gives them: "the
+    /// Section or Meetings menu" in a club (#990;
+    /// <c>sectionIsChangingFromTheMeetingsMenu</c>).
     /// </summary>
-    public static string SectionIsChangingFromTheMenu(string course, string section) =>
-        $"{course} Section {section} is being changed from the Section menu right now, so nothing was changed. Try again once that has finished.";
+    public static string SectionIsChangingFromTheMenu(string course, string section, Plantoir.Core.Models.ClassNoun noun) =>
+        $"{course} Section {section} is being changed from the {Plantoir.Core.Models.SubjectMenuLayout.EitherMenu(noun)} menu right now, so nothing was changed. Try again once that has finished.";
+
+    /// <summary>The same refusal in a club: "the Section or Meetings menu" (<c>sectionIsChangingFromTheMeetingsMenu</c>).</summary>
+    public static string SectionIsChangingFromTheMeetingsMenu(string course, string section) =>
+        SectionIsChangingFromTheMenu(course, section, Plantoir.Core.Models.ClassNoun.Meeting);
 
     // ---- Why the class dates are asked for first ------------------------------
 

@@ -87,6 +87,7 @@ struct MembershipToggleListView: View {
                     toggleMembership(of: item)
                     return .handled
                 }
+                .accessibilityLabel(Text(title))
                 .accessibilityIdentifier("table-\(title)")
             }
         }

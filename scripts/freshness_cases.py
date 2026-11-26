@@ -89,7 +89,15 @@ def _apply(course: Path, change: dict) -> None:
         older = Path(os.readlink(course)).parent / ("older-" + course.name)
         beside = course.with_name(course.name + ".relinking")
         os.symlink(older, beside, target_is_directory=True)
-        os.replace(beside, course)
+        if os.name == "nt":
+            # Windows cannot rename anything over a directory link (WinError
+            # 5, measured on the PC over SSH, where an administrator token
+            # lets the link be made and the case runs): take the old link
+            # away first. os.rmdir removes the link, never what it points at.
+            os.rmdir(course)
+            os.rename(beside, course)
+        else:
+            os.replace(beside, course)
     elif what == "createKeepingAnOldTime":
         _write(path, "restored from a backup\n")
         a_year_ago = time.time_ns() - 365 * 24 * 3600 * 1_000_000_000

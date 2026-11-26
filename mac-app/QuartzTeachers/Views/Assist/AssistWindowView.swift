@@ -238,10 +238,20 @@ struct AssistWindowView: View {
             ),
             isPresented: $isConfirmingRestore
         ) {
+            // Cancel answers Escape and Command-Period, and nothing is the
+            // default, so Return does nothing (#987, D1): putting a section
+            // back loses the teacher's own edits. Alerts: "Note that you
+            // don't want to make a Cancel button the default button"; "If
+            // you want to encourage people to read an alert and not just
+            // automatically press Return to dismiss it, avoid making any
+            // button the default button." Cancel with `.defaultAction` had
+            // Return and left Escape with no button (#832). In a SwiftUI
+            // alert the destructive role is the only way a button takes no
+            // Return (`AlertKeysTests`), so the go-ahead keeps it.
             Button("Cancel", role: .cancel) {
                 isConfirmingRestore = false
             }
-            .keyboardShortcut(.defaultAction)
+            .keyboardShortcut(.cancelAction)
             .accessibilityIdentifier("assistCancelRestoreButton")
 
             Button(
@@ -398,59 +408,20 @@ struct AssistWindowView: View {
     /// stops growing at four).
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField("Ask about this section…", text: $typing, axis: .vertical)
-                .borderedTextField()
-                .lineLimit(1...4)
-                .onSubmit {
+            AssistComposerField(
+                typing: $typing,
+                history: $history,
+                lastRecalled: $lastRecalled,
+                isFocused: $isComposerFocused,
+                canAcceptTyping: session.canAcceptTyping,
+                onSubmit: {
                     // Ignored while the assistant is mid-run: it does one
                     // thing at a time, and a second request would interleave
                     // with the first one's tool calls. During the warm-up it
                     // is held rather than ignored — see `sendOrHold()`.
                     sendOrHold()
                 }
-                // Up and Down walk what has been asked before, the way a
-                // Terminal does.
-                //
-                // Handed back as `.ignored` in two cases, so the keys keep
-                // doing their ordinary job when history is not what is
-                // wanted: when the box holds more than one line, where the
-                // arrows have to move the caret between those lines, and
-                // when there is nowhere further to walk — a key that silently
-                // does nothing reads as a dropped keystroke, while one that
-                // is passed on lets the field answer it.
-                .onKeyPress(.upArrow) {
-                    if typing.contains("\n") {
-                        return .ignored
-                    }
-                    guard let recalled = history.earlier(startingFrom: typing) else {
-                        return .ignored
-                    }
-                    show(recalled)
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    if typing.contains("\n") {
-                        return .ignored
-                    }
-                    guard let recalled = history.later() else {
-                        return .ignored
-                    }
-                    show(recalled)
-                    return .handled
-                }
-                // Editing a recalled line makes it a new line, so Down must
-                // not come along afterwards and replace what was typed. The
-                // walk writes through `show(_:)`, which records what it put
-                // there — so anything ELSE that changes the box came from the
-                // keyboard, and ends the walk.
-                .onChange(of: typing) { _, current in
-                    if history.isBrowsing && current != lastRecalled {
-                        history.stopBrowsing()
-                    }
-                }
-                .focused($isComposerFocused)
-                .disabled(!session.canAcceptTyping)
-                .accessibilityIdentifier("assistInputField")
+            )
 
             Button {
                 sendOrHold()
@@ -471,6 +442,9 @@ struct AssistWindowView: View {
             }
             .buttonStyle(.plain)
             .disabled(!isSendAvailable)
+            // Named, not left to the symbol, which VoiceOver read as
+            // "Arrow Up Circle" (#993, D17).
+            .accessibilityLabel(Text(AccessibilityNames.send))
             .accessibilityIdentifier("assistSendButton")
         }
         .padding(.horizontal, 12)
@@ -595,6 +569,94 @@ struct AssistWindowView: View {
     }
 }
 
+/// The composer's box: the bordered field every field in Plantoir wears,
+/// growing to four lines, with Up and Down walking what has been asked
+/// before. Its own view (#1012) so a test can host the real field and read
+/// the name VoiceOver is given, without opening an assistant window, which
+/// starts the assistant.
+struct AssistComposerField: View {
+
+    // MARK: - Stored properties
+
+    @Binding var typing: String
+    @Binding var history: AssistPromptHistory
+
+    /// What the last walk through the history put in the box, so an edit
+    /// made afterwards can be told apart from the walk.
+    @Binding var lastRecalled: String?
+
+    var isFocused: FocusState<Bool>.Binding
+    let canAcceptTyping: Bool
+    let onSubmit: () -> Void
+
+    // MARK: - Body
+
+    var body: some View {
+        TextField("Ask about this section…", text: $typing, axis: .vertical)
+            .borderedTextField()
+            .lineLimit(1...4)
+            .onSubmit {
+                onSubmit()
+            }
+            // Up and Down walk what has been asked before, the way a
+            // Terminal does.
+            //
+            // Handed back as `.ignored` in two cases, so the keys keep
+            // doing their ordinary job when history is not what is
+            // wanted: when the box holds more than one line, where the
+            // arrows have to move the caret between those lines, and
+            // when there is nowhere further to walk — a key that silently
+            // does nothing reads as a dropped keystroke, while one that
+            // is passed on lets the field answer it.
+            .onKeyPress(.upArrow) {
+                if typing.contains("\n") {
+                    return .ignored
+                }
+                guard let recalled = history.earlier(startingFrom: typing) else {
+                    return .ignored
+                }
+                show(recalled)
+                return .handled
+            }
+            .onKeyPress(.downArrow) {
+                if typing.contains("\n") {
+                    return .ignored
+                }
+                guard let recalled = history.later() else {
+                    return .ignored
+                }
+                show(recalled)
+                return .handled
+            }
+            // Editing a recalled line makes it a new line, so Down must
+            // not come along afterwards and replace what was typed. The
+            // walk writes through `show(_:)`, which records what it put
+            // there — so anything ELSE that changes the box came from the
+            // keyboard, and ends the walk.
+            .onChange(of: typing) { _, current in
+                if history.isBrowsing && current != lastRecalled {
+                    history.stopBrowsing()
+                }
+            }
+            .focused(isFocused)
+            .disabled(!canAcceptTyping)
+            // Named in words of its own (#1012): the placeholder is a hint
+            // that goes as soon as a teacher types, and assistive apps do
+            // not read it as the box's name.
+            .accessibilityLabel(Text(AccessibilityNames.askAboutThisSection))
+            .accessibilityIdentifier("assistInputField")
+    }
+
+    // MARK: - Functions
+
+    /// Puts a line from the history in the box, and records that the walk
+    /// put it there.
+    private func show(_ recalled: String) {
+        lastRecalled = recalled
+        typing = recalled
+    }
+}
+
 /// One line of what a teacher reads back: something said, or a restore.
 private enum AssistTranscriptLine: Identifiable {
     case said(AssistAgent.Entry)
@@ -622,7 +684,7 @@ private struct AssistRestoreNoteView: View {
     var body: some View {
         Label(note.text, systemImage: note.isProblem ? "exclamationmark.triangle" : "clock.arrow.circlepath")
             .font(.callout)
-            .foregroundStyle(note.isProblem ? Color.orange : Color.secondary)
+            .foregroundStyle(note.isProblem ? AnyShapeStyle(StatusColour.warning.style) : AnyShapeStyle(Color.secondary))
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("assistRestoreNote")
@@ -723,7 +785,7 @@ private struct AssistEntryView: View {
         case .problem:
             HStack {
                 Label(entry.text, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(StatusColour.warning.style)
                     .textSelection(.enabled)
                     .padding(.leading, 12)
                     .padding(.trailing, 9)
@@ -793,7 +855,8 @@ private struct AssistApprovalView: View {
 /// before they had read the request, and the request was behind the form. A
 /// form nobody asked for is a demand; this makes it an offer.
 ///
-/// "Yes" is the default button here, unlike the plan gate, and the difference
+/// "Add Dates…" (it was "Yes" until #987, D9) is the default button here,
+/// unlike the plan gate, and the difference
 /// is deliberate: a plan asks permission to CHANGE something, where this asks
 /// permission to ask a question. Somebody who pressed Return without reading
 /// gets a form they can close, not an edit they did not want.
@@ -827,9 +890,9 @@ private struct AssistDatesOfferView: View {
             // above and every sheet's (#457, the HIG sweep).
             HStack {
                 Spacer(minLength: 0)
-                Button(AssistWording.cancelled, action: decline)
+                Button(AssistWording.declineDatesButton, action: decline)
                     .accessibilityIdentifier("assistNoDatesButton")
-                Button("Yes", action: accept)
+                Button(AssistWording.giveDatesButton, action: accept)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("assistGiveDatesButton")
             }

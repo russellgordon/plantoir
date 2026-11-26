@@ -112,13 +112,13 @@ struct KeepACopyForReferenceSheet: View {
             LabeledContent("Folder name") {
                 TextField("", text: $folderName, prompt: Text("Folder name"))
                     .borderedTextField()
+                    .accessibilityLabel(Text("Folder name"))
                     .accessibilityIdentifier("keepACopyFolderName")
             }
 
             if let entryProblem {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(entryProblem)
-                        .foregroundStyle(.orange)
+                    StatusColour.blocking.sentence(entryProblem)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("keepACopyProblem")
                     // Beside the shelf rule's refusal, and only there
@@ -159,6 +159,7 @@ struct KeepACopyForReferenceSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 Button("Keep a Copy") {
                     keepACopy()
                 }

@@ -228,10 +228,11 @@ public sealed partial class AssistWindow : Window
             },
             PrimaryButtonText = AssistSectionRestore.GoAheadTitle(_section),
             CloseButtonText = "Cancel",
-            // The safe answer is the default: this discards work.
-            DefaultButton = ContentDialogButton.Close,
             XamlRoot = Root.XamlRoot,
         };
+        // This discards work: no button is the default (the mac's D1, #987),
+        // and the focus starts on Cancel, so Enter is never the put-back (#979).
+        DialogButtons.AskWithNoDefault(dialog);
         ContentDialogResult choice;
         try { choice = await dialog.ShowAsync(); }
         catch (Exception ex) { App.LogDiagnostic($"restore dialog: {ex.Message}"); return; }
@@ -242,6 +243,13 @@ public sealed partial class AssistWindow : Window
         {
             notPutBack = AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
                                          Workspace.CoursesDirectory(_folder));
+        }
+        catch (AssistSectionRestore.StoppedPartWay stopped)
+        {
+            // Something WAS changed, so "Nothing was put back:" would not be
+            // true (#911; the mac's window says it the same way).
+            Say("Assistant", stopped.Message);
+            return;
         }
         catch (Exception error)
         {
@@ -512,6 +520,7 @@ public sealed partial class AssistWindow : Window
             // A club's "make room for one meeting at Week 5" matches only in
             // a numbered course, on its own page word (#274).
             NumberedPageWord = _course.Configuration.Naming is { IsNumbered: true } naming ? naming.Word : null,
+            CourseNoun = _course.Configuration.ClassNoun,
             // The full surface, so a tool the model names but was not shown
             // is refused rather than run (#350 / mac #327).
             ServedTools = served
@@ -526,7 +535,7 @@ public sealed partial class AssistWindow : Window
             ShowPreviewInApp = () => MainWindowForBuilds()?.ShowPreviewFor(_course.Code, _section),
             // "Rebuild" means rebuild (#489, Q1): a serving preview is stopped
             // and started again, where ShowPreviewFor would leave it as it was.
-            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section),
+            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section) ?? Task.FromResult<string?>(null),
             // The Section menu's claim (#489): this window's change to a
             // section the menu is changing right now is refused, never interleaved.
             SectionIsChangingFromTheMenu = () => SectionMenuActivity.IsChanging(_folder, _course.Code, _section),
@@ -562,17 +571,18 @@ public sealed partial class AssistWindow : Window
             {
                 if (_main is not null) await _main.StopPreviewForAsync(_folder, _course.Code, _section);
             },
-            // Asked of a window showing this section's folder — the busy
-            // answer is read off a detail pane, and another folder's pane
-            // answers about another folder's section.
-            SectionIsBusy = () => MainWindowShowingThisSection()?.IsSectionBusy(_folder, _course.Code, _section) == true,
+            // Asked app-wide, of the section's run and the in-process publish
+            // record by THIS section's folder, never of a window: with no
+            // window showing the section, its deploy running in this app is
+            // still busy (#769 item 2; the mac's deployIsUnderWay, #706).
+            SectionIsBusy = () => SectionRuns.DeployIsUnderWay(_folder, _course.Code, _section),
             // Same process as every window's Deploy, so the in-memory publish
             // record is the truth about this section being deployed (#386).
             SectionIsBeingDeployed = () => CourseActivity.IsPublishingSection(_folder, _course.Code, _section),
             // Same process as the previews, so the in-memory leases are the
             // truth about whether one is on screen.
             PreviewIsShowing = () => PreviewLeases.Active.Any(lease =>
-                lease.FolderPath == _folder &&
+                WorkingFolder.IsTheSame(lease.FolderPath, _folder) &&
                 string.Equals(lease.CourseCode, _course.Code, StringComparison.OrdinalIgnoreCase) &&
                 lease.SectionNumber == _section),
             ConfirmationMode = () => App.Settings.AssistantAsksBeforeChanging,
@@ -594,8 +604,7 @@ public sealed partial class AssistWindow : Window
             },
             // Read from disk at the call: a course marked by hand while this
             // window was open is refused all the same (doors 2-4).
-            CourseIsKeptForReference = () => Workspace.DiscoverCourses(_folder)
-                .Any(c => c.Code.Equals(_course.Code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
+            CourseIsKeptForReference = () => Workspace.CourseIsKeptForReference(_folder, _course.Code),
             // "What does Unit 2, Day 3 in SPH3U link to?": SPH3U is a course
             // because it is a code in the shipped lists, not because of its
             // shape (#305 / mac #167).
@@ -806,7 +815,10 @@ public sealed partial class AssistWindow : Window
             {
                 Say(Speaker(line.Speaker), line.Text);
                 if (line.NeedsApproval) ShowApproval(line.Text);
-                if (line.Text.Contains(AssistWording.MayIAskForYourDates)) ShowDatesOffer();
+                // Either noun's question offers the sheet: a club's teacher copy
+                // asks for meeting dates (#1027 round 4).
+                if (line.Text.Contains(AssistWording.MayIAskForYourDates)
+                    || line.Text.Contains(AssistWording.MayIAskForYourDatesForAMeeting)) ShowDatesOffer();
             }
         }
         catch (OperationCanceledException) { /* the window is closing */ }
@@ -1114,7 +1126,7 @@ public sealed partial class AssistWindow : Window
 
     /// <summary>
     /// Presents an inline card asking whether the teacher would like to enter class dates,
-    /// with "Enter Class Dates" (opens SectionScheduleDialog) and "Not Now" buttons, title case
+    /// with Add Dates… (opens SectionScheduleDialog; "Enter Class Dates" until #987) and Not Now buttons, title case
     /// and on the trailing end (#491 item 9), the commit button first as Windows orders them.
     /// </summary>
     private void ShowDatesOffer()
@@ -1145,23 +1157,23 @@ public sealed partial class AssistWindow : Window
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
         var enterBtn = new Button
         {
-            Content = "Enter Class Dates",
+            Content = AssistWording.GiveDatesButton,
             Style = (Style)Application.Current.Resources["AccentButtonStyle"],
         };
         var notNowBtn = new Button
         {
-            Content = "Not Now",
+            Content = AssistWording.DeclineDatesButton,
         };
 
         enterBtn.Click += async (_, _) =>
         {
             buttons.Visibility = Visibility.Collapsed;
-            Say("You", "Enter Class Dates");
+            Say("You", AssistWording.GiveDatesButton);
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             var xamlRoot = Root.XamlRoot ?? Content?.XamlRoot;
             if (xamlRoot is null)
             {
-                Say("Assistant", "Could not open class dates dialog.");
+                Say("Assistant", ClassDatesDialogWords.CouldNotOpen(_course));
                 return;
             }
             var dialog = new SectionScheduleDialog(_folder, _course, _section, hwnd)
@@ -1170,28 +1182,32 @@ public sealed partial class AssistWindow : Window
             };
             try
             {
-                var result = await dialog.ShowAsync();
-                if (result == ContentDialogResult.Primary && dialog.SavedDates is { Count: > 0 } dates)
+                await dialog.ShowWithTheFirstFocusInTheBoxAsync();
+                // What is on disk, however the sheet was closed: a sheet that
+                // said the dates are remembered with what their file held
+                // kept stays open, and a Cancel after that leaves them
+                // remembered (#899 W7b1 review 2, LOW 1).
+                if (dialog.SavedDates is { Count: > 0 } dates)
                 {
-                    Say("Assistant", $"Remembered {dates.Count} class {(dates.Count == 1 ? "date" : "dates")} for {_course.Code} Section {_section}.");
+                    Say("Assistant", ClassDatesDialogWords.Remembered(dates.Count, _course, _section));
                 }
                 else
                 {
-                    Say("Assistant", "No class dates were recorded.");
+                    Say("Assistant", ClassDatesDialogWords.NoneRecorded(_course));
                 }
             }
             catch (Exception ex)
             {
                 App.LogDiagnostic($"SectionScheduleDialog ShowAsync exception: {ex.Message}");
-                Say("Assistant", "No class dates were recorded.");
+                Say("Assistant", ClassDatesDialogWords.NoneRecorded(_course));
             }
         };
 
         notNowBtn.Click += (_, _) =>
         {
             buttons.Visibility = Visibility.Collapsed;
-            Say("You", "Not Now");
-            Say("Assistant", "No class dates recorded. You can add them anytime.");
+            Say("You", AssistWording.DeclineDatesButton);
+            Say("Assistant", ClassDatesDialogWords.NotGivenYet(_course));
         };
 
         buttons.Children.Add(enterBtn);

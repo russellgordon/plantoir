@@ -27,7 +27,39 @@ public sealed class CourseConfiguration
         _lastSavedData = lastSavedData;
     }
 
-    public static CourseConfiguration Load(string path) => FromBytes(File.ReadAllBytes(path));
+    /// <summary>
+    /// Reads and parses a course_config.json. Throws
+    /// <see cref="FileNotFoundException"/> when it is not there,
+    /// <see cref="FileInUseException"/> when another program held it past the
+    /// bound, <see cref="FileRefusedException"/> when it is there and could
+    /// not be read for another reason (could not read just now — never "no
+    /// settings"), and
+    /// <see cref="InvalidDataException"/> or a JSON reader's exception when it
+    /// is not valid JSON (#874).
+    /// </summary>
+    public static CourseConfiguration Load(string path) => FromBytes(BytesOnDisk(path));
+
+    /// <summary>
+    /// THE one reader of course_config.json's bytes (#874): every reader in
+    /// the product comes through here, so each asks again while a build, an
+    /// editor, a scanner or another window holds the file
+    /// (<see cref="HeldFiles.ReadBytes"/>), and answers read, not there, or
+    /// could not read just now. A source-text test holds every other reader
+    /// to it (<c>CourseSettingsHeldFileTests</c>).
+    /// </summary>
+    public static HeldFiles.FileBytes ReadBytes(string path) => HeldFiles.ReadBytes(path);
+
+    /// <summary>The file's bytes, or the exception that says which of the other two answers it was.</summary>
+    private static byte[] BytesOnDisk(string path)
+    {
+        var read = ReadBytes(path);
+        return read.Outcome switch
+        {
+            HeldFiles.ReadOutcome.Read => read.Data!,
+            HeldFiles.ReadOutcome.NotThere => throw new FileNotFoundException("course_config.json is not there.", Path.GetFileName(path)),
+            _ => throw HeldFiles.Refusal(path, read),
+        };
+    }
 
     public static CourseConfiguration FromBytes(byte[] data)
     {
@@ -101,21 +133,38 @@ public sealed class CourseConfiguration
     /// window A had just saved — the mac's reported failure, reproduced by
     /// <c>TwoWindowSettingsTests.TheOldWholeFileWriteLostTheOtherWindowsHides</c>.</para>
     /// </summary>
+    ///
+    /// <para><b>A held file (#874).</b> A merge read that could not be made
+    /// just now REFUSES the Save — nothing written, <see cref="FileInUseException"/>,
+    /// whose message is the sentence the status line shows — rather than
+    /// writing this whole copy over what a build may just have written. The
+    /// write goes through a hidden temporary of its own beside the file and
+    /// one rename, asked again while the file is held; still refused, the
+    /// file is as it was and the temporary is gone.</para>
+    /// </summary>
     public SaveReport Write(string path)
     {
         JObject? onDisk = null;
-        try { if (File.Exists(path)) onDisk = ParseObject(File.ReadAllBytes(path)); }
-        catch { onDisk = null; }   // unreadable: this copy is the only truth left
+        // Any refusal of a file that is there (held, a build's replace in
+        // flight, a deny rule) refuses the Save: nothing is written blind over
+        // what is on disk (#874).
+        var read = ReadBytes(path);
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) throw HeldFiles.Refusal(path, read);
+        try { if (read.Outcome == HeldFiles.ReadOutcome.Read) onDisk = ParseObject(read.Data!); }
+        catch { onDisk = null; }   // not valid JSON: this copy is the only truth left
         JObject? lastRead = null;
         try { if (_lastSavedData.Length > 0) lastRead = ParseObject(_lastSavedData); } catch { lastRead = null; }
 
         var (written, kept, replaced) = onDisk is null || lastRead is null
             ? ((JObject)_values.DeepClone(), new List<string>(), new List<string>())
             : Merged(lastRead, onDisk, _values);
+        // Every Save writes the name cleaned, whatever was edited (#821, the
+        // mac's write(to:)): the per-key merge above keeps the FILE's value
+        // for a key this copy did not change, which would keep a raw name.
+        if (written["course_name"] is JValue { Type: JTokenType.String } storedName)
+            written["course_name"] = OneLineText.CourseName((string)storedName!);
         byte[] data = Serialize(written);
-        string temp = path + ".tmp";
-        File.WriteAllBytes(temp, data);
-        File.Move(temp, path, overwrite: true);
+        ReplaceWith(path, data);
         _values = written;
         _lastSavedData = data;
         return new SaveReport(kept, replaced);
@@ -161,31 +210,53 @@ public sealed class CourseConfiguration
     /// Revert reads the FILE (#272 / mac #265, 3a), not this copy's
     /// remembered last save: with two windows, B reverting to its own old copy
     /// showed A's saved hides as gone and "nothing unsaved", and B's next hide
-    /// then wrote them away. Falls back to the remembered copy only when the
-    /// file cannot be read.
+    /// then wrote them away. Falls back to the remembered copy when the file
+    /// is not there or is not valid JSON. When it could not be read JUST NOW
+    /// (held past the bound, #874) the window's copy is kept exactly as it is,
+    /// edits included, and the answer is false: the teacher's edits are never
+    /// thrown away because a build was swapping the file.
     /// </summary>
-    public void RevertToFile(string path)
+    public bool RevertToFile(string path) => RevertToFile(path, out _);
+
+    /// <summary>
+    /// <see cref="RevertToFile(string)"/>, saying why nothing was reverted:
+    /// <paramref name="notReverted"/> is the sentence a teacher reads (the
+    /// file's name, why, and that nothing was reverted), null when it reverted.
+    /// </summary>
+    public bool RevertToFile(string path, out string? notReverted)
     {
+        notReverted = null;
+        var read = ReadBytes(path);
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow)
+        {
+            notReverted = NotRevertedSentence(Path.GetFileName(path), read.SystemWords);
+            return false;
+        }
         try
         {
-            byte[] data = File.ReadAllBytes(path);
-            _values = ParseObject(data);
-            _lastSavedData = data;
+            if (read.Outcome != HeldFiles.ReadOutcome.Read) throw new FileNotFoundException();
+            _values = ParseObject(read.Data!);
+            _lastSavedData = read.Data!;
         }
         catch { DiscardChanges(); }
+        return true;
     }
 
     /// <summary>
     /// After ANOTHER copy saved this course: read the file again, unless this
     /// copy holds unsaved changes — those are left alone, and its own Save
-    /// follows the merge rule. True when it re-read.
+    /// follows the merge rule. True when it re-read; false, with this copy
+    /// left as it is, when the file is not there, not valid JSON, or could
+    /// not be read just now (#874: a held file is not a file that has gone).
     /// </summary>
     public bool RereadIfNothingUnsaved(string path)
     {
         if (HasUnsavedChanges) return false;
         try
         {
-            byte[] data = File.ReadAllBytes(path);
+            var read = ReadBytes(path);
+            if (read.Outcome != HeldFiles.ReadOutcome.Read) return false;
+            byte[] data = read.Data!;
             _values = ParseObject(data);
             _lastSavedData = data;
             return true;
@@ -221,23 +292,53 @@ public sealed class CourseConfiguration
         int attempts = 0;
         while (true)
         {
-            before = File.ReadAllBytes(path);
+            // Held past the bound: nothing is written, and the caller hears it (#874).
+            before = BytesOnDisk(path);
             written = Serialize(change(ParseObject(before)));
             byte[] nowOnDisk;
-            try { nowOnDisk = File.ReadAllBytes(path); } catch (IOException) { nowOnDisk = before; }
+            // A second read that is refused refuses the write (#874); only a
+            // file that has gone since the first read counts as unchanged.
+            try { nowOnDisk = BytesOnDisk(path); } catch (FileNotFoundException) { nowOnDisk = before; }
             if (nowOnDisk.AsSpan().SequenceEqual(before)) break;
             attempts++;
             if (attempts < 3) continue;
             written = Serialize(change(ParseObject(nowOnDisk)));
             break;
         }
-        string temp = path + ".tmp";
-        File.WriteAllBytes(temp, written);
-        File.Move(temp, path, overwrite: true);
+        ReplaceWith(path, written);
 
         _values = change(_values);
         _lastSavedData = written;
     }
+
+    /// <summary>
+    /// The one replace of course_config.json: a hidden temporary of its own
+    /// beside it (<see cref="HeldFiles.TemporaryBeside"/>), then one rename,
+    /// asked again while the file is held (<see cref="HeldFiles.Replace"/>).
+    /// On any failure the temporary is removed and the file is as it was; a
+    /// hold that outlasts the bound throws <see cref="FileInUseException"/>.
+    /// </summary>
+    private static void ReplaceWith(string path, byte[] data)
+    {
+        string temporary = HeldFiles.TemporaryBeside(path);
+        try
+        {
+            File.WriteAllBytes(temporary, data);
+            HeldFiles.Hide(temporary);
+            HeldFiles.Replace(temporary, path, () => File.Move(temporary, path, overwrite: true));
+            HeldFiles.Unhide(path);
+        }
+        finally
+        {
+            try { if (File.Exists(temporary)) File.Delete(temporary); } catch { }
+        }
+    }
+
+    /// <summary>The words a teacher reads when Revert could not read the file: why, and that nothing was reverted.</summary>
+    public static string NotRevertedSentence(string fileName, string? systemWords) =>
+        systemWords is null
+            ? fileName + " is in use by another program, so nothing was reverted."
+            : fileName + " could not be read, so nothing was reverted. Windows said: " + systemWords;
 
     private static JObject ParseObject(byte[] data) =>
         JToken.Parse(Encoding.UTF8.GetString(data)) as JObject
@@ -363,8 +464,11 @@ public sealed class CourseConfiguration
 
     public string CourseName
     {
-        get => StringValue("course_name");
-        set => _values["course_name"] = value;
+        // Cleaned where it is read and where it is set (#821, the mac's #780):
+        // a control character becomes a space and a bidirectional control is
+        // removed, by shared-rules.json → courseNameCharacters. Not trimmed.
+        get => OneLineText.CourseName(StringValue("course_name"));
+        set => _values["course_name"] = OneLineText.CourseName(value);
     }
 
     public string CustomShortName
@@ -1089,6 +1193,16 @@ public sealed class CourseConfiguration
         SetNestedValue("emojis", "sections", SectionKey(section), emoji);
 
     /// <summary>
+    /// The destination types that have a site address, so the only ones a
+    /// custom domain can belong to (<see cref="CustomDomain(int, string)"/>,
+    /// #904, #955). The Mac's
+    /// `CourseConfiguration.destinationTypesWithAnAddress` and the shared
+    /// Python's `custom_domains.DESTINATION_TYPES_WITH_AN_ADDRESS`, in the
+    /// same order.
+    /// </summary>
+    public static readonly IReadOnlyList<string> DestinationTypesWithAnAddress = new[] { "netlify", "cloudflare_pages" };
+
+    /// <summary>
     /// The teacher's own domain for ONE DESTINATION of a section's published
     /// site. Keyed by destination TYPE, not just by section, because a course
     /// publishing to more than one destination for redundancy may want a
@@ -1102,9 +1216,19 @@ public sealed class CourseConfiguration
     /// PRIMARY destination (<see cref="DeployTarget"/>) — the only
     /// destination that existed when it could have been set — and is
     /// invisible to every other destination type.
+    ///
+    /// A folder on this computer has no site address, so `local_folder`
+    /// (any type not in <see cref="DestinationTypesWithAnAddress"/>) never
+    /// has a domain, whatever the setting says (#904, #955; the rule and its
+    /// cases are `contracts/file-formats.json` → `customDomainReading`, which
+    /// the Mac's reader and the shared Python's
+    /// `custom_domains.for_destination` run too). Before #955 a
+    /// folder-primary course's bare string, or a value written under
+    /// `local_folder`, was handed to its folder leg.
     /// </summary>
     public string CustomDomain(int section, string destinationType)
     {
+        if (!DestinationTypesWithAnAddress.Contains(destinationType)) return "";
         if (_values["custom_domains"] is not JObject outer) return "";
         if (outer["sections"] is not JObject sections) return "";
         var entry = sections[SectionKey(section)];

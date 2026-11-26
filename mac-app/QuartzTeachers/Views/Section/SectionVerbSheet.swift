@@ -292,7 +292,7 @@ final class SectionVerbSheetModel: Identifiable {
             if pageRows.isEmpty {
                 return AssistWording.menuNoHiddenPages(course: courseName, section: String(sectionNumber))
             }
-            return AssistWording.menuPickPagesToPublish
+            return AssistWording.menuPickPagesToPublish(noun: noun)
         case .hidePages:
             if pageRows.isEmpty {
                 return AssistWording.menuNoVisiblePages(course: courseName, section: String(sectionNumber))
@@ -585,6 +585,12 @@ final class SectionVerbSheetModel: Identifiable {
             nextClassDay = AssistWording.laterClassesDay(weekday: nextDay.weekdayName, date: nextDay.text)
         }
         stage = .askingAboutLaterClasses
+        // The answer keeps the ticked classes in a step made on the main
+        // actor: the list is read off it while the question is up (#899,
+        // ruling 8 on U1's third round; the first review of U3a, LOW 6).
+        Task {
+            await JournaledStep.readTheListAhead()
+        }
     }
 
     /// The classes asked about that are TICKED: kept published at their
@@ -952,6 +958,7 @@ struct SectionVerbSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(planTableHeight)
+        .accessibilityLabel(Text(AccessibilityNames.planTable))
         .accessibilityIdentifier("sectionVerbSheetPlanTable")
     }
 
@@ -967,6 +974,8 @@ struct SectionVerbSheet: View {
                     set: { text in model.search = text }
                 ))
                 .borderedTextField()
+                // Its placeholder is not a name (#993, D18): the same words.
+                .accessibilityLabel(Text(AssistWording.menuFindAPage))
                 .accessibilityIdentifier("sectionVerbSheetSearch")
                 pickerTable
             }
@@ -977,6 +986,7 @@ struct SectionVerbSheet: View {
             ), displayedComponents: [.date])
             .labelsHidden()
             .datePickerStyle(.field)
+            .accessibilityLabel(Text(AccessibilityNames.classDate(noun: model.noun)))
             .accessibilityIdentifier("sectionVerbSheetDay")
         case .makeRoom:
             Picker("", selection: Binding(
@@ -988,6 +998,7 @@ struct SectionVerbSheet: View {
                 }
             }
             .labelsHidden()
+            .accessibilityLabel(Text(AccessibilityNames.makeRoomClass(noun: model.noun)))
             .accessibilityIdentifier("sectionVerbSheetClass")
             Stepper(value: Binding(
                 get: { return model.howMany },
@@ -996,6 +1007,8 @@ struct SectionVerbSheet: View {
                 Text("\(model.howMany)")
                     .monospacedDigit()
             }
+            .accessibilityValue(Text("\(model.howMany)"))
+            .accessibilityLabel(Text(AccessibilityNames.makeRoomHowMany(noun: model.noun)))
             .accessibilityIdentifier("sectionVerbSheetHowMany")
         case .addClass:
             // One line per way, in the contract's order; a way this section
@@ -1013,6 +1026,7 @@ struct SectionVerbSheet: View {
             }
             .pickerStyle(.radioGroup)
             .labelsHidden()
+            .accessibilityLabel(Text(AccessibilityNames.addClassWay))
             .accessibilityIdentifier("sectionVerbSheetAddClassWay")
             // Each line its own identifier, by its reason (the fix review's
             // finding 8), so a test can tell two apart.
@@ -1030,6 +1044,8 @@ struct SectionVerbSheet: View {
                     set: { text in model.searchTheSources(for: text) }
                 ))
                 .borderedTextField()
+                // Its placeholder is not a name (#993, D18): the same words.
+                .accessibilityLabel(Text(AssistWording.menuFindAPage))
                 .accessibilityIdentifier("sectionVerbSheetSearch")
                 sourceTable
             }
@@ -1063,8 +1079,25 @@ struct SectionVerbSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(sourceTableHeight)
+        .accessibilityLabel(Text(AccessibilityNames.sourceTable(noun: model.noun)))
         .accessibilityIdentifier("sectionVerbSheetSourceTable")
     }
+
+    /// The picker's Folder and Date columns (#997, D48): set widths, the
+    /// widths they came to at the sheet's opening size (135 and 175), so
+    /// Page is the one column that takes the table's width as it changes.
+    /// With all three flexible (Folder 80 to 140, Date 120 to 180) the
+    /// table shared each change between them, and when the rows arrived
+    /// after it was drawn, with the scroll bars a mouse shows, the shares
+    /// came out in half points (146.5, 134.5, 174.5) ending at 501.5 in a
+    /// table showing 501, and a sideways scroll bar appeared under the
+    /// rows. Folder and Date could be dragged 5 pt wider at most, so set
+    /// widths cost a teacher almost nothing; Page, the column that holds
+    /// long titles, still resizes. HIG, Lists and tables: "Consider ways to
+    /// preserve readability of text that might otherwise get clipped or
+    /// truncated."
+    static let pickerFolderColumnWidth: CGFloat = 135
+    static let pickerDateColumnWidth: CGFloat = 175
 
     /// The pages to tick (#608): a bordered, banded table — Page (with its
     /// checkbox), Folder and Date — the look of the plan that follows it, so
@@ -1086,12 +1119,12 @@ struct SectionVerbSheet: View {
                     .foregroundStyle(.secondary)
                     .help(row.folder)
             }
-            .width(min: 80, ideal: 110, max: 140)
+            .width(SectionVerbSheet.pickerFolderColumnWidth)
             TableColumn(AssistWording.menuPickDateColumn) { (row: SectionVerbSheetModel.PageRow) in
                 Text(dateCell(for: row))
                     .foregroundStyle(.secondary)
             }
-            .width(min: 120, ideal: 150, max: 180)
+            .width(SectionVerbSheet.pickerDateColumnWidth)
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(pickerTableHeight)
@@ -1102,6 +1135,7 @@ struct SectionVerbSheet: View {
             model.flipTick(ofRowWithID: pickedRowID)
             return .handled
         }
+        .accessibilityLabel(Text(AccessibilityNames.pagesTable))
         .accessibilityIdentifier("sectionVerbSheetPickerTable")
     }
 
@@ -1128,6 +1162,7 @@ struct SectionVerbSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(laterClassesTableHeight)
+        .accessibilityLabel(Text(AccessibilityNames.laterClassesTable(noun: model.noun)))
         .onKeyPress(.space) {
             if pickedLaterClassID == nil {
                 return .ignored

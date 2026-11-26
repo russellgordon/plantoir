@@ -121,26 +121,78 @@ enum SectionTimetableStore {
 
     /// Why a timetable could not be remembered or trusted, in words a teacher
     /// can act on.
-    enum Problem: LocalizedError {
+    enum Problem: LocalizedError, SaidInACoursesNoun {
         case noDatesGiven(String, Int)
         case unreadableDates(String, Int, [String])
         case halfRemembered(String, Int, [String])
         case cannotBeClassDates(String, Int, [String])
         case couldNotWrite(String, Int, String)
+        /// The dates went in, but what the file held just before could not
+        /// be put back over them after a check, so it is kept beside it
+        /// under each hidden name (`JournaledStepError.leftPartWay`; the
+        /// third review of U3a, LOW 2). The dates ARE remembered.
+        case savedWithWhatItHeldKept(String, Int, [String])
 
+        /// The ordinary wording: what a tool result, which the model reads,
+        /// always says (#1027: the model is told class in every course).
         var errorDescription: String? {
+            return sentence(noun: .class)
+        }
+
+        /// The refusal in a course's own noun, for the Class Dates sheet a
+        /// teacher reads (#1027: "meeting" in a club).
+        func sentence(noun: ClassNoun) -> String {
             switch self {
             case .noDatesGiven(let code, let number):
-                return "No class dates were given for \(code) Section \(number), so there is nothing to remember."
+                return AssistWording.classDatesNoneGiven(place: "\(code) Section \(number)", noun: noun)
             case .unreadableDates(let code, let number, let offenders):
-                return "\(SectionTimetableStore.list(offenders)) \(offenders.count == 1 ? "isn’t a date" : "aren’t dates") written as 2026-09-08, so nothing was remembered for \(code) Section \(number). A half-remembered timetable would date the wrong classes, so the whole list is refused — send it again with those corrected."
+                return AssistWording.classDatesNotWrittenAsDates(
+                    offenders: SectionTimetableStore.list(offenders), count: offenders.count,
+                    place: "\(code) Section \(number)", noun: noun
+                )
             case .halfRemembered(let code, let number, let offenders):
-                return "The remembered timetable for \(code) Section \(number) has \(offenders.count == 1 ? "an entry" : "entries") that cannot be read — \(SectionTimetableStore.list(offenders)). It is being ignored rather than half-trusted. Record the class dates again."
+                return AssistWording.classDatesOnFileUnreadable(
+                    offenders: SectionTimetableStore.list(offenders), count: offenders.count,
+                    place: "\(code) Section \(number)", noun: noun
+                )
             case .cannotBeClassDates(let code, let number, let offenders):
-                return "\(SectionTimetableStore.list(offenders)) \(offenders.count == 1 ? "is too far from today to be a class date" : "are too far from today to be class dates"), so nothing was remembered for \(code) Section \(number). A half-remembered timetable would date the wrong classes, so the whole list is refused — send it again with \(offenders.count == 1 ? "that date" : "those dates") corrected."
+                return AssistWording.classDatesTooFarFromToday(
+                    offenders: SectionTimetableStore.list(offenders), count: offenders.count,
+                    place: "\(code) Section \(number)", noun: noun
+                )
             case .couldNotWrite(let code, let number, let reason):
-                return "The class dates for \(code) Section \(number) could not be saved, so they are NOT remembered: \(reason)"
+                return AssistWording.classDatesCouldNotBeSaved(
+                    place: "\(code) Section \(number)", reason: reason, noun: noun
+                )
+            case .savedWithWhatItHeldKept(let code, let number, let keptOriginals):
+                return Problem.rememberedTitle(code, number, noun: noun) + " " + Problem.keptMessage(keptOriginals)
             }
+        }
+
+        /// The title of the one alert the Class Dates sheet shows when the
+        /// dates went in part way (#899 U3c's first review, LOW 6, after
+        /// Russell's ruling for today's class): a complete sentence, so
+        /// sentence-style capitals and a full stop (the HIG's Alerts page).
+        static func rememberedTitle(_ code: String, _ number: Int, noun: ClassNoun = .class) -> String {
+            return AssistWording.classDatesAreRemembered(place: "\(code) Section \(number)", noun: noun)
+        }
+
+        /// That alert's message, naming each hidden file kept.
+        static func keptMessage(_ keptOriginals: [String]) -> String {
+            var said: String = keptLead
+            for kept in keptOriginals {
+                said += " " + keptSentence(place: JournaledStepError.placeName(ofKept: kept), kept: kept)
+            }
+            return said
+        }
+
+        /// `shared-rules.json` → `undo.wording.classDatesKeptLead` (the U3
+        /// sweep, finding 5).
+        static let keptLead: String = "Another program may have changed their file as they were saved."
+
+        /// `undo.wording.classDatesKeptBesideIt`; `place` is already quoted.
+        static func keptSentence(place: String, kept: String) -> String {
+            return "What \(place) held just before is kept beside it as the hidden file “\(kept)”."
         }
     }
 
@@ -211,8 +263,8 @@ enum SectionTimetableStore {
     /// The trail's words when a remembered timetable is set aside — the date
     /// that could not be a class date, and what happens next. Never a page,
     /// never the teacher's description of where the dates came from.
-    static func setAsideTrailLine(naming impossible: CalendarDay) -> String {
-        return "remembered class dates set aside: they include \(impossible.text), which cannot be a class date, so they will be asked for again"
+    static func setAsideTrailLine(naming impossible: CalendarDay, noun: ClassNoun = .class) -> String {
+        return AssistWording.classDatesSetAside(naming: impossible.text, noun: noun)
     }
 
     /// Where a section's remembered timetable lives.
@@ -251,7 +303,7 @@ enum SectionTimetableStore {
         if let impossible = firstDateThatCannotBeAClassDate(in: remembered.dates, today: today) {
             ActivityTrail.note(
                 .rememberedTimetableSetAside,
-                setAsideTrailLine(naming: impossible),
+                setAsideTrailLine(naming: impossible, noun: course.configuration.classNoun),
                 course: course.code,
                 section: sectionNumber
             )
@@ -387,7 +439,12 @@ enum SectionTimetableStore {
     /// Write the dates down. The plan is trusted because the plan is the only
     /// thing that can make one — every list has already been through
     /// `checkedDates`.
-    static func applyRememberTimetable(_ plan: RememberTimetablePlan) throws {
+    ///
+    /// One step through the door (#899, U3): "remember timetable".
+    static func applyRememberTimetable(
+        _ plan: RememberTimetablePlan,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("rememberTimetable")
+    ) throws {
         var datesText: [String] = []
         for date in plan.dates {
             datesText.append(date.text)
@@ -399,17 +456,25 @@ enum SectionTimetableStore {
         values["source"] = plan.source
         values["recorded"] = plan.recorded.text
 
-        let fileManager: FileManager = FileManager.default
         do {
-            try fileManager.createDirectory(
-                at: plan.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
-            )
             // Key order is alphabetical, which neither reader minds — both
             // look keys up by name.
             let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             var data: Data = try JSONSerialization.data(withJSONObject: values, options: options)
             data.append(contentsOf: [0x0A])
-            try data.write(to: plan.fileURL, options: [.atomic])
+            let step: JournaledStep = JournaledStep(
+                courseCode: plan.courseCode, fileInside: plan.fileURL, section: plan.sectionNumber, maker: maker
+            )
+            step.write(data, to: plan.fileURL)
+            try step.make()
+        } catch JournaledStepError.leftPartWay(let refusal, let fileName, let keptOriginals) {
+            // The dates went in and what the file held could not be put
+            // back over them: carried through as it is, so every caller says
+            // what is true, never "NOT remembered" (the third review of U3a,
+            // LOW 2). The assistant says it as part way
+            // (`saidWhenTheStepStopped`); the sheet as remembered
+            // (`Problem.savedWithWhatItHeldKept`).
+            throw JournaledStepError.leftPartWay(refusal, fileName: fileName, keptOriginals: keptOriginals)
         } catch {
             throw Problem.couldNotWrite(plan.courseCode, plan.sectionNumber, error.localizedDescription)
         }
@@ -460,16 +525,32 @@ struct RememberTimetablePlan {
         return replacing.dates == dates && replacing.source == source
     }
 
-    /// The proposal, as a teacher would hear it.
+    /// The proposal in the ordinary wording: what a tool result, which the
+    /// model reads, says in every course (#1027).
     var description: String {
+        return description(noun: .class)
+    }
+
+    // MARK: - Functions
+
+    /// The proposal, as a teacher would hear it, in the course's noun (the
+    /// Class Dates sheet; #1027).
+    func description(noun: ClassNoun) -> String {
         var lines: [String] = []
+        let place: String = "\(courseCode) Section \(sectionNumber)"
 
         if changesNothing {
-            lines.append("\(courseCode) Section \(sectionNumber) already has exactly these \(dates.count) class dates recorded, so nothing would change.")
+            lines.append(AssistWording.classDatesAlreadyRecorded(count: dates.count, place: place, noun: noun))
             return lines.joined(separator: "\n")
         }
 
-        lines.append("Remember \(dates.count) class date\(dates.count == 1 ? "" : "s") for \(courseCode) Section \(sectionNumber), from \(dates[0].text) (\(dates[0].weekdayName)) to \(dates[dates.count - 1].text) (\(dates[dates.count - 1].weekdayName)).")
+        lines.append(AssistWording.classDatesToRemember(
+            count: dates.count,
+            place: place,
+            first: "\(dates[0].text) (\(dates[0].weekdayName))",
+            last: "\(dates[dates.count - 1].text) (\(dates[dates.count - 1].weekdayName))",
+            noun: noun
+        ))
         lines.append("")
         lines.append("Where they came from: \(source).")
 

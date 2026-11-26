@@ -29,7 +29,7 @@ public class CutOffAnswerTests : IDisposable
         ActivityTrail.SetCustomLogPathForTesting(_trail);
         _agent = new AssistAgent(_model, _tools,
             ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ConfirmationMode = () => false,
             CoursesInTheFolder = () => new[] { "ICS3U" },
         };
@@ -239,7 +239,7 @@ public class CutOffAnswerTests : IDisposable
         var model = new WindowBindingContractTests.ScriptedModel();
         model.Then(Calling("add_next_class", "{}"), "tool_calls");
         var tools = new WindowBindingContractTests.RecordingTools();
-        var agent = new AssistAgent(model, tools, schemas, "ICS3U", 1) { ConfirmationMode = () => false };
+        var agent = new AssistAgent(model, tools, schemas, "ICS3U", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class, ConfirmationMode = () => false };
 
         await agent.Say(Request, CancellationToken.None);
 

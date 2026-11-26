@@ -43,11 +43,12 @@ nonisolated struct ProblemsTableRow: Identifiable, Hashable, Sendable {
 /// Fix with Codex… hand over — sortable by kind, and the repair inline where
 /// a problem has one, because the alert no longer comes with every build.
 ///
-/// The two Fix buttons sit under the table (#717 part two,
-/// `FixWithAssistant`): each shown only while its assistant is installed
-/// (`OutsideAssistantPresence`, never asked while this view draws), never on
-/// a course kept for reference, and enabled while a ticked row is still this
-/// section's problem.
+/// The Fix buttons sit under the table (#717 part two, `FixWithAssistant`):
+/// one per outside assistant, never on a course kept for reference, enabled
+/// while its assistant is installed (`OutsideAssistantPresence`, never asked
+/// while this view draws) and a ticked row is still this section's problem.
+/// Since #990 one whose assistant is missing is dimmed, not left out, and a
+/// dimmed button's help tag and VoiceOver hint say why.
 ///
 /// Drawn OVER the section's site, which stays mounted underneath (see
 /// `DetailTabs`).
@@ -97,25 +98,10 @@ struct ProblemsTableView: View {
         })
     }
 
-    var showsClaude: Bool {
-        return FixWithAssistant.buttonIsShown(
-            assistantIsInstalled: presence.claudeIsInstalled,
-            courseIsKeptForReference: course.isKeptForReference
-        )
-    }
-
-    var showsCodex: Bool {
-        return FixWithAssistant.buttonIsShown(
-            assistantIsInstalled: presence.codexIsInstalled,
-            courseIsKeptForReference: course.isKeptForReference
-        )
-    }
-
-    var showsCopilot: Bool {
-        return FixWithAssistant.buttonIsShown(
-            assistantIsInstalled: presence.copilotIsInstalled,
-            courseIsKeptForReference: course.isKeptForReference
-        )
+    /// The three Fix with buttons are drawn on every course not kept for
+    /// reference, whatever this Mac has (#990, D11).
+    var showsFixButtons: Bool {
+        return FixWithAssistant.buttonIsShown(courseIsKeptForReference: course.isKeptForReference)
     }
 
     /// Every row, in the order the teacher sorted them.
@@ -167,7 +153,7 @@ struct ProblemsTableView: View {
                 .width(min: 90, ideal: 130)
             }
             .accessibilityIdentifier("problemsTable")
-            if showsClaude || showsCodex || showsCopilot {
+            if showsFixButtons {
                 fixButtons
             }
         }
@@ -210,38 +196,40 @@ struct ProblemsTableView: View {
     }
 
     /// Fix with Claude…, Fix with Codex… and Fix with GitHub Copilot…,
-    /// trailing under the table, in that order.
+    /// trailing under the table, in that order. Each is dimmed while its
+    /// assistant is not on this Mac (#990, D11, Russell's ruling Q9) or
+    /// while no row is handed over.
     var fixButtons: some View {
-        HStack(spacing: 8) {
+        let hasRows: Bool = handover.hasRows
+        return HStack(spacing: 8) {
             Spacer()
-            if showsClaude {
-                Button(FixWithAssistant.claudeButtonTitle) {
-                    fix(with: .claude)
-                }
-                .accessibilityIdentifier("fixWithClaude")
-                .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
-            }
-            if showsCodex {
-                Button(FixWithAssistant.codexButtonTitle) {
-                    fix(with: .codex)
-                }
-                .accessibilityIdentifier("fixWithCodex")
-                .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
-            }
-            if showsCopilot {
-                Button(FixWithAssistant.copilotButtonTitle) {
-                    fix(with: .copilot)
-                }
-                .accessibilityIdentifier("fixWithCopilot")
-                .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
-            }
+            fixButton(.claude, identifier: "fixWithClaude", installed: presence.claudeIsInstalled, hasRows: hasRows)
+            fixButton(.codex, identifier: "fixWithCodex", installed: presence.codexIsInstalled, hasRows: hasRows)
+            fixButton(.copilot, identifier: "fixWithCopilot", installed: presence.copilotIsInstalled, hasRows: hasRows)
         }
-        .disabled(!handover.hasRows)
         .padding(.horizontal)
         .padding(.bottom, 10)
     }
 
     // MARK: - Functions
+
+    /// One Fix with button: enabled only while its assistant is installed
+    /// and a row is handed over, with the hint that says which is missing.
+    func fixButton(
+        _ assistant: FixWithAssistant.Assistant, identifier: String, installed: Bool, hasRows: Bool
+    ) -> some View {
+        return Button(assistant.buttonTitle) {
+            fix(with: assistant)
+        }
+        .disabled(!FixWithAssistant.buttonIsEnabled(assistantIsInstalled: installed, hasRows: hasRows))
+        // The same reason as a help tag (#990 review), so a sighted teacher
+        // who holds the pointer over a dimmed button reads why: HIG,
+        // Offering help, "Consider offering context-sensitive tooltips".
+        // Empty, so no tag, while a press would work.
+        .help(FixWithAssistant.buttonHint(assistantIsInstalled: installed, hasRows: hasRows))
+        .accessibilityIdentifier(identifier)
+        .accessibilityHint(Text(FixWithAssistant.buttonHint(assistantIsInstalled: installed, hasRows: hasRows)))
+    }
 
     @ViewBuilder
     func problemCell(_ tableRow: ProblemsTableRow) -> some View {

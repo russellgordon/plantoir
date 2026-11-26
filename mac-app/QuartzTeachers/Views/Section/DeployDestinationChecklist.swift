@@ -19,10 +19,19 @@ struct DeployDestinationChecklist: View {
                 HStack(spacing: 4) {
                     Image(systemName: DeployDestinationChecklist.symbolName(for: leg))
                         .foregroundStyle(DeployDestinationChecklist.tint(for: leg))
+                        // The state in words as well as colour (#993, D19):
+                        // VoiceOver reads "Netlify, Done" rather than a
+                        // symbol's name.
+                        .accessibilityLabel(Text(DeployDestinationChecklist.stateName(
+                            isFinished: leg.isFinished,
+                            succeeded: leg.succeeded,
+                            isRunning: leg.runner.isRunning
+                        )))
                     Text(DeployCommand.destinationDescription(for: leg.destination))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("deployDestinationStatus-\(leg.destination.type)")
             }
         }
@@ -34,15 +43,38 @@ struct DeployDestinationChecklist: View {
 
     static func symbolName(for leg: MultiDestinationDeployRunner.Leg) -> String {
         if leg.isFinished {
-            return leg.succeeded ? "checkmark.circle.fill" : "xmark.circle.fill"
+            // A failed leg stopped: the stop symbol, one per meaning (#994).
+            return leg.succeeded ? "checkmark.circle.fill" : StatusColour.blocking.filledSymbolName
         }
         return leg.runner.isRunning ? "arrow.triangle.2.circlepath.circle.fill" : "circle"
     }
 
-    static func tint(for leg: MultiDestinationDeployRunner.Leg) -> Color {
-        if leg.isFinished {
-            return leg.succeeded ? .green : .red
+    /// What a destination's symbol means, in a word, for VoiceOver (#993,
+    /// D19). The same four states `symbolName(for:)` draws.
+    static func stateName(isFinished: Bool, succeeded: Bool, isRunning: Bool) -> String {
+        if isFinished {
+            if succeeded {
+                return AccessibilityNames.destinationDone
+            }
+            return AccessibilityNames.destinationFailed
         }
-        return leg.runner.isRunning ? .blue : .secondary
+        if isRunning {
+            return AccessibilityNames.destinationDeploying
+        }
+        return AccessibilityNames.destinationWaiting
+    }
+
+    static func tint(for leg: MultiDestinationDeployRunner.Leg) -> AnyShapeStyle {
+        if leg.isFinished {
+            if leg.succeeded {
+                return AnyShapeStyle(Color.green)
+            }
+            // A failed leg is the stopping red (#994).
+            return AnyShapeStyle(StatusColour.blocking.style)
+        }
+        if leg.runner.isRunning {
+            return AnyShapeStyle(Color.blue)
+        }
+        return AnyShapeStyle(Color.secondary)
     }
 }

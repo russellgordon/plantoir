@@ -148,11 +148,11 @@ nonisolated enum ClassesDatedLater {
         /// Written with a rename, so a reader never meets half a file. Last
         /// writer wins between two windows; the worst outcome is being asked
         /// once more.
-        func write(courseDirectory: URL, section: Int) throws {
+        ///
+        /// Through the door (#899, U3): planned into `step` when keeping them
+        /// is part of a larger step, otherwise one step of its own.
+        func write(courseDirectory: URL, section: Int, into step: JournaledStep? = nil, maker: UndoStepMaker = UndoStepMaker.sheet("keepClassesDatedLater")) throws {
             let url: URL = KeptRecord.fileURL(courseDirectory: courseDirectory, section: section)
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(), withIntermediateDirectories: true
-            )
             var rows: [[String: Any]] = []
             for entry in kept {
                 rows.append(["place": entry.place, "date": entry.date])
@@ -163,7 +163,16 @@ nonisolated enum ClassesDatedLater {
                 "kept": rows
             ]
             let data: Data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-            try data.write(to: url, options: .atomic)
+            if let step {
+                step.write(data, to: url)
+                return
+            }
+            let own: JournaledStep = JournaledStep(
+                courseCode: courseDirectory.lastPathComponent, courseDirectory: courseDirectory,
+                section: section, maker: maker
+            )
+            own.write(data, to: url)
+            try own.make()
         }
 
         /// Adds `pages` to what is already kept — replacing a page's older
@@ -302,13 +311,16 @@ nonisolated enum ClassesDatedLater {
     /// Remembers `pages` as kept for `sectionNumber`. A record that cannot
     /// be written costs the question once more at the next Deploy.
     @MainActor
-    static func keep(_ pages: [Flagged], forSection sectionNumber: Int, in course: Course) {
+    static func keep(
+        _ pages: [Flagged], forSection sectionNumber: Int, in course: Course,
+        into step: JournaledStep? = nil, by maker: UndoStepMaker = UndoStepMaker.sheet("keepClassesDatedLater")
+    ) {
         if pages.isEmpty {
             return
         }
         let existing: KeptRecord? = KeptRecord.read(courseDirectory: course.directoryURL, section: sectionNumber)
         let record: KeptRecord = KeptRecord.adding(pages, to: existing)
-        try? record.write(courseDirectory: course.directoryURL, section: sectionNumber)
+        try? record.write(courseDirectory: course.directoryURL, section: sectionNumber, into: step, maker: maker)
     }
 
     /// The trail's words for a deploy held back for them (#475):

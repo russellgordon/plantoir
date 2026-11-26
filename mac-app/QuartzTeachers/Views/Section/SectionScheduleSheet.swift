@@ -55,6 +55,12 @@ struct SectionScheduleSheet: View {
 
     @State var route: Route = .typed
 
+    /// Whether the teacher has chosen another route since the sheet opened
+    /// (#997). The dates box takes the focus when the sheet opens on it,
+    /// not when someone arrows the route picker back onto Typed: that
+    /// would pull the keyboard out of the picker mid-choice.
+    @State var hasChangedRoute: Bool = false
+
     /// The pasted column, as typed.
     @State var typed: String = ""
 
@@ -84,9 +90,39 @@ struct SectionScheduleSheet: View {
     /// The refusal, when there was one.
     @State var failure: String?
 
+    /// The dates went in part way: remembered, with what their file held
+    /// just before kept beside it under a hidden name. One alert names it;
+    /// its OK carries on as a plain save does (the first review of U3c,
+    /// LOW 6). Nil the rest of the time.
+    @State var rememberedKeeping: RememberedKeeping?
+
+    /// What that alert says, and what was remembered.
+    struct RememberedKeeping {
+
+        // MARK: - Stored properties
+
+        let title: String
+        let message: String
+        let timetable: SectionTimetable
+
+        /// Where each kept file is, for the alert's Show in Finder.
+        let keptFiles: [URL]
+    }
+
     @Environment(\.dismiss) var dismiss
 
     // MARK: - Computed properties
+
+    /// What this course calls a class: "meeting" in a club (#1027). Every
+    /// sentence the sheet says itself is said in it.
+    var noun: ClassNoun {
+        return course.configuration.classNoun
+    }
+
+    /// The line under the title: what giving the dates buys.
+    var purposeLine: String {
+        return AssistWording.classDatesPurpose(noun: noun)
+    }
 
     /// The types the file picker offers. A `.ics` has no built-in type on
     /// every Mac, so it is named by its extension as well.
@@ -128,9 +164,10 @@ struct SectionScheduleSheet: View {
 
             if let failure {
                 ScrollView {
-                    Text(failure)
+                    // Selectable, so the symbol sits beside the words and is
+                    // not copied with them (#994).
+                    StatusLine(kind: .blocking, words: failure)
                         .font(.callout)
-                        .foregroundStyle(.orange)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("sectionScheduleFailure")
@@ -163,6 +200,39 @@ struct SectionScheduleSheet: View {
                 break
             }
         }
+        .alert(
+            rememberedKeeping?.title ?? "",
+            isPresented: Binding(
+                get: { return rememberedKeeping != nil },
+                set: { isUp in
+                    if !isUp, let remembered = rememberedKeeping {
+                        rememberedKeeping = nil
+                        onRemembered(remembered.timetable)
+                        dismiss()
+                    }
+                }
+            ),
+            presenting: rememberedKeeping
+        ) { remembered in
+            // Informational: OK, the default, on the trailing side, with
+            // Show in Finder beside it (the HIG's Alerts page; Russell's
+            // second ruling of 2026-11-20, night). Either closes it, and
+            // closing it carries on as a plain save does. The files come
+            // with the alert, never read back from state its closing clears.
+            Button("OK") { }
+                .keyboardShortcut(.defaultAction)
+            Button(FrontPageWording.showKept) {
+                FolderActions.showInFinder(files: remembered.keptFiles)
+            }
+        } message: { remembered in
+            Text(remembered.message)
+        }
+        .task {
+            // Remembering the dates makes a step on the main actor: the list
+            // is read off it while the teacher fills the sheet in (#899,
+            // ruling 8 on U1's third round; the first review of U3a, LOW 6).
+            await JournaledStep.readTheListAhead()
+        }
     }
 
     // MARK: - Computed properties — the parts of the sheet
@@ -173,7 +243,7 @@ struct SectionScheduleSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             // The one sentence that has to be here: a teacher being asked
             // for a column of dates deserves to know what it buys them.
-            Text("Give Plantoir the class dates once, so it can date new class pages for you. They are kept inside the course folder, so they travel with it through backup, archive and restore.")
+            Text(purposeLine)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -200,6 +270,7 @@ struct SectionScheduleSheet: View {
         .accessibilityIdentifier("sectionScheduleRoutePicker")
         .onChange(of: route) {
             failure = nil
+            hasChangedRoute = true
         }
     }
 
@@ -211,11 +282,17 @@ struct SectionScheduleSheet: View {
                 Text("One date per line. A heading row and blank lines are fine.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $typed)
-                    .font(.body.monospaced())
-                    .frame(minHeight: 150)
-                    .border(Color.secondary.opacity(0.3))
-                    .accessibilityIdentifier("sectionScheduleTypedField")
+                // Tab moves on rather than typing a tab (#997, ruling Q-C).
+                // Named (#993, D41) on the text area itself, where VoiceOver
+                // lands, rather than on the scroll view around it.
+                ClassDatesTextBox(
+                    text: $typed,
+                    accessibilityName: AccessibilityNames.classDates(noun: noun),
+                    identifier: "sectionScheduleTypedField",
+                    takesTheFocusWhenShown: !hasChangedRoute
+                )
+                .frame(minHeight: 150)
+                .border(Color.secondary.opacity(0.3))
             }
 
         case .file:
@@ -247,6 +324,8 @@ struct SectionScheduleSheet: View {
                     .foregroundStyle(.secondary)
                 TextField("https://docs.google.com/spreadsheets/d/…/edit", text: $googleSheetLink)
                     .borderedTextField()
+                    // Its placeholder is an address, not a name (#1012).
+                    .accessibilityLabel(Text(AccessibilityNames.googleSheetAddress))
                     .accessibilityIdentifier("sectionScheduleGoogleSheetField")
 
                 // Said plainly, and before the button is pressed. Everything
@@ -278,6 +357,8 @@ struct SectionScheduleSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             TextField("Where these came from", text: $source)
                 .borderedTextField()
+                // Its placeholder is not a name (#993, D18): the same words.
+                .accessibilityLabel(Text("Where these came from"))
                 .accessibilityIdentifier("sectionScheduleSourceField")
             Text("In your own words — “timetable.xlsx, block H”. This is what you will read months from now when you wonder where these dates came from.")
                 .font(.caption)
@@ -323,7 +404,7 @@ struct SectionScheduleSheet: View {
 
     func confirmation(of plan: RememberTimetablePlan) -> some View {
         ScrollView {
-            Text(plan.description)
+            Text(plan.description(noun: noun))
                 .font(.callout)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -355,6 +436,7 @@ struct SectionScheduleSheet: View {
             Button("Cancel", role: .cancel) {
                 dismiss()
             }
+            .keyboardShortcut(.cancelAction)
             .accessibilityIdentifier("sectionScheduleCancelButton")
 
             if let plan {
@@ -406,7 +488,7 @@ struct SectionScheduleSheet: View {
             }
         } catch {
             isFetching = false
-            failure = error.localizedDescription
+            failure = SectionScheduleSheet.sentence(for: error, noun: noun)
             return
         }
 
@@ -429,7 +511,7 @@ struct SectionScheduleSheet: View {
             self.question = nil
             propose(reading)
         } catch {
-            failure = error.localizedDescription
+            failure = SectionScheduleSheet.sentence(for: error, noun: noun)
         }
     }
 
@@ -449,7 +531,7 @@ struct SectionScheduleSheet: View {
                 in: course
             )
         } catch {
-            failure = error.localizedDescription
+            failure = SectionScheduleSheet.sentence(for: error, noun: noun)
         }
     }
 
@@ -469,20 +551,74 @@ struct SectionScheduleSheet: View {
         return described
     }
 
-    func remember(_ plan: RememberTimetablePlan) {
-        do {
-            try SectionTimetableStore.applyRememberTimetable(plan)
-        } catch {
-            failure = error.localizedDescription
-            return
-        }
-        onRemembered(SectionTimetable(
+    /// What saving the dates came to, for the sheet to act on.
+    enum Remembering {
+        /// Saved: carry on.
+        case remembered(SectionTimetable)
+        /// Saved part way: remembered, one alert names the kept file, and its
+        /// OK carries on as `.remembered` does.
+        case rememberedKeeping(RememberedKeeping)
+        /// Not saved: the sentence, said in the sheet.
+        case notRemembered(String)
+    }
+
+    /// Saves the plan's dates and says what that came to. The dates going
+    /// in part way are REMEMBERED (the first review of U3c, LOW 6): what
+    /// waits on them carries on once the one alert naming the kept file
+    /// closes, never held up by a blocking line.
+    static func save(_ plan: RememberTimetablePlan, noun: ClassNoun) -> Remembering {
+        let timetable: SectionTimetable = SectionTimetable(
             sectionNumber: plan.sectionNumber,
             dates: plan.dates,
             source: plan.source,
             recorded: plan.recorded
-        ))
-        dismiss()
+        )
+        do {
+            try SectionTimetableStore.applyRememberTimetable(plan)
+        } catch JournaledStepError.leftPartWay(_, _, let keptOriginals) {
+            return .rememberedKeeping(RememberedKeeping(
+                title: SectionTimetableStore.Problem.rememberedTitle(plan.courseCode, plan.sectionNumber, noun: noun),
+                message: SectionTimetableStore.Problem.keptMessage(keptOriginals),
+                timetable: timetable,
+                keptFiles: SectionScheduleSheet.keptFiles(keptOriginals, beside: plan.fileURL)
+            ))
+        } catch {
+            return .notRemembered(SectionScheduleSheet.sentence(for: error, noun: noun))
+        }
+        return .remembered(timetable)
+    }
+
+    /// A refusal as this sheet says it: in the course's noun when it is one
+    /// of the timetable's own (#1027), otherwise the error's own words.
+    static func sentence(for error: Error, noun: ClassNoun) -> String {
+        if let problem = error as? SectionTimetableStore.Problem {
+            return problem.sentence(noun: noun)
+        }
+        if let problem = error as? SectionScheduleSource.Problem {
+            return problem.sentence(noun: noun)
+        }
+        return error.localizedDescription
+    }
+
+    /// Each kept file's place: beside the file it was kept from.
+    static func keptFiles(_ keptOriginals: [String], beside fileURL: URL) -> [URL] {
+        var files: [URL] = []
+        for name in keptOriginals {
+            files.append(fileURL.deletingLastPathComponent().appendingPathComponent(name))
+        }
+        return files
+    }
+
+    func remember(_ plan: RememberTimetablePlan) {
+        switch SectionScheduleSheet.save(plan, noun: noun) {
+        case .remembered(let timetable):
+            onRemembered(timetable)
+            dismiss()
+        case .rememberedKeeping(let remembered):
+            rememberedKeeping = remembered
+        case .notRemembered(let sentence):
+            failure = sentence
+        }
     }
 }
 
@@ -696,9 +832,17 @@ struct SectionScheduleCourseMissingView: View {
 
     // MARK: - Computed properties
 
+    /// The course is gone, so its settings cannot be read: a club is known
+    /// by its code (`ClubCodeRule`), as `WorkspaceModel.classNoun(ofCourse:)`
+    /// knows one it cannot find (#1027).
+    var message: String {
+        let noun: ClassNoun = ClubCodeRule.isClub(courseCode) ? .meeting : .class
+        return AssistWording.classDatesCourseMissing(course: courseCode, noun: noun)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("\(courseCode) could not be found in this working folder, so there is nothing to record class dates against.")
+            Text(message)
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("sectionScheduleCourseMissing")

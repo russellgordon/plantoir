@@ -32,7 +32,6 @@ enum SetUpsUnderWay {
 /// Where a teacher opened the set-up from, for the trail (plan review L6).
 nonisolated enum AssistantSetUpOpenedFrom: String, Sendable {
     case settings = "the Settings pane"
-    case helpMenu = "the Help menu"
     case reviseWith = "Revise With"
 }
 

@@ -302,6 +302,113 @@ def link_directory(target: Path, link: Path) -> str:
 
 
 # ---------------------------------------------------------------------------
+# The native modules' libraries in an existing mirror (#1006, after #965)
+#
+# Windows' runtime carries vcruntime140.dll beside the two native modules
+# that import it (contracts/toolchain.json -> windowsNodeVcRuntime ->
+# besideModules), because Windows looks for a .node file's libraries in the
+# module's own folder first. A section's work folder holds node_modules as a
+# hardlink mirror of the runtime's, made when the section is FIRST built and
+# not remade after (remaking it is a walk of tens of thousands of files), so
+# a section first built under 1.9.3 kept a mirror without those copies after
+# an upgrade, and its modules found only the copy beside node.exe, through
+# PATH and behind any older copy in System32. So every build brings the
+# named files, and only those, into an existing mirror: a handful of stats.
+# documentation/12-windows-app.md -> "The Visual C++ runtime beside node.exe".
+# ---------------------------------------------------------------------------
+
+def on_windows() -> bool:
+    """True when these scripts run natively on Windows (never in the container)."""
+    return os.name == "nt"
+
+
+def module_library_places() -> list:
+    """
+    The contract's module folders as (folder relative to the scaffold's
+    node_modules, with forward slashes, [library names]). Folders the
+    contract names outside quartz\\node_modules are not in the mirror and
+    are left out. Raises contracts.ContractMissing when the contract cannot
+    be read.
+    """
+    import contracts  # here, not at the top: contracts imports this module
+    entry = contracts.load("toolchain.json")["windowsNodeVcRuntime"]
+    names = []
+    for carried in entry["files"]:
+        names.append(str(carried["name"]))
+    prefix = "quartz/node_modules/"
+    places = []
+    for folder in entry["besideModules"]:
+        relative = str(folder).replace("\\", "/")
+        if relative.startswith(prefix):
+            places.append((relative[len(prefix):], names))
+    return places
+
+
+def same_content(first: Path, second: Path) -> bool:
+    """
+    True when the two files hold the same bytes: the same size, then the
+    same SHA-256. Content, not identity (#1010): a mirror whose copy was
+    COPIED because a hardlink was refused holds the runtime's bytes under
+    another inode, and comparing inodes re-copied it on every build.
+    """
+    import hashlib
+    if first.stat().st_size != second.stat().st_size:
+        return False
+    digests = []
+    for path in (first, second):
+        digest = hashlib.sha256()
+        with open(path, "rb") as handle:
+            block = handle.read(1 << 16)
+            while block:
+                digest.update(block)
+                block = handle.read(1 << 16)
+        digests.append(digest.hexdigest())
+    return digests[0] == digests[1]
+
+
+def bring_module_libraries_into_mirror(mirror: Path, windows: bool = None) -> list:
+    """
+    Make each library the contract names beside a native module in
+    QUARTZ_DIR/node_modules sit at the same place in `mirror` as a hardlink
+    to the runtime's file (a copy when a link is refused), replacing a
+    file of that name with other bytes (compared by size and SHA-256, not
+    by inode, so a copy made where a link was refused is left alone on the
+    next build, #1010). Returns the paths added or replaced,
+    relative to the mirror with forward slashes. Touches nothing else: a
+    runtime without the file, or a mirror without the module's folder, is
+    left as it is. Off Windows it does nothing (the Mac and the container
+    carry no such copies, and a symlinked node_modules is the runtime's own).
+    """
+    import shutil
+    if windows is None:
+        windows = on_windows()
+    if not windows:
+        return []
+    source_root = QUARTZ_DIR / "node_modules"
+    added = []
+    for relative, names in module_library_places():
+        mirror_folder = Path(mirror).joinpath(*relative.split("/"))
+        source_folder = source_root.joinpath(*relative.split("/"))
+        if not mirror_folder.is_dir():
+            continue
+        for name in names:
+            source = source_folder / name
+            target = mirror_folder / name
+            if not source.is_file():
+                continue
+            if target.exists():
+                if same_content(source, target):
+                    continue
+                target.unlink()
+            try:
+                os.link(str(source), str(target))
+            except OSError:
+                shutil.copy2(str(source), str(target))
+            added.append(relative + "/" + name)
+    return added
+
+
+# ---------------------------------------------------------------------------
 # Which toolchain built a site (#746)
 #
 # A built site is stamped with the toolchain that built it, and a deploy

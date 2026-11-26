@@ -84,9 +84,8 @@ struct UnitWordRenameSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let interruptedTarget {
-                Text(UnitWordRenameWording.interruptedRename(from: currentWord, to: interruptedTarget))
+                StatusColour.warning.sentence(UnitWordRenameWording.interruptedRename(from: currentWord, to: interruptedTarget))
                     .font(.callout)
-                    .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("unitWordInterrupted")
             }
@@ -135,16 +134,15 @@ struct UnitWordRenameSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let sentence = failure ?? problem {
-                Text(sentence)
+                StatusColour.blocking.sentence(sentence)
                     .font(.callout)
-                    .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("unitWordRenameProblem")
             }
 
             HStack {
                 Spacer()
-                Button("Cancel") {
+                Button("Cancel", role: .cancel) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)

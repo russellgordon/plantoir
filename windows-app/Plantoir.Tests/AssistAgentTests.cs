@@ -127,7 +127,7 @@ public class AssistAgentTests
         public Rig()
         {
             Agent = new AssistAgent(Model, Tools, new JsonArray(), "VVH2O", 1)
-            {
+            { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
                 Today = () => this.Today,
                 ShowPreviewInApp = () => AppActions.Add("show preview"),
                 StopPreviewInApp = () => AppActions.Add("stop preview"),

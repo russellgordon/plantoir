@@ -364,8 +364,7 @@ struct StartOfYearSheet: View {
         case .done(let done):
             Text(StartOfYearWording.done(pages: StartOfYearWording.pages(done.pagesWritten)))
             if !done.leftAlone.isEmpty {
-                Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: done.leftAlone))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: done.leftAlone))
             }
             if let note = done.previewNote {
                 Text(note)
@@ -384,8 +383,7 @@ struct StartOfYearSheet: View {
             }
             fileList(putBack)
             if !skipped.isEmpty {
-                Text(StartOfYearWording.undoSkipped(pages: StartOfYearWording.pages(skipped.count)))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(StartOfYearWording.undoSkipped(pages: StartOfYearWording.pages(skipped.count)))
                 fileList(skipped)
             }
             Text(StartOfYearWording.undoEndsWhenYouQuit)
@@ -397,10 +395,9 @@ struct StartOfYearSheet: View {
                 Text(StartOfYearWording.undone(pages: StartOfYearWording.pages(undone.putBack)))
             } else {
                 Text(StartOfYearWording.undone(pages: StartOfYearWording.pages(undone.putBack)))
-                Text(StartOfYearWording.undoLeftSome(
+                StatusColour.warning.sentence(StartOfYearWording.undoLeftSome(
                     pages: StartOfYearWording.pages(undone.skipped.count), backup: backup
                 ))
-                .foregroundStyle(.orange)
             }
         }
     }
@@ -444,13 +441,12 @@ struct StartOfYearSheet: View {
     @ViewBuilder
     static func mustBeReadBeforeGo(_ plan: StartOfYearPlan, notice: String?) -> some View {
         if let notice {
-            Text(notice)
-                .foregroundStyle(.orange)
+            StatusColour.warning.sentence(notice)
                 .fixedSize(horizontal: false, vertical: true)
         }
         ForEach(plan.warnings(), id: \.self) { (warning: String) in
             Label(warning, systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
+                .foregroundStyle(StatusColour.warning.style)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -506,6 +502,7 @@ struct StartOfYearSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(StartOfYearSheet.planTableHeight(for: rows))
+        .accessibilityLabel(Text(AccessibilityNames.planTable))
         .accessibilityIdentifier("startOfYearPlanTable")
     }
 
@@ -552,8 +549,7 @@ struct StartOfYearSheet: View {
                 }
             }
             if !plan.publishPlan.noRoomForAKey.isEmpty {
-                Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.publishPlan.noRoomForAKey))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.publishPlan.noRoomForAKey))
                     .fixedSize(horizontal: false, vertical: true)
                     .onGeometryChange(for: CGFloat.self) { (proxy: GeometryProxy) in
                         return proxy.frame(in: .named("startOfYearPlanNotes")).maxY
@@ -626,7 +622,17 @@ struct StartOfYearSheet: View {
                         await model.goAhead()
                     }
                 }
-                .defaultButton(isEnabled: !plan.changesNothing)
+                // Not the default (#987, D39, Russell's ruling Q-B on
+                // #975): putting classes into draft takes them from students
+                // at the next deploy, so it counts as able to lose work, and
+                // a Return pressed under the sheet's own warning does
+                // nothing. Buttons ▸ Role: "Don't assign the primary role to
+                // a button that performs a destructive action, even if that
+                // action is the most likely choice." Alerts: "If you want to
+                // encourage people to read an alert and not just
+                // automatically press Return to dismiss it, avoid making any
+                // button the default button." Escape is still Cancel.
+                .defaultButton(isEnabled: !plan.changesNothing, isTheDefault: false)
                 .accessibilityIdentifier("startOfYearGo")
             case .undoReady(_, let putBack, _):
                 Button("Cancel", role: .cancel) {
@@ -644,6 +650,7 @@ struct StartOfYearSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 .disabled(true)
             case .done:
                 Button(StartOfYearWording.undoButtonAfterward) {

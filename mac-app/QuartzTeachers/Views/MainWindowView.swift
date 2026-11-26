@@ -26,10 +26,7 @@ struct MainWindowView: View {
                 // A restored window whose folder claim has not resolved
                 // yet — a beat of quiet, never the picker it is about to
                 // replace.
-                ProgressView()
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityIdentifier("restoringFolderPlaceholder")
+                RestoringFolderPlaceholder()
             } else if workspace.isShowingPicker {
                 WorkspacePickerView()
             } else {
@@ -85,6 +82,9 @@ struct MainWindowView: View {
         // reason.
         .modifier(ObsidianAddOnsOfferDialog())
         .modifier(ObsidianReopenAlert())
+        // Asked before Plantoir closes a running Obsidian to add a course it
+        // has never seen (#995): every route above ends here when it must.
+        .modifier(ObsidianClosingAlert())
         .fileImporter(
             isPresented: $workspace.isChoosingWorkspace,
             allowedContentTypes: [.folder]
@@ -203,7 +203,7 @@ struct MainWindowView: View {
                 ContentUnavailableView {
                     Label(item.title, systemImage: item.symbolName)
                 } description: {
-                    Text("\(item.subtitle)\(backupSizeClause(for: item)). A saved copy of \(item.courseCode) — restore it to put the course back the way it was then. \(item.keptDescription) You can delete any of them yourself.")
+                    Text("\(item.subtitle(noun: workspace.classNoun(ofCourse: item.courseCode)))\(backupSizeClause(for: item)). A saved copy of \(item.courseCode) — restore it to put the course back the way it was then. \(item.keptDescription(noun: workspace.classNoun(ofCourse: item.courseCode))) You can delete any of them yourself.")
                 } actions: {
                     Button("Restore…") {
                         workspace.backupRestoreRequest = item
@@ -369,9 +369,14 @@ private struct LockedPagesNoteAlert: ViewModifier {
             Button("Open in Obsidian") {
                 workspace.openInObsidianAfterTheNote(shown)
             }
-            Button("Not Now", role: .cancel) {
+            // Cancel, not "Not Now" (#987): the teacher chose Open in
+            // Obsidian, and this note stands in front of it.
+            // Alerts: "Always use 'Cancel' to title a button that cancels the
+            // alert's action."
+            Button("Cancel", role: .cancel) {
                 workspace.lockedPagesNoteRequest = nil
             }
+            .keyboardShortcut(.cancelAction)
         } message: { _ in
             // No warning icon and no "cannot": a teacher who kept this course
             // for reference asked for it, so it reads as a fact.
@@ -433,7 +438,8 @@ private struct ObsidianAddOnsOfferDialog: ViewModifier {
             titleVisibility: .visible,
             presenting: workspace.obsidianAddOnsOfferRequest
         ) { shown in
-            Button(ObsidianFigureAddOnsWording.offerAdd) {
+            // When the yes closes Obsidian, the button says so (#995, D21).
+            Button(shown.addButtonTitle) {
                 Task { @MainActor in
                     await workspace.answerObsidianAddOnsOffer(shown, .addThem)
                 }
@@ -444,6 +450,7 @@ private struct ObsidianAddOnsOfferDialog: ViewModifier {
                     await workspace.answerObsidianAddOnsOffer(shown, answered)
                 }
             }
+            .keyboardShortcut(.cancelAction)
         } message: { shown in
             Text(ObsidianFigureAddOnsWording.offerText(course: shown.course.code, openState: shown.openState))
         }
@@ -494,6 +501,7 @@ private struct ObsidianReopenAlert: ViewModifier {
                     await workspace.answerObsidianReopen(shown, reopen: false)
                 }
             }
+            .keyboardShortcut(.cancelAction)
         } message: { shown in
             Text(ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.reopenMessage, course: shown.course.code))
         }
@@ -508,5 +516,68 @@ private struct ObsidianReopenAlert: ViewModifier {
                 }
             }
         )
+    }
+}
+
+/// "Close Obsidian to open {course}?" (#995, D21, Russell's ruling Q13 on
+/// #975): Obsidian is running and has never seen the course, and it can add
+/// a course to its list only while it is closed. Plantoir never closes it
+/// unasked, and the button that goes ahead says that it closes Obsidian —
+/// the same shape as the rename's "Close Obsidian and Rename".
+private struct ObsidianClosingAlert: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Environment(WorkspaceModel.self) var workspace
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content.alert(
+            ObsidianClosingWording.titleText(course: workspace.obsidianClosingRequest?.course.code ?? ""),
+            isPresented: isPresented,
+            presenting: workspace.obsidianClosingRequest
+        ) { shown in
+            Button(ObsidianClosingWording.closeAndOpen) {
+                Task { @MainActor in
+                    await workspace.answerObsidianClosing(shown, closeObsidian: true)
+                }
+            }
+            Button(ObsidianClosingWording.cancel, role: .cancel) {
+                Task { @MainActor in
+                    await workspace.answerObsidianClosing(shown, closeObsidian: false)
+                }
+            }
+            // Escape always cancels (#987's rule for every question).
+            .keyboardShortcut(.cancelAction)
+        } message: { shown in
+            Text(ObsidianClosingWording.messageText(course: shown.course.code))
+        }
+    }
+
+    private var isPresented: Binding<Bool> {
+        return Binding(
+            get: { return workspace.obsidianClosingRequest != nil },
+            set: { showing in
+                if !showing {
+                    workspace.obsidianClosingRequest = nil
+                }
+            }
+        )
+    }
+}
+
+/// The spinner a restored window shows while its folder claim resolves.
+/// Named (#993, D18): a bare spinner gave VoiceOver nothing to say.
+struct RestoringFolderPlaceholder: View {
+
+    // MARK: - Body
+
+    var body: some View {
+        ProgressView()
+            .controlSize(.small)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityLabel(Text(AccessibilityNames.openingFolder))
+            .accessibilityIdentifier("restoringFolderPlaceholder")
     }
 }

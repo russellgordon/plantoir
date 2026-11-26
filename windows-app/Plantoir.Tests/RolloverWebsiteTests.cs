@@ -609,16 +609,22 @@ public class RolloverWebsiteTests : IDisposable
     }
 
     /// <summary>
-    /// #550: roll_over_section shares ApplyReDate, so a re-date that stops part
-    /// way is ANSWERED here too — the part-way sentence and the pages already
-    /// re-dated — where an IOException used to leave the tool as a protocol
-    /// error (it caught only AssistRefusal).
+    /// roll_over_section shares ApplyReDate, so a re-date whose second page
+    /// cannot be written is ONE step there too, all or none (#899 W7b1):
+    /// ANSWERED as "Nothing was changed", the first page as it was, where
+    /// #550 said it part way with the pages already re-dated.
     /// </summary>
     [Fact]
-    public async Task RollOverThatStoppedPartWay_IsAnsweredNotThrown()
+    public async Task RollOverWhoseSecondPageCannotBeWritten_ChangesNothing()
     {
         Class("ICS3U", "Unit 1, Day 1", "2026-09-01");   // so both pages change, Day 1 first
+        string dayOne = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 1.md");
         string dayTwo = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 2.md");
+        string dayOneBefore = File.ReadAllText(dayOne);
+        // The timetable it rolls onto is written down in the rollover's ONE
+        // step (review 2, M1 and M2), so a refusal leaves it as it was too.
+        string timetable = Path.Combine(_folder, "courses", "ICS3U", ".internal", "timetable", "section1.json");
+        byte[]? timetableBefore = File.Exists(timetable) ? File.ReadAllBytes(timetable) : null;
 
         string said;
         using (new FileStream(dayTwo, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -626,8 +632,10 @@ public class RolloverWebsiteTests : IDisposable
                 "ICS3U", 1, timetable: ATimetableFile(), block: "F", cancellation: default,
                 pages: null, meetings: null, firstDay: "", startYear: 2026);
 
-        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the section's class dates", ""), said);
-        Assert.Contains("The pages already re-dated:\n  courses/ICS3U/section1/All Classes/Unit 1, Day 1.md", said);
+        Assert.StartsWith("Nothing was changed: ", said);
+        Assert.DoesNotContain("The pages already re-dated", said);
+        Assert.Equal(dayOneBefore, File.ReadAllText(dayOne));
+        Assert.Equal(timetableBefore, File.Exists(timetable) ? File.ReadAllBytes(timetable) : null);
     }
 
     /// <summary>

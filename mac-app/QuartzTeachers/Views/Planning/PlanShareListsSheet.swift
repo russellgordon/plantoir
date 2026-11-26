@@ -8,8 +8,14 @@ import SwiftUI
 ///
 /// The rows are what the launcher printed as its marker lines
 /// (`PlanShareLists`), never re-read from disk, so the teacher answers about
-/// exactly what the share holds. Cancel is the default and Escape: a share
-/// that goes out by a stray Return is the one that cannot be taken back.
+/// exactly what the share holds. No button is the default (#987, D4): a
+/// share that goes out by a stray Return is the one that cannot be taken
+/// back, so it counts as able to lose work under Russell's ruling Q3 on
+/// #975, as Get Ready does (Q-B). Cancel leads and answers Escape and
+/// Command-Period. Until #987 Cancel was the default, against Alerts: "Note
+/// that you don't want to make a Cancel button the default button"; "If you
+/// want to encourage people to read an alert and not just automatically
+/// press Return to dismiss it, avoid making any button the default button."
 /// When the share owes the public-address warning (warningCases), Share
 /// opens it here, with the tables' counts, before anything is answered.
 struct PlanShareListsSheet: View {
@@ -62,7 +68,7 @@ struct PlanShareListsSheet: View {
                 Button("Cancel", role: .cancel) {
                     onCancel()
                 }
-                .defaultButton(isEnabled: true)
+                .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("planShareListsCancel")
                 Button(PlanSharingWording.listsShareButton) {
                     share()
@@ -81,16 +87,14 @@ struct PlanShareListsSheet: View {
         // Two tables of five columns fit side by side, and the sheet grows.
         .frame(minWidth: 900, idealWidth: 1040, maxWidth: .infinity, minHeight: 480, idealHeight: 580, maxHeight: .infinity)
         .interactiveDismissDisabled()
-        // Escape is Cancel too (#832). Cancel holds Return, and a button
-        // has one key, so Escape is the sheet's own: measured, it did
-        // nothing before (`QuestionKeysTests`).
-        .onExitCommand {
-            onCancel()
-        }
-        .sheet(isPresented: $isShowingWarning) {
-            // #834's one component for a question with its facts: Cancel
-            // answers Return and Escape, and goes back to the tables, whose
-            // own Cancel shares nothing.
+        // Escape is Cancel's own key since #987. It was this sheet's
+        // `.onExitCommand` while Cancel held Return (#832); `.onExitCommand`
+        // alone does not fire with Keyboard Navigation off (#973).
+        .factsQuestionSheet(isPresented: $isShowingWarning) {
+            // #834's one component for a question with its facts: no button
+            // is the default, so Return does nothing (#973); Cancel answers
+            // Escape and goes back to the tables, whose own Cancel shares
+            // nothing.
             FactsQuestionSheet(
                 question: PlanSharing.warningQuestion(
                     shared: model.sharedCount,

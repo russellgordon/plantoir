@@ -29,10 +29,11 @@ nonisolated enum PlantoirHelpPage {
     }
 }
 
-/// Set Up an Assistant… in Revise With ▸ and Set Up an Assistant… in
-/// Help ▸ (#855, ruling 3): both open Settings ▸ Other Assistants and
-/// install nothing themselves. ONE view for every place it is drawn, so the
-/// menu bar's item and every row's context menu item cannot differ.
+/// Set Up an Assistant… at the end of Revise With ▸ (#855, ruling 3; in
+/// Help ▸ as well until #990, Russell's ruling Q10): it opens Settings ▸
+/// Other Assistants and installs nothing itself. ONE view for every place it
+/// is drawn, so the menu bar's item and every row's context menu item cannot
+/// differ.
 struct SetUpAnotherAssistantButton: View {
 
     // MARK: - Stored properties

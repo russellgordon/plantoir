@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -325,7 +326,9 @@ public sealed class AssistantSettingsPane
         }
         else if (store.IsReady)
         {
-            button.Content = "Remove";
+            // Asks first (#987, D22; assistantModelChoice.removal.asksFirst),
+            // so the button ends in an ellipsis.
+            button.Content = AssistModelRemovalWording.RemoveCommand;
             AutomationProperties.SetAutomationId(button, $"assistantRemove{tier}");
             if (removalReason is not null)
             {
@@ -337,7 +340,7 @@ public sealed class AssistantSettingsPane
             }
             else
             {
-                button.Click += (_, _) => store.Remove();
+                button.Click += async (_, _) => await AskThenRemove(button.XamlRoot, store, tier);
             }
         }
         else
@@ -430,6 +433,45 @@ public sealed class AssistantSettingsPane
         };
         AutomationProperties.SetAutomationId(line, automationId);
         return line;
+    }
+
+    /// <summary>
+    /// The question before a download is removed (#987, D22; the contract's
+    /// <c>assistantModelChoice.removal.words</c>). Apple's HIG, Alerts: "when
+    /// people take an uncommon destructive action that they can't undo, it's
+    /// important to display an alert in case they initiated the action
+    /// accidentally." Cancel answers Escape, and no button is the default, so
+    /// Enter does nothing. <see cref="AssistModelStore.Remove"/> is gated
+    /// itself, so an assistant window opened while the question was up still
+    /// refuses.
+    /// </summary>
+    private static async Task AskThenRemove(XamlRoot? root, AssistModelStore store, AssistModelTier tier)
+    {
+        if (root is null || DialogGate.IsOpen(root)) return;
+        var dialog = new ContentDialog
+        {
+            Title = AssistModelRemovalWording.Question(tier),
+            Content = new TextBlock
+            {
+                Text = AssistModelRemovalWording.Message(FormatBytes(tier.DownloadBytes())),
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = AssistModelRemovalWording.RemoveButton,
+            CloseButtonText = AssistModelRemovalWording.CancelButton,
+            XamlRoot = root,
+        };
+        DialogButtons.AskWithNoDefault(dialog);   // #987 D22: Remove takes no Enter; the focus starts on Cancel (#979)
+        AutomationProperties.SetAutomationId(dialog, "assistantRemoveQuestion");
+        try
+        {
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"the remove question could not be shown: {ex.Message}");
+            return;
+        }
+        store.Remove();
     }
 
     private static string FormatBytes(long bytes)

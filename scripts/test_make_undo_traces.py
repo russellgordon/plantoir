@@ -38,6 +38,48 @@ def shared_undo():
         return json.load(handle)["undo"]
 
 
+def json_cases():
+    # undo-json-cases.json: the editJSON byte cases, kept out of
+    # shared-rules.json because Windows PowerShell 5.1 cannot read them (#899 W6).
+    with open(REPO / "contracts" / "undo-json-cases.json", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+# The one contract file no PowerShell reads, because some of its rows must hold
+# keys that differ only by case (ContractFilesWindowsPowerShellReadsTests).
+NOT_FOR_WINDOWS_POWERSHELL = ["undo-json-cases.json"]
+
+
+def windows_powershell_problems(text):
+    """What would stop Windows PowerShell 5.1's ConvertFrom-Json reading this
+    JSON text: an object with two keys equal ignoring case (it builds each
+    object as a case-insensitive dictionary, comparing character by character
+    as .NET's OrdinalIgnoreCase does), or an empty key. A model of the rule
+    for this Mac; Windows runs the real ConvertFrom-Json on every file."""
+    problems = []
+
+    def fold(key):
+        folded = ""
+        for character in key:
+            upper = character.upper()
+            folded += upper if len(upper) == 1 else character
+        return folded
+
+    def look(pairs):
+        seen = {}
+        for key, _ in pairs:
+            if key == "":
+                problems.append("an empty key")
+            folded = fold(key)
+            if folded in seen and seen[folded] != key:
+                problems.append("keys %r and %r differ only by case" % (seen[folded], key))
+            seen[folded] = key
+        return dict(pairs)
+
+    json.loads(text, object_pairs_hook=look)
+    return problems
+
+
 def committed():
     with open(REPO / "contracts" / "undo-traces.json", encoding="utf-8") as handle:
         return json.load(handle)
@@ -94,6 +136,131 @@ def deployed_answer(case):
     return "noOffer"
 
 
+# Cases the mac's Foundation acts on and this model, like Windows, is not
+# measured to copy (#899 W6 review 2): keys beyond ASCII (sorted by Unicode
+# collation there, canonically equivalent keys taken for one), a byte-order
+# mark at the start of a key or text, a number with an exponent and more than
+# 17 digits or more than 38 without. Held by name, as Windows'
+# NamedGapLedger holds them: the model must REFUSE each (no bytes; cannot
+# tell both ways), never give bytes or a verdict of its own, and the
+# contract's answer must still differ.
+REFUSED_HERE_EDIT_JSON = (
+    "a new object's keys beyond ASCII: the mac sorts them by Unicode collation (an emoji first, \u00e9 between E and f, a full-width \uff21 beside A, \u00df after ss, a tab passed over)",
+    "a new object holding \u00e9 written two ways (one character, and e with a combining accent): the mac takes them for one key",
+    "a key path part beyond ASCII finds the member the file spells another way (\u00e9 as one character in the op, e with a combining accent in the file)",
+    "a key path part beyond ASCII, spelled as the file spells it",
+    "the Kelvin sign in a file's key is the letter K to the mac: the member is found and its value moved",
+    "a file's key that starts with a byte-order mark (written \\ufeff) is the key without it to the mac: the member is found and its value moved",
+)
+REFUSED_HERE_CHECK = (
+    "editJSON: a file's number spelled with an exponent and more than 17 digits is read by the mac as a decimal number, whose double is not the nearest one: the step's value is that double",
+    "editJSON: a file's number spelled with an exponent and more than 17 digits, the step's value its nearest double, which the mac does not read from it",
+    "editJSON: a member holding an object whose key is \u00e9 written as e with a combining accent, the step's value \u00e9 as one character",
+    "editJSON: a key path part \u00e9 as one character, the file's key e with a combining accent, the step having added the member",
+    "editJSON: a member holding text that starts with a byte-order mark (written \\ufeff), which the mac reads without it",
+    "editJSON: a file's key that is the Kelvin sign, the key path the letter K, the step having added the member",
+    "editJSON: another member's number written with 168 digits after the point, which the mac cannot read: the file is not JSON there",
+)
+
+
+def undone_as_read(step, path, text):
+    """A file as a reader compares it after an Undo: its JSON value when the
+    step planned it member by member (U4a), its text otherwise."""
+    if text is not None and any(member["path"] == path for member in step.get("members", [])):
+        return json.loads(text)
+    return text
+
+
+class ActionTraceTests(unittest.TestCase):
+    """U3: the action traces, made from the steps the Mac recorded from the
+    real action code (contracts/undo-action-steps.json)."""
+
+    def test_every_recorded_step_is_reproduced_by_its_ops_both_ways(self):
+        for step in traces.read_action_steps():
+            pages = {entry["path"]: entry["before"] for entry in step["files"] if entry["before"] is not None}
+            for moved in step.get("moves", []):
+                pages[moved["from"]] = moved["content"]
+            model = traces.Model(pages=pages)
+            outcome = model.files_step([(entry["path"], entry["before"], entry["after"]) for entry in step["files"]],
+                                       step.get("recomputes", []), step.get("moves", []),
+                                       step.get("members", []), step.get("trees", []))
+            self.assertEqual(outcome[0], "applied", step["name"])
+            self.assertEqual([op["kind"] for op in outcome[2]], step["ops"], step["name"] + ": the op kinds")
+            undone = traces.plan(outcome[2], True, dict(model.pages))
+            self.assertEqual(undone[0], "ready", step["name"])
+            for entry in step["files"]:
+                self.assertEqual(undone_as_read(step, entry["path"], undone[1].get(entry["path"], model.pages.get(entry["path"]))),
+                                 undone_as_read(step, entry["path"], entry["before"]),
+                                 step["name"] + ": " + entry["path"] + " undone")
+            for tree in step.get("trees", []):
+                self.assertIsNone(undone[1].get(tree["path"], "kept"), step["name"] + ": " + tree["path"] + " taken out")
+
+    def test_a_member_by_member_file_is_made_by_the_member_rule_bytes(self):
+        # U4a: the after the Mac recorded is exactly what the members'
+        # editJSON ops leave, applied in order to its before.
+        for step in traces.read_action_steps():
+            for entry in step["files"]:
+                members = [member for member in step.get("members", []) if member["path"] == entry["path"]]
+                if not members:
+                    continue
+                data = entry["before"].encode("utf-8")
+                for member in members:
+                    op = {"kind": "editJSON", "path": member["path"], "keyPath": member["keyPath"]}
+                    for side in ("before", "after"):
+                        if side in member:
+                            op[side] = member[side]
+                    data = traces.json_bytes_moved(op, False, data)
+                self.assertEqual(data.decode("utf-8"), entry["after"], step["name"])
+
+    def test_a_rollover_after_a_deploy_is_undone_leaving_its_marker_apart(self):
+        # U3b, Russell's ruling of 2026-11-19 on Q3: some rollover trace has
+        # a deploy fill the marker's place and a later undo of the step
+        # that names the marker as left apart, not a refusal.
+        found = False
+        for trace in committed()["actionTraces"]:
+            deployed = False
+            for call in trace["calls"]:
+                if call["call"] == "deploy":
+                    deployed = True
+                if deployed and call["call"] == "undo" and call.get("leftApart"):
+                    found = True
+        self.assertTrue(found, "no action trace undoes a rollover after a deploy")
+
+    def test_there_are_about_120_action_traces_and_each_starts_with_its_step(self):
+        steps = traces.read_action_steps()
+        document = committed()
+        self.assertEqual(len(document["actionTraces"]), len(steps) * traces.ACTION_TRACES_PER_STEP)
+        if steps:
+            self.assertGreaterEqual(len(document["actionTraces"]), 120)
+        names = {step["name"] for step in steps}
+        for trace in document["actionTraces"]:
+            self.assertIn(trace["step"], names)
+            self.assertEqual(trace["calls"][0]["call"], "action")
+            self.assertEqual(trace["calls"][0]["expect"], "applied")
+
+    def test_undoing_an_action_with_no_hand_edits_gives_back_its_befores(self):
+        steps = {step["name"]: step for step in traces.read_action_steps()}
+        for trace in committed()["actionTraces"]:
+            if trace["handEdits"]:
+                continue
+            step = steps[trace["step"]]
+            for entry in step["files"]:
+                if any(member["path"] == entry["path"] for member in step.get("members", [])):
+                    # U4a: an Undo puts each member's VALUE back, spelled
+                    # compactly, so the file's values are its before's, not
+                    # its bytes (test_every_recorded_step_... checks them).
+                    continue
+                wanted = None if entry["before"] is None else traces.sha(entry["before"])
+                self.assertEqual(trace["afterUndoingAll"][entry["path"]], wanted, trace["name"] + " " + entry["path"])
+            for tree in step.get("trees", []):
+                self.assertIsNone(trace["afterUndoingAll"][tree["path"]], trace["name"] + " " + tree["path"])
+
+    def test_the_twenty_seeded_traces_are_unchanged_by_the_action_traces(self):
+        with_steps = traces.generate()
+        without = traces.generate(steps=[])
+        self.assertEqual(with_steps["traces"], without["traces"])
+
+
 class GeneratorTests(unittest.TestCase):
 
     def test_two_runs_write_the_same_bytes(self):
@@ -137,10 +304,10 @@ class GeneratorTests(unittest.TestCase):
             calls = trace["calls"]
             self.assertGreaterEqual(len(calls), traces.SHORTEST, trace["name"])
             for call in calls:
-                self.assertIn(call["call"], ("step", "undo", "redo", "handEdit", "note"), call)
+                self.assertIn(call["call"], ("step", "undo", "redo", "handEdit", "note", "move"), call)
                 self.assertIn("head", call)
                 self.assertIn("redo", call)
-                if call["call"] in ("step", "undo", "redo"):
+                if call["call"] in ("step", "undo", "redo", "move"):
                     self.assertIn("expect", call)
 
     def test_a_refused_redo_drops_only_the_redo(self):
@@ -166,7 +333,7 @@ class GeneratorTests(unittest.TestCase):
         for wanted in [("step", "applied"), ("step", "changedNothing"), ("undo", "undone"),
                        ("undo", "changedSince"), ("undo", "nothingToUndo"), ("redo", "redone"),
                        ("redo", "nothingToRedo"), ("handEdit", "body"), ("handEdit", "sameLine"),
-                       ("handEdit", "otherKey"), ("note", None), ("redo", "changedSince")]:
+                       ("handEdit", "otherKey"), ("note", None), ("redo", "changedSince"), ("move", "applied")]:
             self.assertIn(wanted, seen)
         for call, _ in seen:
             self.assertNotEqual(call, "clear", "a deploy or a share of unit plans clears nothing (rulings 17 and 18)")
@@ -199,7 +366,7 @@ class LineModelTests(unittest.TestCase):
                 if ops[0]["kind"] == "writeFile":
                     continue
                 result = traces.plan(ops, True, {path: after})
-                self.assertEqual(result, ("ready", {path: text}), page_id)
+                self.assertEqual(result, ("ready", {path: text}, []), page_id)
 
     def test_a_body_edit_leaves_the_line_op_undoable(self):
         _, path, text, _ = traces.FIXTURE[0]
@@ -208,30 +375,90 @@ class LineModelTests(unittest.TestCase):
         self.assertEqual(ops[0]["kind"], "editLine")
         edited = after + "Written since.\n"
         result = traces.plan(ops, True, {path: edited})
-        self.assertEqual(result, ("ready", {path: text + "Written since.\n"}))
+        self.assertEqual(result, ("ready", {path: text + "Written since.\n"}, []))
+
+
+def safe_path(path):
+    if not isinstance(path, str) or not path:
+        return False
+    parts = path.split("/")
+    if path.startswith("/") or "\\" in path or "\0" in path or any(part in ("", ".", "..") for part in parts):
+        return False
+    return not (len(path) >= 2 and path[1] == ":" and path[0].isalpha())
+
+
+def is_blob_name(name):
+    return isinstance(name, str) and re.fullmatch(r"[0-9a-f]{64}", name) is not None
+
+
+def overlap(first, second):
+    """Without regard to case: one place on a case-insensitive volume, by
+    the model's one comparison (U4b2-9)."""
+    return traces.places_overlap(first, second)
 
 
 def readable_op(op):
     """UndoOp.shapeIsKnown, as the contract's opKinds and unknown say."""
     kind = op.get("kind")
-    path = op.get("path")
-    if kind not in ("writeFile", "editLine", "recompute") or not isinstance(path, str):
+    if kind not in KINDS_KNOWN:
         return False
-    parts = path.split("/")
-    if path.startswith("/") or "\\" in path or any(part in ("", ".", "..") for part in parts):
-        return False
-    for key in ("before", "after", "key", "afterKey"):
-        if key in op and op[key] is not None and not isinstance(op[key], str):
+    for key in ("blobs",):
+        if key in op and not (isinstance(op[key], list) and all(is_blob_name(name) for name in op[key])):
             return False
+    for key in ("beforeSha", "afterSha", "sha", "listingSha"):
+        if key in op and op[key] is not None and not is_blob_name(op[key]):
+            return False
+    if kind in ("move", "moveApart", "setAside"):
+        if "path" in op or not safe_path(op.get("from")) or not safe_path(op.get("to")):
+            return False
+        if overlap(op["from"], op["to"]) and not traces.is_case_only_move(op):
+            return False
+        return ("sha" in op) != ("listingSha" in op)
+    if kind == "external":
+        target = op.get("target")
+        if "path" in op or not isinstance(target, str) or ":" not in target:
+            return False
+        family, name = target.split(":", 1)
+        if family not in EXTERNAL_TARGETS_KNOWN or not name:
+            return False
+        return "before" in op or "after" in op
+    path = op.get("path")
+    if not safe_path(path):
+        return False
+    if kind in ("editLine", "replaceText", "writeFile", "recompute"):
+        for key in ("before", "after", "key", "afterKey", "contextBefore", "contextAfter"):
+            if key in op and op[key] is not None and not isinstance(op[key], str):
+                return False
     if kind == "editLine":
         return isinstance(op.get("key"), str) and (op.get("before") is not None or op.get("after") is not None)
     if kind == "recompute":
         # A maintainer a reader does not know is a re-derivation it cannot
         # run (opKinds.recompute).
         return op.get("maintainer") in MAINTAINERS_KNOWN
+    if kind == "replaceText":
+        parts = [op.get(key) for key in ("before", "after", "contextBefore", "contextAfter")]
+        if any(not isinstance(part, str) for part in parts):
+            return False
+        return parts[2] + parts[0] + parts[3] != parts[2] + parts[1] + parts[3]
+    if kind == "editJSON":
+        key_path = op.get("keyPath")
+        if "element" in op or not isinstance(key_path, list) or not key_path or not all(isinstance(k, str) for k in key_path):
+            return False
+        if "before" not in op and "after" not in op:
+            return False
+        if "before" in op and "after" in op and traces.json_equal(op["before"], op["after"]):
+            return False
+        return True
+    if kind in ("createTree", "removeTree"):
+        if kind == "removeTree" and "heldBy" in op:
+            return False
+        return is_blob_name(op.get("listingSha")) and op["listingSha"] in op.get("blobs", [])
     return True
 
 
+KINDS_KNOWN = ("writeFile", "editLine", "recompute", "replaceText", "editJSON", "move", "moveApart", "setAside",
+               "createTree", "removeTree", "external")
+EXTERNAL_TARGETS_KNOWN = ("preference", "scheduledDeploy")
 MAINTAINERS_KNOWN = ("sectionFrontPage",)
 HOLDS_KNOWN = ("section", "course")
 
@@ -245,6 +472,24 @@ def readable_step(step):
     for op in step["ops"]:
         if not readable_op(op):
             return False
+    # opKinds.wholeOps: no other op shares a whole op's places.
+    whole = ("move", "moveApart", "setAside", "createTree", "removeTree", "external")
+    for index, op in enumerate(step["ops"]):
+        if op["kind"] not in whole:
+            continue
+        mine = [op[key] for key in ("path", "from", "to") if key in op]
+        for other_index, other in enumerate(step["ops"]):
+            if other_index == index:
+                continue
+            if op.get("target") is not None and other.get("target") == op.get("target"):
+                return False
+            if other_index > index and traces.move_carries(op, other):
+                # U4b: an edit inside what a move moved, at its new place,
+                # after the move (opKinds.wholeOps' order).
+                continue
+            theirs = [other[key] for key in ("path", "from", "to") if key in other]
+            if any(overlap(a, b) for a in mine for b in theirs):
+                return False
     return True
 
 
@@ -271,37 +516,494 @@ class ContractCaseTests(unittest.TestCase):
                 return None, False
         return None, not current.get("folder")
 
+    CHECK_KEYS = {"name", "op", "current", "undo", "redo", "why"}
+
+    def item_bytes(self, current):
+        """The bytes at a place a case describes: None for absent, False for
+        a folder or a tree."""
+        if current.get("absent"):
+            return None
+        if "text" in current:
+            return current["text"].encode("utf-8")
+        if "bytesHex" in current:
+            return bytes.fromhex(current["bytesHex"])
+        return False
+
+    def prepared(self, given):
+        """The op as the replay decodes it: texts turned into their hashes,
+        a listing into its hash and blobs (checkCasesHow)."""
+        op = {key: value for key, value in given.items()}
+        if op.get("kind") == "writeFile":
+            op["beforeSha"] = None if op.get("beforeText") is None else traces.sha(op["beforeText"])
+            op["afterSha"] = None if op.get("afterText") is None else traces.sha(op["afterText"])
+        if "contentText" in op:
+            op["sha"] = traces.sha(op.pop("contentText"))
+        if "listing" in op:
+            tree = op.pop("listing")
+            op["listingSha"] = traces.listing_sha(tree)
+            if op["kind"] in ("createTree", "removeTree"):
+                op["blobs"] = [op["listingSha"]] + [traces.sha(text) for text in tree["files"].values()]
+        for key in [key for key, value in op.items() if value is None and key in ("beforeSha", "afterSha")]:
+            del op[key]
+        return op
+
     def test_check_cases(self):
         cases = shared_undo()["checkCases"]
-        self.assertGreaterEqual(len(cases), 20)
+        self.assertGreaterEqual(len(cases), 90)
         for case in cases:
             with self.subTest(case=case["name"]):
-                op = dict(case["op"])
+                self.assertEqual(set(case) - self.CHECK_KEYS, set(), "a key the replay does not check")
+                op = self.prepared(case["op"])
                 if not readable_op(op):
                     self.assertEqual(case["undo"], "notReadable")
                     self.assertEqual(case["redo"], "notReadable")
                     continue
-                if op["kind"] == "writeFile":
-                    op["beforeSha"] = None if op["beforeText"] is None else traces.sha(op["beforeText"])
-                    op["afterSha"] = None if op["afterText"] is None else traces.sha(op["afterText"])
-                text, is_absent_or_text = self.current_text(case["current"])
-                if op["kind"] == "recompute":
+                current = case["current"]
+                kind = op["kind"]
+                unreadable_now = current.get("cannotBeRead") or any(
+                    isinstance(side, dict) and side.get("cannotBeRead")
+                    for side in (current.get("atFrom"), current.get("atTo")))
+                if kind != "recompute" and kind != "external" and unreadable_now:
+                    # The director's ruling on U2b's review: a read that
+                    # fails is "cannot tell now", never changed since.
+                    self.assertEqual(case["undo"], "cannotTell")
+                    self.assertEqual(case["redo"], "cannotTell")
+                    continue
+                if kind == "recompute":
                     # No check (opKinds.recompute): re-derived, never compared.
                     state = "after"
-                elif text is None and not is_absent_or_text:
-                    state = "neither"
-                elif text is None and op["kind"] == "writeFile":
-                    state = traces.op_state(op, None)
+                elif kind in ("move", "moveApart", "setAside"):
+                    # U4b2-9: listedAs, a third spelling, is the model's to
+                    # judge (move_state), never the harness's.
+                    state = traces.move_state(op, current["atFrom"], current["atTo"], current.get("listedAs"))
+                elif kind in ("createTree", "removeTree"):
+                    state = traces.tree_state(op, current)
+                elif kind == "external":
+                    state = traces.external_state(op, current)
+                elif kind == "replaceText":
+                    data = self.item_bytes(current)
+                    state = traces.replace_text_state(op, data if data else None)
+                elif kind == "editJSON":
+                    data = self.item_bytes(current)
+                    state = traces.edit_json_state(op, data if data else None)
                 else:
-                    state = traces.op_state(op, text)
-                undo = {"after": "canUndo", "before": "alreadyBack", "neither": "changedSince"}[state]
-                redo = {"before": "canRedo", "after": "alreadyRedone", "neither": "changedSince"}[state]
+                    if "before" in case["op"] and case["op"]["before"] is None:
+                        op["before"] = None
+                    if "after" in case["op"] and case["op"]["after"] is None:
+                        op["after"] = None
+                    op.setdefault("beforeSha", None)
+                    op.setdefault("afterSha", None)
+                    text, is_absent_or_text = self.current_text(current)
+                    if text is None and not is_absent_or_text:
+                        state = "neither"
+                    elif text is None and kind == "writeFile":
+                        state = traces.op_state(op, None)
+                    else:
+                        state = traces.op_state(op, text)
+                undo = {"after": "canUndo", "before": "alreadyBack", "neither": "changedSince", "cannotTell": "cannotTell"}[state]
+                redo = {"before": "canRedo", "after": "alreadyRedone", "neither": "changedSince", "cannotTell": "cannotTell"}[state]
+                if case["name"] in REFUSED_HERE_CHECK:
+                    self.assertEqual((undo, redo), ("cannotTell", "cannotTell"), "held: refused as cannot tell, never judged")
+                    self.assertNotEqual((undo, redo), (case["undo"], case["redo"]), "held, and it now agrees: take it off the list")
+                    continue
                 self.assertEqual(undo, case["undo"])
                 self.assertEqual(redo, case["redo"])
 
+    def test_edit_json_cases(self):
+        # The bytes of an editJSON move (the hard review of U2b, LOW a).
+        cases = json_cases()["editJSONCases"]
+        self.assertGreaterEqual(len(cases), 6)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                out = traces.json_bytes_moved(case["op"], case["direction"] == "undo", case["file"].encode("utf-8"))
+                if case["name"] in REFUSED_HERE_EDIT_JSON:
+                    self.assertIsNone(out, "held: refused, never bytes of its own")
+                    self.assertIsNotNone(case["result"], "held, and the contract now refuses it too: take it off the list")
+                    continue
+                self.assertEqual(None if out is None else out.decode("utf-8"), case["result"])
+
+    def test_every_held_case_is_still_in_the_contract(self):
+        names = set()
+        for case in shared_undo()["checkCases"] + json_cases()["editJSONCases"]:
+            names.add(case["name"])
+        for name in REFUSED_HERE_EDIT_JSON + REFUSED_HERE_CHECK:
+            self.assertIn(name, names)
+
+    def test_the_number_limits_are_the_contracts_rule(self):
+        # undo.numberSpellingRule, the one rule Windows' UndoJson checks too.
+        rule = shared_undo()["numberSpellingRule"]
+        self.assertEqual(rule["exponentCharactersAtMost"], traces.MAC_EXPONENT_CHARACTERS_AT_MOST)
+        self.assertEqual(rule["digitsWithAnExponentAtMost"], traces.MEASURED_DIGITS_WITH_AN_EXPONENT)
+        self.assertEqual(rule["digitsWithoutAnExponentAtMost"], traces.MEASURED_DIGITS_WITHOUT_AN_EXPONENT)
+        self.assertGreaterEqual(len(shared_undo()["numberSpellingCases"]), 30)
+
+    def test_number_spelling_cases(self):
+        # Each spelling as the member a of {"a": <spelling>, "b": 1}: not JSON,
+        # cannot tell (read, never as measured), minus infinity, or the double.
+        for case in shared_undo()["numberSpellingCases"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(set(case), {"name", "spelling", "reads"})
+                data = ('{"a": ' + case["spelling"] + ', "b": 1}\n').encode("utf-8")
+                read = traces._mac_read(data)
+                reads = case["reads"]
+                if reads == "notJSON":
+                    self.assertIsNone(read)
+                    continue
+                self.assertIsNotNone(read)
+                if reads == "cannotTell":
+                    self.assertIsInstance(read["a"], traces._Unmeasured)
+                    continue
+                self.assertNotIsInstance(read["a"], traces._Unmeasured)
+                wanted = float("-inf") if reads == "minusInfinity" else reads
+                self.assertEqual(read["a"], wanted)
+
+    def test_listing_cases(self):
+        cases = shared_undo()["listingCases"]
+        self.assertGreaterEqual(len(cases), 3)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                self.assertEqual(traces.listing_text(case["tree"]), case["listing"])
+                self.assertEqual(traces.listing_sha(case["tree"]), case["listingSha"])
+
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-                  "blobKept", "interrupted"}
+                  "blobKept", "interrupted", "markers", "folderKept", "movedFolder", "caseOnlyFolder", "rederived", "nothingMovedOutside",
+                  "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
+                  "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
+                  "refusalNamed", "madeFolder",
+                  # U4b2-4: the whole of the line's words, which the model
+                  # does not write; the Swift replay checks it.
+                  "keptWhatItReplacedSays",
+                  # Review 1 of U4b2-10: empty folders, which the model does
+                  # not hold (folder_of_pages); the Swift replay checks it.
+                  "foldersInside"}
+
+    # U4b2-4: the two pages wholeFileStepOnTwoPagesNamedIndex writes.
+    TWO_PAGES_NAMED_INDEX = ("courses/TST1O/Section 1/Classes/index.md", "courses/TST1O/Section 2/Classes/index.md")
+
+    MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
+    MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
+    OLD_MARKER = "{\"site_id\": \"aaa-111\"}\n"
+    NEW_MARKER = "{\"site_id\": \"bbb-222\"}\n"
+    EXTRA = "courses/TST1O/extra"
+    EXTRA_TREE = {"folders": ["sub"], "files": {"a.md": "A\n", "sub/b.md": "B\n"}}
+    SETTINGS = "courses/TST1O/settings.json"
+    NOTES = "courses/TST1O/notes.md"
+    PREFERENCE = "preference:undoCasesPreference"
+    CLOUDFLARE_FROM = "courses/TST1O/.cloudflare_sites/section1.json"
+    CLOUDFLARE_TO = "courses/TST1O/.cloudflare_sites/section1.previous.json"
+    CLOUDFLARE_MARKER = "{\"project\": \"tst1o-s1-2025\"}\n"
+    LEFTOVER_FROM = "courses/TST1O/.netlify_sites/section1.from-built-output.json"
+    LEFTOVER_TO = "courses/TST1O/.netlify_sites/section1.from-built-output.previous.json"
+    LEFTOVER = "{\"site_id\": \"ccc-333\"}\n"
+    SCHEDULE = "scheduledDeploy:org.plantoir.deploy.undo-cases"
+    SCHEDULE_VALUE = {"plist": "cGxpc3Q=", "script": "c2NyaXB0"}
+
+    def kind_call(self, call, model):
+        """U2's calls (stackCasesHow), on the model's pages. Answers what
+        `last` becomes, or None."""
+        pages = model.pages
+        if call == "moveTheMarker":
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            content = pages.get(self.MARKER_FROM) or ""
+            return model.ops_step([{"kind": "move", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(content)}])
+        if call == "rollOverOntoANewWebsite":
+            # U3b: one step of the year's setting and the marker moved aside
+            # as a `moveApart` (stackCasesHow).
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            content = pages.get(self.MARKER_FROM) or ""
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            marker = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(content)}
+            return model.ops_step([year, marker])
+        if call == "rollOverOntoNewWebsitesOnTwoHosts":
+            # U3b, records as a group: the year and both hosts' markers.
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            if pages.get(self.CLOUDFLARE_FROM) is None and pages.get(self.CLOUDFLARE_TO) is None:
+                pages[self.CLOUDFLARE_FROM] = self.CLOUDFLARE_MARKER
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            netlify = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(self.OLD_MARKER)}
+            cloudflare = {"kind": "moveApart", "from": self.CLOUDFLARE_FROM, "to": self.CLOUDFLARE_TO,
+                          "sha": traces.sha(self.CLOUDFLARE_MARKER)}
+            return model.ops_step([year, netlify, cloudflare])
+        if call == "rollOverTurningOffASchedule":
+            # U3b: the year and the deploy set for later turned off.
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            pages[self.SCHEDULE] = self.SCHEDULE_VALUE
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            return model.ops_step([year, {"kind": "external", "target": self.SCHEDULE, "before": self.SCHEDULE_VALUE}])
+        if call == "rollOverSettingALeftoverAside":
+            # U3b, the review of U3b's fixes, LOW 3: the year, the record as
+            # a `moveApart`, and a leftover no deploy reads as a `setAside`.
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            if pages.get(self.LEFTOVER_FROM) is None and pages.get(self.LEFTOVER_TO) is None:
+                pages[self.LEFTOVER_FROM] = self.LEFTOVER
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            marker = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(self.OLD_MARKER)}
+            leftover = {"kind": "setAside", "from": self.LEFTOVER_FROM, "to": self.LEFTOVER_TO, "sha": traces.sha(self.LEFTOVER)}
+            return model.ops_step([year, marker, leftover])
+        if call == "removeTheKeptLeftover":
+            pages.pop(self.LEFTOVER_TO, None)
+            return None
+        if call == "theScheduleStartsOnlyAtTheNextLogin":
+            model.schedules_start_at_the_next_login = True
+            return None
+        if call == "theScheduleCannotBeSetNow":
+            model.refuses_schedules = True
+            return None
+        if call == "deployANewMarker":
+            pages[self.MARKER_FROM] = self.NEW_MARKER
+            return None
+        if call == "makeAFolder":
+            listing = traces.listing_sha(self.EXTRA_TREE)
+            return model.ops_step([{"kind": "createTree", "path": self.EXTRA, "listingSha": listing, "blobs": [listing]}])
+        if call == "addAFileToTheFolder":
+            tree = {"folders": self.EXTRA_TREE["folders"], "files": dict(self.EXTRA_TREE["files"], **{"c.md": "C\n"})}
+            pages[self.EXTRA] = ("tree", traces.listing_sha(tree))
+            return None
+        if call == "removeTheFolder":
+            listing = pages[self.EXTRA][1]
+            return model.ops_step([{"kind": "removeTree", "path": self.EXTRA, "listingSha": listing, "blobs": [listing]}])
+        if call == "editTheSettings":
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            current = json.loads(pages[self.SETTINGS]).get("school_year")
+            after = "2025-2026" if current == "2026-2027" else "2026-2027"
+            op = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "after": after}
+            if current is not None:
+                op["before"] = current
+            return model.ops_step([op])
+        if call == "editTheSettingsByHand":
+            pages[self.SETTINGS] = "{\"course_name\": \"Test\", \"school_year\": \"2030-2031\"}\n"
+            return None
+        if call == "editAHunk":
+            if pages.get(self.NOTES) is None:
+                pages[self.NOTES] = "Intro.\nLine one: old.\nEnd.\n"
+            is_new = "Line one: new." in pages[self.NOTES]
+            return model.ops_step([{"kind": "replaceText", "path": self.NOTES, "before": "new" if is_new else "old",
+                                    "after": "old" if is_new else "new", "contextBefore": "Line one: ", "contextAfter": ".\n"}])
+        if call == "setAPreference":
+            op = {"kind": "external", "target": self.PREFERENCE, "after": "b"}
+            if self.PREFERENCE in pages:
+                op["before"] = pages[self.PREFERENCE]
+                if pages[self.PREFERENCE] == "b":
+                    op["after"] = "a"
+            return model.ops_step([op])
+        if call == "changeThePreferenceByHand":
+            pages[self.PREFERENCE] = "z"
+            return None
+        if call == "moveThePageAside":
+            source, destination = "courses/TST1O/old/a.md", "courses/TST1O/a.md"
+            if pages.get(source) is None and pages.get(destination) is None:
+                pages[source] = "page\n"
+            return model.ops_step([{"kind": "move", "from": source, "to": destination, "sha": traces.sha("page\n")}])
+        if call in ("moveThePageIntoAFolder", "moveThePageBetweenFolders"):
+            # U4b2-2: one move into courses/TST1O/new.
+            source, destination = {
+                "moveThePageIntoAFolder": ("courses/TST1O/b.md", "courses/TST1O/new/b.md"),
+                "moveThePageBetweenFolders": ("courses/TST1O/old/c.md", "courses/TST1O/new/c.md"),
+            }[call]
+            if pages.get(source) is None and pages.get(destination) is None:
+                pages[source] = "page\n"
+            return model.ops_step([{"kind": "move", "from": source, "to": destination, "sha": traces.sha("page\n")}])
+        if call == "linkItsNewFolderOutside":
+            model.linked_outside.add("courses/TST1O/new")
+            for inside in list(pages):
+                if inside.startswith("courses/TST1O/new/"):
+                    pages.pop(inside)
+            return None
+        if call == "linkItsOldFolderOutside":
+            model.linked_outside.add("courses/TST1O/old")
+            pages.pop("courses/TST1O/old/a.md", None)
+            return None
+        if call == "forgetTheMaintainer":
+            model.maintainer_registered = False
+            return None
+        if call == "moveAFolderWithAPageEditedInside":
+            if traces.folder_of_pages(pages, self.MEDIA) is None and traces.folder_of_pages(pages, self.RENAMED) is None:
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.MEDIA + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.MEDIA)
+            if tree is None:
+                return "noFolderToMove"
+            move = {"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)}
+            edit = {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}
+            return model.ops_step([move, edit])
+        if call == "moveAFolderWithAFileMadeInANewFolderInside":
+            # U4b2-10: the same step, and a file made in a folder (sub) that
+            # was not there, inside the moved folder.
+            if traces.folder_of_pages(pages, self.MEDIA) is None and traces.folder_of_pages(pages, self.RENAMED) is None:
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.MEDIA + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.MEDIA)
+            if tree is None:
+                return "noFolderToMove"
+            move = {"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)}
+            edit = {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}
+            return model.ops_step([move, edit] + traces.ops_for_change(self.RENAMED + "/sub/x.md", None, "X\n"))
+        if call in ("moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt",
+                    "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt"):
+            # Review 1 of U4b2-10, MEDIUM 1. The model holds a folder as its
+            # files only, so the content's own empty sub is not in it: the
+            # step is made and judged without it (the outcome is the same;
+            # the Swift replay checks foldersInside).
+            if traces.folder_of_pages(pages, self.MEDIA) is None and traces.folder_of_pages(pages, self.RENAMED) is None:
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.MEDIA + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.MEDIA)
+            if tree is None:
+                return "noFolderToMove"
+            made = {"moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt": {self.RENAMED + "/sub/deeper/x.md": "X\n"},
+                    "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt": {self.RENAMED + "/sub/x.md": "X\n",
+                                                                                      self.RENAMED + "/new/y.md": "Y\n"}}[call]
+            ops = [{"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)},
+                   {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}]
+            for path in sorted(made):
+                ops += traces.ops_for_change(path, None, made[path])
+            return model.ops_step(ops)
+        if call == "finderRecordsAWindowInTheMadeFolder":
+            # Never listed (listingCases): nothing the model holds.
+            return None
+        if call == "addAFolderInsideTheMadeFolder":
+            pages[self.RENAMED + "/sub/mine/y.md"] = "Y\n"
+            return None
+        if call == "renameAFolderInCaseOnly":
+            spellings = [self.CASE_ONLY_FROM, self.CASE_ONLY_TO, self.CASE_ONLY_BY_HAND]
+            if all(traces.folder_of_pages(pages, spelling) is None for spelling in spellings):
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.CASE_ONLY_FROM + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.CASE_ONLY_FROM)
+            if tree is None:
+                return "noFolderToMove"
+            move = {"kind": "move", "from": self.CASE_ONLY_FROM, "to": self.CASE_ONLY_TO, "listingSha": traces.listing_sha(tree)}
+            edit = {"kind": "replaceText", "path": self.CASE_ONLY_TO + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}
+            return model.ops_step([move, edit])
+        if call == "spellTheFolderAnotherWay":
+            for path in [path for path in pages if isinstance(path, str) and path.startswith(self.CASE_ONLY_TO + "/")]:
+                pages[self.CASE_ONLY_BY_HAND + path[len(self.CASE_ONLY_TO):]] = pages.pop(path)
+            return None
+        if call == "addAFileInsideTheMovedFolder":
+            pages[self.RENAMED + "/c.md"] = "C\n"
+            return None
+        if call == "leaveAKeptCopyInsideTheMovedFolder":
+            # The model holds no staged files: the step's own kept copy is
+            # never content (opKinds.wholeOps, the part-two review's M1).
+            return None
+        if call == "editThePageInsideByHand":
+            pages[self.RENAMED + "/a.md"] = "Hand.\n"
+            return None
+        if call == "stepEditingInsideAMovesFrom":
+            ops = [{"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": "a" * 64},
+                   {"kind": "replaceText", "path": self.MEDIA + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}]
+            seq = model.begin(ops, readable=readable_step({"ops": ops}))
+            model.find(seq)["phase"] = "done"
+            return None
+        self.fail("unknown call " + call)
+
+    MEDIA = "courses/TST1O/media"
+    RENAMED = "courses/TST1O/renamed"
+    MEDIA_FILES = {"a.md": "Intro.\nLine one: old.\nEnd.\n", "b.md": "B\n"}
+    CASE_ONLY_FROM = "courses/TST1O/Media"
+    CASE_ONLY_TO = "courses/TST1O/media"
+    CASE_ONLY_BY_HAND = "courses/TST1O/MEDIA"
+
+    def case_only_folder(self, model):
+        """U4b's caseOnlyFolder: the spelling the folder is listed under,
+        then what its a.md holds. The model keys pages as spelled."""
+        for spelling in (self.CASE_ONLY_FROM, self.CASE_ONLY_TO, self.CASE_ONLY_BY_HAND):
+            if traces.folder_of_pages(model.pages, spelling) is not None:
+                text = model.pages.get(spelling + "/a.md")
+                page = "none"
+                if text is not None:
+                    page = "new" if "Line one: new." in text else "old" if "Line one: old." in text else "byHand"
+                return spelling.rsplit("/", 1)[1] + ", " + page
+        return "none"
+
+    def moved_folder(self, model):
+        """U4b's movedFolder: which place holds the folder, then what its
+        a.md holds."""
+        at_new = traces.folder_of_pages(model.pages, self.RENAMED) is not None
+        at_old = traces.folder_of_pages(model.pages, self.MEDIA) is not None
+        place, folder = "neither", self.RENAMED
+        if at_new and at_old:
+            place = "both"
+        elif at_new:
+            place = "renamed"
+        elif at_old:
+            place, folder = "media", self.MEDIA
+        text = model.pages.get(folder + "/a.md")
+        page = "none"
+        if text is not None:
+            page = "new" if "Line one: new." in text else "old" if "Line one: old." in text else "byHand"
+        return place + ", " + page
+
+    def made_folder(self, model):
+        """U4b2-10's madeFolder: what sub holds wherever the moved folder
+        is. The model holds folders as their files only, so a folder holding
+        nothing is not there: it never answers `empty`."""
+        folder = self.RENAMED if traces.folder_of_pages(model.pages, self.RENAMED) is not None else self.MEDIA
+        tree = traces.folder_of_pages(model.pages, folder + "/sub")
+        if tree is None:
+            return "none"
+        names = set()
+        for inside in tree["files"]:
+            names.add(inside.split("/")[0])
+        return ", ".join(sorted(names, key=lambda name: name.encode("utf-8")))
+
+    def markers(self, model):
+        source, destination = model.pages.get(self.MARKER_FROM), model.pages.get(self.MARKER_TO)
+        if source is None and destination == self.OLD_MARKER:
+            return "moved"
+        if source == self.OLD_MARKER and destination is None:
+            return "movedBack"
+        if source == self.NEW_MARKER and destination == self.OLD_MARKER:
+            return "bothKept"
+        return (source, destination)
+
+    KIND_CALLS = ("moveTheMarker", "rollOverOntoANewWebsite", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
+                  "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
+                  "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
+                  "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
+                  "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
+                  "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
+                  "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
+                  "leaveAKeptCopyInsideTheMovedFolder", "moveThePageIntoAFolder", "moveThePageBetweenFolders",
+                  "linkItsNewFolderOutside", "moveAFolderWithAFileMadeInANewFolderInside", "addAFolderInsideTheMadeFolder",
+                  "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt",
+                  "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt", "finderRecordsAWindowInTheMadeFolder")
+
+    def leftover_markers(self, model):
+        source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
+        if source is None and destination == self.LEFTOVER:
+            return "moved"
+        if source == self.LEFTOVER and destination is None:
+            return "movedBack"
+        if source is None and destination is None:
+            return "gone"
+        return (source, destination)
+
+    def cloudflare_markers(self, model):
+        source, destination = model.pages.get(self.CLOUDFLARE_FROM), model.pages.get(self.CLOUDFLARE_TO)
+        if source is None and destination == self.CLOUDFLARE_MARKER:
+            return "moved"
+        if source == self.CLOUDFLARE_MARKER and destination is None:
+            return "movedBack"
+        return (source, destination)
 
     def test_stack_cases(self):
         folder_b = "@B/"
@@ -389,8 +1091,68 @@ class ContractCaseTests(unittest.TestCase):
                         model.pages[p1] = after
                         model.finish(seq)
                         last = ("applied", seq)
+                    elif call == "wholeFileStepOnTwoPagesNamedIndex":
+                        ops = []
+                        for path in self.TWO_PAGES_NAMED_INDEX:
+                            model.pages[path] = "What " + path + " held before the step.\n"
+                            ops += traces.ops_for_change(path, model.pages[path], "What the step left in " + path + ".\n")
+                        self.assertEqual([op["kind"] for op in ops], ["writeFile", "writeFile"])
+                        seq = model.begin(ops)
+                        for path in self.TWO_PAGES_NAMED_INDEX:
+                            model.pages[path] = "What the step left in " + path + ".\n"
+                        model.finish(seq)
+                        last = ("applied", seq)
+                    elif call in ("firstIndexAfterContentGoneAndCannotBeStored", "secondIndexBeforeContentGoneAndCannotBeStored"):
+                        first = call.startswith("first")
+                        path = self.TWO_PAGES_NAMED_INDEX[0 if first else 1]
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == path:
+                                text = op["afterText"] if first else op["beforeText"]
+                                model.removed_texts.add(text)
+                                model.unstorable_texts.add(text)
+                    elif call == "keepTheOriginalOfTheSecondIndex":
+                        path = self.TWO_PAGES_NAMED_INDEX[1]
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == path:
+                                model.kept.setdefault(path, []).append(op["beforeText"])
                     elif call == "removeContent":
                         model.content_removed = True
+                    elif call == "contentCannotBeStored":
+                        model.content_cannot_be_stored = True
+                    elif call == "beforeContentGoneAndCannotBeStored":
+                        # Only the newest step's before text of p1 is gone
+                        # from the list, and the list will not take it again.
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == p1:
+                                model.removed_texts.add(op["beforeText"])
+                                model.unstorable_texts.add(op["beforeText"])
+                    elif call == "afterContentGone":
+                        # Only the newest step's after text of p1 is gone
+                        # from the list (U4a review 1, LOW 4).
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == p1:
+                                model.removed_texts.add(op["afterText"])
+                    elif call == "keepTheOriginal":
+                        # The newest step's kept original of p1: what p1
+                        # held before its whole-file op (U3c).
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == p1:
+                                model.kept.setdefault(p1, []).append(op["beforeText"])
+                    elif call == "makeTheKeptOriginalUnreadable":
+                        model.kept_unreadable = True
+                    elif call == "changeTheKeptOriginal":
+                        for path in model.kept:
+                            model.kept[path] = [text + "A line added to the kept original.\n" for text in model.kept[path]]
+                    elif call == "foreignKeptOriginal":
+                        # Another list's kept original under the next step's
+                        # name: the model's pages and list never see it; the
+                        # Swift replay checks it is untouched.
+                        pass
                     elif call == "begin:dead@B":
                         path = folder_b + p1
                         after = flipped(path)
@@ -429,15 +1191,22 @@ class ContractCaseTests(unittest.TestCase):
                                              ("outsideAssistant", "A client: with colons", "session-7"))
                         elif variant == "aKeyOnAKnownOp":
                             ops[0]["onlyWhen"] = "aConditionNobodyKnows"
+                        elif variant == "twoWholeOpsOnOnePlace":
+                            listing = traces.listing_sha({})
+                            ops.append({"kind": "createTree", "path": "courses/TST1O/made", "listingSha": listing, "blobs": [listing]})
+                            ops.append({"kind": "createTree", "path": "courses/TST1O/made/inner", "listingSha": listing, "blobs": [listing]})
                         else:
                             self.fail("unknown variant " + variant)
-                        content_ops = [op for op in ops if op["kind"] != "recompute"]
-                        seq = model.begin(content_ops, readable=readable_step(step))
+                        seq = model.begin(ops, readable=readable_step(step))
                         model.pages[p1] = after
                         model.finish(seq)
                     elif call == "foreignStep":
-                        seq = model.begin([{"kind": "move", "from": "a", "to": "b"}], readable=False)
+                        seq = model.begin([{"kind": "aKindNobodyKnows", "from": "a", "to": "b"}], readable=False)
                         model.find(seq)["phase"] = "done"
+                    elif call in self.KIND_CALLS:
+                        answered = self.kind_call(call, model)
+                        if answered is not None:
+                            last = answered
                     elif call == "begin:held":
                         begin_held()
                     elif call == "finish:held":
@@ -469,6 +1238,75 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(lines_written_by_the_deploy, case["linesWritten"])
                 if "interrupted" in case:
                     self.assertEqual([step["seq"] for step in model.steps if step["phase"] == "interrupted"], case["interrupted"])
+                if "markers" in case:
+                    self.assertEqual(self.markers(model), case["markers"])
+                if "cloudflareMarkers" in case:
+                    self.assertEqual(self.cloudflare_markers(model), case["cloudflareMarkers"])
+                if "leftoverMarkers" in case:
+                    self.assertEqual(self.leftover_markers(model), case["leftoverMarkers"])
+                if "startsAtTheNextLogin" in case:
+                    self.assertEqual(model.starts_at_the_next_login, case["startsAtTheNextLogin"])
+                if "movedFolder" in case:
+                    self.assertEqual(self.moved_folder(model), case["movedFolder"])
+                if "madeFolder" in case:
+                    self.assertEqual(self.made_folder(model), case["madeFolder"])
+                if "caseOnlyFolder" in case:
+                    self.assertEqual(self.case_only_folder(model), case["caseOnlyFolder"])
+                if "folderKept" in case:
+                    self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
+                if "rederived" in case:
+                    self.assertEqual(model.rederived, case["rederived"])
+                if "keptOriginalLeft" in case:
+                    # A kept copy the row itself left (a model holds none).
+                    foreign = "foreignKeptOriginal" in case["calls"] or "leaveAKeptCopyInsideTheMovedFolder" in case["calls"]
+                    self.assertEqual(bool(model.kept) or foreign, case["keptOriginalLeft"])
+                if "keptBesideThePage" in case:
+                    self.assertEqual(len(model.kept.get(p1, [])), case["keptBesideThePage"])
+                if "keptWhatItReplacedLines" in case:
+                    self.assertEqual(model.kept_what_it_replaced_lines, case["keptWhatItReplacedLines"])
+                if "leftApart" in case:
+                    self.assertEqual(list(last[2]) if len(last) > 2 else [], case["leftApart"])
+                if "refusalNamed" in case:
+                    self.assertEqual(last[0], "changedSince")
+                    self.assertEqual(last[1], case["refusalNamed"])
+                if "schoolYear" in case:
+                    self.assertEqual(json.loads(model.pages[self.SETTINGS])["school_year"], case["schoolYear"])
+
+    def test_recovery_cases_with_a_moved_folder(self):
+        """undo.recoveryCases' U4b rows (withAMovedFolder): a step killed
+        between its move and the edits it carries settles whole, judged by
+        content. The model holds no staged files, so
+        keptCopyLeftInsideTheFolder is the Swift replay's alone."""
+        cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAMovedFolder")]
+        self.assertEqual(len(cases), 11)
+        first, second = "courses/TST1O/Section 1/Classes/A.md", "courses/TST1O/Section 1/Classes/B.md"
+        before_text = "---\ntitle: A\npublish: false\n---\nBody.\n"
+        texts = {first: before_text, second: before_text.replace("title: A", "title: B")}
+        pages = dict(texts)
+        for name, text in self.MEDIA_FILES.items():
+            pages[self.MEDIA + "/" + name] = text
+        ops = []
+        for path, text in texts.items():
+            ops += traces.ops_for_change(path, text, text.replace("publish: false", "publish: true"))
+        tree = traces.folder_of_pages(pages, self.MEDIA)
+        ops.append({"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)})
+        ops.append({"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"})
+        after_pages = traces.stopped_part_way(ops, False, pages, None)
+        phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
+                  ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done",
+                  ("redo", "nothingTookEffect"): "undone", ("redo", "completed"): "done", ("redo", "rolledBack"): "undone"}
+        for case in cases:
+            with self.subTest(case["name"]):
+                work, stop = case["work"], case["stopAt"]
+                swapped = int(stop.split(":")[1]) if stop.startswith("beforeSwap:") else None
+                starting = after_pages if work == "undo" else pages
+                left = traces.stopped_part_way(ops, work == "undo", starting, swapped)
+                outcome, settled = traces.recover(ops, left, work != "undo")
+                self.assertEqual(phases.get((work, outcome), outcome), case["phase"])
+                wanted = pages if case["files"] == "before" else after_pages
+                self.assertEqual((settled.get(first), settled.get(second)), (wanted[first], wanted[second]))
+                self.assertEqual(self.moved_folder(type("Settled", (), {"pages": settled})), case["movedFolder"])
 
     def test_the_clear_reasons_are_the_four_written(self):
         # Rulings 17 and 18 took the deploy and the share of unit plans off;
@@ -492,6 +1330,51 @@ class ContractCaseTests(unittest.TestCase):
         events = set(journal["events"])
         self.assertEqual(events, {"begin", "applied", "rolledBack", "interrupted", "undoing", "undone",
                                   "redoing", "redone", "failed", "dropped", "pruned", "cleared", "note"})
+
+
+class ContractFileReadabilityTests(unittest.TestCase):
+    """Every contract file that Windows PowerShell reads, or may, stays
+    readable by its ConvertFrom-Json (#899 W6: shared-rules.json once held
+    keys X1 and x1, and windows-app/test_launcher_rules.ps1 could not start)."""
+
+    def test_the_rule_sees_what_windows_powershell_refuses(self):
+        self.assertEqual(len(windows_powershell_problems('{"a": {"X1": 1, "x1": 2}}')), 1)
+        self.assertEqual(len(windows_powershell_problems('{"a": [{"": 1}]}')), 1)
+        self.assertEqual(windows_powershell_problems('{"a": {"X1": 1, "x2": 2, "\u212a": 3, "k": 4}}'), [])
+
+    def test_every_other_contract_file_is_readable_by_windows_powershell(self):
+        names = []
+        for path in sorted((REPO / "contracts").glob("*.json")):
+            names.append(path.name)
+            if path.name in NOT_FOR_WINDOWS_POWERSHELL:
+                continue
+            with self.subTest(path.name):
+                self.assertEqual(windows_powershell_problems(path.read_text(encoding="utf-8")), [])
+        self.assertIn("shared-rules.json", names)
+        for name in NOT_FOR_WINDOWS_POWERSHELL:
+            self.assertIn(name, names)
+
+    def test_the_edit_json_cases_live_only_in_their_own_file(self):
+        self.assertNotIn("editJSONCases", shared_undo())
+        self.assertNotIn("editJSONCasesHow", shared_undo())
+        self.assertGreaterEqual(len(json_cases()["editJSONCases"]), 16)
+
+
+class OneComparisonTests(unittest.TestCase):
+    """U4b2-9: the model's one comparison for "at or inside", and the
+    capitalisation-only move's sides told apart by the moved item's own part."""
+
+    def test_the_part_inside_a_place_is_found_without_regard_to_case(self):
+        self.assertEqual(traces.part_inside("courses/X/renamed", "courses/X/Renamed/a/b.md"), "a/b.md")
+        self.assertEqual(traces.part_inside("courses/X/renamed", "courses/X/RENAMED"), "")
+        self.assertIsNone(traces.part_inside("courses/X/renamed", "courses/X/renamedToo/a.md"))
+
+    def test_a_case_only_move_tells_its_sides_apart_by_the_folders_own_part(self):
+        move = {"kind": "move", "from": "courses/TST1O/Media", "to": "courses/TST1O/media", "listingSha": "a" * 64}
+        at_from = {"kind": "replaceText", "path": "courses/tst1o/Media/a.md"}
+        at_to = {"kind": "replaceText", "path": "courses/tst1o/media/a.md"}
+        self.assertFalse(traces.move_carries(move, at_from))
+        self.assertTrue(traces.move_carries(move, at_to))
 
 
 if __name__ == "__main__":

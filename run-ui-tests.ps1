@@ -15,8 +15,9 @@
     They are still COMPILED by every build: the project is in the solution and
     every test that drives the window carries [UiFact], which skips unless
     PLANTOIR_UI_TESTS=1 (plain facts - AssertAbsentRuleTests for the
-    harness's absence rule, HarnessSourceRuleTests for its key-up rule, #638 -
-    run anywhere). A suite nothing compiles is a
+    harness's absence rule, HeldKeysMessageTests for the held-key message -
+    run anywhere; the key rules, HarnessSourceRuleTests, #638, run in
+    Plantoir.Tests since #1035). A suite nothing compiles is a
     suite that quietly stops matching the code.
 
     WHAT THEY COVER, AND WHAT THEY DO NOT

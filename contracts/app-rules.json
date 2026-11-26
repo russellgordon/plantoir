@@ -1025,7 +1025,7 @@
           "Open the Netlify page linked below, and sign in if you are asked to.",
           "Choose “New access token”.",
           "Describe it as something you will recognise later, such as “Class websites”.",
-          "Change the expiry — it starts at 7 days. A token that expires stops your deploys working, with nothing on screen to say why, so set a date after the end of your school year: next July is a safe choice. Choose “No expiration” instead if it is offered.",
+          "Change the expiry — it starts at 7 days. Set a date after the end of your school year: next July is a safe choice. Choose “No expiration” instead if it is offered. An expired token stops your deploys working. The next deploy then says the saved token no longer works, and Settings shows whether the saved token still works.",
           "Choose “Generate token”, then copy the long code Netlify shows you — it is only shown once.",
           "Paste it below."
         ],
@@ -1468,6 +1468,16 @@
         "why" : "#674 keptDownloads.stop, one that arrived as something else: a build that stopped because a page uses a PhET simulation this computer has not downloaded and could not download now. The first line LIFTED, then which page uses which, from the indented lines (keptDownloads.stop.explained), so the teacher reads the page and the simulation as the ruling asks; the marker line under them is the trail's and is never read here."
       },
       {
+        "expect" : "Section 2's website was not built: the pages students can see lead to more than 50,000 of the course's own web pages and stylesheets, which is more than the website builder reads, and building it anyway could put files on the website that no page students can see uses. Hiding the pages that show or link to those web pages lets it build. Choose “Report a Problem…” from the Help menu so this can be looked into.",
+        "output" : "Failed to emit from plugin `PlantoirAssets`: more of this course's own web pages and stylesheets load one another than the website builder reads, so the website was not built.\nSection 2's website was not built: the pages students can see lead to more than 50,000 of the course's own web pages and stylesheets, which is more than the website builder reads, and building it anyway could put files on the website that no page students can see uses. Hiding the pages that show or link to those web pages lets it build. Choose “Report a Problem…” from the Help menu so this can be looked into.\nPLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"stopped\":\"followLimit\",\"limit\":50000}\nCommand '['python3', '/opt/scripts/build_site.py']' returned non-zero exit status 1.",
+        "why" : "#901 piece 901a, shared-rules.json -> siteFiles.followed.limitsRule: a build the site's emitter stopped at the follow limit. The build's own sentence (siteFiles.words.followLimitStopped) LIFTED, so the teacher reads it without the website builder's error line above it (followed.limitReached, which does not carry FailureExplainer.followLimitStopMarker) and the deploy's exit status below it (901a round 4 review, M2). The marker line is the trail's and is never read here."
+      },
+      {
+        "expect" : "This preview was not built: the pages students can see lead to more than 50,000 of the course's own web pages and stylesheets, which is more than the website builder reads. Hiding the pages that show or link to those web pages lets it build. Choose “Report a Problem…” from the Help menu so this can be looked into.",
+        "output" : "Failed to emit from plugin `PlantoirAssets`: more of this course's own web pages and stylesheets load one another than the website builder reads, so the website was not built.\nThis preview was not built: the pages students can see lead to more than 50,000 of the course's own web pages and stylesheets, which is more than the website builder reads. Hiding the pages that show or link to those web pages lets it build. Choose “Report a Problem…” from the Help menu so this can be looked into.\nPLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"preview\",\"stopped\":\"followLimit\",\"limit\":50000}",
+        "why" : "The same stop in a preview (siteFiles.words.followLimitStoppedPreview), lifted the same way."
+      },
+      {
         "expect" : "Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings say something other than true or false. Nothing was deployed.",
         "output" : "❌ Plantoir cannot tell whether ICS3U-2025 is kept for reference —\n   its settings say something other than true or false. Nothing was deployed.",
         "why" : "The launcher's OTHER reference refusal, and it matters for the same population as the one below: the app reads a course with an odd marker value as ORDINARY, so a teacher can set it to deploy on its own - and at half six the launcher refuses, the app is closed, and without this case the app shows the generic 'did not finish' while the real reason sits in a log nobody opens. Two lines, joined, because the launcher prints them as two. It said 'Nothing was published.' until v1.4.4 (#443), when it moved to DEPLOYED with every other launcher line that meant a deploy - Russell's words rule of 2026-10-03; deploy.ps1 and Windows' ReferenceRefusalTests moved with it under #441, in Windows v1.4.4."
@@ -1520,7 +1530,7 @@
       },
       {
         "expect" : "Cloudflare did not accept that token. Check that it has the 'Cloudflare Pages - Edit' permission, then try again.",
-        "output" : " Netlify requires 3 file(s) for this deploy.\n✅ Delta deploy created (production).\n Deploy ID: 6716a2f0c3e1b40008d2c9a1\n Site URL: https://ics3u-s1-2026-quillfeather.netlify.app\n\n✅ Deploy complete.\n🕒 Host timezone offset: -0400\n⚠️ The saved Cloudflare token no longer works, so it has been cleared.\n\nConnect to Cloudflare.\n\nCloudflare hosts this section's website for free, and it needs to know that\nthe deploys are coming from you. It does that with an API token — a long\ncode that acts like a password made just for this app. Creating one takes\nabout two minutes, and you will not be asked again: it is saved securely on\nthis computer.\n\n  1. Open this page:  https://dash.cloudflare.com/profile/api-tokens\n     (Sign in if you are asked to.)\n  2. Choose \"Create Token\", then \"Create Custom Token\".\n  3. Name it something you will recognise later, such as \"Class websites\".\n  4. Give it ONE permission, chosen from the three dropdowns:\n     Account  ->  Cloudflare Pages  ->  Edit\n  5. Under \"Account Resources\", choose \"Include\" and then your own account\n     by name. A token that names no account cannot deploy anything, and\n     what you get back if you skip this does not mention accounts at all.\n  6. Under \"TTL\", set the end date to after the end of your school year —\n     next July is a safe choice — or leave it with no end date. An expired\n     token stops your deploys working, with nothing to say why.\n  7. Choose \"Continue to summary\", then \"Create Token\".\n  8. Copy the long code Cloudflare shows you — it is only shown once — and\n     paste it below. Nothing appears as you paste; that is normal.\n\nPaste Cloudflare token: \n❌ Cloudflare did not accept that token.\n   Check that it has the 'Cloudflare Pages - Edit' permission, then try again.",
+        "output" : " Netlify requires 3 file(s) for this deploy.\n✅ Delta deploy created (production).\n Deploy ID: 6716a2f0c3e1b40008d2c9a1\n Site URL: https://ics3u-s1-2026-quillfeather.netlify.app\n\n✅ Deploy complete.\n🕒 Host timezone offset: -0400\n⚠️ The saved Cloudflare token no longer works, so it has been cleared.\n\nConnect to Cloudflare.\n\nCloudflare hosts this section's website for free, and it needs to know that\nthe deploys are coming from you. It does that with an API token — a long\ncode that acts like a password made just for this app. Creating one takes\nabout two minutes, and you will not be asked again: it is saved securely on\nthis computer.\n\n  1. Open this page:  https://dash.cloudflare.com/profile/api-tokens\n     (Sign in if you are asked to.)\n  2. Choose \"Create Token\", then \"Create Custom Token\".\n  3. Name it something you will recognise later, such as \"Class websites\".\n  4. Give it ONE permission, chosen from the three dropdowns:\n     Account  ->  Cloudflare Pages  ->  Edit\n  5. Under \"Account Resources\", choose \"Include\" and then your own account\n     by name. A token that names no account cannot deploy anything, and\n     what you get back if you skip this does not mention accounts at all.\n  6. Under \"TTL\", set the end date to after the end of your school year —\n     next July is a safe choice — or leave it with no end date. An expired\n     token stops your deploys working. The next deploy then says the saved\n     token no longer works, and clears it.\n  7. Choose \"Continue to summary\", then \"Create Token\".\n  8. Copy the long code Cloudflare shows you — it is only shown once — and\n     paste it below. Nothing appears as you paste; that is normal.\n\nPaste Cloudflare token: \n❌ Cloudflare did not accept that token.\n   Check that it has the 'Cloudflare Pages - Edit' permission, then try again.",
         "why" : "GitHub #695. The transcript Russell met on 2026-10-27, re-captured 2026-11-01 by driving the real deploy.sh through a terminal in a scratch folder (the Netlify leg's lines in front are deploy.py's own prints, since that leg needs a real site): the Netlify leg of a Netlify + Cloudflare deploy finished, the saved Cloudflare token was refused and cleared, the 'Connect to Cloudflare' steps were shown, and the token pasted was refused too. The window said only 'Something went wrong'. The launcher's two lines are LIFTED and joined, as the 'cannot tell' refusal is, rather than reworded: they already are the sentence a teacher acts on. The whole transcript is the case so that it also pins that nothing earlier in it fires another explanation (the heredoc, the Netlify leg's success lines), which is what makes the order of the checks safe on both platforms without writing that order down. Asking again in the sheet instead of failing is #696."
       },
       {
@@ -3593,7 +3603,7 @@
         "helpAnchors" : {
           "door" : "copilot",
           "educationBenefits" : "github-education",
-          "why" : "The Help book's page ids (#839's outline, one anchor a page). Russell, 2026-11-13: wherever Plantoir offers GitHub Copilot to a teacher who does not have it, it links the github-education page. This door is shown only while Copilot is installed (hiddenWhenNotInstalled), so it offers Copilot to nobody who lacks it; the first such offer is #855's set-up item, which links github-education."
+          "why" : "The Help book's page ids (#839's outline, one anchor a page). Russell, 2026-11-13: wherever Plantoir offers GitHub Copilot to a teacher who does not have it, it links the github-education page. Since #990 (Russell's ruling Q9) this door is drawn in the menu bar's Revise With on every computer and DIMMED while Copilot is not installed (outsideAgents.hiddenWhenNotInstalled false), and a row's context menu leaves it out (hiddenInContextMenusWhenNotInstalled); a dimmed item cannot be chosen, so the door still offers Copilot to nobody who lacks it and links no page of its own. The offer to a teacher without Copilot is #855's set-up item (setUp.menuItem, at the end of Revise With only since #990, ruling Q10), which links github-education."
         },
         "identity" : {
           "rule" : "A copilot found on the search list (searchedForInOrder) is used only when it is GitHub's: either its path, links followed, lies inside an npm install of npmPackage (…/node_modules/@github/copilot/…), or it is a program signed with signedIdentifier and signedTeam under an Apple-issued certificate (requirement). Any other copilot is passed over and the search goes on down the list; none left means no door.",
@@ -3666,9 +3676,11 @@
         }
       ],
       "where" : "Under the table on the section's Problems tab, in the order of buttons: Claude's first, GitHub Copilot's last (Russell, 2026-11-13: after Codex).",
-      "shownWhen" : "A button is shown only while its assistant is installed (the door's own test, hiddenWhenNotInstalled - hidden, never greyed) and never on a course kept for reference, which no door opens on. Each is shown or hidden independently.",
-      "enabledWhen" : "At least one row is handed over: ticked (a row nobody unticked is ticked, sectionProblems ruling 6) and not fixed in the source.",
+      "shownWhen" : "All three buttons are shown on every course not kept for reference, which no door opens on, whatever this computer has. Since #990 (the HIG review's D11, Russell's ruling Q9, 2026-11-18) a button whose assistant is not installed is DIMMED, not left out (enabledWhen); until then it was hidden (hiddenWhenNotInstalled). HIG, The menu bar: 'If a menu bar item isn't actionable, disable the action instead of hiding it', which the ruling applies to these buttons as to Revise With.",
+      "enabledWhen" : "Each button separately: its assistant is installed (the door's own test), and at least one row is handed over: ticked (a row nobody unticked is ticked, sectionProblems ruling 6) and not fixed in the source. buttonCases' expect.enabled is the second half alone (a row is handed over); claudeEnabled, codexEnabled and copilotEnabled are the whole rule, per button (#990), and say nothing about a course kept for reference, where shown is false and no button is drawn.",
       "notEnabledHelp" : "Tick a problem this section still has to hand it over.",
+      "notInstalledHelp" : "Not set up on this Mac. To set it up, see Settings ▸ Other Assistants.",
+      "notInstalledHelpWhy" : "#990: a button dimmed because its assistant is not installed carries this as its help text (the mac's accessibility hint), in place of notEnabledHelp, for the reason notEnabledHelpWhy gives: a greyed button alone says nothing about why. It names the place Revise With ▸ Set Up an Assistant… opens (Settings ▸ Other Assistants), and is 70 characters, within the HIG's 60 to 75 for a tooltip (Offering help, 'Be brief'). When Windows takes this in stage 3 of #975 it says PC, never Windows, where the mac says Mac, and names its own Settings page.",
       "notEnabledHelpWhy" : "Proposed from Windows with #736 (2026-11-11): while the buttons cannot be pressed, Windows gives each this as its help text, which Narrator reads with the button, because a greyed button alone tells somebody who cannot see it nothing about why. The mac owes the same sentence as the buttons' accessibility hint while they are disabled.",
       "fixedInTheSourceIsLeftOut" : "A ticked row that another section's later build shows fixed in the source (sectionProblems.rowState) is LEFT OUT of the message: the page is already right, and this section needs only a build. An assistant asked to fix it would find nothing wrong, and might change something that is not broken looking for it.",
       "atTheClick" : "The same refusal Revise With ▸ makes at the click (a session from any outside door already open on the course, or the course busy) is made here, in its own words, and nothing opens.",
@@ -3734,7 +3746,7 @@
       "rejected" : [
         "Handing the rows over in a file the message names (plan review, MED 9's other option): it is a file written where the assistant can read it - the working folder, which Obsidian is watching - and nobody cleans it up; the one-line message fits.",
         "One session per problem: a shared page's problems are one fix, and ten terminals are not triage.",
-        "Greying a button when its assistant is not installed: hiddenWhenNotInstalled, as Revise With ▸.",
+        "Hiding a button when its assistant is not installed: the rule until #990, when Russell ruled them dimmed (Q9), as the menu bar's Revise With items are.",
         "Asking a shell where the tool is: slow (1.06 s for zsh -lic on the planning Mac), and it runs the teacher's login scripts while a view draws. The doors' own search list (searchedForInOrder) is used."
       ],
       "buttonCases" : [
@@ -3754,6 +3766,9 @@
             "claudeShown" : true,
             "codexShown" : true,
             "copilotShown" : true,
+            "claudeEnabled" : true,
+            "codexEnabled" : true,
+            "copilotEnabled" : true,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3761,7 +3776,7 @@
           }
         },
         {
-          "name" : "only Claude installed: only its button",
+          "name" : "only Claude installed: all three shown, only Claude's can be pressed",
           "claudeInstalled" : true,
           "codexInstalled" : false,
           "copilotInstalled" : false,
@@ -3774,8 +3789,11 @@
           ],
           "expect" : {
             "claudeShown" : true,
-            "codexShown" : false,
-            "copilotShown" : false,
+            "codexShown" : true,
+            "copilotShown" : true,
+            "claudeEnabled" : true,
+            "codexEnabled" : false,
+            "copilotEnabled" : false,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3783,7 +3801,7 @@
           }
         },
         {
-          "name" : "only Codex installed: only its button",
+          "name" : "only Codex installed: all three shown, only Codex's can be pressed",
           "claudeInstalled" : false,
           "codexInstalled" : true,
           "copilotInstalled" : false,
@@ -3795,9 +3813,12 @@
             }
           ],
           "expect" : {
-            "claudeShown" : false,
+            "claudeShown" : true,
             "codexShown" : true,
-            "copilotShown" : false,
+            "copilotShown" : true,
+            "claudeEnabled" : false,
+            "codexEnabled" : true,
+            "copilotEnabled" : false,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3805,7 +3826,7 @@
           }
         },
         {
-          "name" : "only GitHub Copilot installed: only its button (#783)",
+          "name" : "only GitHub Copilot installed: all three shown, only its can be pressed (#783)",
           "claudeInstalled" : false,
           "codexInstalled" : false,
           "copilotInstalled" : true,
@@ -3817,9 +3838,12 @@
             }
           ],
           "expect" : {
-            "claudeShown" : false,
-            "codexShown" : false,
+            "claudeShown" : true,
+            "codexShown" : true,
             "copilotShown" : true,
+            "claudeEnabled" : false,
+            "codexEnabled" : false,
+            "copilotEnabled" : true,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3827,7 +3851,7 @@
           }
         },
         {
-          "name" : "none installed: no button, and no sign any exists",
+          "name" : "none installed: all three shown and dimmed (#990)",
           "claudeInstalled" : false,
           "codexInstalled" : false,
           "copilotInstalled" : false,
@@ -3839,9 +3863,12 @@
             }
           ],
           "expect" : {
-            "claudeShown" : false,
-            "codexShown" : false,
-            "copilotShown" : false,
+            "claudeShown" : true,
+            "codexShown" : true,
+            "copilotShown" : true,
+            "claudeEnabled" : false,
+            "codexEnabled" : false,
+            "copilotEnabled" : false,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3864,6 +3891,9 @@
             "claudeShown" : false,
             "codexShown" : false,
             "copilotShown" : false,
+            "claudeEnabled" : true,
+            "codexEnabled" : true,
+            "copilotEnabled" : true,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3890,6 +3920,9 @@
             "claudeShown" : true,
             "codexShown" : true,
             "copilotShown" : true,
+            "claudeEnabled" : false,
+            "codexEnabled" : false,
+            "copilotEnabled" : false,
             "enabled" : false,
             "handedOver" : 0,
             "unticked" : 2,
@@ -3912,6 +3945,9 @@
             "claudeShown" : true,
             "codexShown" : true,
             "copilotShown" : true,
+            "claudeEnabled" : false,
+            "codexEnabled" : false,
+            "copilotEnabled" : false,
             "enabled" : false,
             "handedOver" : 0,
             "unticked" : 0,
@@ -3942,6 +3978,9 @@
             "claudeShown" : true,
             "codexShown" : true,
             "copilotShown" : true,
+            "claudeEnabled" : true,
+            "codexEnabled" : true,
+            "copilotEnabled" : true,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 1,
@@ -5074,10 +5113,11 @@
       "how" : "Each case is a course folder, read on the day `today`: planningFolder says whether courses/<course>/.internal/planning exists, and each of plans is a folder in it holding plan.json with exactly `file` as its text. referenceCourse is whether the course is kept for reference. expect.sentence is the greeting's last sentence exactly, after its double quotes become apostrophes, or null for no sentence about unit planning at all; expect.trail is what the door's trailLine gains (empty for nothing). Both doors are run."
     },
     "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file. Since 1.9.3 (#736) both its doors start the program DIRECTLY when it is an .exe - by argument vector, with no command interpreter and no Windows Terminal in front, in a console window of its own (Windows Terminal anyway where it is the default terminal) - and through cmd.exe /v:off /s /k when it is an npm .cmd shim, with cmd's metacharacters escaped per parse and every % followed by a quote. Until 1.9.3 the Claude door ran wt.exe -d <folder> cmd /k with a hand-joined line, which left the greeting, and the course's name in it, outside cmd's quotes; and Windows Terminal itself was measured expanding %NAME% and re-joining arguments with its own quoting, which is why it is no longer in front of either door (documentation/12-windows-app.md -> 'What the outside doors hand to Windows, and how'). The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
-    "hiddenWhenNotInstalled" : true,
-    "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown its door at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: a teacher sees an item for each assistant installed, in the order Claude, Codex, GitHub Copilot. Since #855 (Russell, 2026-11-13: Revise With is always shown) the submenu itself is ALWAYS drawn, ending with setUp.menuItem, so a teacher with no assistant at all sees Revise With holding that one item. Until #855 the submenu was left out when it had nothing in it and a teacher with none saw no sign that any existed; that rule is gone, and Windows' menu changes with it.",
+    "hiddenWhenNotInstalled" : false,
+    "hiddenInContextMenusWhenNotInstalled" : true,
+    "hiddenWhenNotInstalledWhy" : "Since #990 (the HIG review's D11, Russell's ruling Q9, 2026-11-18) a door whose tool is not installed is DIMMED in the menu bar's Revise With submenus (Course and Section) and on the Problems tab's Fix with buttons (fixWith.shownWhen), not left out: HIG, The menu bar, 'Always show the same set of menu items… If a menu bar item isn't actionable, disable the action instead of hiding it from the menu.' The same goes for the local assistant on a computer that cannot run it. A row's CONTEXT menu still HIDES it (hiddenInContextMenusWhenNotInstalled): HIG, Context menus, 'Hide unavailable menu items, don't dim them.' The order is Claude, Codex, GitHub Copilot, then the local assistant, and Revise With ends with setUp.menuItem after a divider. Until #990 the door was hidden everywhere, so a teacher with none saw Revise With holding only setUp.menuItem (Revise With itself always drawn since #855, Russell 2026-11-13).",
     "menuItemWhy" : "Each agent's menuItem is the item's title INSIDE Revise With ▸ — in the menu bar's Course and Section menus and, since the HIG sweep (#457 item 4, 2026-10-08), in every course and section row's context menu as well, so one command has one name everywhere (HIG: stable command names). Until the sweep the row's context menu showed it at the top level as 'Revise with Claude…' / 'Revise with Codex…' while the menu bar said Revise With ▸ Claude…, and this key held the context menu's words. 'Revise with Claude' is still the command's name in a SENTENCE (shared-rules.json -> workspaceWait's agent names, the support page); only the menu item's title moved. Windows draws its own menu, so it chooses where the item sits, but the item's words are these.",
-    "installedOnlyWhenAsked" : "Plantoir sets up an outside assistant only when the teacher asks, from Settings > Other Assistants (reached also from Help > Set Up an Assistant… and Revise With > Set Up an Assistant…), and only after a confirmation that says what is downloaded, from whom, where it goes, and where the course content goes (setUp). Nothing is offered unasked: no launch-time offer, no notice, no badge. Plantoir still works without any of them (the never-requires rule). Until #855 this key was neverInstalled ('Plantoir never installs an outside assistant and never offers to'); Russell reversed it on 2026-11-13 because teachers with an account may not know how to set the tool up.",
+    "installedOnlyWhenAsked" : "Plantoir sets up an outside assistant only when the teacher asks, from Settings > Other Assistants (reached also from Revise With > Set Up an Assistant…; from Help > Set Up an Assistant… too until #990), and only after a confirmation that says what is downloaded, from whom, where it goes, and where the course content goes (setUp). Nothing is offered unasked: no launch-time offer, no notice, no badge. Plantoir still works without any of them (the never-requires rule). Until #855 this key was neverInstalled ('Plantoir never installs an outside assistant and never offers to'); Russell reversed it on 2026-11-13 because teachers with an account may not know how to set the tool up.",
     "neverProbedForSignIn" : "Finding the tool says nothing about whether the teacher is signed in to it, and the DOOR does not try to find out: that would mean running the tool while a context menu is being drawn. A teacher who is signed out meets their assistant's own sign-in step inside the terminal. Narrowed by #855: Settings > Other Assistants asks the maker's own signed-in question (setUp.agents' signedInCheck) for a tool Plantoir set up, only after its set-up, after its sign-in window and on Check Again, never while a menu or a tab draws, and keeps the exit code alone, never the output, which names the account.",
     "note" : "The OUTSIDE doors: handing one course to a command-line assistant the teacher already has on their own machine, so it can work on their pages through Plantoir's MCP server. Distinct from the assistant Plantoir carries itself (contracts/assist-cases.json), which runs on the teacher's machine with no account and no CLI. AUTHORED, not generated. This block is the first contract data either door has ever had: it arrived on the mac with issue #205, which added the Codex door, and it describes BOTH doors so that the Claude half states what the two apps already do rather than leaving it written down nowhere.",
     "planAUnit" : {
@@ -5159,7 +5199,7 @@
     "serverName" : "plantoir",
     "setUp" : {
       "note" : "#855 (Russell's rulings on the issue, 2026-11-13): one button per assistant runs the maker's OWN documented set-up, unchanged, in the background; Plantoir then checks that every program it left is the maker's before it calls the assistant set up. It goes where the maker puts it (the home folder), so the maker's updater, the teacher's own Terminal and the doors' search all agree; no admin rights. Rejected: downloading the programs into Plantoir's own folder (Claude Code's updater installs into ~/.local/share/claude whatever Plantoir does, so a second copy would drift, and pinning versions means a Plantoir release a week); bundling them (Claude Code's licence grants no redistribution, and the three would add about 650 MB); typing the command into a terminal window (needs an Automation prompt, steals focus, and Plantoir learns the result only by polling); a managed setting for school IT (Russell: no, the offer always appears and a locked-down Mac is told so in plain words). AUTHORED.",
-      "whereItIsOffered" : "Settings > Other Assistants (the pane; GitHub Copilot listed first), Help > helpMenuItem, and Revise With > menuItem, last in every Revise With submenu (both subject menus and every live row's context menu), after a divider when anything is above it. The two menu items open the pane and set up nothing themselves. Never on a course kept for reference's row, where Revise With is not drawn (decision s).",
+      "whereItIsOffered" : "Settings > Other Assistants (the pane; GitHub Copilot listed first), and Revise With > menuItem, last in every Revise With submenu (both subject menus and every live row's context menu), after a divider. The menu item opens the pane and sets up nothing itself. Not in the Help menu since #990 (Russell's ruling Q10, 2026-11-18): it was there too until then (helpMenuItem), the same words twice in the menu bar, which #457 item 4 rules out. Never on a course kept for reference's row, where Revise With is not drawn (decision s).",
       "childEnvironment" : {
         "names" : [
           "HOME",
@@ -5349,7 +5389,6 @@
         }
       ],
       "menuItem" : "Set Up an Assistant…",
-      "helpMenuItem" : "Set Up an Assistant…",
       "helpAnchor" : "set-up-assistant",
       "wording" : {
         "cancelButton" : "Cancel",
@@ -5366,7 +5405,6 @@
         "failedNotFromMaker" : "Plantoir didn’t set up {tool}: what was downloaded wasn’t made by {maker}, so Plantoir took it away again.",
         "failedOther" : "Plantoir couldn’t finish setting up {tool}, and took away what it had added. If your school looks after this computer, it may not allow new programs: the people who look after it can tell you.",
         "failedTookTooLong" : "Plantoir stopped setting up {tool} because it was taking far too long, and took away what it had added. Try again later, or on another network.",
-        "helpMenuItem" : "Set Up an Assistant…",
         "installedSignedOut" : "{tool} is set up. Sign in to your {maker} account to start using it.",
         "interrupted" : "Plantoir didn’t finish setting up {tool} last time. Try again to finish it.",
         "menuItem" : "Set Up an Assistant…",

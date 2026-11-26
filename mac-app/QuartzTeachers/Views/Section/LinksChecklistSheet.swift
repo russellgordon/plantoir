@@ -369,6 +369,13 @@ struct LinksChecklistSheet: View {
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("linksChecklistSheet")
+        .task {
+            // Publish and Not Now each make a step on the main actor: the
+            // list is read off it now, while the teacher reads the sheet, so
+            // that step reads on from here (#899, ruling 8 on U1's third
+            // round; the first review of U3a, LOW 6).
+            await JournaledStep.readTheListAhead()
+        }
     }
 
     // MARK: - Parts
@@ -398,13 +405,11 @@ struct LinksChecklistSheet: View {
             Text(LinksChecklistWording.published(count: String(count), pages: LinksChecklistWording.pageWord(count)))
                 .fixedSize(horizontal: false, vertical: true)
             ForEach(outcome.changedSince, id: \.self) { name in
-                Text(LinksChecklistWording.pageChangedSince(name: name))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(LinksChecklistWording.pageChangedSince(name: name))
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !outcome.declined.isEmpty {
-                Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: outcome.declined))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: outcome.declined))
                     .fixedSize(horizontal: false, vertical: true)
             }
         case .problem(let sentence):

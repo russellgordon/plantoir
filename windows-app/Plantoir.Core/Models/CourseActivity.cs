@@ -8,7 +8,9 @@ namespace Plantoir.Core.Models;
 /// mid-copy of those very files; the Add Section entry points decline while
 /// their course is busy anywhere. Mirrors the mac app's CourseActivity
 /// (row 104). The same code in a different working folder is a different
-/// course, so every question carries the folder path.
+/// course, so every question carries the folder path — and one folder however
+/// it is spelled is one folder: every comparison goes through
+/// <see cref="WorkingFolder.IsTheSame"/>, never <c>==</c> (#769, mac #189).
 /// </summary>
 public static class CourseActivity
 {
@@ -67,15 +69,20 @@ public static class CourseActivity
     public static QuitConfirmation.UnderWay UnderWay()
     {
         lock (_gate)
-            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Count, 0);
+            // Each section once however many starts hold a claim on it
+            // (previewBuildRecord.rule, #928): a window's start beside the
+            // assistant's rebuild is one preview being built — and one folder
+            // however it is spelled, through SectionKey (#769).
+            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Select(b => SectionKey.For(b.FolderPath, b.CourseCode, b.SectionNumber)).Distinct().Count(), 0,
+                                                 DeployedFolderShows.Shared.Count);
     }
 
     public static bool IsPreviewing(string folderPath, string courseCode) =>
-        PreviewLeases.Active.Any(l => l.FolderPath == folderPath && l.CourseCode == courseCode);
+        PreviewLeases.Active.Any(l => WorkingFolder.IsTheSame(l.FolderPath, folderPath) && l.CourseCode == courseCode);
 
     public static bool IsPublishing(string folderPath, string courseCode)
     {
-        lock (_gate) return _publishes.Any(p => p.FolderPath == folderPath && p.CourseCode == courseCode);
+        lock (_gate) return _publishes.Any(p => WorkingFolder.IsTheSame(p.FolderPath, folderPath) && p.CourseCode == courseCode);
     }
 
     /// <summary>
@@ -89,7 +96,7 @@ public static class CourseActivity
     public static bool IsPublishingSection(string folderPath, string courseCode, int sectionNumber)
     {
         lock (_gate)
-            return _publishes.Any(p => p.FolderPath == folderPath && p.CourseCode == courseCode &&
+            return _publishes.Any(p => WorkingFolder.IsTheSame(p.FolderPath, folderPath) && p.CourseCode == courseCode &&
                                        p.SectionNumber == sectionNumber);
     }
 
@@ -113,6 +120,14 @@ public static class CourseActivity
         Assist.WorkLease.IsHeld(folderPath, courseCode, Assist.WorkLease.Building);
 
     /// <summary>
+    /// The reason under an item greyed while this course deploys (the mac's
+    /// <c>CourseActivity.availableOnceDeployCompleted</c>); the deployed folder's
+    /// Open in Browser shows it too (#889, <c>offeredCases</c> "a deploy of the
+    /// section is running").
+    /// </summary>
+    public const string AvailableOnceDeployCompleted = "Available once deploy completed";
+
+    /// <summary>
     /// The short line naming what stands in the way of structural work on
     /// this course, or null when it is free.
     /// </summary>
@@ -122,7 +137,7 @@ public static class CourseActivity
         bool publishing = IsPublishing(folderPath, courseCode);
         if (previewing && publishing) return "Available once preview and deploy complete";
         if (previewing) return "Available once preview completed";
-        if (publishing) return "Available once deploy completed";
+        if (publishing) return AvailableOnceDeployCompleted;
         // Said in the app's voice, naming the thing the teacher started rather
         // than the process that holds the lease — and since #468 naming WHICH
         // thing: an outside session, or this app's own assistant window.

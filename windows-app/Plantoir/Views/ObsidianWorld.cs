@@ -47,10 +47,13 @@ public sealed class ObsidianWorld : IObsidianWorld
     // The page, when one is named, goes in through FolderActions' own page
     // door (`page ?? ObsidianTarget(...)`, #329's How I Teach door) - never
     // the folder door, which looks for <page>/index.md and opens the vault (#681).
-    public Task OpenAsync(string folder, string vault, string? page = null) =>
+    public Task<bool> OpenAsync(string folder, string vault, string? page = null) =>
         FolderActions.OpenInObsidian(folder, vault, BundledToolchain.SupportPath("obsidian_defaults/.obsidian"), page);
 
     public Task QuitAndWaitAsync() => FolderActions.QuitObsidianAndWait();
+
+    public Task<bool> CloseAndRegisterAsync(string vault) =>
+        FolderActions.CloseObsidianAndRegister(vault, BundledToolchain.SupportPath("obsidian_defaults/.obsidian"));
 
     public Task ReopenAsync(IReadOnlyList<string> vaultPaths) => FolderActions.ReopenVaults(vaultPaths);
 
@@ -85,7 +88,8 @@ public sealed class ObsidianWorld : IObsidianWorld
         {
             Title = ObsidianFigureAddOnsWording.OfferTitle,
             Content = new StackPanel { Children = { message, dontAsk }, MaxWidth = 460 },
-            PrimaryButtonText = ObsidianFigureAddOnsWording.OfferAdd,
+            // "Close Obsidian and Add Them" whenever this yes closes Obsidian (#1003).
+            PrimaryButtonText = request.AddButtonTitle,
             CloseButtonText = ObsidianFigureAddOnsWording.OfferNotNow,
             DefaultButton = ContentDialogButton.Primary,
         };
@@ -97,7 +101,7 @@ public sealed class ObsidianWorld : IObsidianWorld
         return dontAsk.IsChecked == true ? ObsidianFigureAddOnsTrail.Answered.NotNowDontAskAgain : ObsidianFigureAddOnsTrail.Answered.NotNow;
     }
 
-    /// <summary>The reopen question: Reopen Obsidian (the default) or Later. Escape is Later.</summary>
+    /// <summary>The reopen question: Close and Reopen Obsidian (the default) or Not Now. Escape is Not Now.</summary>
     public async Task<bool> AskReopenAsync(ObsidianAddOnsRequest request)
     {
         var dialog = new ContentDialog
@@ -115,5 +119,55 @@ public sealed class ObsidianWorld : IObsidianWorld
         };
         AutomationProperties.SetAutomationId(dialog, "obsidianReopenForAddOns");
         return _show is not null && await _show(dialog) == ContentDialogResult.Primary;
+    }
+
+    /// <summary>
+    /// "Close Obsidian to open {course}?" (#1003, the mac's #995; Russell's
+    /// ruling Q13 on #975): the sentence and its three facts, then Close
+    /// Obsidian and Open (the default: it is what the teacher pressed Open in
+    /// Obsidian for, HIG Alerts) and Cancel. Escape, and closing the dialog
+    /// any other way, is Cancel. With no window to ask in, nothing closes.
+    /// </summary>
+    public async Task<bool> AskClosingAsync(ObsidianClosingRequest request)
+    {
+        var message = new TextBlock
+        {
+            Text = ObsidianClosingWording.MessageText(request.Course.Code),
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 460,
+        };
+        AutomationProperties.SetAutomationId(message, "obsidianClosingMessage");
+        var dialog = new ContentDialog
+        {
+            Title = ObsidianClosingWording.TitleText(request.Course.Code),
+            Content = message,
+            PrimaryButtonText = ObsidianClosingWording.CloseAndOpen,
+            CloseButtonText = ObsidianClosingWording.Cancel,
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        AutomationProperties.SetAutomationId(dialog, "obsidianClosingQuestion");
+        return _show is not null && await _show(dialog) == ContentDialogResult.Primary;
+    }
+
+    /// <summary>
+    /// "Could not open {course} in Obsidian" (Russell's ruling 2 on #995): one
+    /// sentence and OK, as the rename's "Could not rename course" says it.
+    /// </summary>
+    public async Task ShowCouldNotOpenAsync(ObsidianClosingRequest request, ObsidianClosingTrail.Outcome outcome)
+    {
+        if (_show is null) return;
+        var dialog = new ContentDialog
+        {
+            Title = ObsidianClosingWording.Filling(ObsidianClosingWording.CouldNotOpenTitle, request.Course.Code),
+            Content = new TextBlock
+            {
+                Text = ObsidianClosingWording.CouldNotOpenText(outcome, request.Course.Code),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 460,
+            },
+            CloseButtonText = ObsidianClosingWording.CouldNotOpenOk,
+        };
+        AutomationProperties.SetAutomationId(dialog, "obsidianCouldNotOpen");
+        await _show(dialog);
     }
 }

@@ -107,5 +107,5 @@ Many of these choices can be changed later in the course's settings. See [Change
 ## If it does not work
 
 - **{{menu:newCourse}} is greyed.** No working folder is open, or the folder is still being made ready.
-- **Orange text shows under the course code.** The code cannot be used, and the text says why.
+- **A sentence shows under the course code.** The code cannot be used, and the text says why.
 - **Red text shows beside {{control:newCourseSheetCreateCourse}}.** Something in the form needs attention, and the text says what. One example: the course deploys to a folder on this {{machine}} and no folder is chosen yet.

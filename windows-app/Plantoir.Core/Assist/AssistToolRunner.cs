@@ -72,8 +72,12 @@ public sealed class AssistToolRunner
     /// <see cref="ShowPreviewInApp"/>, which does nothing while a preview is
     /// serving, and still answered "rebuilding" (the plan's finding 0.7). Null
     /// falls back to <see cref="ShowPreviewInApp"/>.
+    /// <para>Its answer (#928 review 2, M3): null when the start went ahead,
+    /// otherwise the sentence the window is showing under "Cannot Preview
+    /// Yet" (another window is previewing the section, say). The answer is
+    /// that sentence then, never "rebuilding".</para>
     /// </summary>
-    public Action? RebuildPreviewInApp { get; init; }
+    public Func<Task<string?>>? RebuildPreviewInApp { get; init; }
 
     public Action? StartDeployInApp { get; init; }
     public Func<Task<string?>>? StartDeployInAppAsync { get; init; }
@@ -110,6 +114,14 @@ public sealed class AssistToolRunner
     /// interleave two undo lists on one section.
     /// </summary>
     public Func<bool>? SectionIsChangingFromTheMenu { get; init; }
+
+    /// <summary>
+    /// What the course calls its class pages: the refusal above names "the
+    /// Section or Meetings menu" in a club (#990). REQUIRED, with no default
+    /// (#990 review 3, low 3): a site that forgot it would give a club "the
+    /// Section or Classes menu" and still compile.
+    /// </summary>
+    public required ClassNoun CourseNoun { get; init; }
 
     /// <summary>
     /// Whether a copy of the course is being saved right now (the work lease's
@@ -209,7 +221,7 @@ public sealed class AssistToolRunner
         // is backed up or written, so two undo lists never interleave on one
         // section. The menu itself, and every read, go ahead.
         if (Surface == AssistSurface.LocalWindow && IsWriteTool(name) && SectionIsChangingFromTheMenu?.Invoke() == true)
-            return Handed(AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString()));
+            return Handed(AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString(), CourseNoun));
 
         // #690: Open in Obsidian is answered by the APP, by pressing the
         // section window's own button (#681's route), never by the server,
@@ -236,7 +248,11 @@ public sealed class AssistToolRunner
         {
             // REBUILD, not show (#489, Q1): a serving preview is stopped and
             // started again, so "rebuilding" is true.
-            if (RebuildPreviewInApp is not null) RebuildPreviewInApp.Invoke();
+            if (RebuildPreviewInApp is not null)
+            {
+                if (await RebuildPreviewInApp.Invoke() is { } refused)
+                    return (AssistToolAnswer.Same(refused) with { ShownInTheWindow = true }, true);
+            }
             else ShowPreviewInApp!.Invoke();
             return Handed(AssistWording.PreviewIsRebuilding(_courseCode, _section.ToString()));
         }

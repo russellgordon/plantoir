@@ -24,7 +24,7 @@ namespace Plantoir.Tests;
 public class OutsideDoorTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
-    private readonly string _scratch = Directory.CreateTempSubdirectory("plantoir-door").FullName;
+    private readonly string _scratch = RunOwnedTempFolders.Create("plantoir-door-");
     private readonly string _folder;
 
     public OutsideDoorTests(ITestOutputHelper output)
@@ -203,9 +203,9 @@ public class OutsideDoorTests : IDisposable
     public void TheLongestShimLineAllowedArrivesWhole_AndOneMoreIsRefused()
     {
         foreach (bool old in new[] { false, true })
-        foreach (int depth in new[] { 1, 180 })
+        foreach (int depth in new[] { 1, DeepShimFolderLength })
         {
-            string shim = StubShimIn(new string('d', depth), "claude.cmd", old);
+            string shim = depth == 1 ? StubShimIn("d", "claude.cmd", old) : StubShimInDeepFolder("claude.cmd", old);
             int most = OutsideDoor.LimitFor(shim);
             var longest = WithLineLength(shim, most);
             Assert.Equal(most, OutsideDoor.LineLength(shim, longest));
@@ -224,7 +224,7 @@ public class OutsideDoorTests : IDisposable
     [Fact]
     public void FixWithDropsRowsToTheShimsRealBound()
     {
-        string shim = StubShimIn(new string('d', 180), "claude.cmd", oldShape: false);
+        string shim = StubShimInDeepFolder("claude.cmd", oldShape: false);
         var rows = Enumerable.Range(1, 10).Select(n => new SectionProblemRow
         {
             Id = "r" + n, Kind = "printPdfNotFound", Page = $"Unit {n}/" + new string('\u00e9', 280),
@@ -249,11 +249,46 @@ public class OutsideDoorTests : IDisposable
         return sent;
     }
 
+    /// <summary>
+    /// The deep shim folder's whole length, in characters, drive letter
+    /// included: the 240-character folder <see cref="OutsideDoor.ShimExpansionAllowance"/>
+    /// was measured from. Chosen HERE, not by the machine (#971): it used to be
+    /// 180 characters below <c>%TEMP%</c>, so the account name decided how
+    /// long the stub's path was, and under <c>russellgordon</c> it passed the
+    /// stub's own limit (<see cref="StubStartsFromAtMost"/>) and nothing arrived.
+    /// </summary>
+    private const int DeepShimFolderLength = 240;
+
+    /// <summary>
+    /// The longest full path the stub <c>node.exe</c> starts from. It is a
+    /// .NET Framework 4.8 program (<see cref="StubProgramCollection"/>);
+    /// measured 2026-11-14 in the Windows ARM VM, started directly with no cmd
+    /// and no shim, it ran from a path of 252 characters and exited -1,
+    /// silently, from 253 up (#971). Real npm <c>claude.cmd</c> sits about 40
+    /// deep and real <c>node.exe</c> is native, so this is the stub's limit,
+    /// not the product's.
+    /// </summary>
+    private const int StubStartsFromAtMost = 252;
+
+    /// <summary>A shim and its stub <c>node.exe</c> in a folder exactly <see cref="DeepShimFolderLength"/> long, whatever <c>%TEMP%</c> is.</summary>
+    private string StubShimInDeepFolder(string name, bool oldShape)
+    {
+        int padding = DeepShimFolderLength - (_scratch.Length + 1);
+        Assert.True(padding >= 1,
+            $"this run's scratch folder {_scratch} is {_scratch.Length} characters, too long to hold a {DeepShimFolderLength}-character shim folder");
+        string shim = StubShimIn(new string('d', padding), name, oldShape);
+        Assert.Equal(DeepShimFolderLength, Path.GetDirectoryName(shim)!.Length);
+        return shim;
+    }
+
     private string StubShimIn(string sub, string name, bool oldShape)
     {
         string original = StubShim(name, oldShape);
         string folder = Directory.CreateDirectory(Path.Combine(_scratch, sub)).FullName;
-        File.Copy(Path.Combine(Path.GetDirectoryName(original)!, "node.exe"), Path.Combine(folder, "node.exe"), overwrite: true);
+        string stub = Path.Combine(folder, "node.exe");
+        Assert.True(stub.Length <= StubStartsFromAtMost,
+            $"the stub node.exe's path is {stub.Length} characters, over the {StubStartsFromAtMost} it can start from: {stub}");
+        File.Copy(Path.Combine(Path.GetDirectoryName(original)!, "node.exe"), stub, overwrite: true);
         string shim = Path.Combine(folder, name);
         File.Copy(original, shim, overwrite: true);
         return shim;

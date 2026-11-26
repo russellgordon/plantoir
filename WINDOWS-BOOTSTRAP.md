@@ -70,10 +70,11 @@ pieces into `dev`; a cut still starts with him asking.
    page that explains it. Read the page an issue names rather than all of them.
    Write-ups for work that already shipped on this port are in
    `documentation/13-windows-port-archive.md` — history, not a specification.
-4. **`contracts/README.md`**, then the eleven JSON files. The coverage table
-   there says what is shared and what deliberately is not. Three of the eleven
-   are GENERATED from the mac and one (`undo-traces.json`) by
-   `scripts/make_undo_traces.py`, and none of those four is hand-edited; the other seven are
+4. **`contracts/README.md`**, then the thirteen JSON files. The coverage table
+   there says what is shared and what deliberately is not. Three of the thirteen
+   are GENERATED from the mac, one (`undo-action-steps.json`) by the mac's
+   `UndoActionStepsTests`, and one (`undo-traces.json`) by
+   `scripts/make_undo_traces.py`, and none of those five is hand-edited; the other eight are
    authored and can be corrected from either side — `contracts/README.md` says
    which is which.
 5. **`GUI-IMPROVEMENTS.md`**, newest rows first, for what changed up to
@@ -143,7 +144,7 @@ reasons rather than tasks:
   arguments changing on the mac arrived here looking like it came from nowhere.
   Only `assist-cases.json` and `app-rules.json` carry that key, because they
   are the two MIXED files and it marks the boundary; `assist-wording.json` is
-  generated in full and says so in its `note`, and the seven authored files
+  generated in full and says so in its `note`, and the eight authored files
   have no generated half to mark.
 - **A red contract test is usually a HANDOVER arriving, and the issue naming it
   is often already open.** The mac opens a `windows` issue in the session it
@@ -259,6 +260,33 @@ dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
 
+**Two prerequisites a fresh machine lacks (#964).** Found setting up a new
+Windows 11 machine in 2026-11 (ARM64, Python 3.14.10 from python.org with no
+extra packages); without them the suite does not match the development PC:
+
+- **`python-frontmatter` for the `python` on PATH** (`python -m pip install
+  python-frontmatter`). `CopyAPageFuzzTests` asks the website builder's own
+  code about each page on PATH's Python, and without the package that test
+  fails in seconds, saying "No module named 'frontmatter'" and naming
+  `python-frontmatter` (until #964 it hung the suite for half an hour).
+- **The symbolic-link privilege: turn on Developer Mode** (Settings ▸ System ▸
+  For developers), or hold `SeCreateSymbolicLinkPrivilege` another way.
+  Without it `scripts/test_site_files.py`'s
+  `test_media_reached_through_a_link_is_read` fails with WinError 1314.
+
+**A runtime fetched before #1010 needs `fetch-runtime.ps1` once more.** The
+build refuses it ("does not carry the Visual C++ runtime 14.52.37029.0 ...
+beside node.exe", or, for a runtime that has the `node.exe` copy only, "not
+beside the native modules that import it"); the re-run places one file,
+`vcruntime140.dll`, beside `node.exe` and beside the lightningcss and Typst
+compiler modules in `runtime\quartz\node_modules`. The file comes from
+Microsoft's own Visual C++ Redistributable (about 18 MB, downloaded and taken
+apart, never run, no administrator rights; #1010) and is kept in
+`windows-app\Vendor\vc-runtime`, so later repairs download nothing. Without it the website builder's native modules do not
+load on a PC that lacks the Visual C++ redistributable, and the development
+PC, which has it, would never show it (`documentation/12-windows-app.md` →
+"The Visual C++ runtime beside node.exe (#965)").
+
 **Read the TOTALS line, not the exit code.** `dotnet test` exits 1 for a failing
 test, for a test host that DIED underneath the run, and for a project that did
 not compile; only the output tells them apart, and a dead host prints no totals
@@ -349,9 +377,18 @@ Split it in two:
   none is; `TheSharedTestsRunOnTheRuntimesPythonWhenOneIsFetched` prints which,
   with its version and OpenSSL. (Before, they ran on PATH's interpreter while
   teachers ran 3.11.9, so the gate had never run them on what ships.) With 93
-  files the run takes about five minutes, not eight seconds. The image's 3.11
+  files the run takes about five minutes, not eight seconds; with 119, on
+  2026-11-14, about eleven minutes alone (10 min 41 s), and each file may run 600 s before it is
+  stopped as hung (#916, `documentation/12-windows-app.md` → "A red that is a
+  busy PC"). The image's 3.11
   is held only by `RuntimePythonTests.TheSharedScriptsParseAsPython311` (a
   grammar check with known limits — `documentation/02-docker-image.md`).
+  **Since #886 it also runs Plantoir Help's `help/tests/test_*.py`**
+  (`SharedHelpTestFilePasses`), discovered the same way, from the
+  repository root as `verify.sh` runs them, with the runtime's `node` on
+  PATH so the search tests run; only the Mac Help book's `hiutil` tests
+  skip. Seven files, about two and a half minutes
+  (`documentation/12-windows-app.md` → "Plantoir Help on Windows").
 - **The IMAGE is not, because Windows has no image at all.** It carries its
   own runtime and builds natively, so a publish driven through the app here
   exercises the bundled runtime, not the image. A change to the Dockerfile or

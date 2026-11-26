@@ -1628,8 +1628,100 @@ enum AssistPublishPlanner {
         _ plan: AssistPublishPlan,
         forSection sectionNumber: Int,
         in course: Course,
-        repointsTheFrontPage: Bool = true
+        repointsTheFrontPage: Bool = true,
+        by maker: UndoStepMaker? = nil,
+        planningAlso: ((JournaledStep) -> Void)? = nil
     ) throws -> (change: AssistChange, leftAlone: [String]) {
+        // ONE step through the door (#899, U3): every page planned first,
+        // then written together, all or none (`JournaledStep`).
+        let step: JournaledStep = JournaledStep(
+            course: course, section: sectionNumber,
+            maker: maker ?? UndoStepMaker.sheet(plan.publishes ? "publishPages" : "hidePages")
+        )
+        let planned: PlannedWrites = try planWrites(plan, forSection: sectionNumber, in: course, into: step)
+        // What the action writes beside the pages, in the same step, read
+        // as the pages will be (Publish Class for a Date's kept record).
+        if let planningAlso {
+            step.whilePlanning {
+                planningAlso(step)
+            }
+        }
+        // The front page is the rule's, never content of the step: named
+        // as a `recompute` op and repointed below, after the pages.
+        if repointsTheFrontPage {
+            step.keepsTheFrontPageTrue(
+                of: sectionNumber, at: SectionIndexPointer.indexURL(forSection: sectionNumber, in: course)
+            )
+        }
+        // All the pages or none: a page that cannot be read stops the plan
+        // above before anything is written, and the door writes every page
+        // together, so `StoppedAfterWriting` is no longer thrown from here.
+        try step.make()
+        var saved: [AssistSavedFile] = planned.saved
+
+        // The section's landing page follows its most recent visible class.
+        //
+        // Done HERE rather than in the tool, so it lands inside the same
+        // `AssistChange` as the pages themselves — which means "Undo that"
+        // takes the index back with them. An undo that restored the lessons
+        // and left the front page pointing at the wrong one would be a worse
+        // state than either.
+        //
+        // Not for the links checklist (#379, the director's ruling F1): a
+        // class ticked there is published because a link leads to it, and
+        // the front page keeps following the class it follows today.
+        if repointsTheFrontPage,
+           let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
+            saved.append(repointed)
+        }
+        let change: AssistChange = AssistPublishPlanner.change(
+            for: plan, forSection: sectionNumber, saved: saved, movedTitles: planned.movedTitles
+        )
+        return (change: change, leftAlone: planned.leftAlone)
+    }
+
+    /// What `planWrites` planned: the files as today's history keeps them,
+    /// the titles whose visibility moved, and the pages declined (#186).
+    struct PlannedWrites {
+
+        // MARK: - Stored properties
+
+        let saved: [AssistSavedFile]
+
+        let movedTitles: [String]
+
+        let leftAlone: [String]
+    }
+
+    /// The change today's history records for a plan's written files.
+    static func change(
+        for plan: AssistPublishPlan,
+        forSection sectionNumber: Int,
+        saved: [AssistSavedFile],
+        movedTitles: [String]
+    ) -> AssistChange {
+        return AssistChange(
+            whatHappened: "\(plan.verb)ed "
+                + AssistPublishPlanner.namingWhatMoved(movedTitles: movedTitles, savedCount: saved.count),
+            courseCode: plan.courseCode,
+            sectionNumber: sectionNumber,
+            // Publishing and hiding rebuild the preview, so taking them back
+            // has to rebuild it too — that was the whole complaint.
+            rebuildsThePreview: true,
+            files: saved
+        )
+    }
+
+    /// Plans the plan's pages into a step, reading each page through it (so
+    /// a page an earlier plan of the same step changed is read as it will
+    /// be), and writes nothing: the caller makes the step. The front page
+    /// is not repointed here.
+    static func planWrites(
+        _ plan: AssistPublishPlan,
+        forSection sectionNumber: Int,
+        in course: Course,
+        into step: JournaledStep
+    ) throws -> PlannedWrites {
         // Every file this plan touches, gathered first, so a page that both
         // changes visibility and moves date is written once.
         var editsByPath: [String: (url: URL, isSectionLocal: Bool)] = [:]
@@ -1672,7 +1764,7 @@ enum AssistPublishPlanner {
                 guard let edit = editsByPath[path] else {
                     continue
                 }
-                let before: String = try String(contentsOf: edit.url, encoding: .utf8)
+                let before: String = try step.readTextOrThrow(edit.url)
                 var text: String = before
                 var declined: Bool = false
                 var visibilityMoved: Bool = false
@@ -1712,46 +1804,14 @@ enum AssistPublishPlanner {
                 if text == before {
                     continue
                 }
-                try text.write(to: edit.url, atomically: true, encoding: .utf8)
+                step.write(text, to: edit.url)
                 saved.append(AssistSavedFile(fileURL: edit.url, before: before, after: text))
                 if visibilityMoved {
                     movedTitles.append(title)
                 }
             }
-        } catch {
-            if saved.isEmpty {
-                throw error
-            }
-            throw StoppedAfterWriting(filesWritten: saved.count, underlying: error)
         }
-
-        // The section's landing page follows its most recent visible class.
-        //
-        // Done HERE rather than in the tool, so it lands inside the same
-        // `AssistChange` as the pages themselves — which means "Undo that"
-        // takes the index back with them. An undo that restored the lessons
-        // and left the front page pointing at the wrong one would be a worse
-        // state than either.
-        //
-        // Not for the links checklist (#379, the director's ruling F1): a
-        // class ticked there is published because a link leads to it, and
-        // the front page keeps following the class it follows today.
-        if repointsTheFrontPage,
-           let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
-            saved.append(repointed)
-        }
-
-        let change: AssistChange = AssistChange(
-            whatHappened: "\(plan.verb)ed "
-                + AssistPublishPlanner.namingWhatMoved(movedTitles: movedTitles, savedCount: saved.count),
-            courseCode: plan.courseCode,
-            sectionNumber: sectionNumber,
-            // Publishing and hiding rebuild the preview, so taking them back
-            // has to rebuild it too — that was the whole complaint.
-            rebuildsThePreview: true,
-            files: saved
-        )
-        return (change: change, leftAlone: leftAlone)
+        return PlannedWrites(saved: saved, movedTitles: movedTitles, leftAlone: leftAlone)
     }
 
     /// What to call the thing that moved, for a sentence read back to the
@@ -1773,7 +1833,7 @@ enum AssistPublishPlanner {
     /// the writer learned to decline a page it cannot change safely, and an
     /// undo labelled "unpublished Unit 4, Day 23" about a page nothing was
     /// written to would be the claim this piece removes.
-    private static func namingWhatMoved(movedTitles names: [String], savedCount: Int) -> String {
+    static func namingWhatMoved(movedTitles names: [String], savedCount: Int) -> String {
         if names.count == 1 {
             return names[0]
         }
@@ -1881,9 +1941,9 @@ enum AssistToolRefusal: LocalizedError, Equatable {
             // — in a sentence that goes straight to the teacher, since a
             // refusal ends the turn rather than going back to the model. The
             // way out is now said in the words the window already offers.
-            return "I can't find a class on \(day.weekdayName), \(day.text), in \(code) "
-                 + "Section \(number). Ask me what dates you are teaching to see the ones I know "
-                 + "about, or tell me the name of the class page you meant."
+            return AssistWording.noClassOnThatDay(
+                weekday: day.weekdayName, date: day.text, code: code, number: number
+            )
         case .unreadableDate(let raw, let which):
             return "“\(raw)” isn't a date \(which) can use. Give it as YYYY-MM-DD, for example 2026-09-15."
         case .unreadableTime(let raw):

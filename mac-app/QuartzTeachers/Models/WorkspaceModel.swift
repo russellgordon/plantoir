@@ -468,6 +468,10 @@ class WorkspaceModel {
     /// "Reopen Obsidian to show diagrams and graphs?" (#495), the same way.
     var obsidianReopenRequest: ObsidianAddOnsRequest?
 
+    /// "Close Obsidian to open {course}?" (#995), the same way: asked before
+    /// Plantoir closes a running Obsidian to add a course it has never seen.
+    var obsidianClosingRequest: ObsidianClosingRequest?
+
     /// What Open in Obsidian asks of Obsidian and the disk (#495) —
     /// replaced only by a test, so the route can be driven without reaching
     /// the teacher's Obsidian.
@@ -2433,6 +2437,16 @@ class WorkspaceModel {
         return CourseActivity.courseIsBeingCopied(folderPath: workspacePath, courseCode: courseCode)
     }
 
+    /// Whether a Rename folder of this course is under way, in any window
+    /// (#899 U4b). While it is, the course's Preview and Deploy are greyed
+    /// and refuse, as for a copy being zipped.
+    func isRenamingAFolder(_ courseCode: String) -> Bool {
+        guard let workspacePath = workspaceURL?.path else {
+            return false
+        }
+        return CourseActivity.courseIsRenamingAFolder(folderPath: workspacePath, courseCode: courseCode)
+    }
+
     /// Saves a copy of a whole course, then reloads so the Backups group
     /// shows it — opened, so the new row is visible feedback.
     ///
@@ -2540,6 +2554,11 @@ class WorkspaceModel {
     func structuralRefusal(courseCode: String, act: String, whenBusy: String) -> String? {
         guard let workspacePath = workspaceURL?.path else {
             return nil
+        }
+        // A Rename folder of the course under way in any window (#899 U4b):
+        // said as itself, since `whenBusy` names a preview or a deploy.
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workspacePath, courseCode: courseCode) {
+            return CourseActivity.folderRenameIsUnderWay(course: courseCode)
         }
         if CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: courseCode) {
             return whenBusy
@@ -3062,7 +3081,7 @@ class WorkspaceModel {
             madeFor = nil
         case .assistant(let sectionNumber):
             madeFor = sectionNumber
-        case .menu(let sectionNumber):
+        case .menu(let sectionNumber, _):
             madeFor = sectionNumber
         }
         guard let sectionNumber = madeFor else {
@@ -3215,7 +3234,7 @@ class WorkspaceModel {
             madeFor = nil
         case .assistant(let number):
             madeFor = number
-        case .menu(let number):
+        case .menu(let number, _):
             madeFor = number
         }
         if madeFor != sectionNumber {
@@ -3746,6 +3765,21 @@ class WorkspaceModel {
             return AssistWording.backupSizeCouldNotBeReadShort
         }
         return sizeDescription(of: item)
+    }
+
+    /// What the course with this code calls its class pages, for a sentence
+    /// about one of its backups that names the Classes menu by the title
+    /// that course's menu bar gives it (Meetings in a club, #990). A backup
+    /// of a course no longer in the folder is read by its code: a club's
+    /// code means a club, whose pages are meetings.
+    func classNoun(ofCourse code: String) -> ClassNoun {
+        for course in courses where course.code.lowercased() == code.lowercased() {
+            return course.configuration.classNoun
+        }
+        if ClubCodeRule.isClub(code) {
+            return .meeting
+        }
+        return .class
     }
 
     /// "15.9 MB" for one backup, `AssistWording.backupSizeCouldNotBeRead` for

@@ -59,22 +59,6 @@ extension SectionDetailView {
         }
     }
 
-    /// The reason line under Section ▸ Open in Browser, when the deployed
-    /// folder is what it would open and it is greyed for a reason.
-    var deployedFolderMenuReason: String? {
-        if previewURL != nil {
-            return nil
-        }
-        guard let lookup = deployedFolderLookup, case .greyed(let reasonKey) = lookup.decision, let reasonKey else {
-            return nil
-        }
-        // While a deploy runs the Section menu already says it once.
-        if reasonKey == "deployIsRunning" {
-            return nil
-        }
-        return DeployedFolderOffer.sentence(forReasonKey: reasonKey)
-    }
-
     // MARK: - Functions
 
     /// Reads the facts again. Called on events, never on a clock: the
@@ -145,8 +129,15 @@ extension SectionDetailView {
         guard let folder = workingFolderPathForTheDeployedFolder else {
             return
         }
-        DeployedFolderShows.shared.stop(courseCode: course.code, sectionNumber: sectionNumber, workingFolderPath: folder)
-        refreshTheDeployedFolder()
+        let courseCode: String = course.code
+        let number: Int = sectionNumber
+        // The show leaves the list at once, so the notice goes as soon as
+        // Stop is pressed; the look-up runs again once the address is free
+        // (#1013).
+        Task { @MainActor in
+            await DeployedFolderShows.shared.stop(courseCode: courseCode, sectionNumber: number, workingFolderPath: folder)
+            refreshTheDeployedFolder()
+        }
     }
 
     /// The notice, while shown or after the folder went away.

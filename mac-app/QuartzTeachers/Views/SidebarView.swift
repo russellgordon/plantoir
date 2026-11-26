@@ -177,7 +177,8 @@ struct SidebarView: View {
                             CourseRowLabel(
                                 course: course,
                                 isBeingRenamed: renamingCourseCode == course.code,
-                                isBeingCopied: workspace.isBeingCopied(course.code)
+                                isBeingCopied: workspace.isBeingCopied(course.code),
+                                isRenamingAFolder: workspace.isRenamingAFolder(course.code)
                             )
                                 .tag(SidebarSelection.course(course.code))
                                 .accessibilityIdentifier("sidebar-\(course.code)")
@@ -235,22 +236,11 @@ struct SidebarView: View {
                         // The total beside the name, once every backup has
                         // been measured — the space is what a teacher could
                         // not see before (#242).
-                        HStack {
-                            Text("Backups")
-                            Spacer()
-                            if workspace.backupSpace.isComplete {
-                                Text(BackupSizes.description(ofBytes: workspace.backupSpace.bytesTaken))
-                                    .foregroundStyle(.secondary)
-                                    .accessibilityIdentifier("backupsTotal")
-                            }
-                        }
-                        // `.contain` (#353). A List section's header is merged into ONE
-                        // static text, so two identifiers cannot both reach the tree:
-                        // with an identifier on the header as well, the text read
-                        // "backupsGroup-backupsGroup" and `backupsTotal` was dead (read
-                        // off the real tree, 2026-09-26). The header's own was dropped;
-                        // nothing read it.
-                        .accessibilityElement(children: .contain)
+                        BackupsSectionHeader(
+                            total: workspace.backupSpace.isComplete
+                                ? BackupSizes.description(ofBytes: workspace.backupSpace.bytesTaken)
+                                : nil
+                        )
                     }
                 }
 
@@ -411,6 +401,7 @@ struct SidebarView: View {
             }
             Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { request in
             Text(request.message)
         }
@@ -424,6 +415,7 @@ struct SidebarView: View {
             }
             Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { item in
             Text(restoreMessage(for: item))
         }
@@ -445,17 +437,20 @@ struct SidebarView: View {
                 }
                 Button("Cancel", role: .cancel) {
                 }
+                .keyboardShortcut(.cancelAction)
             } else {
                 Button("Restore") {
                     Task { await workspace.restoreBackup(item) }
                 }
                 Button("Cancel", role: .cancel) {
                 }
+                .keyboardShortcut(.cancelAction)
             }
         } message: { item in
             if let sectionNumber = workspace.backupRestoreOfferedSection {
                 Text(OneSectionRestoreWording.message(
-                    section: sectionNumber, madeBy: item.maker.description, when: item.whenDescription
+                    section: sectionNumber, madeBy: item.maker.description(noun: workspace.classNoun(ofCourse: item.courseCode)),
+                    when: item.whenDescription
                 ))
             } else {
                 Text("""
@@ -481,6 +476,7 @@ struct SidebarView: View {
             }
             Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { item in
             Text(singleBackupDeleteMessage(for: item))
         }
@@ -494,6 +490,7 @@ struct SidebarView: View {
             }
             Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { item in
             // The app knows what deleting would leave behind — the live
             // course, another archive or backup, or nothing at all — so
@@ -603,14 +600,23 @@ struct SidebarView: View {
             }
         }
         .alert(
-            "Cancel this scheduled deploy?",
+            ScheduledDeployRemovalWording.question,
             isPresented: cancelScheduleRequestIsPresented,
             presenting: cancelScheduleRequest
         ) { request in
-            Button("Cancel It", role: .destructive) {
-                cancelScheduledDeploy(request)
+            // Cancel leads and answers Escape; Remove trails (#987, Russell
+            // 2026-11-18). Cancel, not "Leave It Scheduled": the teacher
+            // started this, and Alerts says "Always use 'Cancel' to title a
+            // button that cancels the alert's action." Remove, so the two
+            // buttons do not share a verb (until #987 both said cancel). Remove keeps the
+            // destructive role, the only way a SwiftUI alert's action takes
+            // no Return (`AlertKeysTests`); whether these alerts stay red is
+            // open, #1000.
+            Button(ScheduledDeployRemovalWording.cancelButton, role: .cancel) {
             }
-            Button("Leave It Scheduled", role: .cancel) {
+            .keyboardShortcut(.cancelAction)
+            Button(ScheduledDeployRemovalWording.removeButton, role: .destructive) {
+                cancelScheduledDeploy(request)
             }
         } message: { request in
             Text(cancelMessage(for: request))
@@ -703,8 +709,7 @@ struct SidebarView: View {
                 Label("Section \(sectionNumber)", systemImage: "doc.richtext")
                 Spacer()
                 if stoppedPublish != nil || hasProblems {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                    SectionRowWarningBadge()
                         .accessibilityIdentifier(
                             SidebarView.warningIdentifier(
                                 courseCode: courseCode,
@@ -727,6 +732,9 @@ struct SidebarView: View {
                             SidebarView.clockIdentifier(courseCode: courseCode, sectionNumber: sectionNumber)
                         )
                         .help(SidebarView.scheduledDeployTooltip(for: scheduledFor))
+                        // The same sentence twice, as on the warning badge
+                        // above (#993, D18).
+                        .accessibilityLabel(Text(SidebarView.scheduledDeployTooltip(for: scheduledFor)))
                 }
             }
         } else {
@@ -824,6 +832,8 @@ struct SidebarView: View {
             TextField("Filter", text: $workspace.filterText)
                 .borderedTextField()
                 .controlSize(.small)
+                // Its placeholder is not a name (#993, D18): the same word.
+                .accessibilityLabel(Text("Filter"))
                 .accessibilityIdentifier("courseFilterField")
         }
         .padding(.horizontal, 8)
@@ -907,10 +917,11 @@ struct SidebarView: View {
 
     /// A backup's tooltip: when, who, and — once measured — what it takes.
     func backupHelp(for item: BackupItem) -> String {
+        let subtitle: String = item.subtitle(noun: workspace.classNoun(ofCourse: item.courseCode))
         guard let size = workspace.sizeDescription(of: item) else {
-            return item.subtitle
+            return subtitle
         }
-        return item.subtitle + " · " + size
+        return subtitle + " · " + size
     }
 
     /// The single delete's confirmation, with what the backup takes once it
@@ -1067,9 +1078,14 @@ struct SidebarView: View {
     /// What cancelling would mean, stated rather than implied.
     func cancelMessage(for request: ScheduledDeployRequest) -> String {
         guard let when = request.when else {
-            return "This section will no longer deploy on its own."
+            return ScheduledDeployRemovalWording.messageWithoutTime
         }
-        return "\(request.course.displayCode) Section \(request.sectionNumber) is set to deploy on its own at \(ScheduledDeploy.timeText(when)) on \(ScheduledDeploy.dayText(when)). Cancelling means it will not go out then, and the site stays as it is until you deploy it yourself."
+        return ScheduledDeployRemovalWording.message(
+            courseCode: request.course.displayCode,
+            sectionNumber: request.sectionNumber,
+            time: ScheduledDeploy.timeText(when),
+            day: ScheduledDeploy.dayText(when)
+        )
     }
 
     func cancelScheduledDeploy(_ request: ScheduledDeployRequest) {
@@ -1252,10 +1268,17 @@ struct SidebarView: View {
     /// it, ending with Set Up an Assistant… (the same view the menu bar
     /// uses). Still left out on a course kept for reference, where no door
     /// opens (decision s), and with no working folder.
+    ///
+    /// Its own icon since #990 (D43), the items' sparkles: on a course row
+    /// it shares a group with Open in Obsidian, which has one, and the HIG
+    /// asks for "icons for all menu items in a group, or none of them"
+    /// (Menus ▸ Icons). An assistant this Mac lacks stays HIDDEN here, not
+    /// dimmed as in the menu bar: "Hide unavailable menu items, don't dim
+    /// them" (Context menus).
     @ViewBuilder
     func reviseWithSubmenu(course: Course, sectionNumber: Int?, row: SidebarSelection) -> some View {
         if !course.isKeptForReference && workspace.workspaceURL != nil {
-            Menu("Revise With") {
+            Menu("Revise With", systemImage: "sparkles") {
                 reviseWithClaudeItem(course: course, row: row)
                 reviseWithCodexItem(course: course, row: row)
                 reviseWithCopilotItem(course: course, row: row)
@@ -1430,7 +1453,10 @@ struct SidebarView: View {
                     }
             }
         } label: {
-            CourseRowLabel(course: course, isBeingRenamed: false, isBeingCopied: workspace.isBeingCopied(course.code))
+            CourseRowLabel(
+                course: course, isBeingRenamed: false, isBeingCopied: workspace.isBeingCopied(course.code),
+                isRenamingAFolder: workspace.isRenamingAFolder(course.code)
+            )
                 .tag(SidebarSelection.course(course.code))
                 .accessibilityIdentifier("sidebar-\(course.code)")
                 .contextMenu {
@@ -1790,11 +1816,14 @@ struct SidebarView: View {
         if !course.isKeptForReference {
             sectionVerbItem("Publish Pages…", .publishPages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Hide Pages…", .hidePages, course: course, sectionNumber: sectionNumber, row: row)
-            sectionVerbItem("Publish Class for a Date…", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
+            // Titled as the menu bar titles them, from `SectionMenu.title`:
+            // Publish Meeting for a Date… and Add Meeting… in a club (#1027).
+            let noun: ClassNoun = course.configuration.classNoun
+            sectionVerbItem(SectionMenu.title(for: .publishClassForADate, noun: noun) ?? "", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
             // #897: Add Class… is here as well as in the Section menu, in the
             // place Add Next Class had (Russell, 2026-11-13 night). The
             // request reaches `performVerb`, which opens the same sheet.
-            sectionVerbItem("Add Class…", .addClass, course: course, sectionNumber: sectionNumber, row: row)
+            sectionVerbItem(SectionMenu.title(for: .addClass, noun: noun) ?? "", .addClass, course: course, sectionNumber: sectionNumber, row: row)
             Divider()
         }
         // One item or the other, never a
@@ -1808,7 +1837,7 @@ struct SidebarView: View {
         // set before the course was kept
         // must still be turnable off.
         if let scheduledFor {
-            Button("Cancel Deploy at \(ScheduledDeploy.timeText(scheduledFor))…", systemImage: "clock") {
+            Button(ScheduledDeployRemovalWording.menuItem, systemImage: "clock") {
                 select(row)
                 cancelScheduleRequest = ScheduledDeployRequest(
                     course: course,
@@ -1842,7 +1871,8 @@ struct SidebarView: View {
         Divider()
         folderMenuItems(for: course.sectionDirectoryURL(forSection: sectionNumber), row: row)
         Divider()
-        removeItem("Remove Section…", course: course, row: row)
+        // No ellipsis since #990: it only asks for a confirmation.
+        removeItem("Remove Section", course: course, row: row)
     }
 
     /// Open in Browser and Stop Showing Deployed Folder on a section row
@@ -1851,6 +1881,10 @@ struct SidebarView: View {
     /// shown. Read when the menu is drawn, which is when it opens. The row
     /// is selected first and its window acts, so the one Open in Browser
     /// opens the preview there if one is showing.
+    ///
+    /// A group of their own, after a divider, since #990 (D43): they have no
+    /// icon, and they sat in Open in Obsidian's group, which has one — "provide
+    /// icons for all menu items in a group, or none of them" (Menus ▸ Icons).
     @ViewBuilder
     func deployedFolderItems(course: Course, sectionNumber: Int, row: SidebarSelection) -> some View {
         if let folder = workspace.workspaceURL?.path {
@@ -1860,6 +1894,9 @@ struct SidebarView: View {
             let shown: Bool = DeployedFolderShows.shared.show(
                 courseCode: course.code, sectionNumber: sectionNumber, workingFolderPath: folder
             ) != nil
+            if lookup.decision == .offered || shown {
+                Divider()
+            }
             if lookup.decision == .offered {
                 sectionVerbItem(DeployedFolderWording.menuItem, .openInBrowser, course: course, sectionNumber: sectionNumber, row: row)
             }
@@ -1976,7 +2013,7 @@ struct SidebarView: View {
     /// its row and asks the question the − button and the menu bar ask —
     /// archiving, never deleting. Greyed while a copy of the course is being
     /// zipped, as the menu item is. A section of a course kept for reference
-    /// has no Remove Section… (`interface.whatIsWithheld`); its course keeps
+    /// has no Remove Section (`interface.whatIsWithheld`); its course keeps
     /// Remove Course….
     func removeItem(_ title: String, course: Course, row: SidebarSelection) -> some View {
         return Button(title, systemImage: "archivebox", role: .destructive) {
@@ -2040,8 +2077,6 @@ struct SidebarView: View {
     var menuCommands: SidebarMenuCommands {
         var situation: SubjectMenuRules.Situation = SubjectMenuRules.Situation()
         situation.obsidianInstalled = FolderActions.obsidianIsInstalled
-        var structuralReason: String? = nil
-        var notes: [String] = []
         var scheduledFor: Date? = nil
         var sectionNumber: Int? = nil
         switch workspace.selection {
@@ -2066,8 +2101,7 @@ struct SidebarView: View {
         }
         if let course = workspace.selectedCourse {
             situation.keptForReference = course.isKeptForReference
-            structuralReason = structuralHoldReason(for: course)
-            situation.structuralHold = structuralReason != nil
+            situation.structuralHold = structuralHoldReason(for: course) != nil
             situation.busy = busyReason(for: course) != nil
             situation.copying = workspace.isBeingCopied(course.code)
             situation.deploying = isBeingDeployed(course)
@@ -2086,7 +2120,6 @@ struct SidebarView: View {
                 blocked.insert(.localAssistant)
             }
             situation.reviseBlocked = blocked
-            notes = reviseNoteLines(course: course, sectionNumber: sectionNumber)
             if let sectionNumber, let folder = workspace.workspaceURL {
                 situation.hasStartOfYearUndo = StartOfYearUndoRegistry.shared.entry(
                     folderPath: folder.path, courseCode: course.code, sectionNumber: sectionNumber
@@ -2100,9 +2133,8 @@ struct SidebarView: View {
         }
         return SidebarMenuCommands(
             situation: situation,
-            structuralReason: structuralReason,
-            reviseNotes: notes,
             scheduledFor: scheduledFor,
+            classNoun: workspace.selectedCourse?.configuration.classNoun ?? .class,
             perform: performMenuItem
         )
     }
@@ -2262,7 +2294,7 @@ struct SidebarView: View {
     }
 
     /// Delete, pressed with a sidebar row selected: runs the item the menu
-    /// bar would — Remove Course…, Remove Section…, Delete Backup… or Delete
+    /// bar would — Remove Course…, Remove Section, Delete Backup… or Delete
     /// Archive… — through `performMenuItem`, which asks the same rule the
     /// menu greys by (so nothing on a reference section, nothing under a
     /// sheet: a beep, as for any greyed item) and then asks the same question.
@@ -2450,6 +2482,46 @@ struct RemovalRequest: Identifiable {
     }
 }
 
+/// The Backups section's heading in the sidebar: the name, and the space
+/// every backup takes once all have been measured (#242).
+///
+/// The total keeps the sidebar's margin on its trailing side (#997, D45):
+/// drawn against the column's edge it sat about 2 pt from the divider while
+/// every row above it, and the heading's own name, sit inset. The HIG's
+/// Layout page: "make it easy to apply standard margins around content".
+struct BackupsSectionHeader: View {
+
+    // MARK: - Stored properties
+
+    /// "271 KB", or nil until every backup has been measured.
+    let total: String?
+
+    /// The room kept between the total and the sidebar's trailing edge.
+    static let trailingMargin: CGFloat = 10
+
+    // MARK: - Computed properties
+
+    var body: some View {
+        HStack {
+            Text("Backups")
+            Spacer()
+            if let total {
+                Text(total)
+                    .foregroundStyle(.secondary)
+                    .padding(.trailing, BackupsSectionHeader.trailingMargin)
+                    .accessibilityIdentifier("backupsTotal")
+            }
+        }
+        // `.contain` (#353). A List section's header is merged into ONE
+        // static text, so two identifiers cannot both reach the tree:
+        // with an identifier on the header as well, the text read
+        // "backupsGroup-backupsGroup" and `backupsTotal` was dead (read
+        // off the real tree, 2026-09-26). The header's own was dropped;
+        // nothing read it.
+        .accessibilityElement(children: .contain)
+    }
+}
+
 /// One course's row: its code, or a field to type a new one into.
 ///
 /// Which of the two it is arrives as a plain `Bool` rather than being read
@@ -2469,7 +2541,18 @@ struct CourseRowLabel: View {
     /// Whether a copy of the course is being zipped right now (#351).
     var isBeingCopied: Bool = false
 
-    // MARK: - Body
+    /// Whether a Rename folder of the course is under way, in any window
+    /// (#899 U4b): its Preview, Deploy and section actions are greyed
+    /// meanwhile, and this row says why, as it does for a copy.
+    var isRenamingAFolder: Bool = false
+
+    // MARK: - Computed properties
+
+    /// What the row's small spinner says the course is busy with, or nil
+    /// when it shows none: a copy being zipped first, then a rename.
+    var workUnderWay: String? {
+        return CourseRowLabel.workUnderWay(isBeingCopied: isBeingCopied, isRenamingAFolder: isRenamingAFolder)
+    }
 
     var body: some View {
         if isBeingRenamed {
@@ -2480,18 +2563,73 @@ struct CourseRowLabel: View {
             // already says 2025–26, so the suffix would be redundant as
             // well as wrong.
             HStack(spacing: 6) {
-                Label(course.displayCode, systemImage: "books.vertical")
+                CourseCodeLabel(code: course.displayCode)
                 // A copy of the course is being zipped (#351) — a backup, or
                 // the archive before a restore or removal. The row says so
                 // rather than the window going quiet for the minute it takes.
-                if isBeingCopied {
+                //
+                // A Rename folder under way is marked the same way (U4b part
+                // seven's review, L2), so a window whose section's Preview
+                // and Deploy are greyed by a rename in another window shows
+                // why.
+                if let workUnderWay {
                     ProgressView()
                         .controlSize(.small)
-                        .accessibilityLabel("Saving a copy")
-                        .accessibilityIdentifier("courseBeingCopied-\(course.code)")
+                        .accessibilityLabel(workUnderWay)
+                        .help(workUnderWay)
+                        .accessibilityIdentifier(
+                            isBeingCopied ? "courseBeingCopied-\(course.code)" : "courseRenamingAFolder-\(course.code)"
+                        )
                 }
             }
         }
+    }
+
+    // MARK: - Functions
+
+    /// The spinner's words for what the course is busy with, or nil.
+    static func workUnderWay(isBeingCopied: Bool, isRenamingAFolder: Bool) -> String? {
+        if isBeingCopied {
+            return "Saving a copy"
+        }
+        if isRenamingAFolder {
+            return "Renaming a folder"
+        }
+        return nil
+    }
+}
+
+/// A course's code in its sidebar row, with the whole code on hover only
+/// when the row cuts it short (#997, D44).
+///
+/// A 12-character code, the most a code may have, is cut short at the
+/// sidebar's default width. The HIG's Text fields page: "Consider using an
+/// expansion tooltip to show the full version of clipped or truncated
+/// text." That tooltip is for text that is cut short, so a code that fits
+/// carries no tag repeating it. `ViewThatFits` decides which version shows,
+/// at layout time and again whenever the sidebar is resized: the plain
+/// label when the whole code fits, and the same label with `.help(code)`,
+/// cut short, when it does not.
+struct CourseCodeLabel: View {
+
+    // MARK: - Stored properties
+
+    /// The code as a teacher reads it (`displayCode`).
+    let code: String
+
+    // MARK: - Computed properties
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            label
+            label
+                .help(code)
+        }
+    }
+
+    var label: some View {
+        return Label(code, systemImage: "books.vertical")
+            .lineLimit(1)
     }
 }
 
@@ -2564,6 +2702,9 @@ struct CourseCodeField: View {
                     .borderedTextField()
                     .foregroundStyle(Color(nsColor: .textColor))
                     .focused($isFocused)
+                    // Its placeholder's words (#1012), as the Filter field
+                    // above the list is named by its own.
+                    .accessibilityLabel(Text("Course code"))
                     .accessibilityIdentifier("renameField")
                     .onSubmit {
                         commit()
@@ -2578,9 +2719,8 @@ struct CourseCodeField: View {
                     }
 
                 if let problem {
-                    Text(problem)
+                    StatusColour.blocking.sentence(problem)
                         .font(.caption)
-                        .foregroundStyle(Color(nsColor: .systemRed))
                         // Short enough to fit, and allowed to wrap rather
                         // than truncate if a longer one ever arrives: half a
                         // sentence with an ellipsis explains nothing.
@@ -2866,6 +3006,7 @@ private struct CourseRenameAlerts: ViewModifier {
                 Button("Cancel", role: .cancel) {
                     workspace.obsidianRenameRequest = nil
                 }
+                .keyboardShortcut(.cancelAction)
             } message: { request in
                 Text(CourseRenamer.obsidianQuestion(openVaultCount: request.openVaultPaths.count))
             }
@@ -2890,5 +3031,21 @@ private struct CourseRenameAlerts: ViewModifier {
             } message: { notice in
                 Text(notice.message)
             }
+    }
+}
+
+/// The one warning triangle on a section row: a stopped scheduled deploy,
+/// or problems in the section (#994, D38). It wears `StatusColour`'s style,
+/// which on a selected row gives way to the row's own text colour: the
+/// orange triangle measured 1.45:1 on the blue selection in Light, white
+/// there is 5.37:1 (HIG, Color: "Make sure all your app's colors work well
+/// in light, dark, and increased contrast contexts").
+struct SectionRowWarningBadge: View {
+
+    // MARK: - Computed properties
+
+    var body: some View {
+        Image(systemName: "exclamationmark.triangle.fill")
+            .foregroundStyle(StatusColour.warning.style)
     }
 }

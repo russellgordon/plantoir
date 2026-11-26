@@ -180,17 +180,20 @@ public static class SectionScheduleSource
         return today.AddDays(forward);
     }
 
-    public static ScheduleOutcome ReadTypedText(string text, ColumnOrdering? ordering = null)
+    /// <param name="noun">The course's noun, for the one refusal that names classes (#1027): the Class Dates
+    /// dialog passes the course's; everything the model reads keeps the default.</param>
+    public static ScheduleOutcome ReadTypedText(string text, ColumnOrdering? ordering = null, ClassNoun noun = ClassNoun.Class)
     {
         var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-        return Read(lines, "what you pasted", "pasted by hand", ordering);
+        return Read(lines, "what you pasted", "pasted by hand", ordering, noun);
     }
 
     public static ScheduleOutcome Read(
         IReadOnlyList<string> column,
         string place,
         string suggestedSource,
-        ColumnOrdering? answered = null)
+        ColumnOrdering? answered = null,
+        ClassNoun noun = ClassNoun.Class)
     {
         var values = column
             .Select(line => line.Trim())
@@ -248,10 +251,7 @@ public static class SectionScheduleSource
 
         if (offenders.Count > 0)
         {
-            string subject = offenders.Count == 1 ? "isn’t a date" : "aren’t dates";
-            throw new AssistRefusal(
-                $"{string.Join(", ", offenders)} {subject} Plantoir can read, so nothing was taken from {place}. " +
-                "A half-read timetable would date the wrong classes, so the whole list is refused — fix those and try again. Dates written 2026-09-08 always work.");
+            throw new AssistRefusal(AssistWording.ClassDatesHalfRead(offenders, place, noun));
         }
 
         if (dayFirstProof != null && monthFirstProof != null)
@@ -466,7 +466,7 @@ public static class SectionScheduleSource
     /// <summary>
     /// A .csv or .ics file, read by what it is rather than by asking.
     /// </summary>
-    public static ScheduleOutcome ReadFromFile(string filePath, ColumnOrdering? ordering = null)
+    public static ScheduleOutcome ReadFromFile(string filePath, ColumnOrdering? ordering = null, ClassNoun noun = ClassNoun.Class)
     {
         string name = Path.GetFileName(filePath);
         string ext = Path.GetExtension(filePath).ToLowerInvariant();
@@ -488,13 +488,13 @@ public static class SectionScheduleSource
         if (ext == ".ics" || text.Contains("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase))
         {
             var column = ColumnFromCalendarExport(text, name);
-            return Read(column, name, name, ordering);
+            return Read(column, name, name, ordering, noun);
         }
         else
         {
             var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
             var column = lines.Select(FirstFieldInCSVRow).ToList();
-            return Read(column, name, name, ordering);
+            return Read(column, name, name, ordering, noun);
         }
     }
 

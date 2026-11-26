@@ -112,6 +112,20 @@ enum CourseActivity {
         let work: PlanWork
     }
 
+    /// A Rename folder under way on one course (#899 U4b), from any window:
+    /// its plan, check and swap run off the main actor, so the app is live
+    /// while it runs. Recorded HERE, for every window and for ⌘Q, because
+    /// a window's own `Course` is only that window's copy of the course.
+    /// `isSwapping` turns true once the step's check and swap begin: from
+    /// then on the rename can no longer be halted (its plan writes nothing,
+    /// and can).
+    struct FolderRenameRecord: Equatable {
+        let folderPath: String
+        let courseCode: String
+        let owner: UUID
+        var isSwapping: Bool
+    }
+
     /// The backing store is observable for the same reason as
     /// `PreviewLeases.Store`: views reading `courseIsBusy` must
     /// re-render the moment a publish begins or ends.
@@ -124,6 +138,9 @@ enum CourseActivity {
         var activeCopies: [CopyRecord] = []
         var activePlanWork: [PlanWorkRecord] = []
         var activeRestores: [RestoreRecord] = []
+        var activeFolderRenames: [FolderRenameRecord] = []
+        /// Whoever waits for every rename's swap to end: the quit (#899 U4b).
+        @ObservationIgnored var folderRenameWaiters: [CheckedContinuation<Void, Never>] = []
     }
 
     // MARK: - Stored properties
@@ -194,7 +211,132 @@ enum CourseActivity {
         WorkLeaseRegistry.reconcile()
     }
 
+    /// Whether any Rename folder has begun its check and swap, in any window
+    /// (#899 U4b): asked at quit, which waits for it. A rename that is only
+    /// planning has written nothing, so a quit does not wait for it; it
+    /// halts it (`FolderRenameRun.haltEveryRunStillPlanning`, U4b2-7).
+    static var anyFolderRenameSwapIsUnderWay: Bool {
+        return folderRenameSwapsUnderWay() > 0
+    }
+
+    /// The menu-length reason while a Rename folder of the course is under
+    /// way (#899 U4b), said under every item it greys.
+    static let availableOnceTheFolderIsRenamed: String = "Available once the folder rename has finished"
+
+    /// What VoiceOver says for the Rename sheet's spinner while the rename
+    /// runs (#899 U4b2-9; `undo.wording.renameFolderUnderWaySpinner`).
+    static let renamingSpinnerLabel: String = "Renaming"
+
     // MARK: - Functions
+
+    /// The sentence an act on a course is refused with at the click while a
+    /// Rename folder of that course is under way (#899 U4b).
+    nonisolated static func folderRenameIsUnderWay(course: String) -> String {
+        return "A folder in \(course) is being renamed right now. Try again once the rename has finished."
+    }
+
+    /// Records that a Rename folder of the course has begun, and returns its
+    /// claim, or nil when one is already under way for the course, from any
+    /// window (#899 U4b): one rename at a time per course folder, so a second
+    /// can neither overwrite nor clear the first's interrupted-rename record.
+    static func beginFolderRename(folderPath: String, courseCode: String) -> FolderRenameRecord? {
+        if courseIsRenamingAFolder(folderPath: folderPath, courseCode: courseCode) {
+            return nil
+        }
+        let claim: FolderRenameRecord = FolderRenameRecord(
+            folderPath: folderPath, courseCode: courseCode, owner: UUID(), isSwapping: false
+        )
+        store.activeFolderRenames.append(claim)
+        return claim
+    }
+
+    /// Records that a rename's check and swap have begun: from here it can
+    /// no longer be halted, so its sheet's Cancel is disabled. Returns false,
+    /// and marks nothing, when the claim is no longer held: an ended claim is
+    /// never taken up again, so a rename whose claim was given back (at
+    /// Cancel, U4b part seven's review, M1) can never reach its swap.
+    static func folderRenameSwapBegins(_ claim: FolderRenameRecord) -> Bool {
+        var updated: [FolderRenameRecord] = []
+        var found: Bool = false
+        for existing in store.activeFolderRenames {
+            var record: FolderRenameRecord = existing
+            if existing.owner == claim.owner {
+                record.isSwapping = true
+                found = true
+            }
+            updated.append(record)
+        }
+        if !found {
+            return false
+        }
+        store.activeFolderRenames = updated
+        return true
+    }
+
+    /// Records that a rename has ended, however it ended, and lets the quit
+    /// go on once no rename's swap is left. Safe to call twice.
+    static func endFolderRename(_ claim: FolderRenameRecord) {
+        var remaining: [FolderRenameRecord] = []
+        for existing in store.activeFolderRenames {
+            if existing.owner != claim.owner {
+                remaining.append(existing)
+            }
+        }
+        store.activeFolderRenames = remaining
+        if folderRenameSwapsUnderWay() == 0 {
+            let waiters: [CheckedContinuation<Void, Never>] = store.folderRenameWaiters
+            store.folderRenameWaiters = []
+            for waiter in waiters {
+                waiter.resume()
+            }
+        }
+    }
+
+    /// Waits until no Rename folder's check and swap is under way: the quit
+    /// path (#899 U4b), as `ToolchainReadiness.waitForAllCopies` is for a
+    /// tools copy. A rename killed part way through its swap leaves a course
+    /// half renamed; one still planning has written nothing and is not
+    /// waited for (U4b2-7).
+    static func waitForEveryFolderRenameSwap() async {
+        if folderRenameSwapsUnderWay() == 0 {
+            return
+        }
+        await withCheckedContinuation { (waiter: CheckedContinuation<Void, Never>) in
+            store.folderRenameWaiters.append(waiter)
+        }
+    }
+
+    /// How many renames, in any window, have begun their check and swap.
+    static func folderRenameSwapsUnderWay() -> Int {
+        var swapping: Int = 0
+        for rename in store.activeFolderRenames {
+            if rename.isSwapping {
+                swapping += 1
+            }
+        }
+        return swapping
+    }
+
+    /// True while a Rename folder of the course is under way, in any window.
+    static func courseIsRenamingAFolder(folderPath: String, courseCode: String) -> Bool {
+        for rename in store.activeFolderRenames {
+            if rename.courseCode == courseCode && FolderIdentity.isSameFolder(rename.folderPath, folderPath) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// True once a rename of the course has begun its check and swap.
+    static func folderRenameIsSwapping(folderPath: String, courseCode: String) -> Bool {
+        for rename in store.activeFolderRenames {
+            if rename.isSwapping && rename.courseCode == courseCode
+                && FolderIdentity.isSameFolder(rename.folderPath, folderPath) {
+                return true
+            }
+        }
+        return false
+    }
 
     /// Records what a run of the unit plans' launcher is doing, beside the
     /// lease it holds (#863).
@@ -539,6 +681,12 @@ enum CourseActivity {
         revisedElsewhere: Bool? = nil,
         revisingAssistant: String? = nil
     ) -> String? {
+        // A Rename folder moves folders inside the course and rewrites its
+        // settings (#899 U4b): no Rename Course, Add Section, archive or
+        // restore meanwhile, from any window.
+        if courseIsRenamingAFolder(folderPath: folderPath, courseCode: courseCode) {
+            return availableOnceTheFolderIsRenamed
+        }
         if let busy = busyDescription(folderPath: folderPath, courseCode: courseCode) {
             return busy
         }
@@ -612,6 +760,12 @@ enum CourseActivity {
         store.activeCopies = []
         store.activePlanWork = []
         store.activeRestores = []
+        store.activeFolderRenames = []
+        let waiters: [CheckedContinuation<Void, Never>] = store.folderRenameWaiters
+        store.folderRenameWaiters = []
+        for waiter in waiters {
+            waiter.resume()
+        }
         WorkLeaseRegistry.reconcile()
     }
 }

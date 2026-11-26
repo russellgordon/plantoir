@@ -1,0 +1,628 @@
+{
+  "note" : "Written by the mac's UndoActionStepsTests from the REAL action code (#899, U3), never by hand: each daily page action run once on a fixture, and the one step it left on the list read back. `files` is every file its content ops name, in op order, with its whole text before and after (null: absent); `moves` (U3b, only when there are any) every file it moved, in op order, from and to (the moment in a kept copy's name set to one fixed moment), its text, and whether it stands apart from the step (moveApart) or not (move); `members` (U4a, only when there are any) every editJSON op, in op order, its file, keyPath and before and after (left out: absent); `trees` (U4a, only when there are any) every folder made (createTree), in op order, its path, the folders inside it and every file's text by its path inside it; `recomputes` its recompute ops; `ops` the op kinds the door chose, in order. `madeBy` is the word before the first colon. scripts/make_undo_traces.py makes contracts/undo-traces.json -> actionTraces from it. Regenerate: TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1 xcodebuild test -only-testing:QuartzTeachersTests/UndoActionStepsTests/testEveryDailyActionIsOneStepThroughTheDoor, then python3 scripts/make_undo_traces.py.",
+  "steps" : [
+    {
+      "action" : "publishPages",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 1, Day 2\npublish: true\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "before" : "---\ntitle: Unit 1, Day 2\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 2.md"
+        }
+      ],
+      "madeBy" : "menu",
+      "name" : "publishPages",
+      "ops" : [
+        "editLine",
+        "recompute"
+      ],
+      "recomputes" : [
+        {
+          "maintainer" : "sectionFrontPage",
+          "path" : "courses/ICS3U/section1/index.md",
+          "section" : 1
+        }
+      ]
+    },
+    {
+      "action" : "hidePages",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 1, Day 1\npublish: false\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nOne.",
+          "before" : "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nOne.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 1.md"
+        }
+      ],
+      "madeBy" : "builtInAssistant",
+      "name" : "hidePages",
+      "ops" : [
+        "editLine",
+        "recompute"
+      ],
+      "recomputes" : [
+        {
+          "maintainer" : "sectionFrontPage",
+          "path" : "courses/ICS3U/section1/index.md",
+          "section" : 1
+        }
+      ]
+    },
+    {
+      "action" : "publishPages",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 1, Day 2\npublish: true\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "before" : "---\ntitle: Unit 1, Day 2\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 2.md"
+        },
+        {
+          "after" : "---\ntitle: Unit 1, Day 3\npublish: true\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nThree.",
+          "before" : "---\ntitle: Unit 1, Day 3\npublish: false\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nThree.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 3.md"
+        }
+      ],
+      "madeBy" : "menu",
+      "name" : "publishPagesAWholeUnit",
+      "ops" : [
+        "editLine",
+        "editLine",
+        "recompute"
+      ],
+      "recomputes" : [
+        {
+          "maintainer" : "sectionFrontPage",
+          "path" : "courses/ICS3U/section1/index.md",
+          "section" : 1
+        }
+      ]
+    },
+    {
+      "action" : "publishClassForADate",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 1, Day 2\npublish: true\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "before" : "---\ntitle: Unit 1, Day 2\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 2.md"
+        }
+      ],
+      "madeBy" : "builtInAssistant",
+      "name" : "publishClassForADate",
+      "ops" : [
+        "editLine",
+        "recompute"
+      ],
+      "recomputes" : [
+        {
+          "maintainer" : "sectionFrontPage",
+          "path" : "courses/ICS3U/section1/index.md",
+          "section" : 1
+        }
+      ]
+    },
+    {
+      "action" : "addNextClass",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 2, Day 2\npublish: false\ncreated: 2026-09-18T07:00:00.000-0400\ntranscludeTitleSize: h2\nenableToc: false\nexcludeBacklinks: true\ntags:\n  - unit-2\n---\n\n%%\nThis is the shape every class page takes: a numbered agenda of what\nhappened, with links to the pages it used, then a short list of things\nto do before next time. Nothing is explained here — the links do that.\n\nThis page was created for you, dated to the days this class actually meets.\nRename them, add more, delete the ones you do not need. The `created:`\ndate is what puts them in order under All Classes, so a new page needs\none of its own.\n\nThis page is unpublished. Write it, then publish it when it is ready.\nDelete this comment when you do — comments never reach the site either.\n%%\n\n## Agenda\n\n1.\n\n## Things to do before our next class\n\n- [ ]\n",
+          "before" : null,
+          "path" : "courses/ICS3U/section1/All Classes/Unit 2, Day 2.md"
+        }
+      ],
+      "madeBy" : "builtInAssistant",
+      "name" : "addNextClass",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "addNextClassInANewUnit",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 3, Day 1\npublish: false\ncreated: 2026-09-18T07:00:00.000-0400\ntranscludeTitleSize: h2\nenableToc: false\nexcludeBacklinks: true\ntags:\n  - unit-3\n---\n\n%%\nThis is the shape every class page takes: a numbered agenda of what\nhappened, with links to the pages it used, then a short list of things\nto do before next time. Nothing is explained here — the links do that.\n\nThis page was created for you, dated to the days this class actually meets.\nRename them, add more, delete the ones you do not need. The `created:`\ndate is what puts them in order under All Classes, so a new page needs\none of its own.\n\nThis page is unpublished. Write it, then publish it when it is ready.\nDelete this comment when you do — comments never reach the site either.\n%%\n\n## Agenda\n\n1.\n\n## Things to do before our next class\n\n- [ ]\n",
+          "before" : null,
+          "path" : "courses/ICS3U/section1/All Classes/Unit 3, Day 1.md"
+        }
+      ],
+      "madeBy" : "menu",
+      "name" : "addNextClassInANewUnit",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "addClasses",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 2, Day 2\npublish: false\ncreated: 2026-09-18T07:00:00.000-0400\ntranscludeTitleSize: h2\nenableToc: false\nexcludeBacklinks: true\ntags:\n  - unit-2\n---\n\n%%\nThis is the shape every class page takes: a numbered agenda of what\nhappened, with links to the pages it used, then a short list of things\nto do before next time. Nothing is explained here — the links do that.\n\n2 of these were created for you, dated to the days this class actually meets.\nRename them, add more, delete the ones you do not need. The `created:`\ndate is what puts them in order under All Classes, so a new page needs\none of its own.\n\nThis page is unpublished. Write it, then publish it when it is ready.\nDelete this comment when you do — comments never reach the site either.\n%%\n\n## Agenda\n\n1.\n\n## Things to do before our next class\n\n- [ ]\n",
+          "before" : null,
+          "path" : "courses/ICS3U/section1/All Classes/Unit 2, Day 2.md"
+        },
+        {
+          "after" : "---\ntitle: Unit 2, Day 3\npublish: false\ncreated: 2026-09-21T07:00:00.000-0400\ntranscludeTitleSize: h2\nenableToc: false\nexcludeBacklinks: true\ntags:\n  - unit-2\n---\n\n%%\nThis is the shape every class page takes: a numbered agenda of what\nhappened, with links to the pages it used, then a short list of things\nto do before next time. Nothing is explained here — the links do that.\n\n2 of these were created for you, dated to the days this class actually meets.\nRename them, add more, delete the ones you do not need. The `created:`\ndate is what puts them in order under All Classes, so a new page needs\none of its own.\n\nThis page is unpublished. Write it, then publish it when it is ready.\nDelete this comment when you do — comments never reach the site either.\n%%\n\n## Agenda\n\n1.\n\n## Things to do before our next class\n\n- [ ]\n",
+          "before" : null,
+          "path" : "courses/ICS3U/section1/All Classes/Unit 2, Day 3.md"
+        }
+      ],
+      "madeBy" : "outsideAssistant",
+      "name" : "addClasses",
+      "ops" : [
+        "writeFile",
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "makeRoomForClasses",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 1, Day 4\npublish: false\ncreated: 2026-09-16T07:00:00.000-0400\n---\n\nThree.",
+          "before" : null,
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 4.md"
+        },
+        {
+          "after" : "---\ntitle: Unit 1, Day 3\npublish: false\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nTwo.",
+          "before" : "---\ntitle: Unit 1, Day 3\npublish: false\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nThree.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 3.md"
+        },
+        {
+          "after" : "---\ntitle: Unit 1, Day 2\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400\ntranscludeTitleSize: h2\nenableToc: false\nexcludeBacklinks: true\ntags:\n  - unit-1\n---\n\n%%\nThis is the shape every class page takes: a numbered agenda of what\nhappened, with links to the pages it used, then a short list of things\nto do before next time. Nothing is explained here — the links do that.\n\nThis page was created for you, dated to the days this class actually meets.\nRename them, add more, delete the ones you do not need. The `created:`\ndate is what puts them in order under All Classes, so a new page needs\none of its own.\n\nThis page is unpublished. Write it, then publish it when it is ready.\nDelete this comment when you do — comments never reach the site either.\n%%\n\n## Agenda\n\n1.\n\n## Things to do before our next class\n\n- [ ]\n",
+          "before" : "---\ntitle: Unit 1, Day 2\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 2.md"
+        },
+        {
+          "after" : "---\ntitle: Unit 2, Day 1\npublish: false\ncreated: 2026-09-18T07:00:00.000-0400\n---\n\nSee [[Unit 1, Day 3]].",
+          "before" : "---\ntitle: Unit 2, Day 1\npublish: false\ncreated: 2026-09-16T07:00:00.000-0400\n---\n\nSee [[Unit 1, Day 2]].",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 2, Day 1.md"
+        }
+      ],
+      "madeBy" : "builtInAssistant",
+      "name" : "makeRoomForClasses",
+      "ops" : [
+        "writeFile",
+        "writeFile",
+        "writeFile",
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "duplicateClass",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 1, Day 4\npublish: false\ncreated: 2026-09-16T07:00:00.000-0400\n---\n\nThree.",
+          "before" : null,
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 4.md"
+        },
+        {
+          "after" : "---\ntitle: Unit 1, Day 3\npublish: false\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nTwo.",
+          "before" : "---\ntitle: Unit 1, Day 3\npublish: false\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nThree.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 3.md"
+        },
+        {
+          "after" : "---\ntitle: Unit 1, Day 2\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nOne.",
+          "before" : "---\ntitle: Unit 1, Day 2\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 2.md"
+        },
+        {
+          "after" : "---\ntitle: Unit 2, Day 1\npublish: false\ncreated: 2026-09-18T07:00:00.000-0400\n---\n\nSee [[Unit 1, Day 3]].",
+          "before" : "---\ntitle: Unit 2, Day 1\npublish: false\ncreated: 2026-09-16T07:00:00.000-0400\n---\n\nSee [[Unit 1, Day 2]].",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 2, Day 1.md"
+        }
+      ],
+      "madeBy" : "builtInAssistant",
+      "name" : "duplicateClass",
+      "ops" : [
+        "writeFile",
+        "writeFile",
+        "writeFile",
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "duplicateAsTheNextClass",
+      "files" : [
+        {
+          "after" : "---\ntitle: Unit 2, Day 2\npublish: false\ncreated: 2026-09-18T07:00:00.000-0400\n---\n\nOne.",
+          "before" : null,
+          "path" : "courses/ICS3U/section1/All Classes/Unit 2, Day 2.md"
+        }
+      ],
+      "madeBy" : "menu",
+      "name" : "duplicateAsTheNextClass",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "reDateClasses",
+      "files" : [
+        {
+          "after" : "---\ncreated: 2026-09-08T07:00:00.000-0400\ntitle: Unit 1, Day 1\ndate: 2020-01-15\n---\nSomething to move.",
+          "before" : "---\ntitle: Unit 1, Day 1\ndate: 2020-01-15\n---\nSomething to move.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 1.md"
+        }
+      ],
+      "madeBy" : "builtInAssistant",
+      "name" : "reDateClasses",
+      "ops" : [
+        "editLine",
+        "recompute"
+      ],
+      "recomputes" : [
+        {
+          "maintainer" : "sectionFrontPage",
+          "path" : "courses/ICS3U/section1/index.md",
+          "section" : 1
+        }
+      ]
+    },
+    {
+      "action" : "rememberTimetable",
+      "files" : [
+        {
+          "after" : "{\n  \"dates\" : [\n    \"2026-09-08\",\n    \"2026-09-10\",\n    \"2026-09-14\"\n  ],\n  \"recorded\" : \"2026-09-08\",\n  \"section\" : 1,\n  \"source\" : \"not recorded\"\n}\n",
+          "before" : "{\n  \"dates\" : [\n    \"2026-09-08\",\n    \"2026-09-10\",\n    \"2026-09-14\",\n    \"2026-09-16\",\n    \"2026-09-18\",\n    \"2026-09-21\",\n    \"2026-09-23\"\n  ],\n  \"recorded\" : \"2026-11-20\",\n  \"section\" : 1,\n  \"source\" : \"timetable.xlsx, block H\"\n}\n",
+          "path" : "courses/ICS3U/.internal/timetable/section1.json"
+        }
+      ],
+      "madeBy" : "builtInAssistant",
+      "name" : "rememberTimetable",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "addCurriculumMentions",
+      "files" : [
+        {
+          "after" : "---\ntitle: Loops\npublishForSection1: true\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n---\n\nA loop repeats work.\n\n%%curriculum-start%%\n## Curriculum connection\n\n![[A1.1]]\n%%curriculum-end%%\n",
+          "before" : "---\ntitle: Loops\npublishForSection1: true\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n---\n\nA loop repeats work.\n",
+          "path" : "courses/ICS3U/Concepts/Loops.md"
+        }
+      ],
+      "madeBy" : "outsideAssistant",
+      "name" : "addCurriculumMentions",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "writeHowITeach",
+      "files" : [
+        {
+          "after" : "---\npublish: false\n---\n\nI start every class with a question.\n",
+          "before" : null,
+          "path" : "courses/ICS3U/How I Teach.md"
+        }
+      ],
+      "madeBy" : "outsideAssistant",
+      "name" : "writeHowITeach",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "startHowITeachPage",
+      "files" : [
+        {
+          "after" : "---\npublish: false\n---\n",
+          "before" : null,
+          "path" : "courses/ICS3U/How I Teach.md"
+        }
+      ],
+      "madeBy" : "sheet",
+      "name" : "startHowITeachPage",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "getReadyForTheStartOfTheYear",
+      "files" : [
+        {
+          "after" : "---\ntitle: Loops\npublishForSection1: false\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n---\n\nA loop repeats work.\n",
+          "before" : "---\ntitle: Loops\npublishForSection1: true\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n---\n\nA loop repeats work.\n",
+          "path" : "courses/ICS3U/Concepts/Loops.md"
+        },
+        {
+          "after" : "---\ntitle: Unit 1, Day 2\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "before" : "---\ntitle: Unit 1, Day 2\npublish: true\ncreated: 2026-09-10T07:00:00.000-0400\n---\n\nTwo.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 2.md"
+        }
+      ],
+      "madeBy" : "builtInAssistant",
+      "name" : "getReadyForTheStartOfTheYear",
+      "ops" : [
+        "editLine",
+        "editLine",
+        "recompute"
+      ],
+      "recomputes" : [
+        {
+          "maintainer" : "sectionFrontPage",
+          "path" : "courses/ICS3U/section1/index.md",
+          "section" : 1
+        }
+      ]
+    },
+    {
+      "action" : "showTodaysClassOnTheFrontPage",
+      "files" : [
+        {
+          "after" : "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-30T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "before" : "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "path" : "courses/ICS3U/section1/index.md"
+        }
+      ],
+      "madeBy" : "sheet",
+      "name" : "showTodaysClassOnTheFrontPage",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "notTodayOnTheFrontPage",
+      "files" : [
+        {
+          "after" : "{\n  \"class\" : \"Unit 2, Day 5\",\n  \"day\" : \"2026-09-30\",\n  \"version\" : 1\n}",
+          "before" : null,
+          "path" : "courses/ICS3U/.publish_state/section1.front-page-not-today.json"
+        }
+      ],
+      "madeBy" : "sheet",
+      "name" : "notTodayOnTheFrontPage",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "answerTheLinksChecklist",
+      "files" : [
+        {
+          "after" : "{\n  \"answeredAt\" : \"2026-09-08T11:00:00Z\",\n  \"leftUnticked\" : [\n\n  ],\n  \"offered\" : [\n    \"section1\\/All Classes\\/Unit 1, Day 2.md\"\n  ],\n  \"version\" : 1\n}",
+          "before" : null,
+          "path" : "courses/ICS3U/.publish_state/section1.links-checklist-answered.json"
+        }
+      ],
+      "madeBy" : "sheet",
+      "name" : "answerTheLinksChecklist",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "keepClassesDatedLater",
+      "files" : [
+        {
+          "after" : "{\n  \"answeredAt\" : \"2026-09-08T11:00:00Z\",\n  \"kept\" : [\n    {\n      \"date\" : \"2026-09-14\",\n      \"place\" : \"section1\\/All Classes\\/Unit 1, Day 3\"\n    }\n  ],\n  \"version\" : 1\n}",
+          "before" : null,
+          "path" : "courses/ICS3U/.publish_state/section1.later-classes-kept.json"
+        }
+      ],
+      "madeBy" : "sheet",
+      "name" : "keepClassesDatedLater",
+      "ops" : [
+        "writeFile"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "rollOver",
+      "files" : [
+        {
+          "after" : "---\ncreated: 2026-09-08T07:00:00.000-0400\ntitle: Unit 1, Day 1\ndate: 2020-01-15\n---\nSomething to move.",
+          "before" : "---\ntitle: Unit 1, Day 1\ndate: 2020-01-15\n---\nSomething to move.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 1.md"
+        },
+        {
+          "after" : null,
+          "before" : "{\"offered\": [], \"leftUnticked\": []}\n",
+          "path" : "courses/ICS3U/.publish_state/section1.links-checklist-answered.json"
+        }
+      ],
+      "madeBy" : "menu",
+      "moves" : [
+        {
+          "content" : "{\"places\": [\"Concepts/Worksheet\"]}",
+          "from" : "courses/ICS3U/.publish_state/section1.published-pages/20260601T120000Z-netlify.json",
+          "standsApart" : false,
+          "to" : "courses/ICS3U/.publish_state/section1.published-pages.previous-2026-09-08_070000/20260601T120000Z-netlify.json"
+        },
+        {
+          "content" : "{\"site_id\": \"last-year\"}",
+          "from" : "courses/ICS3U/.netlify_sites/section1.json",
+          "standsApart" : true,
+          "to" : "courses/ICS3U/.netlify_sites/section1.previous-2026-09-08_070000.json"
+        }
+      ],
+      "name" : "rollOverOntoANewWebsite",
+      "ops" : [
+        "editLine",
+        "writeFile",
+        "move",
+        "moveApart",
+        "recompute"
+      ],
+      "recomputes" : [
+        {
+          "maintainer" : "sectionFrontPage",
+          "path" : "courses/ICS3U/section1/index.md",
+          "section" : 1
+        }
+      ]
+    },
+    {
+      "action" : "rollOver",
+      "files" : [
+        {
+          "after" : "---\ncreated: 2026-09-08T07:00:00.000-0400\ntitle: Unit 1, Day 1\ndate: 2020-01-15\n---\nSomething to move.",
+          "before" : "---\ntitle: Unit 1, Day 1\ndate: 2020-01-15\n---\nSomething to move.",
+          "path" : "courses/ICS3U/section1/All Classes/Unit 1, Day 1.md"
+        },
+        {
+          "after" : null,
+          "before" : "{\"offered\": [], \"leftUnticked\": []}\n",
+          "path" : "courses/ICS3U/.publish_state/section1.links-checklist-answered.json"
+        }
+      ],
+      "madeBy" : "builtInAssistant",
+      "moves" : [
+        {
+          "content" : "{\"places\": [\"Concepts/Worksheet\"]}",
+          "from" : "courses/ICS3U/.publish_state/section1.published-pages/20260601T120000Z-netlify.json",
+          "standsApart" : false,
+          "to" : "courses/ICS3U/.publish_state/section1.published-pages.previous-2026-09-08_070000/20260601T120000Z-netlify.json"
+        }
+      ],
+      "name" : "rollOverKeepingTheWebsite",
+      "ops" : [
+        "editLine",
+        "writeFile",
+        "move",
+        "recompute"
+      ],
+      "recomputes" : [
+        {
+          "maintainer" : "sectionFrontPage",
+          "path" : "courses/ICS3U/section1/index.md",
+          "section" : 1
+        }
+      ]
+    },
+    {
+      "action" : "saveCourseSettings",
+      "files" : [
+        {
+          "after" : "{\n  \"course_code\" : \"ICS3U\",\n  \"course_name\" : \"Introduction to Computer Science\",\n  \"curriculum_folder\" : \"Curriculum\",\n  \"expandable\" : [\n    \"Concepts\"\n  ],\n  \"hidden\" : [\"Media\"],\n  \"include_curriculum_coverage\" : true,\n  \"num_sections\" : 1,\n  \"per_section_files\" : [\n    \"index.md\",\n    \"Announcements.md\"\n  ],\n  \"per_section_folders\" : [\n    \"All Classes\",\n    \"Tasks\"\n  ],\n  \"section_numbers\" : [\n    1\n  ],\n  \"shared_files\" : [\n    \"Learning Goals.md\"\n  ],\n  \"shared_folders\" : [\n    \"Concepts\",\n    \"Curriculum\",\n    \"Tasks\",\n    \"Tests\"\n  ],\n  \"graded_folders\" : [\"Tests\"]\n}",
+          "before" : "{\n  \"course_code\" : \"ICS3U\",\n  \"course_name\" : \"Introduction to Computer Science\",\n  \"curriculum_folder\" : \"Curriculum\",\n  \"expandable\" : [\n    \"Concepts\"\n  ],\n  \"hidden\" : [\n    \"Media\",\n    \"Tasks\"\n  ],\n  \"include_curriculum_coverage\" : true,\n  \"num_sections\" : 1,\n  \"per_section_files\" : [\n    \"index.md\",\n    \"Announcements.md\"\n  ],\n  \"per_section_folders\" : [\n    \"All Classes\",\n    \"Tasks\"\n  ],\n  \"section_numbers\" : [\n    1\n  ],\n  \"shared_files\" : [\n    \"Learning Goals.md\"\n  ],\n  \"shared_folders\" : [\n    \"Concepts\",\n    \"Curriculum\",\n    \"Tasks\",\n    \"Tests\"\n  ]\n}",
+          "path" : "courses/ICS3U/course_config.json"
+        }
+      ],
+      "madeBy" : "sheet",
+      "members" : [
+        {
+          "after" : [
+            "Tests"
+          ],
+          "keyPath" : [
+            "graded_folders"
+          ],
+          "path" : "courses/ICS3U/course_config.json"
+        },
+        {
+          "after" : [
+            "Media"
+          ],
+          "before" : [
+            "Media",
+            "Tasks"
+          ],
+          "keyPath" : [
+            "hidden"
+          ],
+          "path" : "courses/ICS3U/course_config.json"
+        }
+      ],
+      "name" : "saveCourseSettings",
+      "ops" : [
+        "editJSON",
+        "editJSON"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "addFolder",
+      "files" : [
+
+      ],
+      "madeBy" : "sheet",
+      "name" : "addFolder",
+      "ops" : [
+        "createTree"
+      ],
+      "recomputes" : [
+
+      ],
+      "trees" : [
+        {
+          "files" : {
+            "_DUPLICATE ME.md" : "---\ntitle: _DUPLICATE ME\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: false\n---\n%%\nHow to use this template:\n1. Duplicate this file in Obsidian (right-click this file in the file list and choose \"Duplicate\", or copy and paste it).\n2. Rename the duplicated file to your topic name (for example, \"Momentum.md\" or \"Lighting Techniques.md\").\n3. Change the title in the frontmatter above to match your page title.\n\nDo you need to worry about frontmatter (the lines between the --- markers at the top of the file, such as createdSection1 dates or publishForSection1 flags)?\nNo! Use the local AI assistant in Plantoir to help you publish class pages. When this content page is linked from a class page (such as a Unit X, Day Y page) and that class is published, the dates and publishing flags for this page will be set automatically.\n%%\n\nWrite an introduction or opening summary for this page here. Introduce the core question, context, or warm-up problem for your students.\n\n> [!tip] Previewing notes in Obsidian\n> You can preview your formatted notes directly inside Obsidian at any time by pressing **Command-E** (on macOS) or **Control-E** (on Windows) to switch between editing and reading views.\n> \n> Keep in mind that when your site is previewed in Plantoir and deployed to the web, the final styling, fonts, and colours will match your chosen course theme.\n\n## First Main Topic\n\nExplain the key idea, activity, demonstration, or investigation here.\n\n> [!note] Table of contents\n> Every `##` (level 2) and `###` (level 3) heading you use on this page automatically becomes an entry in the **Navigate this page** table of contents on the right side of the page on your class website.\n\n### Supporting Details\n\nAdd sub-sections, worked examples, step-by-step instructions, or callouts as needed.\n\n## Second Main Topic\n\nOrganize further concepts, practice questions, or reflection prompts under additional headings.\n\n",
+            "index.md" : "---\ntitle: Labs\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: true\n---\nThis is the **Labs** folder. Add Markdown files to this folder to build out your site. Optionally, you can remove this `index.md` file and Quartz will then show only a listing of files that exist in this folder instead.\n"
+          },
+          "folders" : [
+
+          ],
+          "path" : "courses/ICS3U/Labs"
+        }
+      ]
+    },
+    {
+      "action" : "setSchoolYear",
+      "files" : [
+        {
+          "after" : "{\n  \"course_code\" : \"ICS3U\",\n  \"course_name\" : \"Introduction to Computer Science\",\n  \"curriculum_folder\" : \"Curriculum\",\n  \"expandable\" : [\n    \"Concepts\"\n  ],\n  \"hidden\" : [\n    \"Media\",\n    \"Tasks\"\n  ],\n  \"include_curriculum_coverage\" : true,\n  \"num_sections\" : 1,\n  \"per_section_files\" : [\n    \"index.md\",\n    \"Announcements.md\"\n  ],\n  \"per_section_folders\" : [\n    \"All Classes\",\n    \"Tasks\"\n  ],\n  \"section_numbers\" : [\n    1\n  ],\n  \"shared_files\" : [\n    \"Learning Goals.md\"\n  ],\n  \"shared_folders\" : [\n    \"Concepts\",\n    \"Curriculum\",\n    \"Tasks\",\n    \"Tests\"\n  ],\n  \"reference_school_year\" : 2025\n}",
+          "before" : "{\n  \"course_code\" : \"ICS3U\",\n  \"course_name\" : \"Introduction to Computer Science\",\n  \"curriculum_folder\" : \"Curriculum\",\n  \"expandable\" : [\n    \"Concepts\"\n  ],\n  \"hidden\" : [\n    \"Media\",\n    \"Tasks\"\n  ],\n  \"include_curriculum_coverage\" : true,\n  \"num_sections\" : 1,\n  \"per_section_files\" : [\n    \"index.md\",\n    \"Announcements.md\"\n  ],\n  \"per_section_folders\" : [\n    \"All Classes\",\n    \"Tasks\"\n  ],\n  \"section_numbers\" : [\n    1\n  ],\n  \"shared_files\" : [\n    \"Learning Goals.md\"\n  ],\n  \"shared_folders\" : [\n    \"Concepts\",\n    \"Curriculum\",\n    \"Tasks\",\n    \"Tests\"\n  ]\n}",
+          "path" : "courses/ICS3U/course_config.json"
+        }
+      ],
+      "madeBy" : "sheet",
+      "members" : [
+        {
+          "after" : 2025,
+          "keyPath" : [
+            "reference_school_year"
+          ],
+          "path" : "courses/ICS3U/course_config.json"
+        }
+      ],
+      "name" : "setSchoolYear",
+      "ops" : [
+        "editJSON"
+      ],
+      "recomputes" : [
+
+      ]
+    }
+  ]
+}

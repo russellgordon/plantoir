@@ -20,7 +20,7 @@ enum PlaceholderClassPlanner {
     // MARK: - Types
 
     /// Why placeholders could not be planned, in words a teacher can act on.
-    enum Problem: LocalizedError {
+    enum Problem: LocalizedError, SaidInACoursesNoun {
         case unitOutOfRange
         case dayOutOfRange
         case countOutOfRange
@@ -32,17 +32,23 @@ enum PlaceholderClassPlanner {
         case noUnitsInANumberedCourse(String, String)
 
         var errorDescription: String? {
+            return sentence(noun: .class)
+        }
+
+        /// The refusal in a course's own noun (#1027): "meeting" in a club.
+        /// The model is given `errorDescription`, the class form (#267).
+        func sentence(noun: ClassNoun) -> String {
             switch self {
             case .noUnitsInANumberedCourse(let code, let word):
-                return NextClassPlanner.Problem.noUnitsInANumberedCourse(code, word).errorDescription
+                return NextClassPlanner.Problem.noUnitsInANumberedCourse(code, word).sentence(noun: noun)
             case .unitOutOfRange:
                 return "A unit number starts at 1."
             case .dayOutOfRange:
                 return "A day number starts at 1."
             case .countOutOfRange:
-                return "Ask for at least one class."
+                return AssistWording.askForAtLeastOneClass(noun: noun)
             case .noTimetable(let code, let number):
-                return "I don’t know when \(code) Section \(number) meets, so I can’t date new classes. Ask for the class dates, then record them first."
+                return AssistWording.cannotDateNewClassesWithoutDates(code: code, number: number, noun: noun)
             case .wrongCourse(let planned, let given):
                 return "That plan is for \(planned), not \(given)."
             }
@@ -98,7 +104,7 @@ enum PlaceholderClassPlanner {
 
         var classes: [PlannedClass] = []
         var alreadyThere: [String] = []
-        var problems: [String] = []
+        var problems: [PlanProblem] = []
 
         let fileManager: FileManager = FileManager.default
         for offset in 0..<count {
@@ -116,7 +122,10 @@ enum PlaceholderClassPlanner {
             }
             if classes.count >= freeDates.count {
                 let undated: Int = count - alreadyThere.count - classes.count
-                problems.append("Only \(freeDates.count) unused class date\(freeDates.count == 1 ? "" : "s") remain in the timetable, so the last \(undated) can’t be dated. Add more class dates and ask again.")
+                let free: Int = freeDates.count
+                problems.append(PlanProblem { noun in
+                    AssistWording.unusedDatesRunShort(free: free, undated: undated, noun: noun)
+                })
                 break
             }
             classes.append(PlannedClass(
@@ -154,7 +163,8 @@ enum PlaceholderClassPlanner {
     @discardableResult
     static func apply(
         _ plan: PlaceholderClassPlan,
-        in course: Course
+        in course: Course,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("addNextClass")
     ) throws -> ClassChangeOutcome {
         if plan.courseCode != course.code {
             throw Problem.wrongCourse(plan.courseCode, course.code)
@@ -166,9 +176,10 @@ enum PlaceholderClassPlanner {
         }
 
 
-        let fileManager: FileManager = FileManager.default
+        // ONE step through the door (#899, U3): every new page together, all
+        // or none; the class folder is made by the door with them.
+        let step: JournaledStep = JournaledStep(course: course, section: plan.sectionNumber, maker: maker)
         let folderURL: URL = ClassPages.folderURL(forSection: plan.sectionNumber, in: course)
-        try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
 
         let tail: String = ClassPages.siblingTimeAndOffset(
             from: ClassPages.list(forSection: plan.sectionNumber, in: course),
@@ -178,7 +189,7 @@ enum PlaceholderClassPlanner {
         var written: [PlannedClass] = []
         var appearedInBetween: [String] = []
         for planned in plan.classes {
-            if fileManager.fileExists(atPath: planned.fileURL.path) {
+            if step.fileExists(planned.fileURL) {
                 appearedInBetween.append(planned.title)
                 continue
             }
@@ -191,9 +202,10 @@ enum PlaceholderClassPlanner {
                 howMany: plan.classes.count,
                 tail: tail
             )
-            try body.write(to: planned.fileURL, atomically: true, encoding: .utf8)
+            step.write(body, to: planned.fileURL)
             written.append(planned)
         }
+        try step.make()
 
         var message: String = ""
         if written.isEmpty {
@@ -264,8 +276,14 @@ struct PlaceholderClassPlan {
     /// Pages that already exist and would be left exactly as they are.
     let alreadyThere: [String]
 
-    /// Anything the teacher should know before saying yes.
-    let problems: [String]
+    /// Anything the teacher should know before saying yes, in both nouns
+    /// (#1027): the card reads the course's, the model the class form.
+    let plannedProblems: [PlanProblem]
+
+    /// The problems as the model reads them: always "class".
+    var problems: [String] {
+        return PlanProblem.sentences(plannedProblems, noun: .class)
+    }
 
     /// Meeting dates still spare once these classes take theirs.
     let spareDatesLeft: Int
@@ -311,7 +329,7 @@ struct PlaceholderClassPlan {
 
         if changesNothing {
             lines.append("Nothing to add — every class asked for in \(whereTheyGo) already exists.")
-            for problem in problems {
+            for problem in PlanProblem.sentences(plannedProblems, noun: noun) {
                 lines.append("• " + problem)
             }
             return lines.joined(separator: "\n")
@@ -328,7 +346,7 @@ struct PlaceholderClassPlan {
             lines.append("\(alreadyThere.count) already exist\(alreadyThere.count == 1 ? "s" : "") and \(alreadyThere.count == 1 ? "is" : "are") left alone: \(SectionTimetableStore.list(alreadyThere)).")
         }
 
-        for problem in problems {
+        for problem in PlanProblem.sentences(plannedProblems, noun: noun) {
             lines.append("• " + problem)
         }
 
@@ -357,7 +375,7 @@ struct PlaceholderClassPlan {
         naming: ClassPageNaming,
         classes: [PlannedClass],
         alreadyThere: [String],
-        problems: [String],
+        problems: [PlanProblem],
         spareDatesLeft: Int,
         sharingTheLastDay: Int = 0,
         timetableSource: String
@@ -368,7 +386,7 @@ struct PlaceholderClassPlan {
         self.naming = naming
         self.classes = classes
         self.alreadyThere = alreadyThere
-        self.problems = problems
+        self.plannedProblems = problems
         self.spareDatesLeft = spareDatesLeft
         self.sharingTheLastDay = sharingTheLastDay
         self.timetableSource = timetableSource

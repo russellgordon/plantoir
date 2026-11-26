@@ -57,6 +57,7 @@ final class FixWithAssistantTests: XCTestCase {
         XCTAssertEqual(fixWith["replaceInTheMessage"] as? [[String]], FixWithAssistant.replaceInTheMessage)
         XCTAssertEqual(Set((fixWith["deployOnlyKinds"] as? [String]) ?? []), FixWithAssistant.deployOnlyKinds)
         XCTAssertEqual(fixWith["notEnabledHelp"] as? String, FixWithAssistant.notEnabledHelp)
+        XCTAssertEqual(fixWith["notInstalledHelp"] as? String, FixWithAssistant.notInstalledHelp)
         for (_, piece) in swiftPieces {
             XCTAssertFalse(piece.contains(";"), "Windows Terminal splits at a semicolon: \(piece)")
         }
@@ -110,11 +111,13 @@ final class FixWithAssistantTests: XCTestCase {
 
     // MARK: - The contract's cases
 
-    /// `fixWith.buttonCases`: shown per assistant installed (hidden, never
-    /// greyed), never on a reference course; enabled while a ticked row is
-    /// still this section's problem — a ticked row fixed in the source is
-    /// LEFT OUT. MUST FAIL if `handover` counts a fixed-in-the-source row,
-    /// or `buttonIsShown` ignores the reference course.
+    /// `fixWith.buttonCases`: every button shown on a live course whatever
+    /// is installed, never on a reference course; each enabled only while its
+    /// assistant is installed (dimmed, not hidden, since #990) and a ticked
+    /// row is still this section's problem — a ticked row fixed in the
+    /// source is LEFT OUT. MUST FAIL if `handover` counts a
+    /// fixed-in-the-source row, `buttonIsShown` ignores the reference
+    /// course, or a button is enabled for an assistant this Mac lacks.
     func testButtonCases() throws {
         let cases: [[String: Any]] = try XCTUnwrap(try FixWithAssistantTests.fixWith()["buttonCases"] as? [[String: Any]])
         XCTAssertGreaterThanOrEqual(cases.count, 9)
@@ -149,30 +152,26 @@ final class FixWithAssistantTests: XCTestCase {
                 }
             )
 
-            XCTAssertEqual(
-                FixWithAssistant.buttonIsShown(
-                    assistantIsInstalled: try XCTUnwrap(testCase["claudeInstalled"] as? Bool),
-                    courseIsKeptForReference: reference
-                ),
-                expect["claudeShown"] as? Bool, name
-            )
-            XCTAssertEqual(
-                FixWithAssistant.buttonIsShown(
-                    assistantIsInstalled: try XCTUnwrap(testCase["codexInstalled"] as? Bool),
-                    courseIsKeptForReference: reference
-                ),
-                expect["codexShown"] as? Bool, name
-            )
+            let shown: Bool = FixWithAssistant.buttonIsShown(courseIsKeptForReference: reference)
+            XCTAssertEqual(shown, expect["claudeShown"] as? Bool, name)
+            XCTAssertEqual(shown, expect["codexShown"] as? Bool, name)
+            XCTAssertEqual(shown, expect["copilotShown"] as? Bool, name)
+            let claudeInstalled: Bool = try XCTUnwrap(testCase["claudeInstalled"] as? Bool)
+            let codexInstalled: Bool = try XCTUnwrap(testCase["codexInstalled"] as? Bool)
             let copilotInstalled: Bool = try XCTUnwrap(testCase["copilotInstalled"] as? Bool, "\(name) (#783)")
-            XCTAssertEqual(
-                FixWithAssistant.buttonIsShown(
-                    assistantIsInstalled: copilotInstalled,
-                    courseIsKeptForReference: reference
-                ),
-                expect["copilotShown"] as? Bool, name
+            let claudeEnabled: Bool = FixWithAssistant.buttonIsEnabled(
+                assistantIsInstalled: claudeInstalled, hasRows: handover.hasRows
             )
-            if copilotInstalled && (expect["copilotShown"] as? Bool) == true
-                && (expect["claudeShown"] as? Bool) == false && (expect["codexShown"] as? Bool) == false {
+            let codexEnabled: Bool = FixWithAssistant.buttonIsEnabled(
+                assistantIsInstalled: codexInstalled, hasRows: handover.hasRows
+            )
+            let copilotEnabled: Bool = FixWithAssistant.buttonIsEnabled(
+                assistantIsInstalled: copilotInstalled, hasRows: handover.hasRows
+            )
+            XCTAssertEqual(claudeEnabled, try XCTUnwrap(expect["claudeEnabled"] as? Bool, "\(name) (#990)"), name)
+            XCTAssertEqual(codexEnabled, try XCTUnwrap(expect["codexEnabled"] as? Bool, "\(name) (#990)"), name)
+            XCTAssertEqual(copilotEnabled, try XCTUnwrap(expect["copilotEnabled"] as? Bool, "\(name) (#990)"), name)
+            if shown && copilotEnabled && !claudeEnabled && !codexEnabled {
                 sawCopilotAlone = true
             }
             XCTAssertEqual(handover.hasRows, expect["enabled"] as? Bool, name)
@@ -180,7 +179,7 @@ final class FixWithAssistantTests: XCTestCase {
             XCTAssertEqual(handover.unticked, expect["unticked"] as? Int, name)
             XCTAssertEqual(handover.fixedInTheSource, expect["fixedInTheSource"] as? Int, name)
         }
-        XCTAssertTrue(sawCopilotAlone, "a case with GitHub Copilot the only button (#783)")
+        XCTAssertTrue(sawCopilotAlone, "a case with GitHub Copilot the only button that can be pressed (#783)")
     }
 
     /// The buttons are listed in the order the doors are shown, Claude,
@@ -529,8 +528,8 @@ final class FixWithAssistantTests: XCTestCase {
 
     /// The view's half, read from its source: presence is the app-level
     /// answer (no disk read while the table draws), the buttons are hidden
-    /// per assistant and on a reference course, disabled with nothing to
-    /// hand over, Revise With's refusal is made at the click, the door is
+    /// on a reference course, each disabled by the one rule (its assistant
+    /// missing, or nothing to hand over), Revise With's refusal is made at the click, the door is
     /// given the message, and the trail line is written only once it opened.
     func testTheViewShowsHidesAndOpensAsTheRuleSays() throws {
         let view: String = try FixWithAssistantTests.readSource("QuartzTeachers/Views/Section/ProblemsTableView.swift")
@@ -539,7 +538,9 @@ final class FixWithAssistantTests: XCTestCase {
         XCTAssertTrue(view.contains("presence.codexIsInstalled"))
         XCTAssertTrue(view.contains("presence.copilotIsInstalled"))
         XCTAssertTrue(view.contains("courseIsKeptForReference: course.isKeptForReference"))
-        XCTAssertTrue(view.contains(".disabled(!handover.hasRows)"))
+        XCTAssertTrue(view.contains(
+            ".disabled(!FixWithAssistant.buttonIsEnabled(assistantIsInstalled: installed, hasRows: hasRows))"
+        ))
         let fix: String = try FixWithAssistantTests.body(of: "func fix(with assistant:", in: view)
         XCTAssertTrue(fix.contains("workspace.reviseRefusal(item: item"), "Revise With's refusal at the click")
         XCTAssertTrue(fix.contains("greeting: greeting.text"))
@@ -550,21 +551,41 @@ final class FixWithAssistantTests: XCTestCase {
 
     /// #776: while the buttons cannot be pressed, each tells VoiceOver why
     /// (`fixWith.notEnabledHelp`), and while they can, it says nothing more.
-    /// Every button takes the hint from the one rule, so none can drift.
+    /// #990: a button dimmed because its assistant is not on this Mac says
+    /// that instead (`fixWith.notInstalledHelp`). Every button takes the hint
+    /// from the one rule, so none can drift.
     func testTheButtonsSayWhyOnlyWhileTheyCannotBePressed() throws {
         let fixWith: [String: Any] = try FixWithAssistantTests.fixWith()
         let sentence: String = try XCTUnwrap(fixWith["notEnabledHelp"] as? String)
-        XCTAssertEqual(FixWithAssistant.buttonHint(hasRows: false), sentence, "disabled: the reason")
-        XCTAssertEqual(FixWithAssistant.buttonHint(hasRows: true), "", "enabled: no hint")
+        let notInstalled: String = try XCTUnwrap(fixWith["notInstalledHelp"] as? String)
+        XCTAssertEqual(FixWithAssistant.buttonHint(assistantIsInstalled: true, hasRows: false), sentence, "disabled: the reason")
+        XCTAssertEqual(FixWithAssistant.buttonHint(assistantIsInstalled: true, hasRows: true), "", "enabled: no hint")
+        XCTAssertEqual(FixWithAssistant.buttonHint(assistantIsInstalled: false, hasRows: true), notInstalled, "not on this Mac")
+        XCTAssertEqual(FixWithAssistant.buttonHint(assistantIsInstalled: false, hasRows: false), notInstalled, "not on this Mac")
+        // #990, second review: a help tag stays within the HIG's 60 to 75
+        // characters (Offering help, "Be brief"), and it names the place
+        // Revise With ▸ Set Up an Assistant… really opens.
+        XCTAssertLessThanOrEqual(notInstalled.count, 75, "the not-installed help tag is brief")
+        XCTAssertTrue(notInstalled.contains("Settings ▸ \(AssistantSetUpWording.paneTitle)"), "it names the pane that sets one up")
 
         let view: String = try FixWithAssistantTests.readSource("QuartzTeachers/Views/Section/ProblemsTableView.swift")
         let buttons: String = try FixWithAssistantTests.body(of: "var fixButtons: some View {", in: view)
-        let hint: String = ".accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))"
         XCTAssertEqual(
-            buttons.components(separatedBy: hint).count - 1,
+            buttons.components(separatedBy: "fixButton(.").count - 1,
             FixWithAssistant.Assistant.allCases.count,
-            "every button carries the hint, one per door"
+            "one button per door, every one through fixButton"
         )
+        let button: String = try FixWithAssistantTests.body(of: "func fixButton(", in: view)
+        XCTAssertTrue(button.contains(
+            ".accessibilityHint(Text(FixWithAssistant.buttonHint(assistantIsInstalled: installed, hasRows: hasRows)))"
+        ))
+        // #990 review: the same reason as a help tag, so a sighted teacher
+        // holding the pointer over a dimmed button reads it too (HIG,
+        // Offering help: context-sensitive tooltips). MUST FAIL on
+        // 23b554773, where only VoiceOver was told.
+        XCTAssertTrue(button.contains(
+            ".help(FixWithAssistant.buttonHint(assistantIsInstalled: installed, hasRows: hasRows))"
+        ), "the dimmed button's help tag says why")
     }
 
     // MARK: - Helpers

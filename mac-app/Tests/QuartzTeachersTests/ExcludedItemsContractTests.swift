@@ -89,7 +89,7 @@ final class ExcludedItemsContractTests: XCTestCase {
                     let editor: StringListEditorView = CourseSettingsGestureScript.editor(
                         for: try ExcludedItemsContractTests.gestureList(removal["list"]), of: view
                     )
-                    editor.removeItem(named: try XCTUnwrap(removal["name"], caseName))
+                    editor.takeOutOfTheList(named: try XCTUnwrap(removal["name"], caseName))
                 } else if let addition = step["add"] as? [String: String] {
                     let editor: StringListEditorView = CourseSettingsGestureScript.editor(
                         for: try ExcludedItemsContractTests.gestureList(addition["list"]), of: view
@@ -139,7 +139,7 @@ final class ExcludedItemsContractTests: XCTestCase {
         let viewB: CourseSettingsView = CourseSettingsView(course: windowB)
 
         windowA.configuration.courseName = "An unrelated unsaved edit in A"
-        CourseSettingsGestureScript.editor(for: .perSectionFolders, of: viewB).removeItem(named: "Labs")
+        CourseSettingsGestureScript.editor(for: .perSectionFolders, of: viewB).takeOutOfTheList(named: "Labs")
         viewB.save()
 
         viewA.revertToFile()
@@ -152,8 +152,8 @@ final class ExcludedItemsContractTests: XCTestCase {
         XCTAssertEqual(reverted, [], "A never excluded anything")
         XCTAssertEqual(windowA.configuration.excludedItems(forScope: "per_section"), ["Labs"], "A now shows B's save")
 
-        CourseSettingsGestureScript.editor(for: .sharedFolders, of: viewA).removeItem(named: "Tests")
-        CourseSettingsGestureScript.editor(for: .sharedFolders, of: viewB).removeItem(named: "Concepts")
+        CourseSettingsGestureScript.editor(for: .sharedFolders, of: viewA).takeOutOfTheList(named: "Tests")
+        CourseSettingsGestureScript.editor(for: .sharedFolders, of: viewB).takeOutOfTheList(named: "Concepts")
         viewB.save()
         viewA.revertToFile()
         reverted = []

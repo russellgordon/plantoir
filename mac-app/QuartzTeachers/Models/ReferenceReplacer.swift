@@ -71,6 +71,11 @@ enum ReferenceReplacer {
     enum Problem: LocalizedError, Equatable {
         case notOnTheShelf(course: String)
         case busy(course: String)
+        /// A Rename folder of the course under way in a window (#899 U4b):
+        /// the sequence case "a folder in it is being renamed", said with
+        /// `undo.wording.renameFolderUnderWay` (U4b2-6). Mac only for now:
+        /// Windows has no off-thread rename yet (W8) and no replace (#826).
+        case folderBeingRenamed(course: String)
         case openInObsidian(course: String)
         case couldNotBackUp(course: String)
         /// A backup was made and did not hold the whole course (plan review
@@ -88,6 +93,8 @@ enum ReferenceReplacer {
                 return ReferenceReplaceWording.notOnTheShelf(course: course)
             case .busy(let course):
                 return ReferenceReplaceWording.replaceWhileBusy(course: course)
+            case .folderBeingRenamed(let course):
+                return CourseActivity.folderRenameIsUnderWay(course: course)
             case .openInObsidian(let course):
                 return ReferenceReplaceWording.openInObsidian(course: course)
             case .couldNotBackUp(let course):
@@ -109,6 +116,8 @@ enum ReferenceReplacer {
                 return "notOnTheShelf"
             case .busy:
                 return "replaceWhileBusy"
+            case .folderBeingRenamed:
+                return "replaceWhileAFolderIsRenamed"
             case .openInObsidian:
                 return "openInObsidian"
             case .couldNotBackUp:
@@ -353,6 +362,9 @@ enum ReferenceReplacer {
             return .notOnTheShelf(course: folderName)
         }
         let workingFolderPath: String = coursesDirectoryURL.deletingLastPathComponent().path
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workingFolderPath, courseCode: folderName) {
+            return .folderBeingRenamed(course: old.displayCode)
+        }
         if world.isBusy(workingFolderPath, folderName, true) {
             return .busy(course: old.displayCode)
         }
@@ -456,6 +468,11 @@ enum ReferenceReplacer {
         }
         let course: String = old.displayCode
         let group: String = ReferenceReplacer.groupLabel(for: old, coursesDirectoryURL: coursesDirectoryURL)
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workingFolderPath, courseCode: folderName) {
+            throw ReferenceReplacer.givingUp(
+                .folderBeingRenamed(course: course), asked: asked, group: group, stagingURL: stagingURL, world: world
+            )
+        }
         if world.isBusy(workingFolderPath, folderName, true) {
             throw ReferenceReplacer.givingUp(
                 .busy(course: course), asked: asked, group: group, stagingURL: stagingURL, world: world
@@ -991,7 +1008,7 @@ enum ReferenceReplacer {
         _ = world.removeTree(stagingURL)
         var course: String = asked.folderName
         switch problem {
-        case .notOnTheShelf(let named), .busy(let named), .openInObsidian(let named),
+        case .notOnTheShelf(let named), .busy(let named), .folderBeingRenamed(let named), .openInObsidian(let named),
              .couldNotBackUp(let named), .couldNotReplace(let named), .couldNotPutBackYet(let named):
             course = named
         case .backupIsIncomplete(let named, _):

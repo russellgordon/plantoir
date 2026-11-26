@@ -889,16 +889,21 @@ enum StartOfYearPlanner {
     /// answer asked of the BUILT SITE's reader, not assumed.
     static func apply(
         _ plan: StartOfYearPlan,
-        in course: Course
+        in course: Course,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("getReadyForTheStartOfTheYear")
     ) throws -> (change: AssistChange, leftAlone: [String]) {
-        let applied: (change: AssistChange, leftAlone: [String]) = try AssistPublishPlanner.apply(
-            plan.publishPlan, forSection: plan.sectionNumber, in: course
+        // ONE step through the door (#899, U3): the pages hidden, the stray
+        // keys set, all or none; the front page is the rule's (`recompute`),
+        // repointed once after the step, which is where the two repoints of
+        // before U3 left it.
+        let step: JournaledStep = JournaledStep(course: course, section: plan.sectionNumber, maker: maker)
+        let applied: AssistPublishPlanner.PlannedWrites = try AssistPublishPlanner.planWrites(
+            plan.publishPlan, forSection: plan.sectionNumber, in: course, into: step
         )
-        var files: [AssistSavedFile] = applied.change.files
-        var fixedAny: Bool = false
+        var files: [AssistSavedFile] = applied.saved
         for planned in plan.publishPlan.changes {
             let url: URL = planned.page.fileURL
-            guard let current = try? String(contentsOf: url, encoding: .utf8),
+            guard let current = step.readText(url),
                   PageVisibilityReader.answer(in: current, forSection: plan.sectionNumber) != .hidden else {
                 continue
             }
@@ -908,17 +913,19 @@ enum StartOfYearPlanner {
             if fixed.outcome != .written || fixed.text == current {
                 continue
             }
-            try fixed.text.write(to: url, atomically: true, encoding: .utf8)
-            fixedAny = true
+            step.write(fixed.text, to: url)
             StartOfYearPlanner.merge(
                 AssistSavedFile(fileURL: url, before: current, after: fixed.text), into: &files
             )
         }
-        // The front page was repointed inside `AssistPublishPlanner.apply`,
-        // BEFORE the pass above — while a class carrying the stray key still
-        // read as visible, so it may still embed that class (the review's H2,
-        // measured). Repoint again once the pass has written anything.
-        if fixedAny, let repointed = SectionIndexPointer.repointIndex(forSection: plan.sectionNumber, in: course) {
+        step.keepsTheFrontPageTrue(
+            of: plan.sectionNumber, at: SectionIndexPointer.indexURL(forSection: plan.sectionNumber, in: course)
+        )
+        try step.make()
+        // Repointed once every page is written, so a class that carried the
+        // stray key is not still embedded (the review's H2, measured: the
+        // first repoint ran before that pass).
+        if let repointed = SectionIndexPointer.repointIndex(forSection: plan.sectionNumber, in: course) {
             StartOfYearPlanner.merge(repointed, into: &files)
         }
         let change: AssistChange = AssistChange(

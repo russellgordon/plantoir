@@ -105,7 +105,7 @@ public sealed class TodaysClassContractTests : IDisposable
             if (c["expectAfterYes"] is not JsonObject after) continue;
             var outcome = workspace.ShowTodaysClass("ICS3U", section, today, offer);
             string written = File.ReadAllText(index);
-            if (outcome != TodaysClassOnTheFrontPage.Outcome.Written) failures.Add($"{name}: Yes gave {outcome}");
+            if (outcome is not TodaysClassOnTheFrontPage.Outcome.Written) failures.Add($"{name}: Yes gave {outcome}");
             if (Body(written) != after["body"]!.ToString())
                 failures.Add($"{name}: body\n  expected {System.Text.Json.JsonSerializer.Serialize(after["body"]!.ToString())}\n  got      {System.Text.Json.JsonSerializer.Serialize(Body(written))}");
             if (CreatedDay(written) != after["createdDay"]!.ToString())
@@ -137,7 +137,7 @@ public sealed class TodaysClassContractTests : IDisposable
         string before = File.ReadAllText(index);
         // After midnight: decided again for the day ASKED, still Yes-able —
         // but answered as if for tomorrow, no class is today's, nothing written.
-        Assert.Equal(TodaysClassOnTheFrontPage.Outcome.NoLongerOffered,
+        Assert.IsType<TodaysClassOnTheFrontPage.Outcome.NoLongerOffered>(
                      workspace.ShowTodaysClass("ICS3U", section, today.AddDays(3), offer));
         Assert.Equal(before, File.ReadAllText(index));
     }
@@ -154,6 +154,179 @@ public sealed class TodaysClassContractTests : IDisposable
         Assert.Equal(w["notChangedTitle"]!.ToString(), TodaysClassOnTheFrontPage.NotChangedTitle);
         Assert.Equal(w["noLongerOffered"]!.ToString().Replace("{noun}", "class"), TodaysClassOnTheFrontPage.NoLongerOffered(ClassNoun.Class));
         Assert.Equal(w["couldNotSave"]!.ToString().Replace("{shown}", "Y"), TodaysClassOnTheFrontPage.CouldNotSave("Y"));
+
+        // The kept-file alert (#899 W7b2-9, Russell's ruling of 2026-11-25 (a)).
+        Assert.Equal(w["keptTitle"]!.ToString().Replace("{class}", "X"), TodaysClassOnTheFrontPage.KeptTitle("X"));
+        Assert.Equal(w["kept"]!.ToString().Replace("{kept}", "K"), TodaysClassOnTheFrontPage.KeptSentence("K"));
+        Assert.Equal(w["keptGone"]!.ToString().Replace("{kept}", "K"), TodaysClassOnTheFrontPage.KeptGoneSentence("K"));
+        // showKept is the one key Windows says in its own words: the button
+        // opens the folder, never the file (keptOnWindows.showKept), the path
+        // bar's open action.
+        var onWindows = Rule["keptOnWindows"]!;
+        Assert.Equal(onWindows["showKept"]!.ToString(), TodaysClassOnTheFrontPage.OpenKeptFolder);
+        Assert.Equal(onWindows["hiddenItems"]!.ToString(), TodaysClassOnTheFrontPage.HiddenItems);
+        var pathBarOpen = ContractLoader.LoadJson("shared-rules.json")["workingFolderPathBar"]!["actions"]!.AsArray()
+            .First(action => action!["action"]!.ToString() == "open")!;
+        Assert.Equal(pathBarOpen["windowsLabel"]!.ToString(), TodaysClassOnTheFrontPage.OpenKeptFolder);
+
+        // Every key the contract has is compared above or held by name in
+        // NamedGapLedger: a key added on the mac turns this red rather than
+        // passing unseen. A held key fails the day it is said here.
+        var saidHere = new[] { "question", "because", "show", "notToday", "notChangedTitle", "noLongerOffered", "couldNotSave",
+                               "keptTitle", "kept", "showKept", "keptGone" };
+        var keys = w.AsObject().Select(pair => pair.Key).ToList();
+        var held = NamedGapLedger.GapsIn(NamedGapLedger.TodaysClassWording, keys, saidHere);
+        foreach (string key in keys)
+            Assert.True(saidHere.Contains(key) || held.Contains(key), $"todaysClassOnTheFrontPage.wording.{key} is neither said here nor held");
+    }
+
+    /// <summary>
+    /// The kept-file alert's message (#899 W7b2-9): one <c>kept</c> sentence
+    /// per kept name, then the sentence that says how to see hidden items,
+    /// since the file stays hidden on Windows (Russell's ruling of 2026-11-25 (a)).
+    /// </summary>
+    [Fact]
+    public void TheKeptAlertNamesTheFileThenSaysHowToSeeHiddenItems()
+    {
+        var w = Rule["wording"]!;
+        string name = ".index.md.plantoir-undo-0123-orig";
+        string expected = w["kept"]!.ToString().Replace("{kept}", name) + " " + Rule["keptOnWindows"]!["hiddenItems"]!.ToString();
+        Assert.Equal(expected, TodaysClassOnTheFrontPage.KeptMessage([name]));
+    }
+
+    /// <summary>
+    /// The kept-file alert's make-up, read without a screen (W7b2-9 review 1,
+    /// MEDIUM 1): titled with the class the page NOW shows (<c>Show</c>, never
+    /// <c>Shows</c>), the message, Open Folder as the action, and OK as the
+    /// closing button and the default, so Enter and Escape are both OK.
+    /// </summary>
+    [Fact]
+    public void TheKeptAlertIsTitledWithTheClassNowShownWithOkTheDefaultAndTheClose()
+    {
+        var w = Rule["wording"]!;
+        var offer = new TodaysClassOnTheFrontPage.Offering("Unit 2, Day 5", "Unit 2, Day 4", Path.Combine(_folder, "Unit 2, Day 5.md"));
+        string kept = Path.Combine(_folder, ".index.md.plantoir-undo-1-apply-orig");
+
+        var alert = TodaysClassOnTheFrontPage.KeptAlertFor(offer, new TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept([kept]));
+
+        Assert.Equal(new TodaysClassOnTheFrontPage.AlertDescription(
+                         w["keptTitle"]!.ToString().Replace("{class}", "Unit 2, Day 5"),
+                         TodaysClassOnTheFrontPage.KeptMessage([".index.md.plantoir-undo-1-apply-orig"]),
+                         Rule["keptOnWindows"]!["showKept"]!.ToString(),
+                         "OK",
+                         TodaysClassOnTheFrontPage.AlertButton.Close),
+                     alert.Shows);
+        Assert.Equal([kept], alert.KeptOriginals);
+    }
+
+    /// <summary>The <c>keptGone</c> alert: its sentences alone, with OK as the closing button and the default, and no action.</summary>
+    [Fact]
+    public void TheGoneAlertSaysItsSentenceWithOkAlone()
+    {
+        string sentence = Rule["wording"]!["keptGone"]!.ToString().Replace("{kept}", "K");
+        Assert.Equal(new TodaysClassOnTheFrontPage.AlertDescription(null, sentence, null, "OK", TodaysClassOnTheFrontPage.AlertButton.Close),
+                     TodaysClassOnTheFrontPage.GoneAlert(sentence));
+    }
+
+    /// <summary>
+    /// The section window only renders the description (read from source:
+    /// the WinUI app cannot be loaded here). The two lines that wire the
+    /// press are pinned whole, and each appears once; <c>ShowAlertAsync</c>
+    /// is cut out of the file and pinned WHOLE, so a line added to it (a
+    /// second default, another button, an alert not shown answered as Open
+    /// Folder) goes red (W7b2-9 review 2, LOW 1: a line matched anywhere in
+    /// the file, such as <c>_ => null,</c>, proved nothing about the method).
+    /// </summary>
+    [Fact]
+    public void TheSectionWindowOnlyRendersTheKeptAlertsDescription()
+    {
+        string view = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"))
+                          .Replace("\r\n", "\n");   // a Windows checkout has CRLF
+        string[] lines =
+        [
+            "                var alert = TodaysClassOnTheFrontPage.KeptAlertFor(offer, kept);\n",
+            "                await alert.PressedAsync(await ShowAlertAsync(alert.Shows), ShowAlertAsync, FolderActions.OpenFolder);\n",
+        ];
+        foreach (string line in lines)
+        {
+            int first = view.IndexOf(line, StringComparison.Ordinal);
+            Assert.True(first >= 0, "missing: " + line.Trim());
+            Assert.True(view.IndexOf(line, first + 1, StringComparison.Ordinal) < 0, "said twice: " + line.Trim());
+        }
+
+        const string signature = "    private async Task<TodaysClassOnTheFrontPage.AlertButton?> ShowAlertAsync(TodaysClassOnTheFrontPage.AlertDescription alert)\n";
+        int start = view.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, "ShowAlertAsync is missing");
+        Assert.True(view.IndexOf(signature, start + 1, StringComparison.Ordinal) < 0, "ShowAlertAsync is said twice");
+        int end = view.IndexOf("\n    }\n", start, StringComparison.Ordinal) + "\n    }\n".Length;
+        Assert.Equal(
+            signature +
+            "    {\n" +
+            "        var dialog = new ContentDialog\n" +
+            "        {\n" +
+            "            Title = alert.Title,\n" +
+            "            Content = new TextBlock { Text = alert.Message, TextWrapping = TextWrapping.Wrap },\n" +
+            "            CloseButtonText = alert.CloseButton,\n" +
+            "            DefaultButton = alert.Default == TodaysClassOnTheFrontPage.AlertButton.Action ? ContentDialogButton.Primary : ContentDialogButton.Close,\n" +
+            "        };\n" +
+            "        if (alert.ActionButton is { } action) dialog.PrimaryButtonText = action;\n" +
+            "        return await ShowDialogSafelyAsync(dialog) switch\n" +
+            "        {\n" +
+            "            ContentDialogResult.Primary => TodaysClassOnTheFrontPage.AlertButton.Action,\n" +
+            "            ContentDialogResult.None => TodaysClassOnTheFrontPage.AlertButton.Close,\n" +
+            "            _ => null,\n" +
+            "        };\n" +
+            "    }\n",
+            view[start..end]);
+        Assert.DoesNotContain("ShowInFileExplorer", view[view.IndexOf("KeptAlertFor(", StringComparison.Ordinal)..view.IndexOf("ShowAlertAsync(TodaysClassOnTheFrontPage.AlertDescription", StringComparison.Ordinal)]);
+    }
+
+    /// <summary>
+    /// No sentence of the kept-file alert says a word <c>plainWordsCheck</c>
+    /// rules out (the mac's T3 list), checked FILLED; the one exception is a
+    /// name the contract lists in <c>plainWordsExceptions</c> (W7b2-9 review 1, LOW 1).
+    /// </summary>
+    [Fact]
+    public void NoKeptAlertSentenceSaysATechnicalWord()
+    {
+        string[] words = ["transclude", "transcludes", "transcluded", "transclusion", "transclusions",
+                          "embed", "embeds", "embedded", "index", "file", "frontmatter", "link"];
+        string plain = Rule["plainWordsCheck"]!.ToString();
+        foreach (string word in new[] { "transclude", "embed", "index", "file", "frontmatter", "link" })
+            Assert.Contains($"“{word}”", plain);
+        var exceptions = new List<string>();
+        foreach (JsonNode? exception in Rule["plainWordsExceptions"]!.AsArray()) exceptions.Add(exception!["name"]!.ToString());
+        Assert.Equal(["File Explorer"], exceptions);
+
+        var scopes = new List<string>();
+        foreach (JsonNode? exception in Rule["plainWordsExceptions"]!.AsArray()) scopes.Add(exception!["in"]!.ToString());
+        Assert.Equal(["keptOnWindows.hiddenItems"], scopes);
+
+        // Each filled sentence by the contract key it says, so a name is taken
+        // out only of the sentence its `in` names (W7b2-9 review 2, LOW 2).
+        string message = TodaysClassOnTheFrontPage.KeptMessage(["KEPT"]);
+        Assert.EndsWith(" " + TodaysClassOnTheFrontPage.HiddenItems, message, StringComparison.Ordinal);
+        (string Key, string Sentence)[] sentences =
+        [
+            ("wording.keptTitle", TodaysClassOnTheFrontPage.KeptTitle("Unit 2, Day 5")),
+            ("wording.kept", message[..^(" " + TodaysClassOnTheFrontPage.HiddenItems).Length]),
+            ("keptOnWindows.hiddenItems", TodaysClassOnTheFrontPage.HiddenItems),
+            ("keptOnWindows.showKept", TodaysClassOnTheFrontPage.OpenKeptFolder),
+            ("wording.keptGone", TodaysClassOnTheFrontPage.KeptGoneSentence("KEPT")),
+        ];
+        foreach ((string key, string sentence) in sentences)
+        {
+            string checkedText = sentence;
+            for (int index = 0; index < exceptions.Count; index++)
+            {
+                if (scopes[index] == key) checkedText = checkedText.Replace(exceptions[index], " ", StringComparison.Ordinal);
+            }
+            var said = new HashSet<string>();
+            foreach (string piece in System.Text.RegularExpressions.Regex.Split(checkedText.ToLowerInvariant(), "[^\\p{L}]+"))
+                if (piece.Length > 0) said.Add(piece);
+            foreach (string word in words)
+                Assert.False(said.Contains(word), $"“{sentence}” says “{word}”");
+        }
     }
 
     /// <summary>

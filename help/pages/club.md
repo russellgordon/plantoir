@@ -5,6 +5,7 @@ covers:
 - mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift
 - mac-app/QuartzTeachers/Models/WizardWording.swift
 - mac-app/QuartzTeachers/Models/UnitWordRenameWording.swift
+- mac-app/QuartzTeachers/Models/SubjectMenuLayout.swift
 - contracts/shared-rules.json
 - contracts/class-planning.json
 keywords:
@@ -47,6 +48,7 @@ The {{control:newCourseSheetMeetingsPart}} part has one more choice, which sets 
 - Its pages are numbered one after another, with no units and days.
 - It has no curriculum, and no ready-made pages or starting skeleton.
 - It starts with empty folders and one page, for its first meeting.
+- While a club is selected, the menu that a course calls Classes is titled Meetings. It holds the same items, in the same order, and they say meeting in place of class: {{say:shared-rules#subjectMenus.layout.itemTitles.items.addClass.titleForAMeeting}}, {{say:shared-rules#subjectMenus.layout.itemTitles.items.classDates.titleForAMeeting}}, {{say:shared-rules#subjectMenus.layout.itemTitles.items.reDateClasses.titleForAMeeting}} and {{say:shared-rules#subjectMenus.layout.itemTitles.items.makeRoomForClasses.titleForAMeeting}}. In the Section menu, {{say:shared-rules#subjectMenus.layout.itemTitles.items.publishClassForADate.titleForAMeeting}} does the same.
 
 Everything else works as it does for a course. You write the pages in Obsidian, then preview and deploy.
 

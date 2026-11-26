@@ -58,11 +58,15 @@ nonisolated enum ObsidianFigureAddOnsWording {
 
     /// The facts under either sentence, a line each (#834, Russell on #742):
     /// Add Them closes the whole of Obsidian, so every other course open in
-    /// it closes too, and only this course opens again.
+    /// it closes too. What opens again is every vault Obsidian's list marks
+    /// open — courses or not — then this one (`reopenObsidianWithAddOns`),
+    /// which is this one alone when the list cannot be read. Until #995 the
+    /// value said "{course} only", true only in that second case; it now
+    /// says what the closing question's own line says, in the same words.
     static let closesLabel: String = "Closes"
     static let closesValue: String = "Obsidian, with every course open in it, not only {course}"
     static let opensAgainLabel: String = "Opens again"
-    static let opensAgainValue: String = "{course} only"
+    static let opensAgainValue: String = "{course}, and everything else Obsidian had open"
     static let keptLabel: String = "Kept"
     static let keptValue: String = "Everything you have written"
 
@@ -75,8 +79,10 @@ nonisolated enum ObsidianFigureAddOnsWording {
     /// nothing is written into an open course (plan review S3).
     static let reopenTitle: String = "Reopen Obsidian to show diagrams and graphs?"
     static let reopenMessage: String = "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”."
-    static let reopen: String = "Reopen Obsidian"
-    static let later: String = "Later"
+    static let reopen: String = "Close and Reopen Obsidian"
+    /// "Not Now" on an offer Plantoir raised by itself (#987, Russell's
+    /// ruling Q2 on #975). It was "Later".
+    static let later: String = "Not Now"
 
     /// Plantoir ▸ Settings ▸ Obsidian.
     static let paneTitle: String = "Obsidian"

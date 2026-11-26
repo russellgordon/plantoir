@@ -3,6 +3,7 @@ id: class-dates
 checked: 2.0.0
 covers:
 - mac-app/QuartzTeachers/Views/Section/SectionScheduleSheet.swift
+- mac-app/QuartzTeachers/Views/Section/ClassDatesTextBox.swift
 - mac-app/QuartzTeachers/Models/SectionScheduleSource.swift
 - mac-app/QuartzTeachers/Models/SectionTimetable.swift
 - mac-app/QuartzTeachers/Views/Section/SectionDetailVerbs.swift
@@ -44,6 +45,10 @@ alt: The class dates sheet with dates pasted in, the field that says where they 
 6. If Plantoir asks which way round the dates are, answer it. The next part of this page explains the question.
 7. Read the plan. It says how many dates there are, and gives the first and the last with their weekdays. It also says where they came from, and what they replace if the section already had dates.
 8. Press {{control:rememberTheseDates}}. The sheet closes. {{control:classDatesBack}} returns to the dates, and {{control:cancel}} closes the sheet with nothing remembered.
+
+{{mac}}
+In the box of dates, the Tab key moves on to the next field and types nothing in the box.
+{{/mac}}
 
 The dates are kept inside the course's folder. They travel with the course when it is backed up, archived or restored.
 
@@ -95,4 +100,4 @@ If you choose one for a section with no dates on file, this sheet opens first, w
 - **The address is not a Google Sheet's.** Copy it from the browser's address bar while the sheet is open. A link that Google makes for showing a sheet as a web page of its own does not work, and the sheet says so. Use the address of the sheet itself, which ends in `/edit`.
 - **Google sent a sign-in page.** The sheet is not shared. Share it as described above.
 - **The file is refused.** It is not a .csv or .ics file, or it is a calendar file with no events in it.
-- **{{menu:classDates}} is greyed.** The course is kept for reference, or the section is busy with a deploy, a backup or another command from the Section menu.
+- **{{menu:classDates}} is greyed.** The course is kept for reference, or the section is busy with a deploy, a backup or another command from the Section or Classes menu.

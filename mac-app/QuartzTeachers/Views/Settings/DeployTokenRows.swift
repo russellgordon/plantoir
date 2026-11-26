@@ -45,8 +45,8 @@ struct DeployTokenRows: View {
                     ProgressView()
                         .controlSize(.small)
                 }
-                Text(panel.statusLine())
-                    .foregroundStyle(statusNeedsAttention ? Color.orange : Color.primary)
+                StatusColour.sentence(panel.statusLine(), wornAs: statusNeedsAttention ? .warning : nil)
+                    .foregroundStyle(statusNeedsAttention ? AnyShapeStyle(StatusColour.warning.style) : AnyShapeStyle(Color.primary))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("\(panel.destination.rawValue)TokenStatus")
             }
@@ -93,22 +93,35 @@ struct DeployTokenRows: View {
             )
             .alert(
                 DeployTokenWording.unreachableQuestionTitle(count: panel.unreachablePlaces.count),
-                // Closed only by its two buttons, each of which settles the
-                // question itself, so the setter has nothing to do. Return is
-                // the first button: `.cancel` with `.defaultAction` on one
-                // button gives it Return and gives Escape to nothing, as
-                // QuestionKeysTests records from #832, and Return is the
-                // answer that changes nothing.
+                // Closed by its two buttons, each of which settles the
+                // question itself. A close by any other route (Command-Period)
+                // is Cancel, so the setter keeps the old token (#987).
                 isPresented: Binding(
                     get: { panel.isAskingAboutUnreachable },
-                    set: { _ in }
+                    set: { (showing: Bool) in
+                        if !showing && panel.isAskingAboutUnreachable {
+                            panel.keepTheOldToken()
+                        }
+                    }
                 )
             ) {
-                Button(panel.keepButtonTitle, role: .cancel) {
+                // #987 (D2): Cancel answers Escape and Command-Period, and no
+                // button is the default, because the new token would move
+                // students' links. Alerts: "Note that you don't want to make
+                // a Cancel button the default button"; "If you want to
+                // encourage people to read an alert and not just
+                // automatically press Return to dismiss it, avoid making any
+                // button the default button." Use the New Token is red: the
+                // teacher chose to change the token, not to break the links,
+                // and Alerts asks for the destructive style on "a destructive
+                // action people didn't deliberately choose". In a SwiftUI
+                // alert that role is also the only way a button takes no
+                // Return (`AlertKeysTests`).
+                Button(DeployTokenWording.cancelButton, role: .cancel) {
                     panel.keepTheOldToken()
                 }
-                .keyboardShortcut(.defaultAction)
-                Button(DeployTokenWording.useNewToken) {
+                .keyboardShortcut(.cancelAction)
+                Button(DeployTokenWording.useNewToken, role: .destructive) {
                     panel.useTheNewTokenAnyway()
                 }
             } message: {
@@ -128,6 +141,7 @@ struct DeployTokenRows: View {
             }
             Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: {
             Text(DeployTokenWording.filled(DeployTokenWording.removeMessage, ["service": service]))
         }

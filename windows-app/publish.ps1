@@ -360,6 +360,19 @@ if ($iscc) {
 $zip = "dist\Plantoir-win-x64.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path "$substDrive\*" -DestinationPath $zip
+# The zip carries the licences beside the app (#1010, Russell's ruling 6 of
+# 2026-11-19): Plantoir's own LICENSE, and the third-party notice with the
+# terms for Microsoft's vcruntime140.dll, under the name the installer gives
+# it ({app}\THIRD_PARTY_LICENSES.txt), so a teacher who unzips Plantoir has
+# what an installed copy has. Added to the zip, not to the publish folder,
+# which the installer takes whole and would then carry a second copy of.
+$zipLicences = "dist\zip-licences"
+if (Test-Path $zipLicences) { Remove-Item $zipLicences -Recurse -Force }
+New-Item -ItemType Directory -Force $zipLicences | Out-Null
+Copy-Item "..\LICENSE" "$zipLicences\LICENSE"
+Copy-Item "..\THIRD_PARTY_LICENSES.md" "$zipLicences\THIRD_PARTY_LICENSES.txt"
+Compress-Archive -Path "$zipLicences\LICENSE", "$zipLicences\THIRD_PARTY_LICENSES.txt" -Update -DestinationPath $zip
+Remove-Item $zipLicences -Recurse -Force
 
 } finally {
     subst $substDrive /D | Out-Null

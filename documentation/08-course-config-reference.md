@@ -55,7 +55,7 @@ A representative example:
 | `emojis.sections.section<N>` | string | setup | build (page title) | Single emoji per section, e.g. `"📚"`. Legacy `emojis.default` is honoured as a fallback. **Cleaned where it is read** (#822), as `course_name` is. |
 | `num_sections` | int | setup | setup (prompt default) + build and launchers (fallback when `section_numbers` is absent) | Count of sections; normalized to `len(section_numbers)`. |
 | `section_numbers` | int[] | setup | build (validation); `preview.ps1` also checks it host-side and asks | The teacher's actual timetable section numbers, e.g. `[1,3,4]`. Only these sections can be built or deployed. |
-| `shared_folders` | string[] | setup + build discovery | build | Course-root folders copied into every section's site. `Media` never appears here (symlinked instead). |
+| `shared_folders` | string[] | setup + build discovery | build | Course-root folders copied into every section's site. `Media` never appears here (symlinked instead). A file in them that is not a page reaches the website only when a published page uses it (#901). |
 | `shared_files` | string[] | setup + build discovery | build | Course-root loose `.md` files copied into every section's site. |
 | `per_section_folders` | string[] | setup + build discovery | build | Folder names expected inside each `section<N>/`, copied only into that section's site. |
 | `per_section_files` | string[] | setup + build discovery | build | Loose `.md` files inside each `section<N>/`. |
@@ -438,6 +438,7 @@ file — or any file in the working folder.
 | `<CODE>/.publish_state/section<N>.front-page-not-today.json` | Not Today, answered to Preview's question about today's class on the front page (#397): the calendar day and the class offered, so that class is not asked about again that day. The app's own file; never removed, since a record for another day or class stops nothing. `frontPageNotToday`. |
 | `<CODE>/.publish_state/section<N>.published-pages/` | A folder of fragments, one per destination a deploy reached, each naming the pages that site showed — what "published before" means when a page hidden again is published once more (#379). On every rollover its fragments are moved into `section<N>.published-pages.previous-<stamp>/` beside it (the folder itself stays, so the rollover's undo can put them back). `publishedPagesRecord`. |
 | the built output's `section<N>/.visible-pages.json` and `.build-id` | Beside `public/`, never inside it: the pages a build for publishing showed, and the id of the build that last started there; what a deploy records from (`visiblePagesList`). |
+| the built output's `section<N>/.site-files.json` | Beside `public/`, never inside it: how many of the course's files the last build carried and left off, and the check's safety counts, counts only; read by the next build to tell whether it is the first to leave files off and whether the count changed (#901, `siteFilesRecord`). |
 | the built output's `section<N>/.page-sources.json` | Beside `public/`, never inside it: which file in the course folder each page of the site came from, written by every build, preview or publish, just before Quartz runs; what a section's Open in Obsidian reads to open the page the preview shows (#518, `pageSourcesList`). |
 | `<CODE>/Media/` | Shared binary assets; symlinked into every build, always hidden from the sidebar. |
 | `<CODE>/.obsidian/` | Obsidian vault settings (seeded from `support/obsidian_defaults`). |
@@ -1398,6 +1399,56 @@ name.
 `scripts/test_config_write_race.py` forces the race with a scan that mutates the
 file mid-flight, and it runs on both platforms — Windows reaches it through
 `PythonToolchainTests`.
+
+## One build reads the settings once (#999)
+
+Shared Python, so both platforms have it (`scripts/build_site.py`,
+`scripts/reference_course.py`); no app code changed.
+
+**Why.** One build used to open `course_config.json` at least five times:
+the load in `build_section_site`, preflight (again on each retry), the
+kept-for-reference question (`reference_course.is_reference` and
+`cannot_tell`, three opens between them), the copy into
+`<output>/quartz/course_config.json` that the site's components import, and
+the copy to the output root that is mirrored beside `public/`. A Save landing
+between two of those gave one build a site of mixed settings, for example a
+sidebar from the new file and pages from the old. Course Settings saving as it
+changes (#986) makes such a Save much likelier, so this landed first.
+
+**What a build does now.** It reads the file once, as bytes, at its start
+(`BuildSettings.read_from`, right after `.build-started.pending` is made), and
+every later step asks that object: preflight starts from those bytes rather
+than opening the file (`preflight_the_build_settings`), the frozen-course
+question is asked of its text (`BuildSettings.is_frozen`, through
+`reference_course.is_reference_in` and `cannot_tell_from`), and both copies
+write its bytes (`_write_the_build_settings`, which leaves a copy alone when it
+already holds them). A Save made after the build started reaches the next
+build, never this one; `.build-started` already tells freshness that.
+
+**The one second read, kept on purpose.** Preflight's compare-and-swap (the
+section above) still re-reads when the file changed while it scanned AND it
+has something to write: writing its older reading back would erase a rename.
+That newer reading then becomes the build's one reading for every step after
+preflight, so the site is still made from one set of settings. Before
+preflight only the section check and the How I Teach "listed before" note have
+looked at the first reading. When preflight writes, the reading's bytes are
+exactly what it wrote (`_settings_file_bytes`, shared with the write-back), so
+the copies in the site match the file it left.
+
+**Rejected:** re-reading the file before each copy and comparing (it narrows
+the window without closing it), and a lock on the file (both apps and the
+launchers would have to take it, and a stuck lock would stop every Save).
+`preflight_update_course_config` keeps its old signature for its tests and
+callers outside the build.
+
+**Not covered here:** the launchers' own section check before the build
+(`preview.sh`, `preview.ps1`) and `deploy.py`'s reads of the settings
+(`scripts/deploy.py`, for the destination and the deploy's rebuild) are
+outside the build and unchanged.
+
+`scripts/test_build_reads_settings_once.py` saves mid-build and checks each
+step follows the build's reading; one case pins that `build_section_site`
+uses the file's path only to check, read once, and hand preflight its target.
 
 ## A rename interrupted after the folders moved was a dead end
 

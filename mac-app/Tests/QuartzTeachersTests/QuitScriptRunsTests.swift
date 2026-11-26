@@ -611,7 +611,7 @@ final class QuitScriptRunsTests: XCTestCase {
 
     private func makeScratch() throws -> Scratch {
         // A SHORT root: a unix socket's whole path must fit in 104 bytes, and
-        // the usual `Plantoir-tests-<uuid>` name under the per-user temporary
+        // the usual `Plantoir-tests-<pid>-<UUID>` name under the per-user temporary
         // folder does not leave room for `.colima/default/docker.sock`.
         let root: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("q-" + String(UUID().uuidString.prefix(6)), isDirectory: true)

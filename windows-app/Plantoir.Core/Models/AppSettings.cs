@@ -143,6 +143,50 @@ public sealed class AppSettings
     }
 
     /// <summary>
+    /// Whether stopping a running deploy asks "Stop the deploy?" first (#1009,
+    /// the mac's <c>asksBeforeStoppingADeploy</c>, #988). On by default;
+    /// turned off by the question's Don't ask again ticked with Stop Deploy,
+    /// and on or off in File ▸ Settings ▸ Deploying ▸ Stopping. Changed only
+    /// through <see cref="ChangeAsksBeforeStopping"/>.
+    /// </summary>
+    public bool AsksBeforeStoppingADeploy { get; set; } = true;
+
+    /// <summary>
+    /// Whether stopping a running share of unit plans asks "Stop this share?"
+    /// first: its own setting, apart from the deploy's, so silencing one
+    /// question never silences the other (the mac's
+    /// <c>asksBeforeStoppingAShareOfUnitPlans</c>). Windows has no share yet
+    /// (#824); the setting is kept so the answer travels with the question.
+    /// </summary>
+    public bool AsksBeforeStoppingAShare { get; set; } = true;
+
+    /// <summary>Whether this question is asked before its task stops.</summary>
+    public bool AsksBeforeStopping(StopQuestion question) =>
+        question == StopQuestion.Deploy ? AsksBeforeStoppingADeploy : AsksBeforeStoppingAShare;
+
+    /// <summary>
+    /// Turns one stop question on or off and saves at once. Returns whether
+    /// anything changed, so the caller writes one trail line per change and
+    /// none for a setting left as it was (<c>stopQuestions.trail.rule</c>).
+    /// </summary>
+    public bool ChangeAsksBeforeStopping(StopQuestion question, bool asked)
+    {
+        if (AsksBeforeStopping(question) == asked) return false;
+        if (question == StopQuestion.Deploy) AsksBeforeStoppingADeploy = asked;
+        else AsksBeforeStoppingAShare = asked;
+        Save();
+        StopQuestionSettingChanged?.Invoke(question);
+        return true;
+    }
+
+    /// <summary>
+    /// Raised after one stop question is turned on or off, from wherever:
+    /// an open File ▸ Settings ▸ Deploying shows the change at once when the
+    /// question's own Don't ask again turns it off (#1009's review).
+    /// </summary>
+    public event Action<StopQuestion>? StopQuestionSettingChanged;
+
+    /// <summary>
     /// Which section File ▸ Settings… opened on last ("assistant", "preview", "deploying"),
     /// so it opens there again — the mac remembers its pane the same way
     /// (<c>SettingsPane.storageKey</c>). Open Settings… beside the Account ID
@@ -185,6 +229,14 @@ public sealed class AppSettings
     /// longer exists is dropped, so the list cannot grow forever.
     /// </summary>
     public Dictionary<string, RememberedPlacement> AssistWindowPlacements { get; set; } = new();
+
+    /// <summary>
+    /// The port each deployed folder was last shown at in the web browser, by the
+    /// folder's canonical path (#889, the mac's #850 <c>deployedFolderPorts</c>):
+    /// the same address each time, so what the site keeps per address is still
+    /// there. Read and written through <see cref="SettingsDeployedFolderPorts"/>.
+    /// </summary>
+    public Dictionary<string, int> DeployedFolderPorts { get; set; } = new();
 
     /// <summary>The key for one section's assistant window. The folder comes first so pruning can read it back.</summary>
     public static string AssistWindowKey(string folderPath, string courseCode, int section) =>

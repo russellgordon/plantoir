@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Plantoir.Core.Models;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -253,15 +254,18 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
-    /// Publish = ONE merged write: the ticked classes through the normal
-    /// class publish (they bring their pages, dated by that class, the class's
-    /// own date untouched), the going page rows through the exact-pages
-    /// publish with the offer's date (none for keepsItsDate, datedByTheBuild,
-    /// structuralNeverDated); where a page is both, the CLASS's date wins; the
-    /// front page is NOT repointed (ruling F1). Nothing is freed here: what
-    /// goes is worked out from the rows AS SHOWN, less pages changed since.
+    /// The sheet's Publish (#899 W7b2-8): ONE step, key
+    /// <c>answerTheLinksChecklist</c>, made by the sheet (the mac's
+    /// <c>LinksChecklistPublisher.publish</c>, <c>UndoStepMaker.sheet</c>):
+    /// every page it publishes and dates, then the answered record, then the
+    /// record of the later classes it published, planned in that order and
+    /// made together, all or none. The front page is NOT repointed (ruling
+    /// F1), so the step names no recompute, as the mac's names none. The
+    /// answered file's leftUnticked holds only rows whose OWN tick was off.
     /// </summary>
-    public LinksChecklistPublished PublishLinksChecklist(LinksChecklistSheet sheet)
+    /// <exception cref="AssistRefusal">A deploy is under way; or the step was refused, "Nothing was changed: …", or
+    /// stopped part way, the checklist's part-way sentence (<see cref="LinksChecklistWording.PagesYouTicked"/>).</exception>
+    public LinksChecklistPublished PublishAndRemember(LinksChecklistSheet sheet)
     {
         var course = Course(sheet.CourseCode);
         int section = Section(course, sheet.Section);
@@ -269,11 +273,113 @@ public sealed partial class AssistWorkspace
             throw new AssistRefusal(LinksChecklistWording.Fill(LinksChecklistWording.DeployUnderWay,
                 new Dictionary<string, string> { ["course"] = course.Code }));
 
+        string backup = BackUpOnceForThisConversation(course, section);
+        _ = backup;
+        using var recording = UndoHistory.Record(_undo, $"published pages that links lead to in {course.Code} Section {section}");
+        var step = NewUndoStep(LinksChecklist.AnsweredActionKey, course.Code, section, madeBy: "sheet");
+        LinksChecklistPublished result;
+        try { result = PlanThePress(sheet, step); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // A page the plan needs could not be read: nothing was written
+            // (the mac's catch around planning, AssistToolRefusal.unreadablePage).
+            throw RefusalForAPressThatStopped(error, sheet, planning: true);
+        }
+        try { MakeTheUndoStep(step); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw RefusalForAPressThatStopped(error, sheet, planning: false);
+        }
+        recording.Done();
+        NotePublished(sheet, result);
+        return result;
+    }
+
+    /// <summary>
+    /// A press whose step failed, said as the mac's <c>publish</c> and
+    /// <c>LinksChecklistPublisher.sentence(forRefused:)</c> say it (W7b2-8
+    /// review 1, L1). Every refusal wrote nothing (the press is one step):
+    /// a page the plan could not read, and a file the door could not read
+    /// just now that really cannot be read, are the unreadable-page sentence
+    /// naming the course; a section page changed since it was checked is
+    /// <c>linksChecklist.wording.pageChangedSince</c>, the page named as the
+    /// sheet names it; a file left holding the new content, its earlier
+    /// content kept beside it, is the checklist part-way sentence naming each
+    /// kept file, and nothing more (the mac's sheet points at no button
+    /// after it); anything else is "Nothing was changed: …".
+    /// </summary>
+    internal AssistRefusal RefusalForAPressThatStopped(Exception error, LinksChecklistSheet sheet, bool planning)
+    {
+        var course = Course(sheet.CourseCode);
+        if (planning) return new AssistRefusal(UnreadablePage(course.Code));
+        if (error is UndoStepLeftPartWayException)
+        {
+            NoteAChangeWithNoUndoEntry();
+            return new AssistRefusal(AssistWording.PublishStoppedPartWay(LinksChecklistWording.PagesYouTicked, ReasonItStopped(error)));
+        }
+        if (error is UndoStepRefusedException { Refusal: { Path: { } named } refusal })
+        {
+            string full = Path.IsPathRooted(named) ? named : UndoDoor.FullPath(_folder, named);
+            if (refusal.Kind == UndoRefusalKind.ChangedSince && PageNameOnTheSheet(sheet, course, full) is { } name)
+                return new AssistRefusal(LinksChecklistWording.Fill(LinksChecklistWording.PageChangedSince,
+                    new Dictionary<string, string> { ["name"] = name }));
+            // "Could not be read" only for a file that really cannot be read
+            // now; a page that is a link, or a folder, cannot be checked and
+            // so was not written, which "Nothing was changed" says.
+            if (refusal.Kind == UndoRefusalKind.CannotTellNow && UndoCurrent.Read(full) is UndoCurrent.CannotReadNow)
+                return new AssistRefusal(UnreadablePage(course.Code));
+        }
+        return new AssistRefusal(NothingWasChanged(error));
+    }
+
+    /// <summary>The page at <paramref name="fullPath"/> as the sheet names it, or null when it is not one of the course's pages (the answered record, the kept record).</summary>
+    private string? PageNameOnTheSheet(LinksChecklistSheet sheet, Course course, string fullPath)
+    {
+        if (!fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) return null;
+        string place = PlaceOf(course, Relative(Path.GetFullPath(fullPath)));
+        string key = LinksChecklist.Key(place);
+        if (!PlaceIndex(course).ContainsKey(key)) return null;
+        return sheet.RowTitles.TryGetValue(key, out string? title) ? title : sheet.NameOf(place);
+    }
+
+    /// <summary>
+    /// Plans the press into <paramref name="step"/> without making it:
+    /// the ticked classes through the normal class publish (they bring their
+    /// pages, dated by that class, the class's own date untouched), the going
+    /// page rows through the exact-pages publish with the offer's date (none
+    /// for keepsItsDate, datedByTheBuild, structuralNeverDated); where a page
+    /// is both, the CLASS's date wins; then the answered record and the kept
+    /// record. Each page is read as the step will leave it, and each before
+    /// is read here, at plan time. Nothing is freed here: what goes is worked
+    /// out from the rows AS SHOWN, less pages changed since.
+    /// </summary>
+    internal LinksChecklistPublished PlanThePress(LinksChecklistSheet sheet, UndoActionStep step)
+    {
+        var course = Course(sheet.CourseCode);
+        int section = Section(course, sheet.Section);
+        PlanningThrough = step;
+        try
+        {
+            var result = PlanThePages(sheet, course, section, step);
+            LinksChecklist.PlanAnswered(step, course.DirectoryPath, section, sheet.Rows.Select(r => r.Place),
+                                        result.RememberedUnticked, DateTime.UtcNow);
+            // A class dated after the next class that the teacher published from
+            // here is one they chose: kept at its date (#475), or the next Deploy
+            // would offer to hide it again and the two questions would undo each
+            // other (the mac's batch B implementation review, finding 2).
+            KeepTheClassesItPublished(course, section, result.Written, step);
+            return result;
+        }
+        finally { PlanningThrough = null; }
+    }
+
+    private LinksChecklistPublished PlanThePages(LinksChecklistSheet sheet, Course course, int section, UndoActionStep step)
+    {
         var pages = PlaceIndex(course);
         var going = sheet.Going;
         var coming = sheet.ComingWith;
         var changedSince = new List<string>();
-        bool Hidden(string key) => pages.TryGetValue(key, out var path) && !IsVisible(path, section);
+        bool Hidden(string key) => pages.TryGetValue(key, out var path) && !IsVisibleThrough(step, path, section);
 
         var rowByKey = sheet.Rows.ToDictionary(r => LinksChecklist.Key(r.Place), r => r, StringComparer.Ordinal);
         var classesGoing = sheet.Rows.Where(r => r.IsClass && going.Contains(LinksChecklist.Key(r.Place))).ToList();
@@ -297,8 +403,6 @@ public sealed partial class AssistWorkspace
         var brought = classPlan?.Changing.Select(p => Path.GetFullPath(PagePaths.ResolveInside(_folder, p.RelativePath)))
                           .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        string backup = BackUpOnceForThisConversation(course, section);
-        using var recording = UndoHistory.Record(_undo, $"published pages that links lead to in {course.Code} Section {section}");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         var written = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         // Pages the writer DECLINED (#421, the mac's #186): named in the reply,
@@ -314,9 +418,9 @@ public sealed partial class AssistWorkspace
             foreach (var page in classPlan.Changing)
             {
                 string full = PagePaths.ResolveInside(_folder, page.RelativePath);
-                var (updated, edit) = PageFrontmatter.SetDraft(File.ReadAllText(full), page.FrontmatterKey, false, section);
+                var (updated, edit) = PageFrontmatter.SetDraft(step.ReadText(full), page.FrontmatterKey, false, section);
                 if (edit.NoRoomForAKey) { Decline(full, page.DisplayTitle); continue; }
-                if (edit.Changed) { Save(full, updated); written.Add(Path.GetFullPath(full)); }
+                if (edit.Changed) { step.Write(full, updated); written.Add(Path.GetFullPath(full)); }
             }
             // Each page a ticked class brings takes THAT class's date (the
             // first class in the sheet's order when two bring it) — not the
@@ -328,7 +432,7 @@ public sealed partial class AssistWorkspace
             foreach (var cls in stillHiddenClasses)
             {
                 string start = Path.GetFullPath(pages[LinksChecklist.Key(cls.Place)]);
-                if (PageFrontmatter.CreatedOn(File.ReadAllText(start), section, true) is not { } classDay) continue;
+                if (PageFrontmatter.CreatedOn(step.ReadText(start), section, true) is not { } classDay) continue;
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { start };
                 var queue = new Queue<string>(new[] { start });
                 while (queue.Count > 0)
@@ -338,8 +442,8 @@ public sealed partial class AssistWorkspace
                         queue.Enqueue(target);
                         if (!brought.Contains(target) || !dated.Add(target)) continue;
                         string createdKey = PageFrontmatter.CreatedKeyFor(section, PagePaths.IsSectionLocal(course.DirectoryPath, target));
-                        var (updated, moved) = PageFrontmatter.SetCreated(File.ReadAllText(target), createdKey, classDay, tail);
-                        if (moved) Save(target, updated);
+                        var (updated, moved) = PageFrontmatter.SetCreated(step.ReadText(target), createdKey, classDay, tail);
+                        if (moved) step.Write(target, updated);
                     }
             }
             // The front page is deliberately left as it is (ruling F1): classPlan.Index is not applied.
@@ -352,7 +456,7 @@ public sealed partial class AssistWorkspace
             string full = Path.GetFullPath(pages[key]);
             if (brought.Contains(full)) continue;   // a ticked class brings it: the CLASS's date wins
             var planned = Plan(course, section, full, draft: false, viaLink: false);
-            string text = File.ReadAllText(full);
+            string text = step.ReadText(full);
             var (updated, edit) = PageFrontmatter.SetDraft(text, planned.FrontmatterKey, false, section);
             // Declined: not even the date is written — a hidden page with a new date is no publish.
             if (edit.NoRoomForAKey) { Decline(full, planned.DisplayTitle); continue; }
@@ -363,10 +467,8 @@ public sealed partial class AssistWorkspace
                 var (dated, moved) = PageFrontmatter.SetCreated(updated, createdKey, day, tail);
                 if (moved) { updated = dated; }
             }
-            if (edit.Changed || updated != text) { Save(full, updated); written.Add(full); }
+            if (edit.Changed || updated != text) { step.Write(full, updated); written.Add(full); }
         }
-        recording.Done();
-        _ = backup;
 
         // What the press left hidden, of both kinds — never a page a ticked
         // class WROTE, and never a page that is no longer hidden.
@@ -455,56 +557,76 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
-    /// The sheet's Publish: write, remember what was unticked, record it.
-    /// The answered file's leftUnticked holds only rows whose OWN tick was off.
-    /// </summary>
-    public LinksChecklistPublished PublishAndRemember(LinksChecklistSheet sheet)
-    {
-        var result = PublishLinksChecklist(sheet);
-        var course = Course(sheet.CourseCode);
-        LinksChecklist.WriteAnswered(course.DirectoryPath, sheet.Section, sheet.Rows.Select(r => r.Place),
-                                     result.RememberedUnticked, DateTime.UtcNow);
-        // A class dated after the next class that the teacher published from
-        // here is one they chose: kept at its date (#475), or the next Deploy
-        // would offer to hide it again and the two questions would undo each
-        // other (the mac's batch B implementation review, finding 2).
-        KeepTheClassesItPublished(course, sheet.Section, result.Written);
-        NotePublished(sheet, result);
-        return result;
-    }
-
-    /// <summary>
     /// Records as kept (<see cref="LaterClassesKept"/>) any class among
     /// <paramref name="places"/> the question at Deploy would now ask about:
     /// a class published from the links checklist, or by naming its date
     /// (Publish Class for a Date…, <c>publish_class_on</c>). A class that
     /// would not be asked about — tomorrow's — leaves no record.
     /// </summary>
-    internal void KeepTheClassesItPublished(Course course, int section, IEnumerable<string> places)
+    internal void KeepTheClassesItPublished(Course course, int section, IEnumerable<string> places, UndoActionStep step)
     {
         var published = places.Select(ClassesDatedLater.PlaceKey).ToHashSet(StringComparer.Ordinal);
-        var kept = ClassesDatedLater.FlaggedIn(course, section, Today())
-            .Where(page => published.Contains(page.Place))
-            .ToList();
-        LaterClassesKept.Keep(course.DirectoryPath, section, kept);
+        Func<string, string> readPage = step.ReadText;
+        Func<string, string?> readRecord = step.ReadTextIfAny;
+        // Planned into the action's own step: written only if the pages are
+        // (#899 W7a; the links checklist's press, W7b2-8), and never part of
+        // today's in-memory undo, as before. A record that cannot be read or
+        // planned just now costs only the record, never the publish, as
+        // before and as the mac's `try?` (part three, review 1, MEDIUM 2;
+        // LaterClassesKept's own sentence).
+        try
+        {
+            var kept = ClassesDatedLater.FlaggedIn(course, section, Today(), readPage, readRecord)
+                .Where(page => published.Contains(page.Place))
+                .ToList();
+            LaterClassesKept.PlanInto(step, course.DirectoryPath, section, kept);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 
-    /// <summary>The classes a publish by DATE published, kept at that date (#475): the teacher named the day.</summary>
-    public void KeepTheClassesPublishedByTheirDate(PublishPlan plan)
+    /// <summary>The classes a publish by DATE published, kept at that date (#475): the teacher named the day. Planned into <paramref name="step"/>.</summary>
+    internal void KeepTheClassesPublishedByTheirDate(PublishPlan plan, UndoActionStep step)
     {
         var course = Course(plan.CourseCode);
         KeepTheClassesItPublished(course, plan.SectionNumber, plan.NamedPages.Select(page =>
-            ClassesDatedLater.PlaceOf(course.DirectoryPath, PagePaths.ResolveInside(_folder, page.RelativePath))));
+            ClassesDatedLater.PlaceOf(course.DirectoryPath, PagePaths.ResolveInside(_folder, page.RelativePath))), step);
     }
 
-    /// <summary>Not Now: nothing written but the answer; every row left (0 followers, since the press leaves every row).</summary>
-    public void NotNow(LinksChecklistSheet sheet)
+    /// <summary>
+    /// Publish Class for a Date whose pages needed no change (#899 W7a): a
+    /// class it names that the question at Deploy would ask about is still
+    /// kept at its date, on a step of its own (<c>publishClassForADate</c>),
+    /// as the mac's does. A record that cannot be written costs the question
+    /// once more, nothing else (<see cref="LaterClassesKept"/>).
+    /// </summary>
+    public void KeepTheClassesPublishedByTheirDateOnAStepOfTheirOwn(PublishPlan plan)
+    {
+        var step = NewUndoStep("publishClassForADate", plan.CourseCode, plan.SectionNumber);
+        try
+        {
+            KeepTheClassesPublishedByTheirDate(plan, step);
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>
+    /// Not Now: nothing written but the answer, as ONE step of that one record
+    /// (#899 W7b2-8; the mac's <c>LinksChecklistAnswered.write</c> on a step of
+    /// its own, key <c>answerTheLinksChecklist</c>, made by the sheet); every
+    /// row left (0 followers, since the press leaves every row).
+    /// </summary>
+    /// <returns>False when the record could not be written: the checklist is offered again, nothing else (the mac's <c>try?</c>).</returns>
+    public bool NotNow(LinksChecklistSheet sheet)
     {
         var course = Course(sheet.CourseCode);
+        int section = Section(course, sheet.Section);
         var unticked = sheet.Rows.Where(r => !(sheet.Ticks.TryGetValue(LinksChecklist.Key(r.Place), out bool on) && on))
                                  .Select(r => r.Place).ToList();
-        LinksChecklist.WriteAnswered(course.DirectoryPath, sheet.Section, sheet.Rows.Select(r => r.Place), unticked, DateTime.UtcNow);
+        bool remembered = LinksChecklist.RecordTheAnswer(NewUndoStep(LinksChecklist.AnsweredActionKey, course.Code, section, madeBy: "sheet"),
+                                                         course.DirectoryPath, section, sheet.Rows.Select(r => r.Place), unticked, DateTime.UtcNow);
         NoteLeftHidden(sheet, "Not Now", sheet.Rows.Count, 0);
+        return remembered;
     }
 
     /// <summary>Every page of the course by its place (course-relative, no .md), in composed form.</summary>
@@ -523,6 +645,13 @@ public sealed partial class AssistWorkspace
     private static bool IsVisible(string path, int section)
     {
         try { return PageFrontmatter.Visibility(File.ReadAllText(path), section) == PageVisibility.Visible; }
+        catch { return false; }
+    }
+
+    /// <summary><see cref="IsVisible"/>, the page read as <paramref name="step"/> will leave it.</summary>
+    private static bool IsVisibleThrough(UndoActionStep step, string path, int section)
+    {
+        try { return PageFrontmatter.Visibility(step.ReadText(path), section) == PageVisibility.Visible; }
         catch { return false; }
     }
 

@@ -44,7 +44,7 @@ Under that, it says what quitting now could leave unfinished.
 - While a preview is made or a copy of a course is saved, it says the work could be left unfinished. It adds that nothing on the class website changes.
 
 {{picture:quitting-1}}
-alt: The question Plantoir asks when you quit during a deploy, with the buttons Keep Working and Quit Anyway.
+alt: The question Plantoir asks when you quit during a deploy, with the buttons Cancel and Quit Anyway.
 
 {{assistant}}
 Work on unit plans is named together with deploys. For unit plans, the message names what each kind of work could leave:
@@ -56,10 +56,12 @@ Work on unit plans is named together with deploys. For unit plans, the message n
 See [Share a unit plan with a colleague](page:share-plan).
 {{/assistant}}
 
-## Keep Working or Quit Anyway
+## Cancel or Quit Anyway
 
-- {{control:quitQuestionKeepWorkingButton}} is the default, so pressing Return chooses it. Plantoir stays open, and nothing is stopped.
+- {{control:quitQuestionKeepWorkingButton}} keeps Plantoir open, and nothing is stopped. Pressing Escape or Command-Period chooses it too.
 - {{control:quitQuestionQuitAnywayButton}} quits Plantoir. Plantoir does not stop a deploy on purpose, but the deploy may be left unfinished.
+
+Neither button is chosen by pressing Return, so a question you have not read is never answered by accident.
 
 ## When Plantoir does not ask
 

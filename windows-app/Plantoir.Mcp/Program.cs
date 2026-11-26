@@ -105,6 +105,13 @@ AppDomain.CurrentDomain.ProcessExit += (_, _) =>
     lease?.Dispose();
 };
 
+// Undo's list (#899 W4): recovery at launch, on a thread of its own, after
+// --state-dir is applied (above), so this server finds the same list as the
+// window that started it, or the default list when an outside door started
+// it with none. It never writes to stdout, never stops or slows the server,
+// and with the switch off only records what it finds.
+_ = Plantoir.Core.Undo.UndoAtLaunch.Recover();
+
 var builder = Host.CreateApplicationBuilder();
 
 // Every log line goes to stderr. stdout carries JSON-RPC frames and nothing
@@ -146,7 +153,28 @@ builder.Services.AddMcpServer(options =>
                 return new CallToolResult { Content = [new TextContentBlock { Text = refusal }] };
         }
         var topBefore = workspace.TopOfTheUndoList;
-        var result = await next(context, cancellation);
+        // #990: the window names the menu its item is in, in the call's _meta,
+        // so the copy saved before it names Section or Classes. One call at a
+        // time on the menu's server, and back to Section after it.
+        workspace.MenuOfTheChange = AssistWorkspace.MenuNamed(
+            AssistWorkspace.MetaText(context.Params?.Meta, AssistWorkspace.MenuMetaKey));
+        // #1027: the selected section's course, for a sentence with no course of its own.
+        workspace.MenuCourseOfTheCall = AssistWorkspace.MetaText(context.Params?.Meta, AssistWorkspace.CourseMetaKey);
+        CallToolResult result;
+        try
+        {
+            // #927: Classes ▸ Add Class…, as a copy, names its source in an
+            // argument no schema declares, read here before the binder drops it.
+            result = context.Params is { Name: { } tool }
+                     && new PlantoirTools(workspace).FromTheMenuIfACopy(tool, arguments) is { } copy
+                ? copy
+                : await next(context, cancellation);
+        }
+        finally
+        {
+            workspace.MenuOfTheChange = Plantoir.Core.Models.SubjectMenuLayout.Menu.Section;
+            workspace.MenuCourseOfTheCall = null;
+        }
         return PlantoirTools.AfterCall(workspace, topBefore, Text(arguments, "course"), Number(arguments, "section"), result);
     }));
 

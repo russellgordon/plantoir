@@ -329,7 +329,8 @@ nonisolated enum PlanSharing {
     }
 
     /// The public-address warning as #834's question: the title asks, one
-    /// sentence, the rows, Cancel the default and Escape.
+    /// sentence, the rows, then Cancel (Escape) and Share Without a Password
+    /// (no key); no button is the default (#973).
     static func warningQuestion(shared: Int, heldBack: Int, keysInShared: Int) -> FactsQuestion {
         return FactsQuestion(
             title: PlanSharingWording.crawlerWarningTitle,
@@ -612,7 +613,10 @@ nonisolated enum PlanSharingWording {
     static let whatChangesItValue: String = "Sharing these plans again"
     static let earlierYearsLabel: String = "Earlier years"
     static let earlierYearsValue: String = "Keep the password they were shared with"
-    static let later: String = "Later"
+    /// "Not Now" on an offer Plantoir raised by itself (#987, Russell's
+    /// ruling Q2 on #975): Plantoir asks this after Change Password. It was
+    /// "Later".
+    static let later: String = "Not Now"
     static let newPasswordNotInUse: String = "The new password is not in use yet: people who open the address are still asked for the old one until these plans are shared again."
 
     // MARK: - Computed properties

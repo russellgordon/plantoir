@@ -3,6 +3,7 @@ id: preview
 checked: 2.0.0
 covers:
 - mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift
+- mac-app/QuartzTeachers/Views/Console/TaskCancelButton.swift
 - mac-app/QuartzTeachers/Models/PreviewStartPage.swift
 - mac-app/QuartzTeachers/Views/Settings/PreviewSettingsView.swift
 - mac-app/QuartzTeachers/Models/SubjectMenuRules.swift
@@ -58,6 +59,12 @@ A preview shows the pages as they were when it was made. A change you make to a 
 ## Stop the preview
 
 While a preview runs, the {{control:previewButton}} button and menu item are named {{control:stopPreview}}. Press it to end the preview. The window then says {{control:noPreviewRunning}}.
+
+While Plantoir is still making the website, before it shows, {{control:cancel}} in the window stops the preview too.
+
+{{mac}}
+The Escape key and Command-Period press {{control:cancel}} as well, until the website shows. While you are typing in a box, they belong to the box.
+{{/mac}}
 
 Deploying the section also stops its preview.
 

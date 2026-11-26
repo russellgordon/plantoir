@@ -1,3 +1,4 @@
+using Plantoir.Core.Undo;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 
@@ -57,7 +58,6 @@ public sealed partial class AssistWorkspace
 
     internal static string CurrentCloudflareAccountId() =>
         CloudflareAccountIdOverrideForTests?.Invoke() ?? AppSettings.Load().CloudflareAccountId;
-
 
     // ---- One backup per conversation ---------------------------------------
 
@@ -178,6 +178,15 @@ public sealed partial class AssistWorkspace
     /// back without restoring a whole course. Optional: without it every write
     /// still happens, just unrecorded.
     /// </param>
+    /// <summary>
+    /// The refusal for a folder that is not set up: the folder by its name,
+    /// no file named and no system text, since the Section menu's Rebuild
+    /// Preview shows it to a teacher (#928 invariant 3).
+    /// </summary>
+    public static string NotAWorkingFolderYet(string folderName) =>
+        $"“{folderName}” isn’t a Plantoir working folder yet: it is missing a piece it needs. " +
+        "Open the folder in Plantoir once to set it up.";
+
     public AssistWorkspace(string workspacePath, ILauncherRunner launcher, string? lockedCourse = null,
                            UndoHistory? undo = null)
     {
@@ -186,9 +195,9 @@ public sealed partial class AssistWorkspace
         _undo = undo;
         _lockedCourse = string.IsNullOrWhiteSpace(lockedCourse) ? null : lockedCourse.Trim();
         if (Workspace.Classify(_folder) != WorkspaceState.Ready)
-            throw new AssistRefusal(
-                $"“{_folder}” isn’t a Plantoir working folder — it has no {Workspace.MarkerLauncher}. " +
-                "Open the folder in Plantoir once to set it up.");
+            // Plantoir's own words, no file named (#928 invariant 3, the
+            // review's L6): Section ▸ Rebuild Preview shows this to a teacher.
+            throw new AssistRefusal(NotAWorkingFolderYet(Path.GetFileName(_folder)));
 
         if (_lockedCourse is not null &&
             !Workspace.DiscoverCourses(_folder).Any(
@@ -384,7 +393,7 @@ public sealed partial class AssistWorkspace
         try
         {
             var resolutions = WikiLinks.Resolve(
-                WikiLinks.PageLinks(File.ReadAllText(keyLinks)), course.DirectoryPath, sectionNumber, keyLinks);
+                WikiLinks.PageLinks(ReadPlanned(keyLinks)), course.DirectoryPath, sectionNumber, keyLinks);
             foreach (var resolution in resolutions)
                 if (resolution.Outcome == LinkOutcome.Resolved)
                     protectedPaths.Add(Path.GetFullPath(resolution.Path!));
@@ -440,7 +449,7 @@ public sealed partial class AssistWorkspace
             try
             {
                 foreach (var resolution in WikiLinks.Resolve(
-                             WikiLinks.PageLinks(File.ReadAllText(keyLinks)), course.DirectoryPath, section, keyLinks))
+                             WikiLinks.PageLinks(ReadPlanned(keyLinks)), course.DirectoryPath, section, keyLinks))
                     if (resolution.Outcome == LinkOutcome.Resolved)
                         reference.Add(Path.GetFullPath(resolution.Path!));
             }
@@ -723,7 +732,7 @@ public sealed partial class AssistWorkspace
         foreach (var page in pagesList)
         {
             string fullPath = PagePaths.ResolveInside(_folder, page.RelativePath);
-            string text = File.ReadAllText(fullPath);
+            string text = ReadPlanned(fullPath);
             var targets = new List<string>();
             foreach (var resolution in WikiLinks.Resolve(WikiLinks.PageLinks(text), course.DirectoryPath, section, fullPath))
             {
@@ -1183,7 +1192,7 @@ public sealed partial class AssistWorkspace
     {
         try
         {
-            string text = File.ReadAllText(PagePaths.ResolveInside(_folder, relativePath));
+            string text = ReadPlanned(PagePaths.ResolveInside(_folder, relativePath));
             return PageFrontmatter.SetDraft(text, key, draft, section).Edit.NoRoomForAKey;
         }
         catch { return false; }
@@ -1215,7 +1224,6 @@ public sealed partial class AssistWorkspace
 
     /// <summary>The reason an unpublish keeps a page in the section's Key Links.</summary>
     internal const string KeptBecauseInKeyLinks = "it is in this section's Key Links.";
-
 
     private string? ReasonToKeep(
         PlannedPage page,
@@ -1263,7 +1271,6 @@ public sealed partial class AssistWorkspace
         return null;
     }
 
-
     /// <summary>
     /// The pages one page links to, adding any unresolvable links to
     /// <paramref name="problems"/> once each.
@@ -1272,7 +1279,7 @@ public sealed partial class AssistWorkspace
     {
         var found = new List<string>();
         string text;
-        try { text = File.ReadAllText(page); } catch { return found; }
+        try { text = ReadPlanned(page); } catch { return found; }
 
         foreach (var resolution in WikiLinks.Resolve(
                      WikiLinks.PageLinks(text), course.DirectoryPath, section, page))
@@ -1394,7 +1401,7 @@ public sealed partial class AssistWorkspace
             bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, target);
             try
             {
-                var visibility = PageFrontmatter.Visibility(File.ReadAllText(target), section);
+                var visibility = PageFrontmatter.Visibility(ReadPlanned(target), section);
                 if (visibility is PageVisibility.Visible or PageVisibility.SaysNothing) continue;
             }
             catch { }
@@ -1413,7 +1420,6 @@ public sealed partial class AssistWorkspace
 
         return inherited;
     }
-
 
 
     /// <summary>
@@ -1449,7 +1455,7 @@ public sealed partial class AssistWorkspace
 
         string indexPath = SectionIndex.PathFor(course, section);
         string indexText;
-        try { indexText = File.ReadAllText(indexPath); }
+        try { indexText = ReadPlanned(indexPath); }
         catch { return null; }
 
         var pointer = PointerFor(course, section, newest);
@@ -1497,12 +1503,11 @@ public sealed partial class AssistWorkspace
                 // "Hidden" is the question here, and the file answers the
                 // opposite one, so it has to be read in draft terms. REPORTING,
                 // so a flag this app will not read collapses to visible.
-                return PageFrontmatter.StoredDraft(File.ReadAllText(full), section) ?? false;
+                return PageFrontmatter.StoredDraft(ReadPlanned(full), section) ?? false;
             }
             catch { return false; }
         });
     }
-
 
     /// <summary>The section's link graph, for the standalone consistency check.</summary>
     public (LinkGraph Graph, Func<string, bool> IsHidden) Inspect(Course course, int section)
@@ -1515,19 +1520,18 @@ public sealed partial class AssistWorkspace
                 // "Hidden" is the question here, and the file answers the
                 // opposite one, so it has to be read in draft terms. REPORTING,
                 // so a flag this app will not read collapses to visible.
-                return PageFrontmatter.StoredDraft(File.ReadAllText(path), section) ?? false;
+                return PageFrontmatter.StoredDraft(ReadPlanned(path), section) ?? false;
             }
             catch { return false; }
         }
         );
     }
 
-
     private PlannedPage Plan(Course course, int section, string pagePath, bool draft, bool viaLink)
     {
         bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, pagePath);
         string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-        string text = File.ReadAllText(pagePath);
+        string text = ReadPlanned(pagePath);
         bool isFolderIndex = Path.GetFileName(pagePath).Equals("index.md", StringComparison.OrdinalIgnoreCase);
         // The shared rule (contracts/class-planning.json -> classFolder), against
         // the path relative to the SECTION. This used to test the whole absolute
@@ -1556,7 +1560,6 @@ public sealed partial class AssistWorkspace
             IsSectionLocal: sectionLocal,
             VisibilityIsCertain: visibility != PageVisibility.CannotTell);
     }
-
 
     /// <summary>
     /// The one class taught on a given day, or a refusal that says what is
@@ -1693,9 +1696,13 @@ public sealed partial class AssistWorkspace
             ActivityTrail.Note(ActivityTrail.Event.LaterClassesHeldADeployBack,
                 ClassesDatedLater.HeldBackLine(later.Count), course.Code, section);
             var titles = later.Select(page => page.Title).ToList();
+            var noun = course.Configuration.ClassNoun;
             throw new AssistRefusal(IsOutside
                 ? AssistWording.DeployHasClassesDatedLater(course.Code, section.ToString(), titles)
-                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles));
+                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles),
+                IsOutside
+                ? AssistWording.DeployHasClassesDatedLater(course.Code, section.ToString(), titles, noun)
+                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles, noun));
         }
 
         using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's deploy", asker);
@@ -1711,7 +1718,9 @@ public sealed partial class AssistWorkspace
         if (buildReason is not null)
         {
             progress?.Report($"Building Section {section} of {course.Code}…");
-            var ran = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
+            // A DEPLOY's build leg: --for-deploy (#828, mac #729).
+            var ran = await _launcher.Run("preview",
+                                          PreviewCommand.BuildOnlyArguments(_folder, course.Code, section, forADeploy: true, nonInteractive: true),
                                           _folder, progress, cancellation);
             if (ran.NeededAnAnswer)
                 // The build leg's question is the deploy's, not a destination's:
@@ -1852,7 +1861,7 @@ public sealed partial class AssistWorkspace
 
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's rebuild");
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
+        var build = await _launcher.Run("preview", PreviewCommand.BuildOnlyArguments(_folder, course.Code, section, forADeploy: false, nonInteractive: true),
                                         _folder, progress, cancellation);
         if (build.NeededAnAnswer)
             return new AssistResult(false,
@@ -1896,8 +1905,16 @@ public sealed partial class AssistWorkspace
     /// be encouraged to use an LLM for bulk edits, and an LLM can make a mess
     /// that is hard to undo" — so undo is a real button here, not advice.
     /// </summary>
+    /// <param name="keepingTheClassByItsDate">
+    /// Publish Class for a Date (#475, #899 W7a): the step's key is
+    /// <c>publishClassForADate</c>, and a class it publishes that the question
+    /// at Deploy would ask about is kept at its date in
+    /// <c>section&lt;N&gt;.later-classes-kept.json</c> INSIDE the same step,
+    /// so the record goes in only with the pages (the mac's U3 LOW 10); when
+    /// the pages change nothing, the record is the step's only file.
+    /// </param>
     public async Task<AssistResult> Apply(PublishPlan plan, bool preview = true, IProgress<string>? progress = null,
-                                          CancellationToken cancellation = default)
+                                          CancellationToken cancellation = default, bool keepingTheClassByItsDate = false)
     {
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
@@ -1939,55 +1956,71 @@ public sealed partial class AssistWorkspace
 
         var changed = new List<string>();
         var declined = plan.CannotBeAddedTo.Select(p => p.DisplayTitle).ToList();
-        // Whether a file has been written yet: a failure after one is a write
-        // with no undo entry (the recording is abandoned), and before one it
-        // changed nothing (#550, the mac's #531).
-        bool wrote = false;
+        // ONE step for the whole action, made once through the door (#899
+        // W7a): every page planned first, nothing written until the step is
+        // made, all of it or none (undo.rule.stagedThenSwapped).
+        var step = NewUndoStep(keepingTheClassByItsDate ? "publishClassForADate" : plan.Hiding ? "hidePages" : "publishPages",
+                               course.Code, section);
         try
         {
-            foreach (var page in plan.Changing)
+            PlanningThrough = step;
+            try
             {
-                // Named as it happens, so a teacher watching the conversation
-                // sees the work go by page by page rather than a silence with
-                // a count at the end.
-                progress?.Report($"Editing “{page.Title}”…");
-                string full = PagePaths.ResolveInside(_folder, page.RelativePath);
-                string text = File.ReadAllText(full);
-                var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
-                // Edited since the plan into a shape with no room: named, never
-                // counted as done (#308).
-                if (edit.NoRoomForAKey) { declined.Add(page.DisplayTitle); continue; }
-                if (!edit.Changed) continue;
-                Save(full, updated);
-                wrote = true;
-                changed.Add(page.Title);
+                foreach (var page in plan.Changing)
+                {
+                    // Named as it happens, so a teacher watching the conversation
+                    // sees the work go by page by page rather than a silence with
+                    // a count at the end.
+                    progress?.Report($"Editing “{page.Title}”…");
+                    string full = PagePaths.ResolveInside(_folder, page.RelativePath);
+                    string text = step.ReadText(full);
+                    var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
+                    // Edited since the plan into a shape with no room: named, never
+                    // counted as done (#308).
+                    if (edit.NoRoomForAKey) { declined.Add(page.DisplayTitle); continue; }
+                    if (!edit.Changed) continue;
+                    step.Write(full, updated);
+                    changed.Add(page.Title);
+                }
+
+                // Pages only this class uses take its date.
+                string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+                foreach (var date in plan.InheritedDates.Where(d => d.WillChange))
+                {
+                    try
+                    {
+                        string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                        var (updated, moved) = PageFrontmatter.SetCreated(
+                            step.ReadText(full), date.FrontmatterKey, date.New, tail);
+                        if (moved) step.Write(full, updated);
+                    }
+                    catch { }
+                }
+
+                // The kept record, read as the pages will be (Publish Class for a Date).
+                if (keepingTheClassByItsDate) KeepTheClassesPublishedByTheirDate(plan, step);
+
+                // And the front page catches up with what is now published: kept
+                // true by its rule, re-derived once after the step. Named on
+                // every publish and hide, as the mac's apply names it; when no
+                // page changes no step is made, and the front page is still
+                // repointed, as the mac's apply repoints it after its step.
+                step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
+            finally { PlanningThrough = null; }
+
+            MakeTheUndoStep(step);
             if (changed.Count > 0)
                 progress?.Report($"Changed {changed.Count} page{(changed.Count == 1 ? "" : "s")}.");
             NoteSettingsLeftAsTheyWere(act, declined.Count, course.Code, section);
-
-            // Pages only this class uses take its date.
-            string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
-            foreach (var date in plan.InheritedDates.Where(d => d.WillChange))
-            {
-                try
-                {
-                    string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-                    var (updated, moved) = PageFrontmatter.SetCreated(
-                        File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
-                    if (moved) { Save(full, updated); wrote = true; }
-                }
-                catch { }
-            }
-
-            // And the front page catches up with what is now published.
-            if (plan.Index is { WillChange: true } index) { ApplyIndexChange(index, tail); wrote = true; }
-
             recording.Done();
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            StoppedWhileWriting(wrote, error);
+            // Part way only when the door left a file holding the new content
+            // (its earlier content kept beside it); otherwise nothing was
+            // written, and "Nothing was changed" is true (#550, W7a).
+            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
             throw;
         }
 
@@ -2040,7 +2073,7 @@ public sealed partial class AssistWorkspace
                 Summary(changed, previewed: false, course.Code, section, plan.Hiding, declined) + " " + note,
                 backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
+        var build = await _launcher.Run("preview", PreviewCommand.BuildOnlyArguments(_folder, course.Code, section, forADeploy: false, nonInteractive: true),
                                         _folder, progress, cancellation);
         string declinedTail = declined.Count > 0 ? " " + SettingsCannotBeAddedTo(declined) : "";
         // The build stopped for a question nobody here can answer (#478,
@@ -2216,7 +2249,7 @@ public sealed partial class AssistWorkspace
         using var recording = UndoHistory.Record(_undo,
             $"{verb} {course.Configuration.UnitWord} {unit} in {course.Code} Section {section}");
 
-        bool changedAnything = false;
+        bool changedAnything;
         var changed = new List<string>();
         var declined = new List<string>();
         void Decline(string title)
@@ -2224,60 +2257,70 @@ public sealed partial class AssistWorkspace
             if (!declined.Contains(title, StringComparer.OrdinalIgnoreCase)) declined.Add(title);
         }
 
+        // ONE step for the whole unit (#899 W7a; the mac's
+        // `publishPagesAWholeUnit`, key publishPages / hidePages): every class
+        // planned into it in order, each planned SEEING the classes before it
+        // (the planners read through the step while it is planned), nothing
+        // written until the step is made, all of it or none
+        // (undo.rule.stagedThenSwapped). The front page is named once and
+        // re-derived once after the step, never written per class.
+        var step = NewUndoStep(publishing ? "publishPages" : "hidePages", course.Code, section);
         try
         {
-            foreach (var page in unitPages)
+            PlanningThrough = step;
+            try
             {
-                var pagePlan = PlanPublish(
-                    course.Code, section, new[] { page.RelativePath }, draft: !publishing, publishes: publishing);
-                foreach (var refused in pagePlan.CannotBeAddedTo) Decline(refused.DisplayTitle);
-
-                if (pagePlan.ChangesNothing) continue;
-
-                foreach (var change in pagePlan.Changing)
+                foreach (var page in unitPages)
                 {
-                    progress?.Report($"Editing “{change.Title}”…");
-                    string full = PagePaths.ResolveInside(_folder, change.RelativePath);
-                    string text = File.ReadAllText(full);
-                    var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft, section);
-                    if (edit.NoRoomForAKey) { Decline(change.DisplayTitle); continue; }
-                    if (!edit.Changed) continue;
-                    Save(full, updated);
-                    if (!changed.Contains(change.Title)) changed.Add(change.Title);
-                    changedAnything = true;
-                }
+                    var pagePlan = PlanPublish(
+                        course.Code, section, new[] { page.RelativePath }, draft: !publishing, publishes: publishing);
+                    foreach (var refused in pagePlan.CannotBeAddedTo) Decline(refused.DisplayTitle);
 
-                string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
-                foreach (var date in pagePlan.InheritedDates.Where(d => d.WillChange))
-                {
-                    try
+                    if (pagePlan.ChangesNothing) continue;
+
+                    foreach (var change in pagePlan.Changing)
                     {
-                        string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-                        var (updated, moved) = PageFrontmatter.SetCreated(
-                            File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
-                        if (moved)
-                        {
-                            Save(full, updated);
-                            changedAnything = true;
-                        }
+                        progress?.Report($"Editing “{change.Title}”…");
+                        string full = PagePaths.ResolveInside(_folder, change.RelativePath);
+                        string text = step.ReadText(full);
+                        var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft, section);
+                        if (edit.NoRoomForAKey) { Decline(change.DisplayTitle); continue; }
+                        if (!edit.Changed) continue;
+                        step.Write(full, updated);
+                        if (!changed.Contains(change.Title)) changed.Add(change.Title);
                     }
-                    catch { }
-                }
 
-                if (pagePlan.Index is { WillChange: true } index)
-                {
-                    ApplyIndexChange(index, tail);
-                    changedAnything = true;
+                    string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+                    foreach (var date in pagePlan.InheritedDates.Where(d => d.WillChange))
+                    {
+                        try
+                        {
+                            string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                            var (updated, moved) = PageFrontmatter.SetCreated(
+                                step.ReadText(full), date.FrontmatterKey, date.New, tail);
+                            if (moved) step.Write(full, updated);
+                        }
+                        catch { }
+                    }
+
                 }
+                // Named once, only when a class of the unit changes, as the
+                // mac names it (`if changedAnything`): a unit that changes no
+                // page touches nothing, its front page included, and answers
+                // "already published" (part three, review 1, MEDIUM 1).
+                if (step.ChangesAnything) step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
+            finally { PlanningThrough = null; }
 
+            changedAnything = MakeTheUndoStep(step);
             recording.Done();
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            // changedAnything is set after each write, so it says whether
-            // one landed before the failure (#550).
-            StoppedWhileWriting(changedAnything, error);
+            // Part way only when the door left a file holding the new content
+            // (its earlier content kept beside it); otherwise nothing was
+            // written, and "Nothing was changed" is true (#550, W7a).
+            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
             throw;
         }
 
@@ -2305,7 +2348,7 @@ public sealed partial class AssistWorkspace
         if (claim is null)
             return new AssistResult(true, summary + " " + note, backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
+        var build = await _launcher.Run("preview", PreviewCommand.BuildOnlyArguments(_folder, course.Code, section, forADeploy: false, nonInteractive: true),
                                         _folder, progress, cancellation);
         if (build.Succeeded) return new AssistResult(true, summary, backup);
         // As in Apply: a question (#478), then one clean sentence (#481, #471).
@@ -2371,6 +2414,26 @@ public sealed partial class AssistWorkspace
             Save(path, withDate);
         }
         catch { /* the front page falling behind must not fail the publish */ }
+    }
+
+    /// <summary>
+    /// The section's front page re-derived from the pages as they now stand
+    /// (#899 W4, the <c>sectionFrontPage</c> maintainer of
+    /// <c>undoJournal.opKinds.recompute</c>): pointed at its newest published
+    /// class and given that class's date, by the same rule a publish applies
+    /// (<see cref="IndexChangeFor"/>, <see cref="ApplyIndexChange"/>). False,
+    /// writing nothing, when <paramref name="namedPage"/> is not this section's
+    /// front page or there is no published class to point at. Idempotent.
+    /// </summary>
+    internal bool RederiveTheFrontPage(string courseCode, int section, string namedPage)
+    {
+        Course course = Course(courseCode);
+        string indexPath = SectionIndex.PathFor(course, section);
+        if (!string.Equals(Path.GetFullPath(indexPath), Path.GetFullPath(namedPage), StringComparison.OrdinalIgnoreCase)) return false;
+        if (!File.Exists(indexPath)) return false;
+        if (IndexChangeFor(course, section, [], []) is not { Pointer: { } } index) return false;
+        ApplyIndexChange(index, SiblingTimeAndOffset(course, section, ClassPages(course, section)));
+        return true;
     }
 
     /// <summary>
@@ -2574,7 +2637,6 @@ public sealed partial class AssistWorkspace
     }
 
 
-
     // ---- Rolling a course onto a real timetable --------------------------
 
     /// <summary>
@@ -2704,7 +2766,6 @@ public sealed partial class AssistWorkspace
         };
     }
 
-
     /// <summary>
     /// Concepts, exercises and tutorials moved by the same number of days as
     /// the lesson that anchors them.
@@ -2819,7 +2880,7 @@ public sealed partial class AssistWorkspace
             string key = PageFrontmatter.CreatedKeyFor(section, sectionLocal);
             try
             {
-                string? raw = PageFrontmatter.StoredText(File.ReadAllText(path), key);
+                string? raw = PageFrontmatter.StoredText(ReadPlanned(path), key);
                 if (raw is { Length: > 10 }) return raw[10..];
             }
             catch { }
@@ -2872,15 +2933,19 @@ public sealed partial class AssistWorkspace
         using var recording = UndoHistory.Record(_undo,
             $"cut section {sectionNumber} loose from its website");
 
-        foreach (string folder in new[] { ".netlify_sites", ".cloudflare_sites" })
+        // The markers, in the order they are walked, from ONE list
+        // (MarkersTheReleaseWalks), which Roll Over to a New Year…'s dialog
+        // reads too (#954: sectionIsPinned is "any marker the release walks").
+        foreach (string marker in MarkersTheReleaseWalks(_folder, course, sectionNumber))
         {
-            string marker = Path.Combine(course.DirectoryPath, folder, $"section{sectionNumber}.json");
-            string keptPath = Path.Combine(course.DirectoryPath, folder,
-                ReleasedMarkerName(sectionNumber, stamp));
+            string home = Path.GetDirectoryName(marker)!;
+            string keptPath = Path.GetFileName(marker) == LegacyMarkerFileName
+                ? Path.Combine(home, $".netlify_site.previous-{stamp}.json")
+                : Path.Combine(home, ReleasedMarkerName(sectionNumber, stamp));
             Release(marker, keptPath, kept, stillPinned);
         }
 
-        // The LEGACY marker, which `deploy.py` still reads and migrates back
+        // The LEGACY marker, walked last in the list above, which `deploy.py` still reads and migrates back
         // into the stable path (`load_netlify_marker`). Leaving it would make
         // a rollover report "never published" and then publish over last
         // year's site on the next deploy — in exactly the folders old enough
@@ -2902,13 +2967,6 @@ public sealed partial class AssistWorkspace
         // path `deploy.py` reads HERE; the `.merged_output` one is what a
         // folder carried here from a mac would have, and releasing a file that
         // is not there costs nothing.
-        foreach (string sectionOutput in LegacyMarkerHomes(course, sectionNumber))
-        {
-            string marker = Path.Combine(sectionOutput, ".netlify_site.json");
-            string keptPath = Path.Combine(sectionOutput, $".netlify_site.previous-{stamp}.json");
-            Release(marker, keptPath, kept, stillPinned);
-        }
-
         recording.Done();
         return new SiteRelease(kept, stillPinned);
     }
@@ -2960,18 +3018,39 @@ public sealed partial class AssistWorkspace
     /// harmless here because it can only cause a release to be skipped, never
     /// a wrong file to be moved.
     /// </remarks>
-    private IEnumerable<string> LegacyMarkerHomes(Course course, int sectionNumber)
+    private static IEnumerable<string> LegacyMarkerHomes(string workingFolder, Course course, int sectionNumber)
     {
         string fromBuildRoot;
         try
         {
             fromBuildRoot = BuildOutputLocation.ForSection(
-                BuildOutputLocation.BuildsRootFor(_folder), course.Code, sectionNumber);
+                BuildOutputLocation.BuildsRootFor(workingFolder), course.Code, sectionNumber);
         }
         catch { fromBuildRoot = ""; }
         if (fromBuildRoot.Length > 0) yield return fromBuildRoot;
 
         yield return Path.Combine(course.DirectoryPath, ".merged_output", $"section{sectionNumber}");
+    }
+
+    /// <summary>The legacy marker's file name, in each of <see cref="LegacyMarkerHomes"/>.</summary>
+    private const string LegacyMarkerFileName = ".netlify_site.json";
+
+    /// <summary>
+    /// Every marker <see cref="ReleaseSite"/> walks for a section, in its
+    /// order: <c>.netlify_sites</c> and <c>.cloudflare_sites</c>
+    /// <c>section&lt;N&gt;.json</c>, then the legacy <c>.netlify_site.json</c>
+    /// in each of its homes. ONE list, so Roll Over to a New Year…'s
+    /// <c>sectionIsPinned</c> (#954, <c>subjectMenus.rollOverSheet</c>) asks
+    /// about exactly the files a rollover onto a new website would move.
+    /// </summary>
+    public static IReadOnlyList<string> MarkersTheReleaseWalks(string workingFolder, Course course, int sectionNumber)
+    {
+        var markers = new List<string>();
+        foreach (string folder in new[] { ".netlify_sites", ".cloudflare_sites" })
+            markers.Add(Path.Combine(course.DirectoryPath, folder, $"section{sectionNumber}.json"));
+        foreach (string sectionOutput in LegacyMarkerHomes(workingFolder, course, sectionNumber))
+            markers.Add(Path.Combine(sectionOutput, LegacyMarkerFileName));
+        return markers;
     }
 
     /// <summary>
@@ -3029,16 +3108,15 @@ public sealed partial class AssistWorkspace
         try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
+            // Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece
+            // B, the director's ruling on its implementation review's I2): no
+            // copy, no rollover, said with the start of the year's own words
+            // for the same fact. Nothing has been written yet.
+            if (SpeaksFromTheMenu && isARollover)
+                throw new AssistRefusal(AssistWording.StartOfYearNeedsABackup(course.Code));
             throw new AssistRefusal(
                 $"{course.Code} couldn’t be backed up, so no dates were changed: {error.Message}");
         }
-
-        // Write the timetable down now the teacher has committed to it. They
-        // have just done the tedious part; asking again next week — or in the
-        // next conversation — is the tedium this is here to end.
-        if (plan.AllMeetings.Count > 0)
-            TimetableMemory.Write(_folder, course.Code, section, plan.AllMeetings,
-                $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
 
         using var recording = UndoHistory.Record(_undo,
             $"re-dated {course.Code} Section {section} onto block {plan.Block}");
@@ -3050,71 +3128,81 @@ public sealed partial class AssistWorkspace
         // a date it could not set, and a hide it could not write.
         var undated = new List<string>();
         var notHidden = new List<string>();
-        // The pages already written, so a re-date that stops part way can name
-        // them (#550, the mac's #531).
-        var written = new List<string>();
 
+        // ONE step through the door (#899 W7b1; the mac's
+        // SectionReDatePlanner.apply): every page re-dated together, all or
+        // none, each read through the step at plan time, and the front page
+        // kept true by its rule after the step (recompute, sectionFrontPage),
+        // never written as a file of it. A rollover makes the same step under
+        // its own key; the record it releases (below) stays outside it until
+        // the rollover is one step (W7c).
+        // The timetable the teacher committed to is written down IN this
+        // step, after the pages (#899 W7b1 review 2, M1: one teacher action
+        // is one step, as the re-date is on the mac): they have just done the
+        // tedious part, and asking again next week is the tedium this ends.
+        // All or none with the pages, so a refusal leaves it as it was and
+        // "Nothing was changed" is true of it too (review 2, M2). Dates Read
+        // would not believe are not planned, which costs only the record.
+        var step = NewUndoStep(isARollover ? "rollOver" : "reDateClasses", course.Code, section);
         try
         {
-            foreach (var date in plan.Changing)
+            PlanningThrough = step;
+            try
             {
-                string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-                string fileText = File.ReadAllText(full);
-                var dateEdit = PageFrontmatter.SetCreated(fileText, date.FrontmatterKey, date.New, tail);
-                string updated = dateEdit.Text;
-                bool changed = dateEdit.Changed;
-                if (dateEdit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(date.Title);
-                if (date.Unpublishes)
+                foreach (var date in plan.Changing)
                 {
-                    bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
-                    string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-                    var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
-                        updated, pubKey, draft: true, section);
-                    updated = draftUpdated;
-                    if (draftEdit.Changed) changed = true;
-                    if (draftEdit.NoRoomForAKey) notHidden.Add(date.Title);
+                    string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                    string fileText = step.ReadText(full);
+                    var dateEdit = PageFrontmatter.SetCreated(fileText, date.FrontmatterKey, date.New, tail);
+                    string updated = dateEdit.Text;
+                    bool changed = dateEdit.Changed;
+                    if (dateEdit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(date.Title);
+                    if (date.Unpublishes)
+                    {
+                        bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
+                        string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
+                        var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
+                            updated, pubKey, draft: true, section);
+                        updated = draftUpdated;
+                        if (draftEdit.Changed) changed = true;
+                        if (draftEdit.NoRoomForAKey) notHidden.Add(date.Title);
+                    }
+                    if (!changed) continue;
+                    step.Write(full, updated);
+                    if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
                 }
-                if (!changed) continue;
-                Save(full, updated);
-                written.Add(full);
-                if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
+                if (plan.AllMeetings.Count > 0)
+                {
+                    try
+                    {
+                        TimetableMemory.PlanInto(step, _folder, course.Code, section, plan.AllMeetings,
+                                                 $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
+                    }
+                    catch (IOException error)
+                    {
+                        // The timetable's before is read here, at plan time: a
+                        // file the teacher never sees is said as the section's
+                        // class dates, never as .NET's sentence with its hidden
+                        // path (#899 W7b1 review 3, LOW 1).
+                        throw new IOException(TimetableMemory.WhyTheClassDatesCouldNotBeRead(error), error);
+                    }
+                }
+                step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
+            finally { PlanningThrough = null; }
+            MakeTheUndoStep(step);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            // Stopped part way: the pages before the failing one ARE re-dated
-            // and the undo entry is abandoned, so it is said as part way, with
-            // those pages named, and counted as a write (the mac's #531,
-            // ruling M3). Before any page was written it changed no page —
-            // though the timetable written above is already remembered.
-            // An AssistRefusal, so re_date_classes and roll_over_section both
-            // ANSWER it, each through its own catch (AssistRefusal); before
-            // #550 both let the IOException escape as a protocol error. Any
-            // OTHER IOException here (TimetableMemory.Write, say) still
-            // escapes; that predates #550.
-            if (written.Count == 0) throw new AssistRefusal(NothingWasChanged(error));
+            // All or none (#899 W7b1): "Nothing was changed" unless the door
+            // left a page holding its new date with its earlier content kept
+            // beside it, which is said as part way, naming each kept file
+            // (#550's list of pages written one by one is gone with the
+            // writing one by one). An AssistRefusal, so re_date_classes and
+            // roll_over_section both ANSWER it, each through its own catch.
+            if (error is not UndoStepLeftPartWayException) throw new AssistRefusal(NothingWasChanged(error));
             NoteAChangeWithNoUndoEntry();
-            throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section) +
-                                    "\n\nThe pages already re-dated:\n" + ListingOf(written));
-        }
-
-        string indexPath = SectionIndex.PathFor(course, section);
-        if (File.Exists(indexPath))
-        {
-            try
-            {
-                string indexText = File.ReadAllText(indexPath);
-                string? newestPublished = SectionIndex.MostRecentPublished(course, section, ClassPages(course, section));
-                if (newestPublished is not null)
-                {
-                    if (SectionIndex.Repointed(indexText, PointerFor(course, section, newestPublished)) is { } newIndexText
-                        && newIndexText != indexText)
-                    {
-                        Save(indexPath, newIndexText);
-                    }
-                }
-            }
-            catch { }
+            throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section));
         }
 
         // A ROLLOVER releases the published-pages record and the checklist's
@@ -3133,15 +3221,44 @@ public sealed partial class AssistWorkspace
         // from a total: "Re-dated 14 classes and -4 pages they use" came from
         // (pages whose date changes) - (every class in the section).
         string summary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials);
-        if (undated.Count > 0) summary += " " + NewDatesCouldNotBeSet(undated);
-        if (notHidden.Count > 0) summary += " " + SettingsCannotBeAddedTo(notHidden);
+        // A club's teacher reads the counts in "meeting", the mac's
+        // reDated(noun:) (#1027 review 3, M1); the model keeps the class form.
+        var noun = NounForCourse(course.Code);
+        string teacherSummary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials, noun);
+        string leftAsTheyWere = "";
+        if (undated.Count > 0) leftAsTheyWere += " " + NewDatesCouldNotBeSet(undated);
+        if (notHidden.Count > 0) leftAsTheyWere += " " + SettingsCannotBeAddedTo(notHidden);
+        summary += leftAsTheyWere;
+        teacherSummary += leftAsTheyWere;
         NoteSettingsLeftAsTheyWere("re-dating classes", undated.Union(notHidden, StringComparer.OrdinalIgnoreCase).Count(),
             course.Code, section);
         string detail = summary +
                         $"\n\n{BackedUpNote}" +
                         "\n\nNothing was published or hidden, so students see no change until you deploy.";
 
-        return new AssistResult(true, detail, backup);
+        return new AssistResult(true, detail, backup)
+        {
+            ForTheTeacher = noun == ClassNoun.Meeting ? teacherSummary : null,
+        };
+    }
+
+    /// <summary>
+    /// Classes ▸ Roll Over to a New Year… on a section whose dates are already
+    /// right (#954, the mac's <c>menuRolloverWithTheDatesAlreadyRight</c>): a
+    /// fresh copy of the course is saved first, which the window's path does
+    /// not do here (a teacher who ran Re-date Classes… first lands exactly
+    /// here), and when it cannot be made the rollover is refused before
+    /// anything is written, with <c>wording.startOfYearNeedsABackup</c>.
+    /// </summary>
+    public void BackUpBeforeARolloverFromTheMenu(string courseCode, int sectionNumber)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+        try { BackUpOnceForThisConversation(course, section); }
+        catch (Exception error) when (error is not AssistRefusal)
+        {
+            throw new AssistRefusal(AssistWording.StartOfYearNeedsABackup(course.Code));
+        }
     }
 
     public const string BackedUpNote =
@@ -3251,14 +3368,28 @@ public sealed partial class AssistWorkspace
 
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         int moved = 0;
-        foreach (var date in plan.Changing)
+        // ONE step through the door (#899 W7b1), Windows' own key
+        // syncPageDates: the mac has no Bring Pages into Date, so no recorded
+        // step holds it (U7's to settle). Each page read through the step, so
+        // a page named twice is moved from what the step already planned;
+        // no recompute, since this never rewrote the front page.
+        var step = NewUndoStep("syncPageDates", course.Code, section);
+        try
         {
-            string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-            var (updated, changed) = PageFrontmatter.SetCreated(
-                File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
-            if (!changed) continue;
-            Save(full, updated);
-            moved++;
+            foreach (var date in plan.Changing)
+            {
+                string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                var (updated, changed) = PageFrontmatter.SetCreated(
+                    step.ReadText(full), date.FrontmatterKey, date.New, tail);
+                if (!changed) continue;
+                step.Write(full, updated);
+                moved++;
+            }
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw RefusalForAStepThatStopped(error, "the pages’ dates", section);
         }
         recording.Done();
 
@@ -3305,23 +3436,74 @@ public sealed partial class AssistWorkspace
         try
         {
             made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
-                                               new BackupMaker.Menu(sectionNumber));
+                                               new BackupMaker.Menu(sectionNumber, MenuOfTheChange));
         }
         catch (Exception error)
         {
             ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
-                $"the Section menu could not back up the course: {error.Message}", course.Code, sectionNumber);
+                MenuCouldNotBackUpLine(MenuOfTheChange, course.Configuration.ClassNoun, error.Message), course.Code, sectionNumber);
             throw;
         }
         double megabytes = 0;
         try { megabytes = new FileInfo(made).Length / (1024.0 * 1024.0); } catch { }
         ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
-            $"the Section menu backed up the course as {Path.GetFileName(made)} " +
-            $"({megabytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, " +
-            $"{clock.Elapsed.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s)",
+            MenuBackedUpLine(MenuOfTheChange, course.Configuration.ClassNoun, Path.GetFileName(made), megabytes, clock.Elapsed.TotalSeconds),
             course.Code, sectionNumber);
         return made;
     }
+
+    /// <summary>
+    /// On the menu's server: the menu the running item is in (#990, Russell's
+    /// ruling "name the real menu"), sent by the window in the call's
+    /// <c>_meta</c> (<see cref="MenuMetaKey"/>) and set for one call by
+    /// <c>plantoir-mcp</c>'s filter, so the copy and its trail line name
+    /// Section or Classes. Section otherwise.
+    /// </summary>
+    public SubjectMenuLayout.Menu MenuOfTheChange { get; set; } = SubjectMenuLayout.Menu.Section;
+
+    /// <summary>The key in a tools/call request's <c>_meta</c> that names the menu (its contract name).</summary>
+    public const string MenuMetaKey = "plantoirMenu";
+
+    /// <summary>
+    /// On the menu's server: the course of the section the running item was
+    /// chosen on (#1027), from the call's <c>_meta</c> (<see cref="CourseMetaKey"/>),
+    /// set for one call by <c>plantoir-mcp</c>'s filter; null otherwise.
+    /// </summary>
+    public string? MenuCourseOfTheCall { get; set; }
+
+    /// <summary>The key in a tools/call request's <c>_meta</c> that names the selected section's course.</summary>
+    public const string CourseMetaKey = "plantoirCourse";
+
+    /// <summary>
+    /// A <c>_meta</c> value read as text: null when it is absent or is not a
+    /// string, never a throw (#1027's review, low 5: a number or an object
+    /// under <see cref="MenuMetaKey"/> or <see cref="CourseMetaKey"/> threw
+    /// before the call began). Absent and malformed mean the same: the
+    /// Section menu, and the class form.
+    /// </summary>
+    public static string? MetaText(System.Text.Json.Nodes.JsonObject? meta, string key) =>
+        meta?[key] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+
+    /// <summary>Undo Last Change's nothing-to-undo from the menu, naming the menus as the selected section's course's menu bar does (#1027).</summary>
+    public string NothingToUndoFromTheMenu() =>
+        AssistWording.NothingToUndoFromTheMenu(MenuCourseOfTheCall is { } code ? NounForCourse(code) : ClassNoun.Class);
+
+    /// <summary>The menu named by a <c>_meta</c> value, or Section.</summary>
+    public static SubjectMenuLayout.Menu MenuNamed(string? contractName) =>
+        Enum.GetValues<SubjectMenuLayout.Menu>().FirstOrDefault(menu => SubjectMenuLayout.ContractName(menu) == contractName);
+
+    /// <summary>
+    /// "the Classes menu backed up the course as …" (<c>activityTrail.mustRecord</c> → <c>lineCases</c>):
+    /// the menu by the title the course's menu bar gives it, "the Meetings menu" in a club (#990).
+    /// </summary>
+    public static string MenuBackedUpLine(SubjectMenuLayout.Menu menu, ClassNoun noun, string fileName, double megabytes, double seconds) =>
+        $"the {SubjectMenuLayout.Title(menu, noun)} menu backed up the course as {fileName} " +
+        $"({megabytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, " +
+        $"{seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s)";
+
+    /// <summary>"the Classes menu could not back up the course: …".</summary>
+    public static string MenuCouldNotBackUpLine(SubjectMenuLayout.Menu menu, ClassNoun noun, string reason) =>
+        $"the {SubjectMenuLayout.Title(menu, noun)} menu could not back up the course: {reason}";
 
     /// <summary>
     /// The one door every assistant zip goes through — the conversation's first
@@ -3516,6 +3698,15 @@ public sealed partial class AssistWorkspace
     private const string CurriculumStart = "%%curriculum-start%%";
     private const string CurriculumEnd = "%%curriculum-end%%";
 
+    /// <summary>
+    /// The heading a new block opens with, the Mac's own
+    /// (<c>AssistCurriculumMentions.heading</c>; the Mac's output is the
+    /// <c>addCurriculumMentions</c> step in <c>contracts/undo-action-steps.json</c>).
+    /// Until #1039 Windows wrote "Today's work points here:" instead; pages that
+    /// carry that line keep it, and a block is found by its markers either way.
+    /// </summary>
+    private const string CurriculumHeading = "## Curriculum connection";
+
     /// <summary>Everything after the frontmatter fence, or the whole text if there is none.</summary>
     private static string BodyAfterFrontmatter(string pageText)
     {
@@ -3567,7 +3758,11 @@ public sealed partial class AssistWorkspace
             $"added {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
 
         string path = PagePaths.ResolveInside(_folder, plan.RelativePath);
-        string text = File.ReadAllText(path);
+        // ONE step through the door (#899 W7b1; the mac's
+        // AssistCurriculumMentions.apply): the page planned, its before read
+        // now, written all or none, with no recompute.
+        var step = NewUndoStep("addCurriculumMentions", course.Code, section);
+        string text = step.ReadText(path);
         string lineEnd = text.Contains("\r\n") ? "\r\n" : "\n";
         string transclusions = string.Join(lineEnd, plan.Adding.Select(e => $"![[{e.Code}]]"));
 
@@ -3582,7 +3777,7 @@ public sealed partial class AssistWorkspace
             // A new block, before the "things to do" list if there is one —
             // that list closes a class page, and the curriculum note belongs
             // with the lesson rather than after the homework.
-            string block = CurriculumStart + lineEnd + "Today's work points here:" + lineEnd + lineEnd +
+            string block = CurriculumStart + lineEnd + CurriculumHeading + lineEnd + lineEnd +
                            transclusions + lineEnd + CurriculumEnd + lineEnd;
             int before = text.IndexOf("## Things to do", StringComparison.OrdinalIgnoreCase);
             text = before > 0
@@ -3590,7 +3785,15 @@ public sealed partial class AssistWorkspace
                 : text.TrimEnd() + lineEnd + lineEnd + block;
         }
 
-        Save(path, text);
+        try
+        {
+            step.Write(path, text);
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw RefusalForAStepThatStopped(error, "the curriculum mentions", section);
+        }
         recording.Done();
 
         return new AssistResult(true,
@@ -3668,12 +3871,15 @@ public sealed partial class AssistWorkspace
         }
 
         if (unit < 1 || atDay < 1) throw new AssistRefusal("Unit and day numbers start at 1.");
-        if (count < 1) throw new AssistRefusal("Ask for at least one class.");
+        if (count < 1) throw new AssistRefusal(AssistWording.AskForAtLeastOneClass(), AssistWording.AskForAtLeastOneClass(course.Configuration.ClassNoun));
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
+            // The model's words are unchanged (#267: what the model is told
+            // stays); the teacher reads the mac's sentence in the course's noun.
             ?? throw new AssistRefusal(
                 $"I don't know when {course.Code} Section {section} meets, so I can't move classes onto real " +
-                "days. Ask the teacher for their class dates, then record them with remember_timetable.");
+                "days. Ask the teacher for their class dates, then record them with remember_timetable.",
+                AssistWording.CannotMoveClassesWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         var classes = NumberedClasses(course, section, out int unnumbered);
         if (classes.Count == 0)
@@ -3681,10 +3887,10 @@ public sealed partial class AssistWorkspace
                 $"{course.Code} Section {section} has no pages named “{naming.ShapeDescription}”, so there is nothing " +
                 "to make room in.");
 
-        var problems = new List<string>();
+        // Each in both nouns (#1027): the card reads the course's, the model the class form.
+        var problems = new List<PlanProblem>();
         if (unnumbered > 0)
-            problems.Add($"{unnumbered} class page{(unnumbered == 1 ? " is" : "s are")} not named " +
-                         $"“{naming.ShapeDescription}”, so I left it where it is — including its date.");
+            problems.Add(PlanProblem.Said(noun => AssistWording.PagesNotNamedTheCoursesWay(unnumbered, naming.ShapeDescription, noun)));
 
         if (naming.IsNumbered)
             return PlanNumberedInsert(course, section, naming, atDay, count, classes, remembered.Dates, problems);
@@ -3707,15 +3913,13 @@ public sealed partial class AssistWorkspace
         int needed = count + shifted.Count;
         if (runway.Count < needed)
         {
-            int short_ = needed - runway.Count;
-            problems.Add($"This needs {needed} class days from {DateText.Iso(firstFree)} onwards and the " +
-                         $"timetable only has {runway.Count}. Add {short_} more class " +
-                         $"date{(short_ == 1 ? "" : "s")} and ask again.");
+            int has = runway.Count;
+            problems.Add(PlanProblem.Said(noun => AssistWording.TimetableTooShortFrom(needed, DateText.Iso(firstFree), has, noun)));
             return new InsertPlan
             {
                 CourseCode = course.Code, SectionNumber = section, Unit = unit, AtDay = atDay, Naming = naming,
                 Added = Array.Empty<NewClass>(), Renames = Array.Empty<Rename>(),
-                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = problems,
+                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
             };
         }
 
@@ -3761,7 +3965,7 @@ public sealed partial class AssistWorkspace
             Renames = renames,
             Moves = moves,
             LinksToRewrite = CountLinksTo(course, section, renames.Select(r => r.From)),
-            Problems = problems,
+            Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
         };
     }
 
@@ -3794,7 +3998,7 @@ public sealed partial class AssistWorkspace
     /// and renamed two published meetings for a slot that was empty.
     /// </summary>
     private InsertPlan PlanNumberedInsert(Course course, int section, ClassPageNaming naming, int atNumber, int count,
-                                          List<ClassRef> numbered, IReadOnlyList<DateOnly> timetable, List<string> problems)
+                                          List<ClassRef> numbered, IReadOnlyList<DateOnly> timetable, List<PlanProblem> problems)
     {
         var shifted = numbered.Where(c => c.Day >= atNumber).OrderBy(c => c.Day).ToList();
         var untouched = numbered.Where(c => c.Day < atNumber).ToList();
@@ -3804,23 +4008,22 @@ public sealed partial class AssistWorkspace
         var runway = timetable.Where(d => !held.Contains(d) && (latestKept is null || d > latestKept.Value))
             .OrderBy(d => d).ToList();
 
-        InsertPlan Refused(string why)
+        InsertPlan Refused(PlanProblem why)
         {
             problems.Add(why);
             return new InsertPlan
             {
                 CourseCode = course.Code, SectionNumber = section, Unit = 1, AtDay = atNumber, Naming = naming,
                 Added = Array.Empty<NewClass>(), Renames = Array.Empty<Rename>(),
-                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = problems,
+                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
             };
         }
 
         if (runway.Count < count)
         {
-            int missing = count - runway.Count;
             string from = latestKept is { } kept ? DateText.Iso(kept) : "the start of the course";
-            return Refused($"This needs {count} class day{(count == 1 ? "" : "s")} after {from} and the timetable " +
-                           $"only has {runway.Count}. Add {missing} more class date{(missing == 1 ? "" : "s")} and ask again.");
+            int has = runway.Count;
+            return Refused(PlanProblem.Said(noun => AssistWording.TimetableTooShortAfter(count, from, has, noun)));
         }
 
         string folder = ClassFolder(course, section);
@@ -3847,8 +4050,7 @@ public sealed partial class AssistWorkspace
         var byDate = InDateOrder(shifted);
         var destinations = DestinationsKeepingGaps(byDate, runway, count);
         if (destinations is null)
-            return Refused("There are not enough class days after the last page to move it onto. " +
-                           "Add more class dates and ask again.");
+            return Refused(PlanProblem.Said(AssistWording.NoDaysAfterTheLastPage));
 
         var moves = new List<DateMove>();
         for (int i = 0; i < byDate.Count; i++)
@@ -3863,7 +4065,7 @@ public sealed partial class AssistWorkspace
             CourseCode = course.Code, SectionNumber = section, Unit = 1, AtDay = atNumber, Naming = naming,
             Added = added, Renames = upward, Moves = moves,
             LinksToRewrite = CountLinksTo(course, section, upward.Select(r => r.From)),
-            Problems = problems,
+            Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
         };
     }
 
@@ -3930,32 +4132,31 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>Carry out the insertion: rename, re-date, relink, then create the blanks.</summary>
-    public AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress = null) =>
-        ApplyInsertClasses(plan, progress, out _, carryPastAFailedNewPage: true);
-
-    /// <param name="created">The full paths of the blank class pages this run
-    /// WROTE — a page already standing at a path is not among them. The
-    /// duplicate asks it, because it is the one question link rewriting and
-    /// date moves cannot fool (#200 A).</param>
-    /// <param name="carryPastAFailedNewPage">
-    /// True for Make Room on its own (#550): a new page whose save FAILS is
-    /// carried past and named, like every other write here, so the renames
-    /// already made are still reported and noted as a change. False for
-    /// <see cref="ApplyDuplicateClass"/>, which asks whether ITS page was
-    /// created and would otherwise tell a teacher "the place for the copy is
-    /// still taken" about a plain write failure: there the failure is noted
-    /// as a change (when anything was written) and thrown, as before.
-    /// </param>
-    private AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress, out List<string> created,
-                                            bool carryPastAFailedNewPage)
+    /// <remarks>
+    /// ONE step through the door (#899 W7b2-1; the mac's
+    /// <c>ClassInsertionPlanner.apply</c>, <c>makeRoomForClasses</c>): each
+    /// rename (the new name written, the old one removed), each link
+    /// rewritten, each date moved and each new page planned, every page read
+    /// through the step, then made together, all or none. A rename whose new
+    /// name is taken and a new page whose name is taken are still carried
+    /// past and named, at plan time; a page that cannot be read or written
+    /// changes nothing ("Nothing was changed: …"), where #550 carried a failed
+    /// write past and said the rest part way. A step the door leaves part way
+    /// says the part-way sentence, naming each kept file.
+    /// </remarks>
+    public AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress = null)
     {
-        created = new List<string>();
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
-        if (plan.ChangesNothing)
+        // A plan that adds nothing because the dates ran out also changes
+        // nothing; its reason is the one actionable sentence, so it is said
+        // first (the mac's makeRoomForClasses; #1027 review 2, M2).
+        if (plan.ChangesNothing && plan.Problems.Count == 0)
             return new AssistResult(true, "Nothing needed moving.", null);
         if (plan.Added.Count == 0)
-            throw new AssistRefusal(string.Join(" ", plan.Problems));
+            throw new AssistRefusal(string.Join(" ", plan.Problems),
+                                    string.Join(" ", course.Configuration.ClassNoun == ClassNoun.Meeting
+                                        ? plan.ProblemsForAMeeting ?? plan.Problems : plan.Problems));
 
         RefuseIfPlantoirIsBuilding(course);
 
@@ -3967,73 +4168,108 @@ public sealed partial class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so nothing was moved: {error.Message}");
         }
 
-        // NO undo entry of its own, deliberately — and this is the mac's rule
-        // rather than a Windows shortcut (`AssistToolRunner.makeRoomForClasses`
-        // records nothing either). Making room renames later days, re-dates
-        // every class from the insertion point onwards and rewrites the links
-        // that pointed at the old names; an undo that put some of that back
-        // and not the rest would leave a course in a state nobody chose. The
-        // way back is the backup taken above, which the reply names.
-        //
-        // It used to call Begin here and never End, which is worse than
-        // either: no entry was recorded AND the next operation's files were
-        // swallowed into the open one under this description.
-        //
-        // The Touch/Wrote calls below stay. They do nothing while no entry is
-        // open, and they are what lets a CALLER that opened its own entry —
-        // ApplyDuplicateClass — record the whole of what happened.
+        var step = NewUndoStep("makeRoomForClasses", course.Code, section);
+        RoomPlanned room;
+        try
+        {
+            room = PlanTheRoom(plan, progress, step, course, section);
+            // Today's in-memory undo keeps no entry of its own for this (the
+            // mac's rule: `makeRoomForClasses` records none there either), so
+            // the menu's trail line is told when a file was written (#489, M1).
+            if (MakeTheUndoStep(step)) NoteAChangeWithNoUndoEntry();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // All or none: "Nothing was changed" unless the door left a page
+            // holding the new content, said as part way (the mac's
+            // saidWhenTheStepStopped, "the classes you made room among").
+            throw RefusalForAStepThatStopped(error, "the classes you made room among", section);
+        }
+        return room.Reply(this, plan, course, section, backup);
+    }
 
-        // Every count in the reply is of what was WRITTEN, as the mac's
+    /// <summary>What making room planned: the counts the reply says, every one of what the step will WRITE.</summary>
+    /// <param name="CreatedPaths">The full paths of the blank class pages planned into the step: a page
+    /// already standing at a path is not among them. Duplicate Class asks it, because it is the one
+    /// question link rewriting and date moves cannot fool (#200 A), now asked of the plan (#899 W7b2-2).</param>
+    private sealed record RoomPlanned(IReadOnlyList<string> CreatedPaths, int Renamed, int Moved, int Links,
+                                      IReadOnlyList<string> Undated, IReadOnlyList<string> NotFinished)
+    {
+        /// <summary>How many blank class pages are planned.</summary>
+        internal int Created => CreatedPaths.Count;
+
+        /// <summary>The reply, said once the step is made: as Make Room has always said it.</summary>
+        internal AssistResult Reply(AssistWorkspace workspace, InsertPlan plan, Course course, int section, string backup)
+        {
+            string leftUndone = "";
+            if (Undated.Count > 0) leftUndone += " " + workspace.NewDatesCouldNotBeSet(Undated);
+            if (NotFinished.Count > 0)
+                leftUndone += " " + workspace.ChangeCouldNotFinish(NotFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+
+            string said =
+                (Created > 0 ? AssistWording.MadeRoom(Created, plan.PositionTitle) + " " : "") +
+                $"Renamed {Renamed}, moved {Moved} onto " +
+                $"later class days, and updated {Links} link" +
+                $"{(Links == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
+                AssistWording.LookTheSectionOverBeforePublishing;
+            said += leftUndone;
+
+            // Said because it is TRUE: today's in-memory undo keeps no entry
+            // for this, so "undo that" afterwards reaches back past it. The
+            // mac says the same sentence, on the same condition
+            // (`makeRoomForClasses` → `movesAnythingElse`).
+            if (plan.Renames.Count > 0 || plan.Moves.Count > 0)
+                said += "\n\n" + ClassChangeWording.OtherClassesMoved(backup);
+
+            // A club's teacher reads the mac's line (#1027 review 3, M1).
+            string? forAClubsTeacher = workspace.NounForCourse(course.Code) == ClassNoun.Meeting
+                ? AssistWording.MadeRoomForAMeeting(Created, plan.PositionTitle) + leftUndone
+                : null;
+            return new AssistResult(true, said, backup) { ForTheTeacher = forAClubsTeacher };
+        }
+    }
+
+    /// <summary>
+    /// Plans making room into <paramref name="step"/>, writing nothing: every
+    /// rename as a write of the new name and a remove of the old, every link,
+    /// date and new page, each page read through the step as it will be left.
+    /// </summary>
+    private RoomPlanned PlanTheRoom(InsertPlan plan, IProgress<string>? progress, UndoActionStep step, Course course, int section)
+    {
+        // Every count is of what is PLANNED, as the mac's
         // ClassInsertionPlanner counts (#422): a rename skipped because its
-        // new name is taken, or a write that failed, is not "renamed", and
-        // links are counted only where a page holding them was saved. A write
-        // that did not finish is NAMED (by the page's name at that moment),
-        // never swallowed.
+        // new name is taken is not "renamed", and links are counted only on a
+        // page that holds them. A page that is not finished is NAMED (by its
+        // name at that moment), never swallowed.
         var notFinished = new List<string>();
-        int notRenamed = 0, notReDated = 0, linkPagesNotSaved = 0;
+        int notRenamed = 0, notReDated = 0, notAdded = 0;
 
         // Highest day first, so a rename never lands on a name still in use.
         progress?.Report("Renaming the classes that come after…");
         var renamed = new List<Rename>();
         foreach (var rename in plan.Renames)
         {
-            if (!File.Exists(rename.FromPath)) continue;   // nothing there to rename
-            bool saved = false;
-            try
-            {
-                if (File.Exists(rename.ToPath)) throw new IOException("the new name is taken");
-                string text = File.ReadAllText(rename.FromPath);
-                Save(rename.ToPath, PageFrontmatter.SetTitle(text, rename.To));
-                saved = true;
-                _undo?.Touch(rename.FromPath, text);
-                File.Delete(rename.FromPath);
-                _undo?.Wrote(rename.FromPath, null);
-                renamed.Add(rename);
-            }
-            catch
-            {
-                // Saved under the new name but the old file is still there:
-                // the links follow the new name (it exists), and the page is
-                // named so the teacher finds the second copy.
-                if (saved) renamed.Add(rename);
-                notFinished.Add(rename.From);
-                notRenamed++;
-            }
+            if (!step.Exists(rename.FromPath)) continue;   // nothing there to rename
+            // Taken (a page of the teacher's own, made after the plan was
+            // shown): never written over, and named.
+            if (step.Exists(rename.ToPath)) { notFinished.Add(rename.From); notRenamed++; continue; }
+            string text = step.ReadText(rename.FromPath);
+            step.Write(rename.ToPath, PageFrontmatter.SetTitle(text, rename.To));
+            step.Remove(rename.FromPath);
+            renamed.Add(rename);
         }
 
         progress?.Report("Following the links that pointed at them…");
-        var (linksUpdated, linkPagesFailed) = RewriteLinks(course, section, renamed);
-        notFinished.AddRange(linkPagesFailed);
-        linkPagesNotSaved = linkPagesFailed.Count;
+        int linksUpdated = RewriteLinks(course, section, renamed, step);
 
         progress?.Report("Moving the dates…");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         // A class the writer could not date (#308, the mac's #186) is NAMED —
-        // by its new name, since by now it has been renamed and moved.
+        // by its new name, since it is renamed and moved in the step.
         var undated = new List<string>();
-        // Counted from what was WRITTEN (#308 review F1, as the mac's
-        // ClassInsertionPlanner counts): a class declined, already on its
-        // date, or whose write failed is not "moved".
+        // Counted from what is PLANNED (#308 review F1, as the mac's
+        // ClassInsertionPlanner counts): a class declined or already on its
+        // date is not "moved".
         int moved = 0;
         // A rename that did not happen leaves its page under the OLD name — and
         // the new name may be a page of the teacher's own (that is usually why
@@ -4042,58 +4278,50 @@ public sealed partial class AssistWorkspace
             .Select(r => r.To).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var move in plan.Moves)
         {
-            string? full = null;
+            string full;
             try
             {
-                // Renamed pages are found under their NEW name by now.
+                // Renamed pages are found under their NEW name, in the step.
                 full = notRenamedTo.Contains(move.Title)
                     ? PagePaths.ResolveInside(_folder, move.RelativePath)
                     : Path.Combine(ClassFolder(course, section), move.Title + ".md");
-                if (!File.Exists(full)) full = PagePaths.ResolveInside(_folder, move.RelativePath);
-                if (!File.Exists(full)) continue;
-
-                bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
-                string key = sectionLocal ? "created" : "createdSection" + section;
-                var edit = PageFrontmatter.SetCreated(File.ReadAllText(full), key, move.To, tail);
-                // By the name the page has NOW: renamed if its rename went through.
-                if (edit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(Path.GetFileNameWithoutExtension(full));
-                if (edit.Changed)
-                {
-                    Save(full, edit.Text);
-                    moved++;
-                }
+                if (!step.Exists(full)) full = PagePaths.ResolveInside(_folder, move.RelativePath);
             }
-            catch
+            catch (Exception error) when (error is not (IOException or UnauthorizedAccessException))
             {
-                notFinished.Add(full is not null && File.Exists(full) ? Path.GetFileNameWithoutExtension(full) : move.Title);
+                // A page whose place cannot be named (it leads outside the
+                // working folder): carried past and named, as before. A page
+                // that cannot be READ stops the action, changing nothing.
+                notFinished.Add(move.Title);
                 notReDated++;
+                continue;
+            }
+            if (!step.Exists(full)) continue;
+
+            bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
+            string key = sectionLocal ? "created" : "createdSection" + section;
+            var edit = PageFrontmatter.SetCreated(step.ReadText(full), key, move.To, tail);
+            // By the name the page has in the step: renamed if its rename is planned.
+            if (edit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(Path.GetFileNameWithoutExtension(full));
+            if (edit.Changed)
+            {
+                step.Write(full, edit.Text);
+                moved++;
             }
         }
         NoteSettingsLeftAsTheyWere("making room for a class", undated.Count, course.Code, section);
 
         progress?.Report("Adding the new classes…");
-        Directory.CreateDirectory(ClassFolder(course, section));
-        int notAdded = 0;
+        // The class folder is made by the swap with the pages, never
+        // beforehand, so a refused step leaves no empty folder behind.
+        var created = new List<string>();
         foreach (var added in plan.Added)
         {
             string path = Path.Combine(ClassFolder(course, section), added.Title + ".md");
             // Still taken: the class whose rename did not happen is there.
             // Not overwritten, and named rather than counted as made.
-            if (File.Exists(path)) { notFinished.Add(added.Title); notAdded++; continue; }
-            try
-            {
-                Save(path, ClassSkeleton(added, plan.Naming.IsNumbered ? null : plan.Unit, plan.Added.Count, tail));
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-            {
-                // Until #550 this one save was not carried past, unlike the
-                // renames and the dates above: a failure here after renames
-                // threw past the note below, so the trail said "changed
-                // nothing" about a section that had been renamed.
-                if (carryPastAFailedNewPage) { notFinished.Add(added.Title); notAdded++; continue; }
-                if (created.Count > 0 || renamed.Count > 0 || moved > 0 || linksUpdated > 0) NoteAChangeWithNoUndoEntry();
-                throw;
-            }
+            if (step.Exists(path)) { notFinished.Add(added.Title); notAdded++; continue; }
+            step.Write(path, ClassSkeleton(added, plan.Naming.IsNumbered ? null : plan.Unit, plan.Added.Count, tail));
             created.Add(path);
         }
 
@@ -4101,32 +4329,81 @@ public sealed partial class AssistWorkspace
         if (unfinishedPages > 0)
             ActivityTrail.Note(ActivityTrail.Event.MakingRoomDidNotFinishEveryPage,
                 $"making room for a class did not finish {(unfinishedPages == 1 ? "1 page" : $"{unfinishedPages} pages")}: " +
-                $"{notRenamed} not renamed, {notReDated} not re-dated, {linkPagesNotSaved} with links not updated, " +
+                $"{notRenamed} not renamed, {notReDated} not re-dated, 0 with links not updated, " +
                 $"{notAdded} new not added",
                 course.Code, section);
 
-        string said =
-            (created.Count > 0 ? AssistWording.MadeRoom(created.Count, plan.PositionTitle) + " " : "") +
-            $"Renamed {renamed.Count}, moved {moved} onto " +
-            $"later class days, and updated {linksUpdated} link" +
-            $"{(linksUpdated == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
-            AssistWording.LookTheSectionOverBeforePublishing;
-        if (undated.Count > 0) said += " " + NewDatesCouldNotBeSet(undated);
-        if (notFinished.Count > 0)
-            said += " " + ChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+        return new RoomPlanned(created, renamed.Count, moved, linksUpdated, undated, notFinished);
+    }
 
-        // Said because it is now TRUE and was not said before: this records no
-        // undo entry, so "undo that" afterwards reaches back past it to
-        // whatever the conversation did before — or answers that nothing has
-        // been changed. The mac says the same sentence, on the same condition
-        // (`makeRoomForClasses` → `movesAnythingElse`).
-        if (plan.Renames.Count > 0 || plan.Moves.Count > 0)
-            said += "\n\n" + ClassChangeWording.OtherClassesMoved(backup);
+    /// <summary>
+    /// Points every link at a renamed page's new name, planned into
+    /// <paramref name="step"/>.
+    ///
+    /// Obsidian does this itself when OBSIDIAN performs the rename. This one
+    /// happens on disk, from another process — which Obsidian reads as a
+    /// delete and a create, leaving links alone — and Obsidian may not be
+    /// running at all. So it cannot be delegated. What Obsidian is good for is
+    /// the list of forms that have to survive, and all of them do:
+    /// <c>[[Page]]</c>, <c>[[Page|alias]]</c>, <c>![[Page]]</c>,
+    /// <c>[[Page#Heading]]</c>, <c>[[Page#^block]]</c> and the combinations,
+    /// because the pattern stops at <c>#</c> and <c>|</c> and only the name
+    /// between the brackets moves.
+    ///
+    /// The one form NOT handled is Obsidian's optional Markdown-style link,
+    /// <c>[text](Unit%202,%20Day%203.md)</c>. Every page Plantoir ships uses
+    /// wikilinks, and the rest of the toolchain only understands those, so a
+    /// vault switched to Markdown links has bigger problems than this — but it
+    /// is a real gap and belongs written down rather than discovered.
+    /// </summary>
+    /// <returns>How many links are rewritten, on the pages planned into the
+    /// step (the shared rewriter's own count, as the plan counts them). Every
+    /// page is read through the step: a renamed page under its new name, never
+    /// the name it no longer has.</returns>
+    private int RewriteLinks(Course course, int section, IReadOnlyList<Rename> renames, UndoActionStep step)
+    {
+        if (renames.Count == 0) return 0;
+        var byName = renames.ToDictionary(r => r.From, r => r.To, StringComparer.OrdinalIgnoreCase);
+        var oldNames = byName.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        int links = 0;
 
-        // No undo entry says so, so the menu's trail line is told here (#489, M1).
-        if (created.Count > 0 || renamed.Count > 0 || moved > 0 || linksUpdated > 0) NoteAChangeWithNoUndoEntry();
+        // The section's pages as the step will leave them: those on the disk,
+        // then each page the step writes that is not on the disk yet (a
+        // renamed class under its new name). A page the step removes is
+        // passed over by step.Exists below.
+        var pages = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string relative in Pages(course, section))
+        {
+            string full;
+            try { full = PagePaths.ResolveInside(_folder, relative); }
+            catch { continue; }
+            if (seen.Add(Path.GetFullPath(full))) pages.Add(full);
+        }
+        foreach (string planned in step.PlannedWithContent)
+        {
+            if (planned.EndsWith(".md", StringComparison.OrdinalIgnoreCase) && seen.Add(Path.GetFullPath(planned)))
+                pages.Add(planned);
+        }
 
-        return new AssistResult(true, said, backup);
+        foreach (string full in pages)
+        {
+            if (!step.Exists(full)) continue;
+            // Read through the step; a page that cannot be read stops the
+            // action before anything is written, as every converted action does.
+            string text = step.ReadText(full);
+
+            // Only the TARGET is rewritten; an alias after "|" is the
+            // teacher's own words and stays exactly as written, and so do an
+            // escaping backslash and a link inside code or a comment (#318,
+            // #339) — the one shared rewriter.
+            string updated = WikiLinks.Rewriting(text, byName);
+            if (updated == text) continue;
+
+            step.Write(full, updated);
+            links += WikiLinks.CountLinksTo(oldNames, text);
+        }
+        return links;
     }
 
     // ---- Duplicating a lesson as the next class ----------------------------
@@ -4157,7 +4434,8 @@ public sealed partial class AssistWorkspace
 
         var numbers = course.Configuration.Naming.Parse(sourceTitle)
             ?? throw new AssistRefusal(
-                ClassChangeWording.NotANumberedClassPage(sourceTitle));
+                ClassChangeWording.NotANumberedClassPage(sourceTitle),
+                ClassChangeWording.NotANumberedClassPage(sourceTitle, course.Configuration.ClassNoun));
 
         // The source's own next day. Throws the timetable refusal unchanged,
         // which is the sentence that asks for the class dates.
@@ -4165,7 +4443,11 @@ public sealed partial class AssistWorkspace
         if (insertion.Added.Count == 0)
         {
             string why = string.Join(" ", insertion.Problems);
-            throw new AssistRefusal(why.Length > 0 ? why : ClassChangeWording.NoClassDateLeft);
+            var nounOfTheCourse = course.Configuration.ClassNoun;
+            string whyForTheTeacher = string.Join(" ",
+                nounOfTheCourse == ClassNoun.Meeting && insertion.ProblemsForAMeeting is { } clubProblems ? clubProblems : insertion.Problems);
+            throw new AssistRefusal(why.Length > 0 ? why : AssistWording.NoClassDateLeftForTheCopy(),
+                whyForTheTeacher.Length > 0 ? whyForTheTeacher : AssistWording.NoClassDateLeftForTheCopy(nounOfTheCourse));
         }
 
         string sourceText;
@@ -4186,10 +4468,19 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
-    /// Make the copy: room first, then the source's words under a new title, a
-    /// date of its own, and hidden.
+    /// Make the copy: the room and the source's words under a new title, a
+    /// date of its own, and hidden, as ONE step.
     /// </summary>
     /// <remarks>
+    /// <para><b>ONE step through the door</b> (#899 W7b2-2; the mac's
+    /// <c>duplicateClass</c>): the room is planned into the step
+    /// (<see cref="PlanTheRoom"/>, as Make Room plans it), the copy is planned
+    /// into the same step over the blank page the room planned, and the step is
+    /// made once, all or none. When the copy is refused once the room is
+    /// planned (the place for it still holds a lesson, or it cannot be made
+    /// certainly hidden), the room alone is made, in the same step under the
+    /// same key, as before.</para>
+    ///
     /// <para><b>Hidden however the source was.</b> A page made by duplicating
     /// a published lesson is a draft of next week's, and putting it in front
     /// of students the moment it is made is the one thing it must not do. The
@@ -4197,13 +4488,13 @@ public sealed partial class AssistWorkspace
     /// OTHER sections, which is what the mac does and what a teacher copying a
     /// shared page would expect.</para>
     ///
-    /// <para><b>Undoable only when nothing else moved.</b> The entry is opened
-    /// HERE, before <see cref="ApplyInsertClasses"/> — which records nothing of
-    /// its own — so this either records the whole change or records none of
-    /// it. A partial undo that deleted the copy and left every later class
-    /// renamed and re-dated would be worse than no undo at all, so when
-    /// classes shuffled the entry is abandoned and the reply names the backup
-    /// instead.</para>
+    /// <para><b>Undoable only when nothing else moved.</b> Today's in-memory
+    /// undo (<c>UndoHistory</c>) is told the step's files once it is made, into
+    /// the entry opened HERE, so this either records the whole change or
+    /// records none of it. A partial undo that deleted the copy and left every
+    /// later class renamed and re-dated would be worse than no undo at all, so
+    /// when classes shuffled the entry is abandoned and the reply names the
+    /// backup instead.</para>
     /// </remarks>
     public AssistResult ApplyDuplicateClass(DuplicateClassPlan plan, IProgress<string>? progress = null)
     {
@@ -4211,69 +4502,83 @@ public sealed partial class AssistWorkspace
         int section = Section(course, plan.SectionNumber);
         string newPath = Path.Combine(ClassFolder(course, section), plan.NewTitle + ".md");
 
-        // OUTERMOST, and that is the whole of why this reads the way it does.
-        // Begin ignores a nested call, so whoever opens the entry first owns
-        // the description — and everything ApplyInsertClasses writes lands in
-        // this one. Leaving without reaching Done abandons it, so every
-        // refusal below is safe by construction rather than by remembering.
+        // Leaving without reaching Done abandons the entry, so every refusal
+        // below is safe by construction rather than by remembering.
         using var recording = UndoHistory.Record(_undo,
             $"duplicated “{plan.SourceTitle}” as “{plan.NewTitle}”");
 
-        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress, out var created, carryPastAFailedNewPage: false);
+        // PlanDuplicateClass refuses a plan that adds no class, so the room
+        // always plans the copy's blank page.
+        RefuseIfPlantoirIsBuilding(course);
 
-        // The one case that could destroy a lesson (#200 A, the mac's #163).
-        // Asked of the PLANNER — did this run write the page standing there? —
-        // not of the page's text. The text comparison this replaced was
-        // defeated by the link pass: a destination whose rename was skipped
-        // but which linked to a page that WAS renamed came back with different
-        // text, read as "not the same page", and the copy was written over the
-        // lesson. Deliberately not ANDed with "was a page there before?": a
-        // sample taken before the shuffle is blind to a page appearing during
-        // it, and Obsidian being open in the other window is the premise.
-        if (!created.Contains(newPath, StringComparer.OrdinalIgnoreCase))
+        string backup;
+        try { backup = BackUpOnceForThisConversation(course, plan.Insertion.SectionNumber); }
+        catch (Exception error)
         {
-            ActivityTrail.Note(ActivityTrail.Event.ClassCopyNotMade,
-                "did not copy a class — the page the copy would have become still held a lesson, " +
-                "and other classes may already have moved", course.Code, section);
             throw new AssistRefusal(
-                ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath));
+                $"{course.Code} couldn’t be backed up, so nothing was moved: {error.Message}");
         }
 
-        progress?.Report($"Copying “{plan.SourceTitle}”…");
-        bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, newPath);
-        // #200 B: REMOVE what the copy inherited, never add a per-section key
-        // to hide it — see PageFrontmatter.WithoutPerSectionKeys for the page
-        // that could never be published again while the reply said it was.
-        string copied = PageFrontmatter.WithoutPerSectionKeys(plan.SourceText);
-        copied = PageFrontmatter.SetTitle(copied, plan.NewTitle);
-        copied = PageFrontmatter.SetCreated(
-            copied, PageFrontmatter.CreatedKeyFor(section, sectionLocal), plan.NewDate,
-            SiblingTimeAndOffset(course, section, ClassPages(course, section))).Text;
-        copied = PageFrontmatter.SetDraft(
-            copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true, section).Text;
-
-        // Read back what is about to be written and ABANDON the copy rather
-        // than write one this app cannot vouch for. `!= Hidden`, not
-        // `== Visible`: "cannot tell" may well be published by the build.
-        // Reachable — a TAB used as indentation in the source's block, or a
-        // block whose first line is indented (SetDraft declines, #186) — and
-        // safe: the blank the insertion wrote here is `publish: false`.
-        if (PageFrontmatter.Visibility(copied, section) != PageVisibility.Hidden)
+        var step = NewUndoStep("duplicateClass", course.Code, section);
+        RoomPlanned room;
+        try
         {
-            ActivityTrail.Note(ActivityTrail.Event.ClassCopyNotMade,
-                "did not copy a class — the copy could not be made certainly hidden, and a copy " +
-                "of a published lesson must never arrive where students can read it", course.Code, section);
-            throw new AssistRefusal(
-                ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, inserted.BackupPath));
+            room = PlanTheRoom(plan.Insertion, progress, step, course, section);
+
+            // The one case that could destroy a lesson (#200 A, the mac's #163).
+            // Asked of the PLAN — did this run plan the page standing there? —
+            // not of the page's text. The text comparison this replaced was
+            // defeated by the link pass: a destination whose rename was skipped
+            // but which linked to a page that WAS renamed came back with
+            // different text, read as "not the same page", and the copy was
+            // written over the lesson.
+            if (!room.CreatedPaths.Contains(newPath, StringComparer.OrdinalIgnoreCase))
+            {
+                MakeTheRoomAlone(step, section);
+                ActivityTrail.Note(ActivityTrail.Event.ClassCopyNotMade,
+                    "did not copy a class — the page the copy would have become still held a lesson, " +
+                    "and other classes may already have moved", course.Code, section);
+                throw new AssistRefusal(
+                    ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, backup),
+                    ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, backup, course.Configuration.ClassNoun));
+            }
+
+            progress?.Report($"Copying “{plan.SourceTitle}”…");
+            string copied = TheCopy(plan, course, section, newPath, step);
+
+            // Read back what is about to be written and ABANDON the copy rather
+            // than write one this app cannot vouch for. `!= Hidden`, not
+            // `== Visible`: "cannot tell" may well be published by the build.
+            // Reachable — a TAB used as indentation in the source's block, or a
+            // block whose first line is indented (SetDraft declines, #186) — and
+            // safe: the blank the room planned here is `publish: false`.
+            if (PageFrontmatter.Visibility(copied, section) != PageVisibility.Hidden)
+            {
+                MakeTheRoomAlone(step, section);
+                ActivityTrail.Note(ActivityTrail.Event.ClassCopyNotMade,
+                    "did not copy a class — the copy could not be made certainly hidden, and a copy " +
+                    "of a published lesson must never arrive where students can read it", course.Code, section);
+                throw new AssistRefusal(
+                    ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, backup),
+                    ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, backup,
+                                                                   course.Configuration.ClassNoun));
+            }
+
+            step.Write(newPath, copied);
+            bool changed = MakeTheUndoStep(step);
+            // Recorded ONLY when nothing else moved. Left unsettled otherwise,
+            // so the scope abandons it, and the menu's trail line is told that
+            // a file was written with no entry (#489, M1).
+            if (!plan.MovesOtherClasses) recording.Done();
+            else if (changed) NoteAChangeWithNoUndoEntry();
         }
-
-        Save(newPath, copied);
-
-        // Recorded ONLY when nothing else moved. Left unsettled otherwise, so
-        // the scope abandons it: a partial undo that deleted the copy and left
-        // every later class renamed and re-dated is worse than no undo at all,
-        // and the reply names the backup instead.
-        if (!plan.MovesOtherClasses) recording.Done();
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // All or none: "Nothing was changed" unless the door left a page
+            // holding the new content, said as part way (the mac's
+            // saidWhenTheStepStopped, "the classes and the copy").
+            throw RefusalForAStepThatStopped(error, "the classes and the copy", section);
+        }
 
         string said = ClassChangeWording.CopiedTo(plan.SourceTitle, plan.NewTitle, plan.NewDate);
         if (plan.MovesOtherClasses)
@@ -4282,72 +4587,56 @@ public sealed partial class AssistWorkspace
             // exactly this condition — that the backup is the way back rather
             // than "undo that". Saying ClassChangeWording.OtherClassesMoved
             // here as well would print it twice.
-            said += "\n\n" + inserted.Message;
+            said += "\n\n" + room.Reply(this, plan.Insertion, course, section, backup).Message;
         }
         else
         {
             said += "\n\n" + AssistWording.ACreatedPageCanBeTakenBack;
         }
 
-        return new AssistResult(true, said, inserted.BackupPath);
+        return new AssistResult(true, said, backup);
     }
 
     /// <summary>
-    /// Point every link at a renamed page's new name.
-    ///
-    /// Obsidian does this itself when OBSIDIAN performs the rename. This one
-    /// happens on disk, from another process — which Obsidian reads as a
-    /// delete and a create, leaving links alone — and Obsidian may not be
-    /// running at all. So it cannot be delegated. What Obsidian is good for is
-    /// the list of forms that have to survive, and all of them do:
-    /// <c>[[Page]]</c>, <c>[[Page|alias]]</c>, <c>![[Page]]</c>,
-    /// <c>[[Page#Heading]]</c>, <c>[[Page#^block]]</c> and the combinations,
-    /// because the pattern stops at <c>#</c> and <c>|</c> and only the name
-    /// between the brackets moves.
-    ///
-    /// The one form NOT handled is Obsidian's optional Markdown-style link,
-    /// <c>[text](Unit%202,%20Day%203.md)</c>. Every page Plantoir ships uses
-    /// wikilinks, and the rest of the toolchain only understands those, so a
-    /// vault switched to Markdown links has bigger problems than this — but it
-    /// is a real gap and belongs written down rather than discovered.
+    /// The copy is refused once the room is planned: the room alone is made,
+    /// in the same step (the mac's <c>duplicateStep.make()</c> before its
+    /// refusal), and noted as a change with no undo entry when it wrote a file.
+    /// A step that stops says so with "the classes" (the mac's words there).
     /// </summary>
-    /// <returns>How many links were rewritten on pages that were SAVED (the
-    /// shared rewriter's own count, as the plan counts them), and the names of
-    /// the pages whose rewritten links could not be saved (#422).</returns>
-    private (int Links, List<string> NotSaved) RewriteLinks(Course course, int section, IReadOnlyList<Rename> renames)
+    private void MakeTheRoomAlone(UndoActionStep step, int section)
     {
-        var notSaved = new List<string>();
-        if (renames.Count == 0) return (0, notSaved);
-        var byName = renames.ToDictionary(r => r.From, r => r.To, StringComparer.OrdinalIgnoreCase);
-        var oldNames = byName.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        int links = 0;
-
-        foreach (string relative in Pages(course, section))
+        try
         {
-            string full;
-            string text;
-            try
-            {
-                full = PagePaths.ResolveInside(_folder, relative);
-                text = File.ReadAllText(full);
-            }
-            catch { continue; }
-
-            // Only the TARGET is rewritten; an alias after "|" is the
-            // teacher's own words and stays exactly as written, and so do an
-            // escaping backslash and a link inside code or a comment (#318,
-            // #339) — the one shared rewriter.
-            string updated = WikiLinks.Rewriting(text, byName);
-            if (updated == text) continue;
-
-            try
-            {
-                Save(full, updated);
-                links += WikiLinks.CountLinksTo(oldNames, text);
-            }
-            catch { notSaved.Add(Path.GetFileNameWithoutExtension(full)); }
+            if (MakeTheUndoStep(step)) NoteAChangeWithNoUndoEntry();
         }
-        return (links, notSaved);
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw RefusalForAStepThatStopped(error, "the classes", section);
+        }
+    }
+
+    /// <summary>
+    /// The copy's text: the source's words under the new title, its own date
+    /// and hidden, the siblings' time of day read through the step as the
+    /// room will leave them (the mac's <c>duplicateStep.whilePlanning</c>).
+    /// </summary>
+    private string TheCopy(DuplicateClassPlan plan, Course course, int section, string newPath, UndoActionStep step)
+    {
+        bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, newPath);
+        string tail;
+        PlanningThrough = step;
+        try { tail = SiblingTimeAndOffset(course, section, ClassPages(course, section)); }
+        finally { PlanningThrough = null; }
+
+        // #200 B: REMOVE what the copy inherited, never add a per-section key
+        // to hide it — see PageFrontmatter.WithoutPerSectionKeys for the page
+        // that could never be published again while the reply said it was.
+        string copied = PageFrontmatter.WithoutPerSectionKeys(plan.SourceText);
+        copied = PageFrontmatter.SetTitle(copied, plan.NewTitle);
+        copied = PageFrontmatter.SetCreated(
+            copied, PageFrontmatter.CreatedKeyFor(section, sectionLocal), plan.NewDate, tail).Text;
+        return PageFrontmatter.SetDraft(
+            copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true, section).Text;
     }
 
     // ---- Laying down a unit that has not been written yet ------------------
@@ -4406,7 +4695,7 @@ public sealed partial class AssistWorkspace
 
         if (unit < 1) throw new AssistRefusal("A unit number starts at 1.");
         if (firstDay < 1) throw new AssistRefusal("A day number starts at 1.");
-        if (count < 1) throw new AssistRefusal("Ask for at least one class.");
+        if (count < 1) throw new AssistRefusal(AssistWording.AskForAtLeastOneClass(), AssistWording.AskForAtLeastOneClass(course.Configuration.ClassNoun));
         var naming = course.Configuration.Naming;
         // A numbered course has one run of pages and no units (#274): any
         // unit but the one it is held as is refused BEFORE the dates are asked for.
@@ -4414,12 +4703,10 @@ public sealed partial class AssistWorkspace
             throw new AssistRefusal(NextClassPlanner.NoUnitsInANumberedCourse(course.Code, naming.Word));
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
-            ?? throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date new classes. {AssistWording.MayIAskForYourDates}");
+            ?? throw NoDatesToAddClassesTo(course, section);
 
         if (remembered.Dates.Count == 0)
-            throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date new classes. {AssistWording.MayIAskForYourDates}");
+            throw NoDatesToAddClassesTo(course, section);
 
         string folder = ClassFolder(course, section);
         var existing = ClassPages(course, section);
@@ -4499,11 +4786,13 @@ public sealed partial class AssistWorkspace
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
             ?? throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date a new class. {AssistWording.MayIAskForYourDates}");
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section),
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         if (remembered.Dates.Count == 0)
             throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date a new class. {AssistWording.MayIAskForYourDates}");
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section),
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         var existing = ClassPages(course, section);
         var existingTitles = existing.Select(p => Path.GetFileNameWithoutExtension(p) ?? "").ToList();
@@ -4551,7 +4840,8 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>Create the pages the plan describes. Backed up first, and undoable.</summary>
-    public AssistResult ApplyAddClasses(NewClassesPlan plan, IProgress<string>? progress = null)
+    /// <param name="actionKey">The step's key (<c>undo-action-steps.json</c>): <c>addClasses</c> for add_classes, <c>addNextClass</c> or <c>addNextClassInANewUnit</c> for add_next_class, as the mac's <c>AssistToolRunner.addNextClass</c> names them.</param>
+    public AssistResult ApplyAddClasses(NewClassesPlan plan, IProgress<string>? progress = null, string actionKey = "addClasses")
     {
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
@@ -4584,13 +4874,29 @@ public sealed partial class AssistWorkspace
         // use, so a new page sorts beside them rather than at midnight.
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         string folder = ClassFolder(course, section);
-        Directory.CreateDirectory(folder);
 
-        foreach (var created in plan.Classes)
+        // ONE step through the door (#899 W7b1; the mac's
+        // PlaceholderClassPlanner.apply): every new page together, all or
+        // none, each a writeFile with no before; the class folder is made by
+        // the swap with them, never beforehand, and a refused swap removes
+        // the empty folders it made, so none is left behind.
+        var step = NewUndoStep(actionKey, course.Code, section);
+        try
         {
-            string path = Path.Combine(folder, created.Title + ".md");
-            if (File.Exists(path)) continue;       // checked again: the plan may be minutes old
-            Save(path, ClassSkeleton(created, plan.Naming.IsNumbered ? null : plan.Unit, plan.Classes.Count, tail));
+            foreach (var created in plan.Classes)
+            {
+                string path = Path.Combine(folder, created.Title + ".md");
+                if (step.Exists(path)) continue;       // checked again: the plan may be minutes old
+                step.Write(path, ClassSkeleton(created, plan.Naming.IsNumbered ? null : plan.Unit, plan.Classes.Count, tail));
+            }
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // All or none: "Nothing was changed" unless the door left a page
+            // holding the new content, said as part way (the mac's
+            // saidWhenTheStepStopped, "the classes you asked for").
+            throw RefusalForAStepThatStopped(error, "the classes you asked for", section);
         }
         recording.Done();
 
@@ -4673,15 +4979,24 @@ public sealed partial class AssistWorkspace
         int section = Section(course, sectionNumber);
         var classes = ClassPages(course, section);
         return TodaysClassOnTheFrontPage.ShowOnTheFrontPage(course, section, classes, SectionIndex.PathFor(course, section),
-            askedOn, offering, path => PointerFor(course, section, path), SiblingTimeAndOffset(course, section, classes));
+            askedOn, offering, path => PointerFor(course, section, path), SiblingTimeAndOffset(course, section, classes),
+            // The sheet's own button (#899 W7b2-6; the mac's UndoStepMaker.sheet), on this workspace's list and door.
+            () => NewUndoStep("showTodaysClassOnTheFrontPage", course.Code, section, madeBy: "sheet"));
     }
 
-    /// <summary>Not Today, remembered for this section, day and class.</summary>
-    public void DeclineTodaysClass(string courseCode, int sectionNumber, DateOnly askedOn,
+    /// <summary>
+    /// Not Today, remembered for this section, day and class: ONE step of
+    /// that one record (#899 W7b2-7), made by the sheet's own button (the
+    /// mac's <c>UndoStepMaker.sheet</c>) on this workspace's list and door.
+    /// </summary>
+    /// <returns>False when the record could not be written: the answer stands, and only the record is lost.</returns>
+    public bool DeclineTodaysClass(string courseCode, int sectionNumber, DateOnly askedOn,
                                    TodaysClassOnTheFrontPage.Offering offering)
     {
         var course = Course(courseCode);
-        TodaysClassOnTheFrontPage.RecordNotToday(course, Section(course, sectionNumber), askedOn, offering);
+        int section = Section(course, sectionNumber);
+        return TodaysClassOnTheFrontPage.RecordNotToday(course, section, askedOn, offering,
+            NewUndoStep("notTodayOnTheFrontPage", course.Code, section, madeBy: "sheet"));
     }
 
     /// <summary>
@@ -4753,6 +5068,19 @@ public sealed partial class AssistWorkspace
         return Path.GetFileName(full);
     }
 
+    /// <summary>
+    /// add_classes with no dates: the model's words are unchanged (#267), and
+    /// they end with the question the window offers the dates sheet for. A
+    /// club's teacher reads the same in the club's noun, the contract's
+    /// <c>cannotDateANewClassWithoutDatesForAMeeting</c>, whose question the
+    /// window offers the sheet for too (#1027 round 4).
+    /// </summary>
+    private static AssistRefusal NoDatesToAddClassesTo(Course course, int section) =>
+        new($"I don’t know when {course.Code} Section {section} meets, so I can’t date new classes. {AssistWording.MayIAskForYourDates}",
+            course.Configuration.ClassNoun == ClassNoun.Meeting
+                ? AssistWording.CannotDateANewClassWithoutDatesForAMeeting(course.Code, section)
+                : null);
+
     private static string ClassFolder(Course course, int sectionNumber)
     {
         // The naming half of the shared rule
@@ -4770,7 +5098,20 @@ public sealed partial class AssistWorkspace
     /// has written yet has no business appearing in the site, and the teacher
     /// asked for exactly that.
     /// </summary>
-    private static string ClassSkeleton(NewClass created, int? unit, int howMany, string tail)
+    internal static string ClassSkeleton(NewClass created, int? unit, int howMany, string tail) =>
+        PageTextFromLiteral(ClassSkeletonLiteral(created, unit, howMany, tail));
+
+    /// <summary>
+    /// A raw string literal made into the text of a teacher's page: LF line
+    /// ends, as the Mac writes (#1040). A raw literal takes its line ends from
+    /// the checkout that compiled it, so built from a <c>core.autocrlf true</c>
+    /// checkout every line of the skeleton was CRLF except the two the unit
+    /// tag adds.
+    /// </summary>
+    internal static string PageTextFromLiteral(string literal) => literal.ReplaceLineEndings("\n");
+
+    /// <summary>The skeleton as the raw literal compiles, line ends and all; <see cref="ClassSkeleton"/> is what is written.</summary>
+    internal static string ClassSkeletonLiteral(NewClass created, int? unit, int howMany, string tail)
     {
         string plural = howMany == 1 ? "This page was" : $"{howMany} of these were";
         // A numbered course has no units, so its page carries no unit tag —
@@ -4811,6 +5152,123 @@ public sealed partial class AssistWorkspace
             """;
     }
 
+    /// <summary>A step for one daily action, made by this workspace's surface (#899 W7a): <c>madeBy</c> is <c>menu</c>, <c>builtInAssistant:&lt;id&gt;</c> or <c>outsideAssistant::&lt;id&gt;</c>.</summary>
+    /// <param name="madeBy">Who makes it when that is not this workspace's surface: <c>sheet</c> for a sheet's own button (#899 W7b2-5, the start of the year's Go, as the mac's <c>UndoStepMaker.sheet</c>).</param>
+    internal UndoActionStep NewUndoStep(string actionKey, string courseCode, int section, string? madeBy = null)
+    {
+        UndoForThisProcess list = UndoList ?? UndoForThisProcess.Current;
+        UndoDoor? door = UndoDoorOfATest
+            ?? (UndoSeams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: UndoSeams, trail: list.Trail));
+        return new(new UndoStepMaker(madeBy ?? UndoMadeBy, actionKey), _folder, courseCode, section, undo: list, door: door);
+    }
+
+    /// <summary>
+    /// A step for an action on a page that belongs to the course, not to a
+    /// section (#899 W7b2-4: the How I Teach page): held by the course
+    /// (<c>holds: course</c>) with no section, as the mac's
+    /// <c>JournaledStep(course:section: nil, holds: "course")</c>.
+    /// </summary>
+    internal UndoActionStep NewCourseUndoStep(string actionKey, string courseCode)
+    {
+        UndoForThisProcess list = UndoList ?? UndoForThisProcess.Current;
+        UndoDoor? door = UndoDoorOfATest
+            ?? (UndoSeams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: UndoSeams, trail: list.Trail));
+        return new(new UndoStepMaker(UndoMadeBy, actionKey), _folder, courseCode, section: null, holds: "course", undo: list, door: door);
+    }
+
+    /// <summary>
+    /// Remembers a section's class dates (<c>remember_timetable</c>, #899
+    /// W7b1): <see cref="TimetableMemory.Write(string, string, int, IEnumerable{DateOnly}, string, DateOnly, string?)"/>
+    /// as ONE step made by this workspace's surface, on its list.
+    /// </summary>
+    /// <returns>Not remembered when the dates could not be saved, as before; left part way, with the kept file to name (review 1, MEDIUM 1).</returns>
+    public TimetableWriteOutcome RememberTimetable(string courseCode, int section, IEnumerable<DateOnly> dates, string source, DateOnly today) =>
+        TimetableMemory.WriteDown(_folder, courseCode, section, dates, source, today,
+                                  NewUndoStep("rememberTimetable", courseCode, section));
+
+    /// <summary>A test's own door for every step of this workspace (the contract replay's list, with its clock); none in the app.</summary>
+    internal UndoDoor? UndoDoorOfATest { get; init; }
+
+    /// <summary>A test's seams for the door every step of this workspace goes through (a put-back that fails, a kill point); none in the app.</summary>
+    internal UndoSeams? UndoSeams { get; init; }
+
+    /// <summary>
+    /// The step an action is planning through, or null (#899 W7a): while one
+    /// is set, the planners (<see cref="PlanPublish"/>, <see cref="IndexChangeFor"/>,
+    /// <see cref="WriterDeclines"/>, the visibility reads) read each page as
+    /// the step will leave it, so an action that plans one class after
+    /// another inside ONE step (a whole unit) plans each seeing the ones
+    /// before it, as it did when each was written to the disk first. Held
+    /// per flow of execution (<see cref="AsyncLocal{T}"/>), so a plan another
+    /// caller runs on this workspace at the same moment reads the disk, never
+    /// this action's half-planned step (part three, review 1, LOW 3).
+    /// </summary>
+    private readonly AsyncLocal<UndoActionStep?> _planningThroughHere = new();
+
+    private UndoActionStep? PlanningThrough
+    {
+        get => _planningThroughHere.Value;
+        set => _planningThroughHere.Value = value;
+    }
+
+    /// <summary>A page's text for a planner: through the step being planned, else the disk's.</summary>
+    private string ReadPlanned(string path) =>
+        PlanningThrough is { } step ? step.ReadText(path) : File.ReadAllText(path);
+
+    /// <summary>The list a step goes to: this process's, or a test's own.</summary>
+    internal UndoForThisProcess? UndoList { get; init; }
+
+    /// <summary>This workspace's conversation, as a step's <c>madeBy</c> names it (one per workspace: the window's or the outside assistant's session).</summary>
+    private readonly string _undoConversation = Guid.NewGuid().ToString("D");
+
+    /// <summary>Who makes this workspace's steps (<c>undoJournal.madeBy</c>).</summary>
+    internal string UndoMadeBy => Surface switch
+    {
+        AssistSurface.Menu => "menu",
+        AssistSurface.LocalWindow => "builtInAssistant:" + _undoConversation,
+        _ => "outsideAssistant::" + _undoConversation,
+    };
+
+    /// <summary>
+    /// Makes the step, then tells today's in-memory undo (<c>UndoHistory</c>)
+    /// exactly what <see cref="Save"/> used to: each file's text before and
+    /// after, the front page as the door re-derived it included.
+    /// </summary>
+    /// <returns>Whether the step changed any file, the re-derived front page included.</returns>
+    internal bool MakeTheUndoStep(UndoActionStep step, IReadOnlyList<string>? frontPages = null)
+    {
+        bool changedAny = false;
+        var changes = step.ChangedFiles;
+        var frontBefore = new List<(string Path, string? Text)>();
+        foreach (string page in frontPages ?? step.FrontPages)
+        {
+            string? text = null;
+            try { if (File.Exists(page)) text = File.ReadAllText(page); } catch { }
+            frontBefore.Add((page, text));
+        }
+        step.Make();
+        foreach (var (path, before, after, beforeBytes) in changes)
+        {
+            changedAny = true;
+            // Beside the pages, never part of today's change (the kept record
+            // of Publish Class for a Date, as on the mac): Undo Last Change
+            // leaves it, as it did.
+            if (!step.TodaysUndoKeeps(path)) continue;
+            _undo?.Touch(path, before, beforeBytes);
+            _undo?.Wrote(path, after);
+        }
+        foreach (var (path, before) in frontBefore)
+        {
+            string? after = null;
+            try { if (File.Exists(path)) after = File.ReadAllText(path); } catch { }
+            if (after == before) continue;
+            changedAny = true;
+            _undo?.Touch(path, before);
+            _undo?.Wrote(path, after);
+        }
+        return changedAny;
+    }
+
     private void Save(string path, string text)
     {
         string? before = null;
@@ -4837,10 +5295,26 @@ public sealed partial class AssistWorkspace
 /// A request that will not be carried out, with a reason a teacher can act on.
 /// Never a stack trace, never a code — the assistant reads this back aloud.
 /// </summary>
-public sealed class AssistRefusal(string message) : Exception(message);
+public sealed class AssistRefusal(string message, string? forTheTeacher = null) : Exception(message)
+{
+    /// <summary>
+    /// What the teacher reads when it differs from <see cref="Exception.Message"/>
+    /// by the course's noun (#1027): "meeting" in a club. The model reads the
+    /// message, the class form, in every course (#267).
+    /// </summary>
+    public string ForTheTeacher { get; } = forTheTeacher ?? message;
+}
 
 /// <summary>How an operation ended, and where the backup went.</summary>
-public sealed record AssistResult(bool Succeeded, string Message, string? BackupPath);
+public sealed record AssistResult(bool Succeeded, string Message, string? BackupPath)
+{
+    /// <summary>
+    /// What the teacher reads when it differs from <see cref="Message"/>, the
+    /// model's copy: a club's result line in "meeting" (#1027 review 3, M1).
+    /// Null when the teacher reads the message itself.
+    /// </summary>
+    public string? ForTheTeacher { get; init; }
+}
 
 /// <summary>
 /// Runs one of the working folder's launchers. Abstracted so the plan logic can

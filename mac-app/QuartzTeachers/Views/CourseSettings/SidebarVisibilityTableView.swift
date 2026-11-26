@@ -104,6 +104,7 @@ struct SidebarVisibilityTableView: View {
                 toggleHidden(item)
                 return .handled
             }
+            .accessibilityLabel(Text("Sidebar Visibility"))
             .accessibilityIdentifier("sidebarVisibilityTable")
         }
     }

@@ -57,8 +57,42 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
         get => _tooltip;
         set { if (_tooltip != value) { _tooltip = value; Raise(nameof(Tooltip)); } }
     }
+    /// <summary>
+    /// A course's row (#1024, the mac's #997 D44): when its code is cut short,
+    /// the code's own text carries the whole code as a tooltip, the HIG's
+    /// expansion tooltip ("Consider using an expansion tooltip to show the
+    /// full version of clipped or truncated text"). A code that fits has none.
+    /// </summary>
+    public bool ShowsWholeTitleWhenCutShort { get; init; }
+
+    private bool _titleIsCutShort;
+    /// <summary>Whether the row's text is drawn cut short, as its TextBlock last reported it.</summary>
+    public bool TitleIsCutShort
+    {
+        get => _titleIsCutShort;
+        set
+        {
+            if (_titleIsCutShort == value) return;
+            _titleIsCutShort = value;
+            Raise(nameof(TitleTooltip));
+            Raise(nameof(TitleHelpText));
+        }
+    }
+
+    /// <summary>The title's own tooltip: the whole code, only on a course's row and only while it is cut short.</summary>
+    public string? TitleTooltip => ShowsWholeTitleWhenCutShort && _titleIsCutShort ? Title : null;
+
+    /// <summary>
+    /// The same words as UI Automation help text, as the mac's help tag is read
+    /// off its tree (the house pattern: SectionProblemsView sets both); empty
+    /// when there is no tooltip.
+    /// </summary>
+    public string TitleHelpText => TitleTooltip ?? "";
+
     public bool IsExpanded { get; set; }   // mutable: user toggles are recorded (row 99)
     public string AutomationId { get; init; } = "";
+    /// <summary>The row's text's own id, so a test can read the text and its tooltip (#1024).</summary>
+    public string TitleId => AutomationId.Length > 0 ? AutomationId + "-title" : "";
     public ObservableCollection<SidebarRow> Children { get; init; } = new();
     public SidebarSelection? Selection { get; init; }
     public ArchivedItem? Archived { get; init; }
@@ -461,7 +495,7 @@ public sealed partial class SidebarPane : UserControl
                 {
                     Title = item.Title,
                     Glyph = RestoreGlyph,
-                    Tooltip = item.Subtitle,
+                    Tooltip = item.SubtitleFor(Workspace.ClassNounOf(item.CourseCode)),
                     Selection = new SidebarSelection.BackupEntry(item.Id),
                     AutomationId = $"backup-{Path.GetFileName(item.FilePath)}",
                 };
@@ -497,7 +531,7 @@ public sealed partial class SidebarPane : UserControl
                     group.Tooltip = BackupsSummarySentence(summary);
                     foreach (var (item, bytes) in task.Result)
                         if (rows.FirstOrDefault(r => r.Selection is SidebarSelection.BackupEntry(var id) && id == item.Id) is { } row)
-                            row.Tooltip = $"{item.Subtitle} · " +
+                            row.Tooltip = $"{item.SubtitleFor(Workspace.ClassNounOf(item.CourseCode))} · " +
                                 (bytes is { } b ? BackupSizes.Describe(b) : AssistWording.BackupSizeCouldNotBeRead);
                 });
             });
@@ -578,7 +612,7 @@ public sealed partial class SidebarPane : UserControl
             string who = item.Maker switch
             {
                 BackupMaker.Assistant a => $"Assistant, Section {a.SectionNumber}",
-                BackupMaker.Menu m => $"Section menu, Section {m.SectionNumber}",
+                BackupMaker.Menu m => $"{SubjectMenuLayout.Title(m.InMenu, Workspace.ClassNounOf(item.CourseCode))} menu, Section {m.SectionNumber}",
                 _ => "You",
             };
             string[] cells = { item.CourseCode, item.WhenDescription, who,
@@ -776,6 +810,8 @@ public sealed partial class SidebarPane : UserControl
             CloseButtonText = going.Count == 0 ? "OK" : "Cancel",
             DefaultButton = ContentDialogButton.Close,
         };
+        // A delete that cannot be undone: no default, the focus on Cancel (#979; the mac's destructive alert).
+        if (going.Count > 0) DialogButtons.AskWithNoDefault(dialog);
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
@@ -843,6 +879,7 @@ public sealed partial class SidebarPane : UserControl
                 row = new SidebarRow
                 {
                     Title = course.Code,
+                    ShowsWholeTitleWhenCutShort = true,
                     Glyph = LibraryGlyph,
                     // The window's own memory decides (row 99); a window
                     // without stored state opens everything.
@@ -1121,7 +1158,10 @@ public sealed partial class SidebarPane : UserControl
     {
         var row = new SidebarSelection.BackupEntry(item.Id);
         var menu = new MenuFlyout();
-        menu.Items.Add(MenuItem("Restore…", RestoreGlyph, Selecting(row, () => ConfirmRestoreBackup(item))));
+        var restoreItem = MenuItem("Restore…", RestoreGlyph, Selecting(row, () => ConfirmRestoreBackup(item)));
+        menu.Items.Add(restoreItem);
+        // Read as the menu opens (row 104's lesson): greyed while a Restore… question is being asked or the course is being zipped.
+        menu.Opening += (_, _) => restoreItem.IsEnabled = !RestoreWaits(item.CourseCode);
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(item.FilePath))));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Delete Backup…", Glyphs.Remove, Selecting(row, () => ConfirmDeleteBackup(item))));
@@ -1149,7 +1189,7 @@ public sealed partial class SidebarPane : UserControl
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
 
         // Only shown when there is one to cancel. A permanently greyed-out
-        // "Cancel Scheduled Deploy…" on every section would teach teachers to
+        // "Remove Scheduled Deploy" on every section would teach teachers to
         // ignore the line, which is the opposite of what it is for.
         // Scheduling without going through the assistant: the same act, and
         // most teachers setting a 6:30 deploy know exactly what they want and
@@ -1164,7 +1204,7 @@ public sealed partial class SidebarPane : UserControl
             // side moves), so the row keeps the one route to it.
             menu.Items.Add(MenuItem($"Change Deploy Time ({when:h:mm tt})…", Glyphs.Clock,
                                      Selecting(row, () => AskWhenToDeploy(course, number, existing: when))));
-            menu.Items.Add(MenuItem("Cancel Scheduled Deploy…", Glyphs.Remove,
+            menu.Items.Add(MenuItem(ScheduledDeployRemovalWording.MenuItem, Glyphs.Remove,
                                      Selecting(row, () => ConfirmCancelScheduledDeploy(course, number, when))));
         }
         else
@@ -1198,19 +1238,25 @@ public sealed partial class SidebarPane : UserControl
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.PublishPages))));
         menu.Items.Add(MenuItem("Hide Pages…", "",
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.HidePages))));
-        menu.Items.Add(MenuItem("Publish Class for a Date…", "",
+        // Titled as the menu bar titles them: Publish Meeting for a Date… and
+        // Add Meeting… in a club (#1027).
+        var noun = course.Configuration.ClassNoun;
+        menu.Items.Add(MenuItem(SubjectMenuLayout.TitleHere(SubjectMenuRules.Item.PublishClassForADate, noun)!, "",
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.PublishClassForADate))));
-        menu.Items.Add(MenuItem("Add Next Class", "",
-            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.AddNextClass))));
+        // #927: Add Class… in the place Add Next Class had (ruled 2026-11-13
+        // on #897), opening the menu bar's dialog; its ways are not items here.
+        menu.Items.Add(MenuItem(SubjectMenuLayout.TitleHere(SubjectMenuRules.Item.AddClass, noun)!, "",
+            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.AddClass))));
         menu.Items.Add(new MenuFlyoutSeparator());
 
         // The vault is the COURSE folder even for a section — the section is
         // a subfolder within it, and Obsidian reveals the SECTION's folder.
         menu.Items.Add(ObsidianItem(course, number, row));
+        AddDeployedFolderItems(menu, course, number, row);
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));
-        AddRemoval(menu, row, SubjectMenuRules.Item.RemoveSection, "Remove Section…");
+        AddRemoval(menu, row, SubjectMenuRules.Item.RemoveSection, "Remove Section");   // no ellipsis since #990: it only confirms
 
         // Read when the menu OPENS, never captured at render — the staleness
         // lesson from row 104, which cost a live debugging session.
@@ -1372,16 +1418,18 @@ public sealed partial class SidebarPane : UserControl
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
+        // scheduledDeployCancellation.removingOne (#987): Cancel answers
+        // Escape, and neither button is the default, so Enter does nothing.
+        // Apple's HIG, Alerts: "Note that you don't want to make a Cancel
+        // button the default button."
         var dialog = new ContentDialog
         {
-            Title = "Cancel this scheduled deploy?",
-            Content = $"{course.Code} Section {number} is set to deploy automatically at " +
-                      $"{when:h:mm tt} on {when:dddd d MMMM}. Cancelling means it will not go out then, " +
-                      "and the site stays as it is until you deploy it yourself.",
-            PrimaryButtonText = "Cancel It",
-            CloseButtonText = "Leave It Scheduled",
-            DefaultButton = ContentDialogButton.Close,
+            Title = ScheduledDeployRemovalWording.Question,
+            Content = ScheduledDeployRemovalWording.Message(course.Code, number, $"{when:h:mm tt}", $"{when:dddd d MMMM}"),
+            PrimaryButtonText = ScheduledDeployRemovalWording.RemoveButton,
+            CloseButtonText = ScheduledDeployRemovalWording.CancelButton,
         };
+        DialogButtons.AskWithNoDefault(dialog);   // the focus starts on Cancel, so Enter is never Remove (#979)
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
@@ -1520,8 +1568,10 @@ public sealed partial class SidebarPane : UserControl
             items.Add(MenuItem(ClaudeCodeLauncher.MenuItemTitle, Glyphs.Star,
                 Selecting(row, () => ReviseWithClaude(course))));
 
-        // Hidden independently when Codex is not installed
-        // (outsideAgents.hiddenWhenNotInstalled, #210).
+        // Hidden independently when Codex is not installed (#210). A row's
+        // context menu still HIDES a missing assistant after #990, where the
+        // menu bar dims it: outsideAgents.hiddenInContextMenusWhenNotInstalled
+        // (HIG, Context menus: "Hide unavailable menu items, don't dim them").
         if (CodexLauncher.IsAvailable)
             items.Add(MenuItem(CodexLauncher.MenuItemTitle, Glyphs.Star,
                 Selecting(row, () => ReviseWithCodex(course))));
@@ -1554,7 +1604,7 @@ public sealed partial class SidebarPane : UserControl
     private void Add_Click(object sender, RoutedEventArgs e) => _ = OpenNewCourseWizard();
 
     /// <summary>
-    /// The − button runs Remove Course… or Remove Section… through the menu
+    /// The − button runs Remove Course… or Remove Section through the menu
     /// bar's guard (#491 item 5): greyed where the item is, so on a section of
     /// a course kept for reference it does nothing — it used to remove the
     /// whole course there. A backup or an archive is never −'s to delete.
@@ -1568,13 +1618,13 @@ public sealed partial class SidebarPane : UserControl
     /// <summary>Remove Course… — from the menu bar, the row's menu, the − button and the Delete key alike.</summary>
     internal Task ConfirmRemoveCourse(Course course) => ConfirmRemove(course, null);
 
-    /// <summary>Remove Section… — from the menu bar, the row's menu, the − button and the Delete key alike.</summary>
+    /// <summary>Remove Section — from the menu bar, the row's menu, the − button and the Delete key alike.</summary>
     internal Task ConfirmRemoveSection(Course course, int section) => ConfirmRemove(course, section);
 
     /// <summary>
     /// Remove a course, or one of its sections, after asking: the footer's
     /// minus button, the Delete key, the rows' menus, Course > Remove Course…
-    /// and Section > Remove Section… (#488, #491) all come here, so they ask
+    /// and Section > Remove Section (#488, #491) all come here, so they ask
     /// the same question.
     /// </summary>
     private async Task ConfirmRemove(Course course, int? sectionNumber)
@@ -1585,7 +1635,7 @@ public sealed partial class SidebarPane : UserControl
 
         // A reference course's section is never removed on its own
         // (interface.whatIsWithheld: "Remove Section N (removing the whole
-        // course stays)"). Every route greys Remove Section… there; this guards
+        // course stays)"). Every route greys Remove Section there; this guards
         // a caller that skipped the rule. Until #491 the − button turned a
         // section's removal into the WHOLE course's here, silently.
         if (sectionNumber is not null && ReferenceCourse.IsKeptForReference(course)) return;
@@ -1624,8 +1674,10 @@ public sealed partial class SidebarPane : UserControl
             Content = message,
             PrimaryButtonText = "Remove",
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
         };
+        // The mac's Remove alert (role .destructive): Return does nothing, Escape is Cancel.
+        // Here: no default, and the focus starts on Cancel (#979).
+        DialogButtons.AskWithNoDefault(dialog);
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
@@ -1704,8 +1756,83 @@ public sealed partial class SidebarPane : UserControl
         _ = when;
     }
 
+    /// <summary>
+    /// True from Restore…'s press until the teacher answers its question,
+    /// the zip's reading before the question opens included (#911, review 2's
+    /// MEDIUM). While it is true every Restore… is greyed: the menu bar's
+    /// (the window reads it as a dialog being up), the backup row's context
+    /// menu item and the backup pane's button, so a second press cannot
+    /// reach a question that has no slot to open in.
+    /// </summary>
+    internal bool IsAskingWhichRestore { get; private set; }
+
+    /// <summary>
+    /// Raised when <see cref="RestoreWaits"/> may have changed: a question
+    /// asked or answered, or a restore's zip started or finished, so the
+    /// window greys or ungreys what reads it.
+    /// </summary>
+    internal event EventHandler? RestoreAvailabilityChanged;
+
+    private void SetAskingWhichRestore(bool asking)
+    {
+        IsAskingWhichRestore = asking;
+        RestoreAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Whether Restore… waits for this course: a Restore… question is being
+    /// asked, or a copy of the course is being zipped (a Back Up Now or a
+    /// one-section restore's archive here, or another program's copy), the
+    /// rule the menu bar's Restore from Backup follows
+    /// (<c>subjectMenus.situationKeys.copying</c>). Every Restore… a teacher
+    /// can press reads this.
+    /// </summary>
+    internal bool RestoreWaits(string courseCode)
+    {
+        if (IsAskingWhichRestore) return true;
+        if (Workspace.WorkspacePath is not { } folder) return false;
+        return WorkLease.IsHeld(folder, courseCode, WorkLease.Copying) || IsZipping(folder, courseCode);
+    }
+
+    /// <summary>What the teacher chose in Restore…'s question. Only an explicit button chooses; anything else is <see cref="Nothing"/>.</summary>
+    private enum RestoreChoice { Nothing, OneSection, WholeCourse }
+
     public async void ConfirmRestoreBackup(BackupItem item)
     {
+        // Greyed while a question is being asked or the course is zipped
+        // (above); this only backs that up, as the mac's isBeingCopied does.
+        if (RestoreWaits(item.CourseCode)) return;
+        SetAskingWhichRestore(true);
+        RestoreChoice choice;
+        int section = 0;
+        OneSectionRestore.BackupFacts? facts = null;
+        try
+        {
+            (choice, section, facts) = await AskWhichRestore(item);
+        }
+        finally
+        {
+            SetAskingWhichRestore(false);
+        }
+        // Decided by the explicit answer only: a question that could not be
+        // shown (null), Cancel, Escape or a closed dialog restores nothing,
+        // and says nothing, as a cancelled question says nothing.
+        switch (choice)
+        {
+            case RestoreChoice.OneSection:
+                await RestoreOneSection(section, item, facts!);
+                break;
+            case RestoreChoice.WholeCourse:
+                await RestoreWholeCourse(item);
+                break;
+            case RestoreChoice.Nothing:
+                break;
+        }
+    }
+
+    private async Task<(RestoreChoice Choice, int Section, OneSectionRestore.BackupFacts? Facts)> AskWhichRestore(BackupItem item)
+    {
+        var nothing = (RestoreChoice.Nothing, 0, (OneSectionRestore.BackupFacts?)null);
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
         // Restoring rewrites the course's folders — never mid-copy (row 104's rule).
@@ -1715,7 +1842,7 @@ public sealed partial class SidebarPane : UserControl
             await ShowError($"{item.CourseCode} is busy right now",
                 "Restoring replaces the course's folders and files, and a preview or deploy " +
                 "of this course is still using them. Try again when it finishes.");
-            return;
+            return nothing;
         }
         // An assistant's hold, in its own words (#468): a Claude or Codex
         // session, or this app's own window — never "a preview or deploy".
@@ -1723,7 +1850,40 @@ public sealed partial class SidebarPane : UserControl
             && CourseActivity.AssistHoldRefusal(heldIn, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held)
         {
             await ShowError(AssistWording.CourseIsAlreadyBeingRevised(item.CourseCode), held);
-            return;
+            return nothing;
+        }
+
+        // A backup made for ONE section offers that section first (#911, the
+        // mac's #897 C; Russell's ruling: Restore Section N is the default),
+        // the whole course beside it. The zip is read once per backup, now,
+        // as the dialog is about to open, never while it draws.
+        Course? course = Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode);
+        OneSectionRestore.BackupFacts? facts = null;
+        int? offered = null;
+        if (OneSectionRestore.MadeFor(item.Maker) is not null && course is not null)
+        {
+            facts = await FactsOfBackup(item);
+            offered = OneSectionRestore.OfferFor(item, course, facts);
+        }
+        if (offered is int section)
+        {
+            var question = new ContentDialog
+            {
+                Title = OneSectionRestoreWording.Title(item.CourseCode),
+                Content = OneSectionRestoreWording.Message(section,
+                    item.Maker.DescriptionFor(Workspace.ClassNounOf(item.CourseCode)), item.WhenDescription),
+                PrimaryButtonText = OneSectionRestoreWording.RestoreSectionButton(section),
+                SecondaryButtonText = OneSectionRestoreWording.RestoreWholeCourseButton,
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            var answer = await ShowDialogSafelyAsync(question);
+            RestoreChoice chosen = RestoreChoice.Nothing;
+            if (answer == ContentDialogResult.Primary) chosen = RestoreChoice.OneSection;
+            if (answer == ContentDialogResult.Secondary) chosen = RestoreChoice.WholeCourse;
+            if (chosen == RestoreChoice.Nothing) return nothing;
+            if (TheFolderMovedUnderThisConfirmation(askedIn)) return nothing;
+            return (chosen, section, facts);
         }
 
         var dialog = new ContentDialog
@@ -1737,9 +1897,77 @@ public sealed partial class SidebarPane : UserControl
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
         };
-        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
-        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return nothing;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return nothing;
+        return (RestoreChoice.WholeCourse, 0, null);
+    }
 
+    /// <summary>What each backup zip holds that the one-section offer needs, read once per backup (a zip does not change; an unreadable one holds nothing).</summary>
+    private readonly Dictionary<string, OneSectionRestore.BackupFacts> _backupFacts = new(StringComparer.OrdinalIgnoreCase);
+
+    private async Task<OneSectionRestore.BackupFacts> FactsOfBackup(BackupItem item)
+    {
+        if (_backupFacts.TryGetValue(item.FilePath, out var kept)) return kept;
+        string path = item.FilePath;
+        var facts = await Task.Run(() => OneSectionRestore.ReadFacts(path));
+        _backupFacts[path] = facts;
+        return facts;
+    }
+
+    /// <summary>
+    /// Restore from Backup…'s "Restore Section N" (#911 step 4): the click's
+    /// order is <see cref="MenuSectionRestore.Run"/>'s; the finished or
+    /// refused sentence is shown in the one result dialog, the backup
+    /// dialog's slot, as the mac shows it in the backup alert's.
+    /// </summary>
+    private async Task RestoreOneSection(int section, BackupItem item, OneSectionRestore.BackupFacts facts)
+    {
+        string coursesDirectory = Workspace.CoursesDirectory();
+        string? folder = Workspace.WorkspacePath;
+        string? BusyRefusal()
+        {
+            if (folder is null) return null;
+            if (CourseActivity.IsPreviewingOrPublishing(folder, item.CourseCode))
+                return $"{item.CourseCode} is previewing or deploying right now. Stop that first, then restore.";
+            if (CourseActivity.AssistHoldRefusal(folder, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held) return held;
+            if (SectionMenuActivity.IsChanging(folder, item.CourseCode, section) || AssistActivity.IsWorking(folder, item.CourseCode, section))
+                return OneSectionRestoreWording.Busy(section, item.CourseCode);
+            return null;
+        }
+        // The course as loaded; RefusalAtTheClick asks the folder and the saved settings themselves.
+        Course? course = Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode);
+        // The whole course is zipped first (the archive), so the course is
+        // marked from here to the end of the swap exactly as Back Up Now
+        // marks it: Back Up Now, Remove Course and every Restore… grey, and
+        // the assistant is refused (CourseIsBeingCopied). The mac refuses at
+        // the top of restoreOneSection on isBeingCopied for the same reason.
+        if (folder is null || RestoreWaits(item.CourseCode)) return;
+        string zipKey = ZipKey(folder, item.CourseCode);
+        lock (_zipping) _zipping.Add(zipKey);
+        _window.ApplyMenuEnablement();
+        RestoreAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+        MenuSectionRestore.Result result;
+        try { result = await Task.Run(() => MenuSectionRestore.Run(section, item, course, facts, coursesDirectory, BusyRefusal)); }
+        finally
+        {
+            lock (_zipping) _zipping.Remove(zipKey);
+            _window.ApplyMenuEnablement();
+            RestoreAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+        }
+        if (result.ArchivePath is not null || result.Finished)
+        {
+            Workspace.Reload();
+            if (result.Finished) Workspace.Selection = new SidebarSelection.SectionItem(item.CourseCode, section);
+            _window.ApplyState();
+        }
+        // The finished, refused or stopped-part-way sentence: the last is the
+        // only place the teacher is told where the set-aside files are, so it
+        // waits for a dialog opened meanwhile rather than being dropped.
+        await ShowError(result.Title, result.Message, waitForTheSlot: true);
+    }
+
+    private async Task RestoreWholeCourse(BackupItem item)
+    {
         try
         {
             // Even a restore has an undo: the current version is archived
@@ -1794,8 +2022,8 @@ public sealed partial class SidebarPane : UserControl
             Content = consequence,
             PrimaryButtonText = "Delete",
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
         };
+        DialogButtons.AskWithNoDefault(dialog);   // deleted for good: no default, the focus on Cancel (#979)
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         if (askedIn is null) return;
@@ -1852,8 +2080,8 @@ public sealed partial class SidebarPane : UserControl
             Content = consequence,
             PrimaryButtonText = "Delete",
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
         };
+        DialogButtons.AskWithNoDefault(dialog);   // deleted for good: no default, the focus on Cancel (#979)
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         try
@@ -2020,7 +2248,42 @@ public sealed partial class SidebarPane : UserControl
         }
     }
 
-    private async Task ShowError(string title, string message)
+    /// <summary>
+    /// Shows <paramref name="dialog"/> once no other dialog holds the window's
+    /// one slot: the popup a ContentDialog is up in is waited out on that
+    /// popup's own <c>Closed</c> event (raised as it stops being open, which
+    /// is what the slot reads), never on a clock, and then the slot is tried
+    /// again. For a sentence that must reach the teacher, where
+    /// <see cref="ShowDialogSafelyAsync"/> would return null and drop it.
+    /// </summary>
+    private async Task<ContentDialogResult?> ShowWhenTheSlotIsFree(ContentDialog dialog)
+    {
+        while (EffectiveXamlRoot is { } root && PopupHoldingADialog(root) is { } holder)
+        {
+            var closed = new TaskCompletionSource();
+            void Closed(object? sender, object args) => closed.TrySetResult();
+            holder.Closed += Closed;
+            // Closed between the read and the subscription: nothing to wait for.
+            if (holder.IsOpen) await closed.Task;
+            holder.Closed -= Closed;
+        }
+        // folder-check: not needed — a result sentence acts on nothing.
+        return await ShowDialogSafelyAsync(dialog);
+    }
+
+    private static Microsoft.UI.Xaml.Controls.Primitives.Popup? PopupHoldingADialog(XamlRoot root)
+    {
+        try
+        {
+            foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(root))
+                if (popup.Child is ContentDialog) return popup;
+        }
+        catch (Exception) { }
+        return null;
+    }
+
+    /// <summary>A sentence with OK. <paramref name="waitForTheSlot"/>: shown once no other dialog holds the slot (<see cref="ShowWhenTheSlotIsFree"/>), never dropped.</summary>
+    private async Task ShowError(string title, string message, bool waitForTheSlot = false)
     {
         var dialog = new ContentDialog
         {
@@ -2029,7 +2292,24 @@ public sealed partial class SidebarPane : UserControl
             CloseButtonText = "OK",
         };
         // folder-check: not needed — an error report acts on nothing.
-        await ShowDialogSafelyAsync(dialog);
+        if (waitForTheSlot) await ShowWhenTheSlotIsFree(dialog);
+        else await ShowDialogSafelyAsync(dialog);
+    }
+
+    /// <summary>
+    /// A row's text reports whether it is drawn cut short (#1024): WinUI
+    /// raises this at layout time and again on every change, so nothing waits
+    /// or measures. A recycled container takes its new row's state at once,
+    /// and the event follows if the new text trims differently.
+    /// </summary>
+    private void RowTitle_IsTextTrimmedChanged(TextBlock sender, IsTextTrimmedChangedEventArgs args)
+    {
+        if (sender.DataContext is SidebarRow row) row.TitleIsCutShort = sender.IsTextTrimmed;
+    }
+
+    private void RowTitle_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        if (args.NewValue is SidebarRow row && sender is TextBlock title) row.TitleIsCutShort = title.IsTextTrimmed;
     }
 
     private void Filter_TextChanged(object sender, TextChangedEventArgs e)
@@ -2158,6 +2438,10 @@ public sealed partial class SidebarPane : UserControl
             MaxWidth = 300,
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
+        // A name of its own, the mac's (#1012, #1020): the placeholder is an
+        // example, not what the box is.
+        AutomationProperties.SetName(codeBox, "Course code");
+        AutomationProperties.SetAutomationId(codeBox, "renameField");
         codeBox.SelectAll();
 
         var warning = new TextBlock

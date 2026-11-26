@@ -124,6 +124,123 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   spelling of an NFC-named folder is another (nonexistent) folder — ids
   `b7e56301` / `bbdbaf32` — and there is no second spelling to disagree about.
 
+
+### What the preview's wait waits on (#1016, the mac's #998)
+
+Until #1016 `SectionDetailView.WaitForPreviewServer` looked once a second in
+every phase, and each look stripped and searched the whole transcript
+(`Transcript.DisplayText`) for "Launching Quartz preview" and "Started a
+Quartz server". Since #1016:
+
+| What the wait needs | Where it comes from | How it waits |
+|---|---|---|
+| The run has ended, could not start, or was stopped | `ScriptRunner` (`IsRunning`, `LastExitCode`, `LaunchProblem`, `WasStoppedByUser`) | Woken by the change. A run refused because the folder's tools are not ready sets `LastExitCode` -1 and ends the wait. A run that sets `LaunchProblem` (the folder has no `preview.ps1`, before the press or after its checks, or a pseudo console that would not open) is a run that never started (`PreviewStarts.HowTheRunStands`, asked before the exit code): the wait ends at once, the record and the lease go back, the trail gets `preview could not start` with the sentence and `LaunchProblemDetail`, and the sentence is shown under "Cannot Preview Yet" while the console keeps it (#928, #1022 item 1). The rule withdrawn in #1016 took the console down with the sentence in it; the console now stays up while `LaunchProblem` is set. |
+| The address | the launcher's line, collected as lines arrive (#278) | Woken by the change (`PreviewAddress` now raises `PropertyChanged` when it changes) |
+| "Launching Quartz preview" | `build_site.py`'s line, collected as lines arrive (`ScriptRunner.HasAnnouncedQuartzLaunch`) | Woken by the change |
+| "Started a Quartz server" | Quartz's line, collected as it arrives (`ScriptRunner.ServerStartedAt`, the time it ARRIVED, where the old loop stamped the look that first saw it, up to a second late), read in the unfinished line too: it is the last line before a quiet server, and ConPTY can hold a line's end back until the next drawing (#623, #661), so waiting for the end would leave the 45 s bound unstarted (#233). The address alone still waits for its line to end | Woken by the change |
+| The server answers | an HTTP request | Asked again after a second; #1011's landed line would let it wait |
+| The quiet bound (45 s, #233) | the clock | `PreviewReachability.UntilTheQuietRunsOut`: the wait sleeps until the run changes OR the bound, then asks `NextStep` again |
+
+`ScriptRunner.WatchTheStanding()` returns a `StandingWatch` that is completed
+by the first change of `ScriptRunner.StandingProperties`. The loop takes it
+BEFORE it reads the state it decides on, so a change landing between the
+reading and the wait is not lost (`AChangeBeforeTheAwaitIsNotLost`), and
+disposes it every turn. Unlike the mac's Observation registration (which
+cannot be withdrawn on macOS 15) a .NET event handler is removed, so nothing
+is left behind.
+
+One start at a time per window (#928, the mac's #812): a start while the window's own start waits for a stop or builds does nothing (`preview already starting`); every start takes through `PreviewStarts.Begin`, the lease then its own record; a parked start runs only while it still belongs (its own lease, the latest start, the page there, the quit not gone ahead, `App.QuitHasGoneAhead`). The repair's Preview Again carries its press (`PreviewAgainPresses`, #813).
+
+Sentences: launch problems name no file and carry no system text (`ScriptRunner.LaunchProblemDetail` holds both, trail only); `LaunchProblemWordingTests` holds Windows to it.
+
+`ScriptRunner.WaitUntilFinished` (a deploy leg, a build before a deploy, the
+tools' own runs) and `WaitUntilFinishedOrKill` looked at `IsRunning` every
+100 ms; they now end on `FinishRun`, which completes a task made at the start
+of each run. `WaitUntilFinishedOrKill`'s bound is the caller's and stays.
+
+Each run has a number. The reader (end of output) and the exit watcher (the
+process ended) both post a finish, and the first one wins; under the old
+100 ms look the second arrived long before anyone noticed the first, but a
+wait that resumes at once can start the next leg (a build's deploy, on the
+same runner) before it lands. So each posted finish carries its run's number
+and does nothing once another run has started; without that the build's
+late finish ended the deploy with the build's exit code, disposed the
+deploy's process and reported the leg a success (first review of #1016,
+`AFinishFromAnEarlierRunDoesNotEndTheNextOne`). `FinishRun` also takes the
+run's task before it notifies, so a handler that starts the next run there
+cannot strand the first run's waiters, and the bounded wait force-finishes
+only the run it was waiting for.
+
+**Measured** on the PC (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200), 2026-11-20, with a throwaway test on the branch: the old look (output
+arrived, so `DisplayText` is joined again, then searched twice) cost 0.039 ms
+on a transcript of 300 lines (24 KB), 0.067 ms at 1,000 lines (82 KB) and
+0.47 ms at the 4,000 lines `TranscriptBuilder` keeps (329 KB), once a second.
+The new wake, from the launch line arriving to the waiting loop resuming:
+median 0.027 ms, 95th percentile 0.040 ms, largest 1.6 ms of 200; where the
+old loop resumed up to 1,000 ms later (500 ms on average). A wait for the
+run's end resumed a median 1.8 ms after the force-finish began, largest
+19.5 ms of 100, `FinishRun`'s own trail line included; the old loop added up
+to 100 ms. So the cost saved is small; what was wrong was the shape, a guess
+at a cadence where the runner already says what happened.
+
+What changes for a teacher is small: the preview notices that
+its run ended, or was stopped, at once instead of up to a second later, and a
+deploy's next leg starts on the end of the last instead of up to 100 ms after
+it. The launch line comes long before the server (it is printed before
+`quartz build --serve` starts), so the site still opens on the HTTP tries'
+one-second cadence; that is #1011's.
+
+**Rejected:**
+
+- Waking on every `PropertyChanged`. `Transcript` and `LastOutputAt` change
+  with every coalesced piece of output (150 ms), which would be the poll
+  again, faster; the quiet bound is met by the clock instead.
+- Searching the transcript when woken. The point of collecting the lines is
+  that nothing re-reads a transcript that can be hundreds of kilobytes.
+- Replacing the HTTP tries. Nothing announces that the server answers until
+  #1011 adds a line.
+
+**Nothing to replace for the other two shapes #998 changed on the mac.**
+Restored windows do not claim folders by frame on Windows: there is no system
+restoration, and `App.OnLaunched` hands each remembered window its own entry
+(`OpenWindow(entry.Path, entry)`). And no view polls for its window: WinUI
+gives a view its `XamlRoot` through `Loaded`.
+
+**Still owed** (each waits out something an event announces; inventoried for
+#1016 with a verdict for every timed wait in `Plantoir` and `Plantoir.Core`):
+
+- **WinUI's one ContentDialog slot**, nine places: the guidance question's 2 s
+  timer and the quit question's 50 ms looks (`MainWindow.Guidance.cs`,
+  `MainWindow.xaml.cs`), a script's question (`TaskProgressView`, 200 ms and
+  500 ms), the Section menu's dialog and the folder-problem dialog (150 ms
+  retries), the problems alert's 2 s re-ask and the checklist's 300 ms wait
+  (`SectionDetailView`), and the assistant's Open in Obsidian (300 ms). One
+  "the slot is free" signal raised from every dialog's `Closed` would replace
+  them all; it needs the UI suites that stack dialogs.
+- **The automation hooks' 1.5 s** (`MainWindow.RunAutomationHooks`): the
+  window's first `Activated` or `Loaded`. Every UI suite starts through them.
+- **Obsidian's processes ending** (`ObsidianProcesses.QuitAndWaitAsync`, 100 ms
+  within 3 s) and **a section's stop sweeps** (`PreviewStopper`, 120 ms within
+  20 s): the process's exit and the sweep's own task, with the same bounds.
+- **The course wizard's answer pump** (`NewCourseCreator.PumpAnswers`, 200 ms):
+  the transcript's change; its 600 ms settle is measured behaviour and stays.
+- **The sidebar's expansion timer** (`SidebarPane.ReassertExpansion`, 100 ms
+  for about 2 s): each row's TreeView container being realised, which the
+  TreeView announces, so the row can be set open then.
+
+Kept, with the reason: cadences that ARE the behaviour (the progress
+counter, output coalescing, the question's three seconds of silence,
+Control-C's grace, the daily update clock, the "Saved" fade, the next whole
+second for a backup's name); bounded waits on what nothing announces (another
+program's windows, HTTP, files another program holds, leases held by other
+processes); and the marketing captures, which never run for a teacher.
+
+Tests: `PreviewWaitWakesOnTheRunTests` (the lines and the watch, the bound and
+the cancel, the run's end, and a source rule pinning that the view's wait
+watches the run and never searches the transcript); end to end,
+`PreviewStartPageUiTests` (real previews opening their page).
+
 ## The solution
 
 | Project | Role |
@@ -134,6 +251,8 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
 | `PtyDriver/` | A console harness that runs a command under a ConPTY and answers prompts from scripted rules. It exercises the same `ConPtyProcess` the app uses, which is the point: it tests the launchers the way the app drives them. |
 | `Plantoir.Mcp/` | A standalone MCP server exposing one working folder to an AI assistant. It SHIPS: `publish.ps1` copies `plantoir-mcp.exe` beside `Plantoir.exe` and signs it. |
 | `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
+| `Plantoir.UiTests.FirstInstall/` | The first-install rehearsal driver (#976). Not a test project and in no solution or suite: a self-contained single-file `win-arm64` console program that runs inside a CLEAN Windows machine's desktop session and does what a teacher does — downloads `PlantoirSetup.exe` through Edge (so it carries the from-the-internet mark), runs it, opens Plantoir, sets up a working folder, adds the example course and previews it. Each step names the windows it expects (`WindowRules.cs`); any other window or dialog ends the run, named, with a screenshot. Three kinds of window get a 20 s grace instead of an answer: one of Plantoir's still being made (no readable class or title), one with no title and no words, and one UI Automation lists but cannot read at all (its properties throw). A window in its grace is tolerated, not allowed. Each unreadable window is numbered and recorded when it appears, and again when it can be read or is gone. UI Automation's element comparison tells such windows apart, because their handles all read 0x0, and a comparison that throws is recorded. A readable window is then judged by the ordinary rules; one still unreadable after 20 s ends the run. Separately, if at least one unreadable window has been present at every look for 20 s, the run ends whichever windows they were, so a window the comparison cannot follow is still caught. No watch and no step may finish while any window is in its grace: when the time is up, the driver goes on looking (a SETTLING line in the log) until each such window is judged, has gone, or has ended the run, for at most 60 s more, and running out of that time is not PASSED. After the last step the driver watches the desktop for 60 s more (step 7: a firewall alert raised when the preview server binds comes a second after the address answers). It writes PASSED only if that minute, and any settling after it, is clean, with at least one successful look per three seconds of the minute and no stretch of it longer than 10 s without one. Every look is recorded: a look that could not read the desktop is counted as failed, not as a look, and the record's gaps run on through it. No step, watch or PASSED is decided except on a successful look made within the last 5 s; when the last look failed, or is older, the driver looks again, and if no look succeeds in 60 s the run is a DRIVER PROBLEM, cause coverage (the fifth review: a final minute whose last 40 s were all failed reads used to end clean on the pending set of an older look). A popup inside Plantoir's window that cannot be read is pending like any unreadable window. PASSED is written straight after a look made for it; the notes, screenshot and uploads come after `result.txt`. The installer's launch call must have had real looks too. `result.txt` carries the record as values (looks, failed looks, the largest gap and the stage it was in, the age of the last look at the decision, the final watch's largest gap, and the times of the final watch's start, the decision and the first sighting of the window stopped on); `--self-test-fail-looks-after N` makes every look from N s into the final watch fail, for the Mac's failed-looks self-test. Driven from a Mac by `vm-tools/win-rehearsal.py`, which restores the Parallels VM's clean snapshot. It also watches for a UAC prompt from outside the guest, asking as SYSTEM whether consent.exe is running, on a thread of its own: once a second (a probe takes about 0.2 s) from before the driver, and so the installer, is launched until the decision, with a probe asked after the driver's result that must be answered. Its screen captures and their OCR, every 5 s, run beside it and cannot delay a probe. Failed probes are counted by the gap they leave between answered ones, not in a row: a PASSED needs no gap over 10 s anywhere in the run, and a gap of 120 s stops it. Measured, not assumed: Windows did not withdraw an unanswered UAC prompt in 20 minutes (`win-rehearsal.py --measure-uac-timeout`, snapshot 00, run `win-uac-timeout-2026-11-18-192158`: consent.exe seen 5.6 s after the request, still running, with the prompt's words on the capture, when the measurement stopped at 20 minutes), so a prompt cannot come and go inside a 10 s gap. A UAC prompt is reported ahead of any stray window found beside it. The driver sees nothing of a UAC prompt, so UAC is caught by the Mac side alone. In `--self-test uac` (runs `win-rehearsal-2026-11-18-180608-selftest-uac` and `-182736-selftest-uac`, snapshot 00 with PromptOnSecureDesktop 0) the prompt was on the ordinary desktop and on the Mac's capture for 45 s. In those 45 s the driver kept looking every second, and it recorded no new top-level window and no unreadable one: UI Automation gave it no element for the prompt at all. Its consent rule in `WindowRules.cs` and its unreadable-window rules therefore cannot catch a UAC prompt. So the uac self-test proves the Mac side is enough on its own, deciding by values. It requires that a periodic probe, not the one after the result, saw consent.exe while the prompt was held up, that the capture taken at once shows the prompt (OCR reads its words), and that the run's outcome is PRODUCT STOPPED with UAC as its cause whatever the driver said (a driver PASSED included); a test pins that the rehearsal's own decision path makes that call. It records what the driver noted only as information. One earlier run (`win-rehearsal-2026-11-18-132158-selftest-uac`) noted one unreadable window, handle 0x0, 2 s before the Mac saw consent.exe; later runs never saw one, so it was not the prompt, or not reliably. The Mac decides the outcome. The driver's `result.txt` carries fixed fields (status, stage, cause, the window's process, whether it stopped while settling, and the look record above), it sends small value files as it goes (`driver-started-PID.txt`, `step-N.txt`, `final-watch-began.txt`), and the Mac and its self-tests decide by those values, never by searching a sentence or a log. A driver PASSED stands only with proof of looking on both sides for the whole run: the Mac's probes as above, the driver's record with no gap over 10 s and its decision on a look under 5 s old, and the final minute seen by the Mac to run its length; otherwise the outcome is DRIVER PROBLEM, cause coverage. The failed-looks and probe-gap self-tests make each kind of gap happen for real and show it refuses a clean result. The last line of every report is the Mac's final outcome (PASSED, PRODUCT STOPPED or DRIVER PROBLEM); the driver's own line in it is labelled as the driver's. References nothing in this repository, because the machine it runs on has only the released app. |
+| `Plantoir.UiTests.FirstInstall.Tests/` | Plain xUnit tests of that allow-list, `net9.0` (not `-windows`), compiling `WindowRules.cs` alone, so they run on any machine with the .NET 9 SDK, a Mac included, with no desktop and no VM: `dotnet test windows-app/Plantoir.UiTests.FirstInstall.Tests`. In no solution and no suite; every build of the driver runs them first. |
 
 The one house-style rule worth stating: **this is ordinary idiomatic C#, LINQ
 included, and that is deliberate.** The Swift follows Russell's machine-wide
@@ -621,8 +740,9 @@ build claim — a preview's, or the assistant's rebuild — not the deploy's.
 - `SectionDeployRun.UnderWay(run, folder, course, section)` is preparing ∨ running ∨
   asking ∨ the in-process publish record. The Deploy button (and so Section ▸
   Deploy… and its key, which read the button), `DeployAsync`'s first check,
-  `DeployWillBeRefused`, `MainWindow.IsSectionBusy` (now given the caller's folder,
-  so a section not on screen still answers) and the Preview button, the links
+  `DeployWillBeRefused`, the assistant window's busy question
+  (`SectionRuns.DeployIsUnderWay`, by its own folder, so a section not on screen
+  still answers; `MainWindow.IsSectionBusy` is gone since #769) and the Preview button, the links
   checklist offered on appearing, today's-class re-check and the folder-repair
   check all read it.
 
@@ -717,16 +837,19 @@ deploy.ps1" and the launcher's refusal no longer happen.
 **Rejected on this side.** Leaving the deploy's claim in `_buildWork` and skipping
 its release on `Unloaded`: a view would still own a claim that outlives it.
 Removing finished runs, or making the store observable: a reader would watch an
-object nothing writes (the mac's reason). Making a run from `IsSectionBusy`: a
-caller off the interface thread would bind the runner to the wrong context — `Find`
+object nothing writes (the mac's reason). Making a run from the busy question (`SectionRuns.DeployIsUnderWay`, which was
+`MainWindow.IsSectionBusy` until #769): a caller off the interface thread would bind the runner to the wrong context — `Find`
 never creates.
 
 **Tests.** `SectionRunsTests` (the key, the store, `UnderWay`, `IsAsking`, the
 ending's order, take-and-clear, shown once, a later preview, and the eleven contract
 cases), `SectionDeployRunSourceTests` (the view binds to the run, appearing never
 deploys, the deploy takes its run once and holds its claims, Cancel and Unloaded,
-the later preview, every reader, `IsSectionBusy`, the progress panel), and the UI
+the later preview, every reader, no window keeping its own busy answer
+(`NoWindowKeepsItsOwnBusyAnswer`, since #769), the progress panel), and the UI
 test `ReturningToASectionMidDeployUiTests`.
+
+**The assistant asks the app, not a window (#769 item 2).** The built-in assistant asks whether its section is already being deployed of the app, not of a window: before it starts a deploy it asks the section's deploy run and the in-process publish record by its own folder, course and section (`SectionRuns.DeployIsUnderWay`), as the Mac's assistant asks `deployIsUnderWay`. A deploy of the section running in this app therefore reads as busy even when no window is showing that section or its folder, and the assistant says the section is busy and hands to the window's Deploy, which shows the running deploy. A preview, built or showing, is not busy: the deploy stops a preview itself.
 
 ---
 
@@ -1035,10 +1158,24 @@ contract's message in place of the plain greeting. `FixWithAssistant` (Core) is
 the mac's `FixWithAssistant.swift` function for function: `HandoverOf`,
 `Buttons`, `GreetingFor`, `TrailLine`, every word a constant pinned key by key
 (`FixWithAssistantContractTests`, which runs the 8 `buttonCases` and 10
-`greetingCases`). A button is HIDDEN when its assistant is not on this PC or
-the course is kept for reference, and GREYED when nothing ticked is handed
-over, with `fixWith.notEnabledHelp` as its help text so Narrator says why
-(proposed from Windows; the mac gives the same as an accessibility hint since #776).
+`greetingCases`). Both buttons are HIDDEN only on a course kept for
+reference. Since #990 (the mac's D11, Russell's ruling Q9) a button whose
+assistant is not on this PC is DIMMED rather than hidden, as Revise With ▸ in
+the menu bar dims it, with `FixWithAssistant.NotInstalledHelp` as its help
+text; until #990 it was hidden. A button is also GREYED when nothing ticked is
+handed over, with `fixWith.notEnabledHelp` as its help text so Narrator says
+why (proposed from Windows; the mac gives the same as an accessibility hint
+since #776). Not set up outranks nothing ticked (`FixWithAssistant.HelpFor`).
+`ButtonState` carries `ClaudeEnabled` and `CodexEnabled` beside `Enabled`
+(a row is handed over), and `buttonCases`' `claudeEnabled`/`codexEnabled` are
+run against them. **The help text is the contract's first sentence only**,
+"Not set up on this PC." (the contract's "Mac" said as
+`platformWording.machine`'s "PC"): its second sentence names Settings ▸
+Other Assistants, which Windows does not have until #903 builds the set-up, so it is held open by name (`NamedGapLedger.FixWithWordsSaidDifferently`,
+`notInstalledHelp`, #903, v2.0.0) and comes back whole, asserted by
+`FixWithAssistantContractTests.PiecesAndBoundsAreTheContracts`, the day that
+entry goes. REJECTED: saying the whole sentence now, which sends a teacher
+looking for a page that is not there.
 Whether each door exists is `OutsideAssistantPresence`, asked at launch and on
 `MainWindow.Activated` off the interface thread — never while the tab draws,
 and false until the first answer, so a tab that draws first shows its buttons
@@ -1159,13 +1296,15 @@ the sidebar, the title and the trail — was the follow-up, and is #780
 (v2.0.0): no, and the name is cleaned where it is READ, by
 `contracts/shared-rules.json` → `courseNameCharacters`, which also spaces out
 C1 and U+2028/2029 and removes the bidi controls. The mac and the shared
-Python did their half in v2.0.0;
-this app's `CourseConfiguration.CourseName` and its trail writer are owed (the
-`windows` issue for #780). **`OutsideDoor.Clean` stays as it is** after that
-lands: a course name will reach it already clean, but it also cleans the page
-names and the working folder a door carries, which are not course names, and
-it is the last layer before `cmd`. Update this paragraph when the Windows half
-lands.
+Python did their half in v2.0.0, and this app did
+its half in #821: `CourseConfiguration.CourseName` cleans the name in its
+getter and setter, every Save writes it cleaned, the New Course window
+cleans before it trims (`OneLineText`, the mac's rule code point for code
+point), and every trail line is cleaned and redacted by
+`ActivityTrail.SafeTrailLine`. **`OutsideDoor.Clean` stays as it is:** a
+course name now reaches it already clean, but it also cleans the page names
+and the working folder a door carries, which are not course names, and it
+is the last layer before `cmd`. Its tests stay.
 
 **The caret set includes `(` and `)`**, and an OLD npm shim shape proves it:
 `cmd-shim`'s older form runs `%*` INSIDE an `IF (…) ELSE (…)` block, where an
@@ -1478,6 +1617,8 @@ comment in its leg loop, and `test_launcher_rules.ps1` section 10).
 `Plantoir.Mcp` uses `ProcessStartInfo.ArgumentList` and was never affected;
 `PtyDriver`'s own joiner has the same naive rule but is fed only the
 harness's `cmd.exe /c "<runner>.cmd"`.
+
+**A section's custom domain (#955).** The Windows reader of a section's custom domain, `CourseConfiguration.CustomDomain(section, destinationType)`, now runs `contracts/file-formats.json` → `customDomainReading`'s cases (`CourseConfigurationTests.ACustomDomainIsReadTheContractsWay`), as the Mac's `customDomain(forSection:destinationType:)` and the shared Python's `custom_domains.for_destination` do: a map gives the destination type's own string; the older bare string is the primary's only (`DeployTarget`, Netlify when `deploy_target` is absent or empty); a type outside `CourseConfiguration.DestinationTypesWithAnAddress` (today `local_folder`) never has a domain, whatever is stored; any other shape is no domain, never an exception (#955, after the Mac's #904).
 
 ### A new course starts on Cloudflare Pages (#739)
 
@@ -1981,6 +2122,94 @@ sides, the accept loop, the reads and writes, HttpClient's continuations
 and the timers, so it would change nothing. A dedicated server thread
 instead of `Task.Run` — the client side starves too, so it cures half.
 
+### A red that is a busy PC: the shared Python limit and one refused write (#916)
+
+Two more reds of the same family turned three gate runs red on 2026-11-13/14,
+while several agents ran suites and filtered runs on this PC (Lenovo
+20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200) at once. Both fixes are
+test code only.
+
+**`PythonToolchainTests` stopped healthy files at 180 s.** The limit is there
+to stop a HUNG file with its name, not to judge speed, and three files met
+it doing nothing wrong: `test_starting_content_prompts.py` (116 s and 151 s
+under load), `test_no_stored_credentials.py` (71 s beside one other test
+host, 193 s beside more) and `test_shared_writes_two_at_once.py`. Timed one
+after another under the suite lock on 2026-11-14 with the runtime's Python
+3.14.10, the way the runner starts them, all 119 files took 10 min 41 s and
+every one passed; the seven at 30 s or more:
+
+| File | Alone |
+|---|---|
+| `test_graded_folders_new_course.py` | 78.5 s |
+| `test_starting_content_prompts.py` | 68.5 s |
+| `test_shared_writes_two_at_once.py` | 59.8 s |
+| `test_deploy_sh_destination.py` | 46.1 s |
+| `test_share_plan.py` | 45.1 s |
+| `test_marking_comments.py` | 44.6 s |
+| `test_no_stored_credentials.py` | 33.8 s |
+
+The worst slowdown seen under load is 5.7 times (33.8 s to 193 s), which
+would take the slowest file to about 450 s. **The limit is now 600 s for
+every file** (`PythonToolchainTests.Limit`): above anything load has
+produced, and a hung file still stops the run inside ten minutes. A timeout
+says the file, the limit and how long it ran, and, for a file in
+`KnownSlowFiles` (the table above), that a busy PC is the likely cause; for
+any other file, to suspect a hang first. `AHungFileIsStoppedAtTheLimitAndNamed`
+proves the limit still bites: a file that sleeps 300 s, written into a
+`RunOwnedTempFolders` folder (never into `scripts/`, which both platforms
+run), is stopped at a 15 s limit with exit 124 and that sentence (15 s, not
+2, so a cold interpreter on a loaded PC still prints before it is stopped).
+**Nothing bounds the class's TOTAL time:** there is no `.runsettings`,
+`--blame-hang-timeout` or session timeout under `windows-app/`, so if every
+file hung (an interpreter that wedges at start, say) the run would take
+119 × 600 s, about 20 hours (about 6 at 180 s). The realistic case, one
+hung file, costs ten minutes and names its file; a hang common to every file
+shows in the first file's message. **Rejected:** a per-file
+allowance table, because it is kept in step by hand with a folder the mac
+adds files to, and the third file stopped that night was in no earlier
+measurement, so the table would have missed exactly the file that needed it
+(`KnownSlowFiles` only words the message; every file gets the same limit).
+Splitting the slow files' scans in shared Python, because it changes files
+the mac's `verify.sh` runs, for no gain to a teacher.
+
+**`LastViewedPagesTests.OnlyTheNewestAreKept` read `Actual: "P3"` once.** It
+wrote 503 entries through `LastViewedPages.Remember` and ignored what each
+call returned. The stamps were never the cause: each is injected, a minute
+apart, and the same test with every stamp EQUAL passes (newest-first order is
+kept by `Insert(0)` and a stable sort). What fails it is one refused write:
+`Remember` saves through a temporary file and a rename onto
+`last-viewed-pages.json`, and a rename onto a file something else holds open
+(a scanner reading the file just written is the usual holder) throws, is
+caught, and returns false. One entry fewer means only P1 and P2 are pushed
+out, so P3 survives at the second assertion. Reproduced with a scratch test,
+not committed: holding the file open (`FileShare.Read`) for write 502 gives
+`Assert.Null() Failure … Actual: "P3"` exactly. The test now SEEDS the 500
+kept entries in one write of its own, oldest first (so the order is also
+proved to come from the stamps, not the file), and sends only the three that
+evict through `Remember`, each asserted to have written and retried up to
+five times; 23 s became under a second. The product's behaviour, one
+remembered page silently not saved when the file is held, is a separate
+matter and is not changed here.
+
+### A file another program holds for a moment (#953, #874)
+
+**#953**
+
+On Windows a rename onto a file another program has open without delete sharing is refused (access denied); with no sharing at all a read is refused too (a sharing violation). `HeldFiles` is the one place that asks again: a sharing or lock violation, or an access-denied rename whose target (or temporary) cannot be opened for delete access with full sharing because of a sharing violation, is a hold; anything else (a deny rule, a read-only file, a reference lock) is a permission and is said at once, never retried. The bound is the one already accepted (`ObsidianFigureAddOns.Retrying`), not tuned. The guidance notice keeps the contract's `couldNotWrite` with the system's own sentence for the hold, and the file is named on the trail line. A refused read is its own answer, never "empty", and nothing that follows it writes.
+
+**#874**
+
+`CourseConfiguration.ReadBytes` is the one reader of `course_config.json`; a source-text test (`CourseSettingsHeldFileTests.EveryReaderOfTheSettingsGoesThroughTheOneReader`) fails on any `File.ReadAll*` of a settings path elsewhere in product code (CourseRestorer.cs excepted by name). During a build's `os.replace` (on Windows `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`) an open of the old file is refused for a moment; measured on a real second process, every one of those refusals was a sharing violation (86 in 476 rounds), none access denied (the "access denied" reported on #874 was Python's `PermissionError`, which covers both). Access denied on a file that is there is still asked again as a precaution, because the delete-access probe cannot tell it from a deny rule; so every access denied on a file that is there is asked again for the bound and, if it lasts, refused in the system's words, never read as "not there". Discovery keeps the run's last good read of each settings file, so a course never leaves the sidebar while a build swaps its file, and the reference doors answer from it, failing closed with no earlier read. A Save whose merge read is refused by a hold is refused, rather than writing the window's whole copy over what a build may just have written; the sentence is `HeldFiles.InUseSentence`, the Undo line's "is in use by another program". Measured with a real second PowerShell process holding the file (`FileShare.None` and `FileShare.Read`).
+
+### What the VMs showed in the unit suite, and what changed (#971, #964, #916 items 3 and 4)
+
+Lane F, 2026-11-21, from the second Windows VM.
+
+- **The tools server is looked for from two roots (#971).** `ClaudeCodeLauncher.FindServer` and `LocalModel.FindServer` search the running program's folder and `AppContext.BaseDirectory`. Under `dotnet test` on Windows ARM the running program is `C:\Program Files\dotnet\dotnet.exe` (`--arch x64` gives `…\dotnet\x64\dotnet.exe`), so a lookup beside the process alone found nothing and the door refused at its first check; the x64 PC's runner starts a `testhost.exe` from the test output folder, which hid it. In the installed app both roots are the `Plantoir.exe` folder. Rejected: searching wider (PATH, Program Files) for the tools server, which could find another install's server.
+- **A test chooses the path lengths it exercises (#971).** `OutsideDoorTests`' deep shim folder is exactly 240 characters whatever `%TEMP%` is, under a run-owned root; the stub `node.exe` (a .NET Framework 4.8 program) starts from at most 252 characters and the test asserts it stays within that. Before, the account name decided it.
+- **The frontmatter oracle fails rather than hangs (#964).** A `multiprocessing.Pool` whose initializer raises replaces the dead worker for ever; the oracle imports in the parent first. Reading a child's stderr to its end waits on every process that inherited the handle, so `Ask` reads both streams in the background and waits on the parent's exit.
+- **The suite's settings folder and trail are the run's own (#916 items 3 and 4)**: `plantoir-tests-<pid>-<start ticks>` and `plantoir-tests-trail-<pid>-<start ticks>\activity.txt` under `%TEMP%`, removed at process exit; a crashed run's are left, and no run removes another's.
+
 ### And when the failure IS real: a red contract test is a handover
 
 Everything above is about telling a genuine failure from a crash or an empty
@@ -2433,7 +2662,8 @@ alone afterwards, they passed in 116 s and 193 s, the second already over
 the limit with one other suite running. One repository scan in the second
 file took 57.9 s over 15,274 files, `help/` is not among its costliest
 files, and the merge grew the repository by 0.6% in bytes, so the merge did
-not cause it (see "A red that is a clock", above). The same method as the
+not cause it (see "A red that is a clock", above). *(Since #916 the limit is
+600 s, with these files' times alone: "A red that is a busy PC", above.)* The same method as the
 two sections above: nothing a teacher sees today differs, and every red is
 held by name against the open `windows` issue that builds it.
 
@@ -2493,9 +2723,11 @@ contract declines must be declined here, and every case it allows is
 declined here too (the course-wide hold). The day #868 narrows a hold to its
 section that second half fails, saying to walk the cases exactly instead.
 
-**Not red, so nothing held.** #839's Help: `help/tests/test_*.py` are not
-discovered by `PythonToolchainTests` (it finds `scripts/test_*.py` only), so
-they neither run nor fail here; wiring them in is #886's first piece.
+**Not red, so nothing held.** #839's Help: `help/tests/test_*.py` were not
+discovered by `PythonToolchainTests` when this was written (it found
+`scripts/test_*.py` only), so they neither ran nor failed here. #886's first
+piece (886a) wires them in: "Plantoir Help on Windows" at the end of this
+page.
 #902's Planning tab sentences carry `{machine}` as Windows' Planning tab
 already says them. #835's `returningToASectionMidDeploy.heldElsewhere`
 cases and `helpForASection` have no Windows reader yet (#868 owes them).
@@ -2518,9 +2750,10 @@ entry, `course-management.json` → `backups.restoreOneSection` and
 unrun rather than red. No Windows test reads the `why` or the `carries` of
 `section restored`.
 
-**Held, 4 entries, all v2.0.0, all `ActivityTrailEvents`.** #911 (1):
-`section restore stopped part way`. Windows' section restore is not staged
-yet, so it has no "stopped part way" outcome to record. #912 (3):
+**Held, 3 entries, all v2.0.0, all `ActivityTrailEvents`.** (#911's
+`section restore stopped part way` was held here until Windows' section
+restore was staged; since #911 merged, Windows writes it and the entry is
+gone.) #912 (3):
 `backup kept its Media files once`, `shared backup Media swept` and
 `backup Media not found`. Windows writes no small backup and sweeps nothing.
 No new area was needed, so the existing area's own closed, withdrawn and
@@ -2560,6 +2793,273 @@ test). The other classes that walk `mustRecord` (`AgentGuidanceTests`,
 `ActivityTrailWiringTests`, `DoorCourseHoldTests`, `SectionRestoreTests`,
 `CourseBackupTests`) passed, 123 of 123. `scripts/test_held_skills.py`, which
 reads `help/`, passed in 9 s.
+
+### After the mac's fourteen pieces: held by name a fourth time (2026-11-14)
+
+At about 05:15 EST the mac merged fourteen pieces into `dev`
+(d75c36543..cadd8eb11, 263 files): #899's journal core (switched off), #897
+pieces A and C, #785a, #597's second half, #891, #696, #812 and #813, the
+"checks that mislead" batch (#802, #905, #906, #907, #738), #674 (PhET), #692
+(video players), #853 and #876 (the redactor), and #879, #887, #791 and #866.
+Nothing under `windows-app/` changed. `verify-deploy.ps1` changed in one line
+(the surname prompt it expects, `deploy.py`'s new example). The shared Python
+it changed runs here today through `PythonToolchainTests`. A full suite on
+cadd8eb11 read `Failed: 19, Passed: 3809, Skipped: 1, Total: 3829, Duration:
+19 m 43 s`. It ran on this PC (a Lenovo 20QES70500, i5-8365U, 16 GB,
+Windows 11 Pro 26200) after a 92-minute wait for the suite lock. Each red is
+sorted below by the open `windows` issue of v2.0.0 whose body names it.
+
+Two of the 19 are not the mac's requests:
+- **`LastViewedPagesTests.OnlyTheNewestAreKept`** (`Actual: "P3"`, 25 s), the
+  ordering flake #916 already names.
+- **`PythonToolchainTests` on `scripts/test_deploy_tokens.py`.** #921 owns
+  it, and its body said to read a red there as a platform question first. It
+  is one. The file's `TheEndDateReading` (6 cases) and two more subtests pass
+  a JSON body to deploy.sh's cut-out functions as an ARGUMENT to Git Bash,
+  and Git Bash's own command-line reading changes such an argument before
+  bash sees it. Measured with `subprocess.run([Git Bash, "-c", 'printf "[%s]"
+  "$1"', "_", arg])` on the runtime's Python:
+  - `{"a":"b"}` arrives empty;
+  - `a"b` arrives as `a\b`;
+  - `{a:b}` arrives as `a:b`;
+  - `"status":"active"` arrives as `\status":"active"`.
+
+  The function itself reads the body right when it is typed into Git Bash
+  (`[active][2027-07-01T00:00:00Z]`). So the red is the shared test's way of
+  passing the body, not `deploy.sh` and not Windows. The fix is in shared
+  Python: hand the body over on standard input or in the environment. It is
+  owed by #921 with the mac, and left red here, because a shared test is not
+  held by name.
+
+**Held, 61 entries from these fourteen, all v2.0.0** (22 more from stack 13, below).
+
+| Issue | Entries | Area: what |
+|---|---|---|
+| #928 | 3 | `ActivityTrailEvents`: `preview already starting`, `preview again abandoned`, `preview could not start` |
+| #921 | 9 | `ActivityTrailEvents`: the four `deploy token …` events and `Cloudflare token end date learned`; `MachineWordUsedIn`: `deployTokens.words.problemCouldNotSave`; `CredentialRequestsSaidDifferently`: `cloudflareToken` (the TTL step now promises an end date in Settings and a warning, which Windows does not show yet); `FailureExplanationCases`: the two #696 refusals |
+| #936 | 8 | `ActivityTrailEvents`: `files for the site downloaded`, `… could not be downloaded`; `FailureExplanationCases`: the five PhET stops; `SectionProblemKinds`: `phetSimulationsNotReady` |
+| #899 | 2 | `ActivityTrailEvents`: `undo could not record a step`, `undo rolled back` (as #949 asks: the owner is the whole of Undo, of which #949 is the first Windows piece) |
+| #920 | 3 | `CredentialRequestsSaidDifferently`: `teacherSurname`, `siteName`, `siteNameConflict` (the invented sample names) |
+| #927 | 35 | `SubjectMenuItemsUnderAnOlderName`: `addClass`, said here as `addNextClass`; `AssistWordingKeys`: the 34 Add Class… sentences |
+| #946 | 1 | `AgentGuidanceWordsSaidDifferently`: `askFound` (it names GitHub Copilot) |
+
+The 34 Add Class… sentences are held, not added: nothing the built-in
+assistant is shown changes. `scripts/test_tool_surface_digest.py` and
+`research/ai-assist/toolhash.py` are untouched by the merge, so the digest's
+expectation did not move. The test passed in the baseline, so Windows'
+surface still matches it.
+Add Next Class is not renamed: the issue says renaming the item is the fix,
+and the item is a menu a teacher sees, so it waited for #927's dialog (built 2026-11-21:
+Classes ▸ Add Class… replaced Add Next Class).
+
+**Five new areas, each read where its red was** (a sixth came with stack 13, below).
+- `SubjectMenuItemsUnderAnOlderName` (`subjectMenus.items`, with an older
+  name in `NamedGapLedger.SubjectMenuItemsOlderNames`). Both
+  `SubjectMenusContractTests` facts read the older name in the held name's
+  place. The older name must be an item here and gone from the contract, it
+  keeps the item list's order, and every case's `enabled` is compared exactly
+  with the held name read as the older one. At least three run cases must
+  enable it (five in the contract; two name #889's held situation keys).
+  `NamedGapLedgerTests.EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose` keeps
+  the map and the entries one to one.
+- `CredentialRequestsSaidDifferently` (`credentialRequests.requests`, by
+  name). A held request's title, label, secrecy, link and number of steps are
+  still compared exactly. Its explanation and steps together must still
+  differ. The number of held requests met must equal the entries.
+- `FailureExplanationCases` (`failureExplanations.cases`, by the case's `why`
+  up to its first colon, since the cases carry no name). A held key must name
+  exactly one case, and that case must be explained by NOTHING here: the
+  contract's honest fallback, the raw output shown. A sentence of another
+  kind fails as a wrong explanation, not a missing one.
+- `SectionProblemKinds` (`sectionProblems.kinds`, by kind; "has it" is
+  `SectionProblemsWording.KindLabels`). The sixteen kinds this app has are
+  still counted and compared label by label and scope by scope. A held kind
+  must be in none of this app's rule lists.
+- `AgentGuidanceWordsSaidDifferently` (`printablePages.agentGuidance.words`,
+  by key). A held sentence must still differ, it is still checked for the
+  machinery, and the count met must equal the entries.
+
+**Fixed in test code only, small and certain (#920 items 3 and 5).**
+`WizardSkeletonToggleTests` and `ClubWizardTests` read a case without
+`usesLCSTerminology` as the switch off, which is what the contract now means
+(there is no switch). A case that still carries the key is read as before.
+The toggle's floor is 15 cases (`contracts/README.md`'s census), and the
+school's list is compared only while the contract carries one: it has
+`factory` alone now. Every case's outcome is still compared exactly, and all
+15 pass with this app's switch off. `PreviewAppearanceTests.TheCloudflareMarkersExamplesAreRead`
+expects the marker example's new invented project name. No product code
+changed.
+
+**A defect, not held: the redactor (#941).** `LogRedactorTests` is red. Two
+of its tests fail: `LogRedactor_AllContractCases_Pass` (24 of the 50
+`problemReportRedaction.cases`, as #941 counts them) and
+`TheAssembledCasesAreFilledBeforeTheyAreRedacted` (3 assembled cases
+expected, 12 found). The 24 are credential shapes and the second word of a
+two-word account name that today's Windows redactor writes into a trail line
+and a problem report. Those are shipped behaviour, so a ledger entry would
+ship the leak quietly. They stay red until #941 lands. **Measured for
+#941 on this PC:** #941's twelve C# patterns pasted verbatim into
+`PatternRules`, in the contract's order (a scratch copy, never committed).
+They pass all 50 `problemReportRedaction.cases`, all 15 `redactedAgainCases`,
+and both `ruleOrder.cases` under .NET's engine. That includes the case ending
+in a carriage return, which #941 feared would differ. With today's patterns,
+24 of 50, 8 of 15 and both rule-order cases differ, exactly as #941 counted
+under ICU. What is left for #941 is the two counts in
+`TheAssembledCasesAreFilledBeforeTheyAreRedacted` (3 to 12 and 1 to 3), the
+three tests it lists, and the linear-time bound, which is unmeasured on .NET.
+The port is kept at `S\work\hold4\LogRedactor.port.cs` for that piece.
+
+**No owner, left red: `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`.**
+#696 put `read -rsp "Paste the token: "` inside `deploy.sh`'s
+`run_token_mode()`, and that function does not start with `assert_can_ask`.
+The question cannot be reached by a scheduled deploy, read rather than run:
+token mode refuses every option but its own, `--non-interactive` included,
+and asks only on a terminal. No `windows` issue names it, and relaxing the
+test would soften it, so the director raises it with the mac.
+
+**Proved three ways** by mutation over the hooked classes, restoring
+`NamedGapLedger.cs` by writing its bytes back (`S\work\hold4\mutation-*.txt`).
+Each round ran the 94 tests of the hooked classes in about 7 s.
+- **Closed.** One entry per new area for something this app already has:
+  `undoLastChange` under an older name, `netlifyToken`, a failure case it
+  explains as the contract does, `mediaFolderMissing` and `askTitle`. Each
+  failed with the closed message ("… it now EXISTS on this side"): 7 failed.
+  The seventh was the menu cases' fact, which read the older name where
+  `undoLastChange` is enabled.
+- **Withdrawn.** One entry per new area for a key the contract lacks. Each
+  failed with the withdrawn message: 6 failed (the kind in both of its facts).
+- **Removal.** Taking out every entry this piece added brought back the ten
+  baseline reds of those classes: trail events, wording, the machine word,
+  the credential requests, the failure explanations, both kinds facts, both
+  menu facts and the guidance words.
+- **Restored:** `Passed! - Failed: 0, Passed: 94`.
+- **Counts that cannot fall to zero unseen.** The held credential requests,
+  failure cases and guidance words met must equal their entries, so an entry
+  that matches nothing fails. Sixteen problem kinds are still compared. At
+  least three run menu cases must enable the renamed item. An item held as
+  missing outright may not also be held under an older name
+  (`NamedGapLedgerTests.EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose`).
+
+**Then stack 13, folded into the same branch.** At about 06:30 EST `dev`
+moved again, to 956defd43: #800, #829 (a deploy typed in Terminal takes a
+work lease), #897 piece B (Roll Over to a New Year… on the Section menu),
+#904, and follow-ups to #674 and #597. Nothing under `windows-app/` changed.
+It turned four tests red here, held as 22 more entries:
+- **#897 (21).** The item `rollOverToANewYear` (`SubjectMenuItems`, so it is
+  taken out of every case's `enabled`) and its 20 sentences
+  (`AssistWordingKeys`).
+- **#829 (1).** The liveness case "#829: a deploy typed in Terminal - bash,
+  its start in whole seconds - is alive while that bash runs"
+  (`LeaseLivenessCases`, a sixth new area).
+
+Windows decides that liveness case as gone today, because `WorkLease.IsAlive`
+compares the start as text. It is held rather than called a defect because
+nothing on Windows writes a whole-second start: `deploy.ps1` takes no lease
+yet, and this app's own leases write six decimal places
+(`WorkLease.LeaseBody`). So no Windows hold is read as gone this way. When
+#829 has Windows write such a lease, Windows must also compare on whole
+seconds. A held liveness case must still be decided opposite to `expect`,
+the number of held cases met must equal the entries, and at least 17 cases
+are still decided exactly.
+
+Proved the same way (`mutation-closed2`, `-withdrawn2`, `-removal2`, 95
+tests):
+- An entry for the kill -9 case, which this app decides as the contract
+  does, failed with the closed message.
+- An entry for a case the contract lacks failed with the withdrawn message.
+- Taking out the 22 entries brought back the four reds.
+- Restored: `Passed! - Failed: 0, Passed: 95`.
+
+In all, the hold is 83 entries. Stack 13's other new lists have no Windows
+reader yet: `workLeases.launcherLeases`,
+`previewWhileItsSectionDeploys.leaseCases`, the two new
+`returningToASectionMidDeploy.heldElsewhere` cases,
+`subjectMenus.rollOverSheet` (`file-formats.json` → `customDomainReading`
+has one since #955), and the trail lines `deploy.sh` writes beside `task started` and
+`task finished`.
+
+**Unrun rather than red**, read by key with no Windows reader yet:
+`activityTrail.lineShape.placeCases` (#946), `subjectMenus.addClassSheet` and
+`class-planning.json` → `duplicatingAsTheNextClass` (#927),
+`colourSchemePicker` (#920), `deployTokens` (#921), `keptDownloads`,
+`phetFences` and `buildOutputLocation.keptDownloadsSurviveTheSweep` (#936),
+`videoEmbeds` (#939), `quittingWhileWorkIsUnderWay.previewBuildRecord` (#928),
+`undo` and `undo-traces.json` (#949), and the `undoListDays` of 61 (#912).
+(`problemReportRedaction.redactedAgainCases` and `ruleOrder` were on this
+list until #941 landed on this branch; see below.)
+
+#### Brought up to `dev` 39d83a0a7, and the redactor fixed (2026-11-18)
+
+The branch waited four days while `dev` moved 94 commits (stack 14: #901a,
+#839, #952; #973, #974, #978, #980 and the roadmap). `dev` merged in without
+a conflict. Nothing under `windows-app/` had changed on `dev`. Before the
+merge, the Windows suite on `origin/dev` 39d83a0a7 read `Failed: 25, Passed:
+3811, Skipped: 0, Total: 3836` (17 m 58 s, over SSH on the PC). This
+section's measurements were made on the same PC, over SSH, in
+`plantoir-wt-compare`.
+
+**#941, the redactor, built from the fourth hold's port.** `PatternRules` is
+the mac's twelve patterns, byte for byte (compared by script against
+`LogRedactor.swift`), in `ruleOrder.order`, with `userFlag` new. `Redacting`
+gained the seam the mac's `redacting(_:applyingInOrder:)` has, and
+`LogRedactorTests` gained the four tests #941 lists: the names in the
+contract's order, `ruleOrder.cases` in the pinned order and with each
+`wrongOrder` move, `redactedAgainCases`, and the linear-time bound (the
+mac's eight slow shapes at 10,000 and 100,000 characters; growth at most 50,
+the best of up to three rounds). The two assembled counts moved from 3 to
+12 and from 1 to 3. Case 20, the line that ends in a carriage return,
+needed no .NET-specific change.
+
+**Two shared tests that were wrong on Windows, fixed in the test, not in the
+product.**
+- `scripts/test_deploy_tokens.py` (#921): the paste and end-date cases now
+  reach bash in the environment (`PLANTOIR_TEST_VALUE`), not as an argument,
+  because Git Bash re-reads its own command line (measured above). The same
+  cases and assertions run on the mac, where the file still passes (22
+  tests).
+- `scripts/freshness_cases.py`, the `pointTheLinkAtAnOlderCopy` change: it
+  renamed a new link over the course folder's link, the way `ln -sfn` does.
+  Windows refuses a rename over a directory link (`PermissionError: [WinError
+  5]`). The case runs only where links can be made: over SSH, with an
+  administrator token, they can, so `test_build_freshness_reuse.py` went red
+  there and nowhere else. On Windows the old link is now removed first
+  (`os.rmdir` removes the link, never what it points at). The mac's path is
+  unchanged (40 tests pass there).
+
+**Re-pointed entries.** The 21 Roll Over entries name #954, which is Windows'
+issue for #897 piece B. The whole-second liveness case names #956, because
+#829 is closed.
+
+**Stack 14's reds, held as four more entries.** Three tests went red from
+what `dev` brought:
+- **#901 (3).** The trail event "site leaves off files no published page
+  uses" (`ActivityTrailEvents`), and the two follow-limit stops in
+  `failureExplanations.cases`, held by `why` up to the first colon
+  (`FailureExplanationCases`). #901a is shared build code, so Windows' build
+  runs it already. What Windows lacks is the trail line and the explanation
+  of the stop: until #901 lands, a stopped build shows its raw output, which
+  is the contract's honest fallback. #901 is open on v2.0.0, and this brief
+  left it alone.
+- **#921 (1).** `netlifyToken` (`CredentialRequestsSaidDifferently`). #952
+  corrected the Netlify token's TTL step on the mac, which now says that the
+  next deploy names a token that no longer works and that Settings shows
+  whether it still works. Windows' Settings does neither until #921 lands, so
+  its older words are the true ones here. The title, label, link and number
+  of steps are still compared exactly.
+
+**Still red, and not held.** `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`
+waits on the mac's answer on #963. Nothing has been posted there since the
+fourth hold filed it.
+
+**The result.** The whole suite on the branch at 1debb04d7, over SSH on the
+PC: `Failed: 6, Passed: 3835, Skipped: 0, Total: 3841, Duration: 15 m 13 s`.
+The six are #963's launcher-question test and five permission tests that
+fail only over SSH, where the token is an administrator's:
+`BuildOutputLocationTests.AFolderThatCannotBeListedMeansRebuild`,
+`ReuseTheLastBuildTests.AFolderThatCannotBeListedCountsAsChanged`,
+`ReopeningTheLastWorkingFolderTests.EveryFolderCaseIsDecidedOnARealFolder`
+and `ReferenceLockTests`' two. Those five were red on `dev` as well. The
+linear-time test took 1.0 s for all eight shapes.
 
 ### Shared Python tests that must run on Windows (step 0 of v2.0.0)
 
@@ -2612,9 +3112,11 @@ a teacher can see it rather than merely held in a constant.
 carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
 `dotnet test` builds them and runs none of those — only
 `AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
-and need no desktop (bundle 11), and `HarnessSourceRuleTests`, five more that
-keep a bare key-down, a discarded `Keyboard.Pressing` and an unwatched key out
-of the sources (#638). The project is in the solution so a SOLUTION build compiles it —
+and need no desktop (bundle 11) (the key rules that keep a bare key-down, a
+discarded `Keyboard.Pressing` and an unwatched key out of these sources,
+`HarnessSourceRuleTests` (#638), live in `Plantoir.Tests` since #1035, so the
+merge gate runs them: in this project they failed on `dev` for days with
+nobody seeing it). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
@@ -2765,11 +3267,16 @@ the 2026-10-23 full run and passed alone).
   `using (Keyboard.Pressing(key)) { … }`, which sends the up on dispose, a
   failing assert included. `PlanTable`'s Shift+Tab had called `Pressing` and
   thrown the disposable away; it is a `using` now.
-- **`HarnessSourceRuleTests`** (plain facts, no desktop) fails on any
-  `Keyboard.Press(` in the UI test sources. The exception is one method,
-  allowed by name: `PageTablesUiTests.HeldSpace`, which imitates
-  auto-repeat (several downs, then one up in a `finally`) and must keep
-  its release.
+- **`HarnessSourceRuleTests`** (in `Plantoir.Tests`, plain facts reading
+  `windows-app/Plantoir.UiTests/*.cs`) fails on any `Keyboard.Press(` in the UI
+  test sources. The one exception, allowed by name, is
+  `HeldKeys.HoldWithRepeats`, which imitates auto-repeat (one down, more downs
+  after the repeat delay, one up in a `finally`) and must keep its release;
+  every held-key imitation calls it (`PageTablesUiTests.HeldSpace`,
+  `StopByKeyboardUiTests`' held Escape). It also fails on a key a test names
+  that `HeldKeys.Watched` does not list, comparing by name because the unit
+  project cannot load FlaUI: spell a key as `Watched` does (`RETURN`, not
+  `ENTER`).
 - **`HeldKeys` sweeps for a key held any other way.** It reads
   `GetAsyncKeyState` for every modifier (generic and left/right, Windows
   keys included) and every key the suite sends. `DrivenApp`'s constructor
@@ -3342,6 +3849,9 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   skill teaches — the `> [!quiz]` callout and what the site does with it — is
   [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), and
   what the build does is 05 → "Self-check quizzes: what the build does".
+
+The guidance-skill pins (`mustSay`, `held`, `starterMacros`, `hintsStarter`, `offeredTemplate`, `testAuthoringSkill`) are read from `shared-rules.json` by `Plantoir.Tests/AgentGuidanceSkillPinsTests.cs`, against what `AgentGuidance.Write` puts in a temporary working folder in both homes. Matching follows `mustSay.rule`; the two folding patterns are the Mac's (`\s+`, and `\s*\n[ \t]*(?:>[ \t]*)*` first), so CRLF never decides a result. A held skill (`held.skills`) is written in neither home and must be kept whole under `held.place`, so a held name that names nothing fails. The test-authoring skill's checks and its Marking Guide run on Windows with these commands (measured on Windows 11 ARM64 in Parallels, Python 3.14.10, 2026-11-21). From the working folder: `python -B .agents\skills\plantoir-test-authoring\scripts\check_kit.py "<test folder>\Marking Kit\answers.json"`. From a test folder: `python -B Checks\check_answers.py`. `py` in place of `python` works the same, and so does the fetched runtime's own `python\python.exe`; `python3` does not, because on stock Windows it is the Microsoft Store alias (exit 9009, "Python was not found"). The Marking Guide compiles with Tectonic 0.17.0's Windows zip (`tectonic-0.17.0-x86_64-pc-windows-msvc.zip`), from the test folder: `tectonic.exe -X compile "Marking Guide.tex"`; the first run fetches the bundle's files, `nicematrix` and `mhchem` among them (77.7 s with an empty cache), and a second run takes 6.0 s.
+
 - **The question** is a ContentDialog (`MainWindow.Guidance.cs`): title
   `askTitle`, `askFound` as the explanation under it, `askWhat`,
   `askYoursStays`, an Expander (`showWhatIsAdded`) over a read-only
@@ -3587,6 +4097,46 @@ runtime's Node 20.18.1):
 The emulated figure (10.41:1, black on white) and the real one (9.64:1, the
 dot's .75 opacity over Black's dark Canvas) differ because the emulation's
 Canvas is white; both clear 3:1 by a wide margin.
+
+## Names for boxes, the sidebar row and Class Dates' keys (#1020, #1024, the mac's #1012 and #997)
+
+### Placeholder-only boxes (#1020)
+
+A placeholder is a hint that goes when the teacher types; the mac named each such field in #1012 (documentation 09, "Placeholders are not names"). Windows sets `AutomationProperties.Name` to the mac's words on each box listed above. Boxes built through `FormBuilders.LabeledRow` were already named by their printed label, and Find a Page and Cloudflare Account ID were named before.
+
+MEASURED, VM `Windows 11 B`, 2026-11-20: on the base commit, the sidebar filter (`PlaceholderText="Filter"`, no Name) already read as "Filter" through UI Automation, so WinUI's TextBox hands its placeholder text over as the automation Name when nothing else names it. The fault on Windows is therefore sharpest where the placeholder is an example rather than a name ("e.g. ICS3U", a Google Sheets address, "For example: This site is licensed…", "If you're asked a question, type your answer here…"), which were read out as the box's name: with the names taken out and the ids kept, Course Settings' footer box read as "For example: This site is licensed under <a href="…">CC BY 4.0</a>." Naming every box keeps the two apps saying the same words and does not depend on that fallback.
+
+Not named, on purpose: Schedule Deploy's day picker (its placeholder is "Pick a day"; the mac's picker is one "Deploy at" control where Windows has a day and a time picker, so the words are not the mac's to copy one for one), and the task's progress bar (the mac named its spinner "Running"; Windows draws a bar with a value). Both are listed in the lane's report.
+
+### The sidebar row's text and a cut-short course code (#1024, the mac's D44)
+
+The row was a horizontal StackPanel, which gives its children all the width they ask for, so a long code ran past the 230-epx column: clipped with no ellipsis, and a section's clock or warning badge after it drawn out of sight. The row is now a Grid (icon, text in a star column, the two badges), left aligned so the badges still sit just after a short title, with margins rather than `ColumnSpacing` (spacing stays between columns whose badge is collapsed). The text trims with an ellipsis. A course's row (`SidebarRow.ShowsWholeTitleWhenCutShort`) gives its text the whole code as its tooltip and as its UI Automation help text while it is cut short, and nothing when it fits, as the mac's `CourseCodeLabel` does; whether it is cut short comes from `TextBlock.IsTextTrimmedChanged`, raised by layout, so nothing measures or waits. A recycled container takes its new row's state on `DataContextChanged`. Reference-course rows are left as they were: they already carry the course's folder as their tooltip.
+
+### Class Dates' keys (#1024, the mac's ruling Q-C)
+
+WinUI's TextBox has no accept-tab mode, so Tab already left the dates box. What was missing was where the keyboard starts: the dialog put its first focus on the route picker. `SectionScheduleDialog` now sends the dialog's own first placement of the focus to the dates box while the route is Type or paste, and touches nothing after it: the first focus move whose new element is inside the dialog and whose old element is not (`SendTheFirstFocusToTheBox`, `TrySetNewFocusedElement`, WinUI's documented place to change where focus lands). Every later move stays where it was going, whoever makes it, so a person using a keyboard or a screen reader always moves focus where they asked. Shift-Tab from the box goes to the route picker, as on the mac with Keyboard Navigation on.
+
+MEASURED, VM `Windows 11 B`, 2026-11-20, with every `GettingFocus` logged (scratch probe, not merged):
+
+- **Focus moved by UI Automation is `FocusState.Programmatic`** (input device Mouse or Keyboard, after the last real input): a UI Automation SetFocus on "Where these came from", on the "A file" radio button and on Cancel, and Narrator's own navigation (Narrator running, Insert+Right and Insert+Left, focus following its cursor) all arrived as Programmatic, exactly as the dialog's own placement does. The fix's first version redirected every Programmatic move until a Keyboard or Pointer one, so each of those moves was pulled back to the dates box (the review's M1, confirmed: 3 of 3 SetFocus and 4 of 4 Narrator moves). The state therefore cannot tell the dialog from assistive technology and is not read.
+- **Opened from the menu by UI Automation (Invoke):** the placement (old: the menu bar item; new: "Type or paste") came before `Opened` in some opens and after it in others (5 of 9 after), and was raised on the dialog's own `GettingFocus`.
+- **Opened from the keyboard (Down to Class Dates…, Enter):** the placement was raised ONLY on the app-wide `FocusManager.GettingFocus`, never on the dialog's own, and came after `Opened` in 3 of 6 opens, so the first version's focus-on-Opened was overtaken and the sheet started on the route picker (the review's L1, confirmed). The fix listens to `FocusManager.GettingFocus` only inside `ShowWithTheFirstFocusInTheBoxAsync` (it is static, so it is left in a `finally`) and focuses nothing on `Opened`.
+- **Rejected:** redirect once while `OldFocusedElement` is null or the box (the review's example): with the box focused on `Opened`, a later placement and a Narrator move both come from the box. Telling them apart by time (a window after `Opened`) is a timed guess.
+
+Review 2's lows, fixed in the branch: only the dialog's OWN placement is moved, the rule in `Plantoir.Core.Models.DialogFirstFocus` (it lands on the route picker, is not by the pointer, and has no direction; MEASURED in VM B, the placement in a keyboard and a UI Automation open was `Programmatic`, direction `None`, on a RadioButton of the picker), so a person's first click or Tab into a dialog that placed no focus stays where they sent it (L4); the app-wide event is joined only inside `ShowWithTheFirstFocusInTheBoxAsync` and left in its `finally`, so a `ShowAsync` that throws leaves nothing joined (L5; joining on `Loaded` was rejected, measured: the placement came before `Loaded` in both opens); the keyboard-open test types a key and checks the focus is still in the box (L6). Tests: `DialogFirstFocusTests` (8).
+
+Tests: `FocusSentByAssistiveTechnologyStaysWhereItWasSent` (no key pressed; SetFocus to the source box, the route picker, Cancel and back), `OpenedFromTheKeyboardTheSheetStartsInTheDatesBox` (three keyboard opens; the Enter types nothing), `TabLeavesTheDatesBoxAndTypesNothing`.
+
+### What did not apply
+
+- **Settings pane heights and the screen cap (D42): not built; ruled on #1024: the Windows Settings window stays resizable, so there is nothing to build here (the mac's change is #1028).** Windows' Settings is a window the person can resize, opened at 760 x 600 effective pixels capped by its own display's work area, and every pane scrolls, so nothing runs off the screen. The mac's pane-fitting needs a window the person does not resize; doing it here means taking the resize away.
+- **The Backups total's margin (D45):** the Windows Backups row draws no total; the summary is the row's tooltip.
+- **The picker's column widths (D48):** already set widths, Folder 140 and Date 170 (`PageTableLayout.PickFolder`, `PickDate`), Page takes the rest.
+- **An empty state with a next step (D12):** Windows has no Planning tab at all yet (`PlanningTab` is used only in `Plantoir.Core` and tests; #801, the tab, is open), so the mac's empty-state fix is owed there under #801.
+
+### How the tooltip was proven
+
+`ACourseCodeCutShortShowsTheWholeCode` reads the text's help text (the whole code on `WWWWWWWWWWWW`, none on `ICS3U`) and then rests the real pointer on the code with the harness's glide (`FixWithButtonsUiTests.RestThePointerOn`, now internal): FlaUI's `Mouse.MoveTo` places the cursor and WinUI opens no tooltip for that, which this test met too. The tooltip came up holding the whole code (capture `1024-cut-short-code-tooltip-rest1.png` in the private run folder `night3-c-captures`). With the row put back to a horizontal StackPanel the text never trims and the test fails at the help text. A bound on the text's rectangle against its row passed with the StackPanel too, so it was taken out.
 
 ## What this page does not cover
 
@@ -4073,7 +4623,8 @@ the same day.)
   for vaults REGISTERED in Obsidian's registry — on Windows,
   `%APPDATA%/obsidian/obsidian.json`, same JSON shape. Port the whole
   dance: quit Obsidian if running (its in-memory vault list ignores
-  registry edits), seed `support/obsidian_defaults/.obsidian` if the
+  registry edits; since #1003 only after the teacher answers "Close
+  Obsidian to open {course}?", never unasked), seed `support/obsidian_defaults/.obsidian` if the
   course has none, write the registry entry, then open the URI. Sections
   open at their `index.md` (Obsidian opens files, not folders). Enable
   the File Explorer's auto-reveal by patching the vault's
@@ -5559,9 +6110,11 @@ So every hand-back now names `_folder`, the section's own:
   A build or a deploy therefore always happens in a window showing the
   section's folder, so no sentence had to be invented for a hand-back that
   could not find its window — it can.
-- `SectionIsBusy` asks a window showing that folder, because "busy" is read off
+- `SectionIsBusy` asked a window showing that folder, because "busy" was read off
   a detail pane and another folder's pane answers about another folder's
-  section.
+  section. Since #769 it asks `SectionRuns.DeployIsUnderWay` by the assistant's
+  own folder, course and section, with no window involved ("A section's deploy outlives
+  its view", above, says how).
 - `App.WindowFor` compares with `WorkingFolder.IsTheSame` like everything else,
   rather than its own `Path.GetFullPath` spelling.
 
@@ -5672,6 +6225,8 @@ Plantoir's folders are chosen from the ordinary Windows picker.
 **No new trail event is owed.** `working folder opened` already records the
 act, its line is still true, and a selection being let go is not something a
 teacher DID — it is the consequence of what they did, recorded one line up.
+
+**The publish registry and the preview leases (#769 item 1).** The publish registry (`CourseActivity`) and the preview leases (`PreviewLeases`) compare working folders as the rest of the app does since #162 and #728 (`SectionKey`, `SectionRuns`): every folder comparison goes through `WorkingFolder.IsTheSame`, which folds what `WorkingFolder.Resolved` folds (case, a trailing separator, a relative or `..` path), and the quit question's count of previews being built is distinct by `SectionKey`. The stored spelling stays as given, because it names the container and the port; only the comparisons fold it. This is the Mac's rule (`FolderIdentity.isSameFolder` in `CourseActivity.coursePublishIsRunning` and `sectionPublishIsRunning`, #189). Before #769, a section deploying under one spelling did not refuse a preview of it asked under another, and a second window could take a second lease on the same section. A mapped drive is not folded (`Resolved` does not resolve it), so it remains a different folder.
 
 ## Course creation and the smaller course pieces (parity bundle 6a)
 
@@ -5847,8 +6402,7 @@ literal string finds only the tests — a review of this bundle read that as
 
 ### The How I Teach row, and the CHECK items of #360
 
-The row writes with `FileMode.CreateNew` and opens THE PAGE
-(`FolderActions.OpenInObsidian` gained a `page` argument), never the vault.
+The row writes the page as ONE undo step (`startHowITeachPage`, made by `sheet`, held by the course) and opens THE PAGE (`FolderActions.OpenInObsidian` gained a `page` argument), never the vault. The exclusive create is a check at plan time plus the door's refusal: a page there when the step reads its before is opened and nothing is made; one that appears after that is refused by the swap (`changedSince`, or the rename's own `replace: false` in the last instant) and opened.
 `HowITeachSettingsRowTests.ACreatedPageNeverWritesOverOneMadeAMomentEarlier`
 injects a page between the look and the write through a test-only overload.
 
@@ -5891,8 +6445,9 @@ on this side, split in two, and only the first half is built.
 **Built and contract-tested** — everything that decides what a press WRITES:
 `Plantoir.Core/Assist/LinksChecklist.cs` (offer reader, the pure gate, the
 answered file, the record release), `LinksChecklistWording.cs`, and
-`AssistWorkspace.LinksChecklist.cs` (`OpenLinksChecklist`, `PublishLinksChecklist`,
-`PublishAndRemember`, `NotNow`, the trail lines). Runners:
+`AssistWorkspace.LinksChecklist.cs` (`OpenLinksChecklist`, `PublishAndRemember`,
+`PlanThePress`, `NotNow`, the trail lines; `PublishLinksChecklist` is gone since
+#899 W7b2-8, where a press became one step). Runners:
 `LinksChecklistGateContractTests` (followingARow 10, comingWithAClass 12),
 `LinksChecklistPublishContractTests` (publishCases 15, through the sheet model),
 `LinksChecklistWordingContractTests`, `PublishedPagesRecordTests`.
@@ -6116,7 +6671,7 @@ Deploy…, Rename (the File menu item, F2 and the context menu all ask
 `CourseThatCanBeRenamed`), Add Section…, Keep a Copy…, every Revise item,
 the Site Health REPAIR button (and `SiteHealthRepair.OutcomeOfRepairing`
 refuses on its own), and the Course Settings form, replaced by
-`ReferenceSummaryView`. Cancel Scheduled Deploy… stays (gate by direction).
+`ReferenceSummaryView`. Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) stays (gate by direction).
 On a reference course's SECTION, the − button, the Delete key and the
 section's menu offer no removal at all (− is greyed, Delete does nothing, the
 menu has no Remove Section…); the course row's Remove Course… removes it all.
@@ -6362,10 +6917,12 @@ Windows".
 ### The unit suite keeps its state in a scratch folder (#285, #179)
 
 `Plantoir.Tests/TestAppDataRedirect.cs` is a `[ModuleInitializer]`: before any
-test runs, `AppDataRoot.RedirectTo(%TEMP%\plantoir-tests-<pid>)`. Settings,
+test runs, `AppDataRoot.RedirectTo(%TEMP%\plantoir-tests-<pid>-<start ticks>)`. Settings,
 models, builds and scheduled-publish state a test touches land there, not in
-the teacher's `%LOCALAPPDATA%\Plantoir`. Per process id, so two worktrees'
-suites do not share a settings file. `AppDataRedirectTests` pins it. The redirect has one documented limit: during
+the teacher's `%LOCALAPPDATA%\Plantoir`. Per process id and start time, so
+two worktrees' suites do not share a settings file and a recycled process id
+does not inherit an earlier run's state; the folder is removed at process
+exit (a crashed run's is left, and no run removes another's). `AppDataRedirectTests` pins it. The redirect has one documented limit: during
 a redirected UI test the launchers (`preview.ps1:512`) still write their trail
 lines to the real `Logs` folder, because they resolve it themselves.
 
@@ -6494,12 +7051,12 @@ became `OutsideDoor.StartGrace` (same 400 ms, same behaviour), and
 for is still asserted. Alone, 10 times each: 10 of 10 passed before and 10 of
 10 after, because the failure needs a loaded PC.
 
-**Two shared temp paths are left as they are** and filed as findings, because
-neither is this sweep: `TestTrailRedirect.ScratchTrailPath` is one fixed
-`%TEMP%\plantoir-tests\activity.txt` that every run appends to, and
-`TestAppDataRedirect`'s `plantoir-tests-<pid>` is never deleted, so a recycled
-id inherits ANY earlier run's settings and state, not only a crashed run's (a
-review counted 1,603 such folders in `%TEMP%` on this PC, back to 2026-10-01).
+**The suite's two temp paths are the run's own (#916 items 3 and 4).**
+`TestAppDataRedirect`'s `plantoir-tests-<pid>-<start ticks>` and
+`TestTrailRedirect`'s `plantoir-tests-trail-<pid>-<start ticks>\activity.txt`
+sit under `%TEMP%` and are removed at process exit, so a run leaves no folder
+behind and a recycled process id inherits nothing. A crashed run's are left,
+and no run removes another's.
 
 ### Same-second backups wait for the next second (#187)
 
@@ -7233,8 +7790,8 @@ half old and half new until the app next ran — and a launcher typed at a
 prompt, or (before #477) a scheduled run, hashed and built from that mix.
 
 **What it does.** `MainWindow.AskBeforeQuittingThroughWork` (the Closing
-handler) asks the #231 quit question FIRST, unchanged — Keep Working leaves
-everything as it was. Then, when the close quits the app (`App.ClosingThisQuits`:
+handler) asks the #231 quit question FIRST — Cancel (Keep Working until #987,
+and no longer the default since) leaves everything as it was. Then, when the close quits the app (`App.ClosingThisQuits`:
 the last window) and a copy is WRITING (`ToolchainReadiness.AnyCopyIsWriting`),
 it cancels the close synchronously, before any await, opens the banner at
 once (the one-second delay treated as passed) — the "Getting this folder
@@ -7665,6 +8222,12 @@ from launch to window is `App.OnLaunched starting` (or `Program.Main starting`)
 to `MainWindow.Activate called`; launch to a usable Preview is the same start to
 `tools copy finished`.
 
+Every trail line about a course gets its place from
+`ActivityTrail.Place` (`placeCases`, #946), and `plantoir-mcp.exe` writes
+`task started` / `task finished` for every launcher it runs (#774), in the
+window's words, exit 3 as "stopped at a question nobody was there to answer
+(exit 3)".
+
 ### Testing it
 
 `ToolchainReadinessTests` (Core): one copy for sixteen concurrent `Ensure`
@@ -7709,15 +8272,16 @@ when they land.
 | Menu | Items (Windows key) |
 |---|---|
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
-| Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
-| Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
+| Course | Add Section…, Copy a Page from This Course… (Ctrl+Shift+K since #990) · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2; its grey reason line under it went with #990), Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
+| Section | Since #990 (grouping A, drawn from `subjectMenus.layout`; "Section and Classes, drawn from the contract (#990)" below): Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Rebuild Preview (Ctrl+Shift+B), Open in Browser · Publish Class for a Date…, Publish Pages…, Hide Pages…, Publish Pages That Links Lead To…, Undo Last Change, Undo Getting Ready for the Start of the Year… · Deploy… (Ctrl+Shift+D), Schedule Deploy…, Remove Scheduled Deploy (Cancel Scheduled Deploy… until #987; no ellipsis since #990) · Revise With ▸ · Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section (no ellipsis since #990) |
+| Classes | Since #990: Add Class… (#927) · Class Dates…, Re-date Classes…, Make Room for Classes… · Roll Over to a New Year… (#954), Get Ready for the Start of the Year… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
 
 **One table, in code** (`Plantoir/MainWindow.Menus.cs`): every item is built
 by one `Add(…)` that carries its contract item (`SubjectMenuRules.Item`), its
 key and its AutomationId, so an item cannot exist without its rule or its id.
-The menu bar's XAML holds five empty `MenuBarItem`s and nothing else.
+The menu bar's XAML holds six empty `MenuBarItem`s (five until #990 added Classes) and nothing else.
 
 **Which items can be used** is `Plantoir.Core/Models/SubjectMenuRules.cs`, a
 port of the mac's `SubjectMenuRules.enabledItems`, run by
@@ -7725,10 +8289,12 @@ port of the mac's `SubjectMenuRules.enabledItems`, run by
 cases, 51 items, 24 situation keys; the names map both ways by camel-casing
 the enum, so "Finder" and "NewTerminalAtFolder" in two names are the mac's
 neutral words for Show in File Explorer and Open in Terminal). Items GREY,
-never hide — except Revise With ▸ Claude… and Codex…, LEFT OUT when not
-installed (`ClaudeCodeLauncher.IsAvailable`, `CodexLauncher.IsAvailable`,
-decided when the window is built: a fact about the PC, not the selection).
-Local AI Assistant… is always drawn, greyed on a course row.
+never hide, Revise With ▸ Claude… and Codex… included since #990: drawn on
+every PC and DIMMED when not installed (`SubjectMenuRules.EnabledInTheMenuBar`,
+fed by `OutsideAssistantPresence`; "Revise With: dimmed in the menu bar, hidden
+in a row's menu (#990)" below). Until #990 they were LEFT OUT when not
+installed, decided when the window was built. Local AI Assistant… is always
+drawn, greyed on a course row.
 
 **What the rule is fed** is `MainWindow.CurrentSituation()`, read from the
 owner that already decides each fact, so the menu and the button cannot
@@ -7804,9 +8370,10 @@ silent too** — F2 on a course whose Rename the rule greys (a reference
 course, a section row, a course being copied) does nothing and says nothing,
 which is what the mac's key on a disabled menu item does. Before #488 F2 opened
 the rename dialog and let it explain the refusal; do not restore that route:
-the reason is on the greyed Course ▸ Rename's own reason line, and a key that
-opens a dialog the menu says cannot be used is the disagreement the one rule
-exists to prevent.
+the reason is in the row's own context menu, under Add Section… (until #990
+it was also a grey line under Course ▸ Rename, which the mac's ruling Q14 took
+out of the menu bar), and a key that opens a dialog the menu says cannot be
+used is the disagreement the one rule exists to prevent.
 
 **Ctrl+Shift+O sits on ONE Open in Obsidian item** — Course's unless a section
 row is selected, then Section's; `ApplyMenuEnablement` moves the accelerator
@@ -7821,9 +8388,217 @@ O follow the mac's ⇧⌘ letters. **Not Ctrl+Alt+anything**: on many European
 layouts AltGr IS Ctrl+Alt, so a Ctrl+Alt key fires while a teacher types @,
 € or { — so Add Section… has no key here (the mac's ⌥⌘N). **Not Ctrl+Shift+C**
 for Copy a Page: it is the browser's inspect-element key and a teacher who has
-used one expects that; Copy a Page has no key. **Settings… lost its "Ctrl+,"
+used one expects that; Copy a Page had no key until Russell ruled Ctrl+Shift+K
+on #990 (2026-11-20), the mac's ⇧⌘K. **Settings… lost its "Ctrl+,"
 label**: it was drawn with nothing behind it, and a comma key measured above
 does not fire. Ctrl+Shift+B was kept free for 2B's Rebuild Preview, which has it now.
+
+### Revise With: dimmed in the menu bar, hidden in a row's menu (#990)
+
+The mac's #990 (the HIG review's D11, D24, D25, D43 and Russell's rulings Q8,
+Q9, Q10 and Q14, 2026-11-18) changed four things a Windows teacher sees, and
+the Windows half (branch `issue/990-menus-windows`, 2026-11-19) brings them
+here where Windows has the same thing:
+
+- **A missing assistant is DIMMED in the menu bar** (Course ▸ and Section ▸
+  Revise With ▸ Claude…, Codex…), never left out: HIG, The menu bar, "Always
+  show the same set of menu items… If a menu bar item isn't actionable,
+  disable the action instead of hiding it from the menu"
+  (`outsideAgents.hiddenWhenNotInstalled`, false since #990). The rule is
+  `SubjectMenuRules.EnabledInTheMenuBar`: the contract's rule AND, for an item
+  that opens an outside door (`OutsideDoorOf`), that door's assistant
+  installed. Presence is `OutsideAssistantPresence`, asked at launch and on
+  activation off the interface thread; its `Changed` re-runs
+  `ApplyMenuEnablement`, and `Invoke` asks presence again at the click.
+  `ReviseWithPresenceTests` holds the rule, the two contract keys and the
+  source (no installed test around the menu bar's `Add`; since #1017, that
+  `ApplyMenuEnablement` sets only `IsEnabled` on the ruled items and the
+  only `Visibility` it sets is Preview's alternate). The mac's dimmed
+  Fix with buttons (and Revert on Planning) also carry the reason as a help
+  tag, shown when the pointer rests on them, and the shared Help page says
+  "Hold the pointer over the button to read why". Since #990's second review
+  Windows gives a dimmed Fix with button its reason twice:
+  `AutomationProperties.HelpText` for Narrator AND `ToolTipService.ToolTip`
+  (`SectionProblemsView.ShowTheFixButtons`; no tooltip while it can be
+  pressed). **The tooltip is on the button's frame, not the button (#1017).**
+  WinUI 3's `ToolTipService` has no `ShowOnDisabled` (that is WPF's), and
+  Microsoft Learn's Control.IsEnabled page says a disabled control "can't
+  handle any input events on itself" but is "still visible to hit testing",
+  and its input events "can bubble to a parent where they can be handled".
+  So each Fix with button sits in a `Border` of exactly its box
+  (`FixButtonFrame`: transparent background, shown and collapsed with the
+  button, drawing nothing of its own), and the frame owns the tooltip;
+  `HelpText` stays on the button. Measured on the PC on 2026-11-20 (Lenovo
+  i5-8365U, Windows 11 Pro 26200, 1920 x 1080 at 150%, the desktop session
+  through Task Scheduler) by `FixWithButtonsUiTests.ACodexThisPcLacks_IsDrawnDimmedWithItsReason`:
+  the real pointer glided onto the button's middle as input (absolute
+  `mouse_event` moves in 15 steps; FlaUI's `Mouse.MoveTo` sets the cursor
+  with `SetCursorPos`, and after it no tooltip showed, the control's
+  included, on 2026-11-19 and in this run's first try; a 2-pixel nudge after
+  it worked once and failed the next run), then UI Automation polled for
+  3 s for a ToolTip named with the reason, in the window and among the
+  desktop's top-level windows, up to three rests, and the screen captured in
+  real pixels each rest (the thread made per-monitor DPI aware; the earlier
+  1280 x 720 crop was the
+  unaware capture). **Before** (tooltip on the button, `2c4ce92e0`): the
+  control, the sidebar's enabled + ("Add a course or club"), showed its
+  tooltip on screen and to UI Automation; the dimmed Fix with Codex…
+  showed none, in either. **After** (`55e0f60e7`): "Not set up on this PC."
+  showed above the dimmed button, on screen and to UI Automation. The test
+  now requires both, and it was shown to fail: with the gliding probe
+  (`139621cb5`) and only the tooltip moved back onto the button, the
+  control's showed at the first rest and the dimmed button's at none of
+  three. The pictures are kept on the main Mac in
+  `vm-tools/runs/1017-tooltip/`. Only the not-installed reason was looked at on screen;
+  the nothing-ticked reason ("Tick a problem this section still has to hand
+  it over.") goes through the same frame and was not hovered. Keyboard: a
+  dimmed button cannot take focus, so a keyboard user does not get the
+  tooltip; Narrator reads `HelpText`. The mac's Help sentence "Hold the
+  pointer over the button to read why" is now true on Windows for a mouse
+  user; `help/pages/fix-with.md` was not changed (886b onward owns the
+  Windows Help book). Revert on the Planning
+  tab, the mac's other new help tag (`unitPlanning.tab.saveOnPlanning.rule`),
+  has no Windows counterpart until #801 builds the Planning tab; when it
+  does, `PlanningTab.RevertOnPlanning` is that item's reason, and a disabled
+  `MenuFlyoutItem` has the same problem, with no frame of its own to carry a
+  tooltip (not measured).
+  `FixWithButtonsUiTests` had also failed on 2026-11-19 at the Codex door's
+  argument count (12 expected, 14 sent): #884 (c319d04f5) added the sixth
+  `-c` pair, `PLANTOIR_DOOR_ASSISTANT="codex"`, on purpose. Since #1017 the
+  test names each of the six pairs and its value, and both of its tests
+  pass on the PC. A dimmed Revise
+  item says nothing about why: a WinUI `MenuFlyoutItem` that is disabled
+  shows no tooltip, and the ruling Q14 rules out a grey text row.
+- **A row's context menu still HIDES a missing assistant**
+  (`hiddenInContextMenusWhenNotInstalled`): HIG, Context menus, "Hide
+  unavailable menu items, don't dim them." Nothing changed in
+  `SidebarPane.ReviseItems`. Its grouping already matches the mac's D43 rule
+  (HIG, Menus: "provide icons for all menu items in a group, or none of
+  them"): Revise With ▸ and every item in it carry the star glyph, and the
+  four assistant functions, the one group without icons, sit between dividers.
+  The mac's other D43 change, the deployed folder's items in a group of their
+  own, had no Windows counterpart until #889 built those items (2026-11-21: Open in Browser and
+Stop Showing Deployed Folder, a group of their own in the section row's menu).
+- **No grey text rows in the Course or Section menu** (Q14): Course ▸
+  Rename's reason line (`courseRenameReason`) is gone. The row's context
+  menus keep their lines (the ruling named the two menus): the busy note under
+  Add Section… and the Revise hold under Revise With ▸. Windows never drew the
+  mac's other grey rows (Revert on Planning, Open in Browser's reason,
+  "Available once deploy completed", the Revise notes in the menu bar).
+- **Set Up an Assistant… only under Revise With ▸** (Q10): Windows has neither
+  item (the set-up is #903), so there was no Help-menu item to take out and
+  nothing is drawn under Revise With; #903 adds it there and only there.
+
+**Shortcuts: none changed on Windows tonight.** The mac moved Preview / Stop
+Preview from ⇧⌘P to ⌘Y (the HIG keeps ⇧⌘P for Page Setup), its Option
+alternate to ⌥⌘Y, and Copy a Page from This Course… from ⇧⌘C to ⇧⌘K (Show
+Colors), and Rebuild Preview from ⇧⌘B to ⇧⌘Y (the review fixes, 7fb03c5f6).
+Nothing in `contracts/` pins a key
+(the mac's keys are its golden's, and `subjectMenus` names items only), and
+this page's rule is only that Ctrl+Shift letters "follow the mac's ⇧⌘
+letters" where Windows has no convention of its own. Ctrl+Y is Windows' Redo
+(Microsoft Learn, Keyboard accelerators → Common keyboard accelerators), and
+this app's own Undo plan gives it Edit ▸ Redo (W11b), so Preview cannot follow
+the mac to Ctrl+Y. Ctrl+Shift+P is not a Windows reserved key (the reason the
+mac moved, Page Setup, is a macOS convention). Whether Windows moves Preview,
+Rebuild Preview, or gives Copy a Page a key (it has none: Ctrl+Shift+C is the
+browser's inspect-element key) was Russell's question, asked on #990's
+hand-back. **Ruled 2026-11-20:** Preview stays Ctrl+Shift+P, Rebuild Preview
+Ctrl+Shift+B, and Copy a Page takes Ctrl+Shift+K (Ctrl+Y is Redo on Windows).
+Ctrl+Shift+K was checked against every key in the app before it was given:
+no `KeyboardAccelerator`, `KeyDown` or `PreviewKeyDown` handler in
+`Plantoir/` names K (they name Enter, Up, Delete, Escape, Space, the arrows
+and the modifier keys), and no other menu item carries it.
+
+### Section and Classes, drawn from the contract (#990, grouping A)
+
+Russell's ruling of 2026-11-20 on #990 (the mac's D27, the Section menu's
+length; the mac's write-up and the HIG sentences are in [09 → "Section and
+Classes: two menus drawn from the contract"](09-mac-app.md#section-and-classes-two-menus-drawn-from-the-contract-990-grouping-a)):
+the Section menu splits into **Section**, the website jobs, and **Classes**
+after it, the class calendar. Windows' menu bar reads File · Course ·
+Section · Classes · View · Help: Windows keeps its own order with View after
+the app's menus (#488), and both read Course, Section, Classes, most to least
+general (`subjectMenus.layout.menuBar`).
+
+**Drawn from data.** `contracts/shared-rules.json` → `subjectMenus.layout`
+says which menu each section item is in, in groups.
+`Plantoir.Core/Models/SubjectMenuLayout.cs` holds the same lists for the
+items Windows has, and `MainWindow.BuildLayoutMenu` draws both menus from
+them, a separator before every group but the first; an item's words
+(`SubjectMenuLayout.TitleHere`: Show in File Explorer and Open in Terminal
+are Windows' own) and AutomationId (`AutomationIdHere`: the menu's contract
+name, then the item's; the Section ids are #488's, unchanged, and the Classes
+ones are new, `classesClassDates` and so on) are this app's. Keys did not
+move: Preview Ctrl+Shift+P, Rebuild Preview Ctrl+Shift+B, Deploy…
+Ctrl+Shift+D, Open in Obsidian Ctrl+Shift+O on the live one. The trail's menu
+path (`SectionVerbDialog.MenuPath`) takes its menu from the layout, so it
+reads "Classes ▸ Re-date Classes… — carried out" now.
+
+**What Windows does not have yet** is left out by its named gap, and its
+neighbours keep their order: GitHub Copilot (#884). Stop Showing Deployed
+Folder (#889), Roll Over to a New Year… (#954) and Add Class… (#927, which
+replaced Add Next Class) were gaps here until each was built on 2026-11-21. `SubjectMenuLayoutContractTests` builds the expected
+menus from the contract less those gaps and compares them with
+`SubjectMenuLayout`; the day a gap closes, the item must be added to the
+Windows lists, in its place, or the test goes red. The two Undo items stay in
+Section, last in the publishing group, until W11b. Change Deploy Time… (#525)
+has its place reserved in `layout.reservedPlaces`.
+
+**Ellipses.** Remove Section and Remove Scheduled Deploy lost theirs (ruled
+on #990: a command that only asks for a confirmation takes none), in the
+menu bar and on the section row's right-click menu.
+
+**Name the real menu** (Russell, 2026-11-20). The copy the menu's server
+saves before a change names the menu the item is in: the window sends it in
+the tools/call request's `_meta` (`plantoirMenu`: `section` or `classes`,
+`McpClient.MenuOfTheNextCalls`, set by `SectionVerbs.Perform` from
+`SubjectMenuLayout.MenuContaining`), never as a tool argument, so no tool's
+schema changed; `plantoir-mcp`'s call filter sets
+`AssistWorkspace.MenuOfTheChange` for that one call. A Classes copy is
+`_classes-section<N>`, listed as "before a change from the Classes menu"
+("Classes menu, Section N" in All Backups), with "the Classes menu backed up
+the course as …" on the trail; a Section copy keeps `_menu-section<N>`. The
+two menus' copies are pruned together, five between them. The sentences that
+cover both menus (`NothingToUndoFromTheMenu`, `SectionIsChangingFromTheMenu`)
+say "the Section or Classes menu" (`SubjectMenuLayout.EitherMenu`). Tests:
+`SectionMenuServerTests.ACopyBeforeAClassesItemIsNamedForTheClassesMenu`,
+`ContractTests` (zipNames, with the words), and
+`SubjectMenuLayoutContractTests.TheMenusCopyLineNamesTheRealMenu`.
+
+**Tests.** `SubjectMenuLayoutContractTests` (the groups, the submenu, every
+section item in one menu once, the bar's order in `MainWindow.xaml`, menu
+paths); `RemovalQuestionsContractTests` (the words); and, through the real
+window, `SectionAndClassesUiTests` in `MenuBarUiTests.cs`: the bar's order,
+both menus line for line against the layout with every item drawn and
+dimmed on a course row, the Classes items live on a section row, Classes ▸
+Class Dates… opening and its trail line, and Copy a Page on Ctrl+Shift+K.
+A `MenuFlyoutSeparator` has no UI Automation element at all (measured in
+the VM, 2026-11-20, with FlaUI's RAW view walker under the open flyout's
+`MenuFlyout` and its `Popup`: the items and their text, nothing else; WinUI
+gives the separator no automation peer), so it cannot be read as structure.
+The test reads it where it is drawn, from the gaps between items' rectangles compared with each other, never with a number of pixels (`SeparatorGaps`): every gap inside a group is one drawn spacing rounded to device pixels, and every gap across a separator is that spacing plus the separator, so the sorted gaps are split at their widest jump, and the split counts only when that jump is wider than the spread inside either set; otherwise the test fails saying the separators cannot be read. At 100% that is 4 or 5 pixels inside a group and 7 or 8 across (measured in the VM, 2026-11-20); the rule does not depend on those numbers. Its plain facts are `SeparatorGapsRuleTests` (one case the old "more than 1 pixel over the smallest" rule misread). The groups themselves are
+pinned without pixels by `SubjectMenuLayoutContractTests`. With
+`PLANTOIR_UI_CAPTURE_DIR` set it also saves a picture of each menu open on a
+section row.
+
+**In a club the Classes menu is titled Meetings** (Russell, 2026-11-20 evening, on #990), live with the selection: `SubjectMenuLayout.Title(menu, ClassNoun)` takes the selected course's noun, read in `ApplyMenuEnablement` (not part of `Situation`, which holds only what greys an item and is pinned against `situationKeys`). The noun decides it, not the club code, because the noun is what a club's sentences are chosen by. Backups name the menus by the noun of the backup's course when drawn (`WorkspaceViewModel.ClassNounOf`, `SubjectMenuLayout.NounOfCourse`: a course no longer in the folder is read by its code). The in-app assistant's refusal while the menu changes the section names "the Section or Meetings menu" through `AssistAgent.CourseNoun` and `AssistToolRunner.CourseNoun`, set by the window. `NothingToUndoFromTheMenu` keeps "Section or Classes" even in a club: the course is known when the item runs, but the item and the sentence leave with U7/W11b in this milestone and no interim state is built (#990 review 3, low 1). The mac's account is documentation 09, "In a club the menu is titled Meetings".
+
+**Classes ▸ Add Class… (#927, the mac's #897 piece A).** The item's enablement is Add Next Class's (`SubjectMenuRules.Item.AddClass`); which ways the dialog offers is decided when it opens, from three facts that are not menu situation keys (`SectionVerbs.AddClassFacts`: the course's naming, the rename's own judgement made without clearing a stale record, and whether the class folders hold a page that is not an `index.md`). `SubjectMenuRules.AddClassWays`, `WhyGreyed`, `Label` and `ReasonLines` are the contract's `greyedRule`, `labelRule` and `reasonLineRule`. The copy is reached through `duplicateFileFromTheMenu`, which no tool declares: the MCP binder drops an undeclared argument, so `plantoir-mcp`'s call filter reads it from the raw arguments before dispatch, on the menu's server only (an outside client sending it is answered as if it had not, `OnlyTheMenusServerReadsTheArgument`). REJECTED: declaring it on `add_next_class` (it would move the schema every outside assistant and the built-in model is shown, which #897 froze). The source is matched against `ClassPages` by folder (`WorkingFolder.IsTheSame`, full path, case-insensitive) and file name as written; the mac also resolves links in the folder, because macOS lists a linked course's class folders resolved, while here both sides are built from the same course directory and are spelled alike. Measured nothing; the dialog's size has not been measured against a 620-epx ceiling (the mac's), only that the list stops at 7 rows.
+
+Seams left: the copy records nothing on the old undo list (`NamedGapLedger.MenuCopyUndoEntries`). Since #899 W7b2-3 (2026-11-26) the copy is the journal step U3a defines, `duplicateAsTheNextClass`: its one new page is written through the door, no longer by an exclusive create. Edit ▸ Undo offering that step is W11b's.
+
+**Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece B).** One rule, `RollOverFromTheMenu.WebsiteFor`, over the contract's three facts (`subjectMenus.rollOverSheet`), read when the dialog opens and again by the menu's server at the plan and at the write, so a deploy in between (a "new" that now would reuse a Cloudflare address) is answered as the mac answers it: kept, with the reason. `sectionIsPinned` is "any marker the release walks", and the release's list is now ONE function, `AssistWorkspace.MarkersTheReleaseWalks`, which `ReleaseSite` iterates: on this platform the legacy marker lives in the BUILD ROOT (`%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>\section<N>\`), not `.merged_output`, and a second list would be the place the two drift. The website is settled inside the tool call, before it returns, so always before the window rebuilds the preview (`AssistToolRunner.AlwaysStartsPreview` runs after the call). The no-copy refusal is in `ApplyReDate` (the dates-change path, menu and rollover only) and in `BackUpBeforeARolloverFromTheMenu` (the dates-right path); the window's path keeps its own sentence. REJECTED: a combined undo entry on the old list (the settled night-3 ruling: the journal step is W7's, built once). Measured nothing; the dialog's width is 420 to 560 epx, not measured against the mac's sheet.
+
+Seams left for W7: the rollover from the menu records the window's entries (see the #954 entry in `windows-app/PROGRESS.md`); `SettleTheWebsiteFromTheMenu` in `PlantoirTools.cs` is the one place the menu's website half is carried out, and `ApplyReDate(isARollover: true)` the dates half.
+
+**Club item titles (#1027).** The menus' item titles in a club come from one function per platform, checked against `subjectMenus.layout.itemTitles`; nothing else retypes them. A sentence with no course of its own (Undo Last Change's nothing-to-undo) learns the selected section's course from the call's `_meta` key `plantoirCourse`, never a tool argument, so no schema changes. Still saying class in a club, outside #1027: the Class Dates dialog's body (`SectionScheduleDialog`'s purpose line). Roll Over to a New Year… (still a named gap here) needs no club title.
+
+**Class Dates dialog, review 1 (#1027).** The dialog's sentences are the mac sheet's, key for key; every caller but the dialog passes no noun and gets the class form, so nothing the model reads changes. `classDatesCourseMissing`, `…NoneGiven`, `…NotWrittenAsDates`, `…OnFileUnreadable`, `…CouldNotBeSaved`, `…AreRemembered` and `…AlreadyRecorded` are carried here for the contract walk; this dialog has no path that says them yet (its own refusals are "Please type or paste some dates first." and the like, which name no class). Still saying class in a club, outside the Meetings menu: the assistant window's dates-card lines ("No class dates were recorded.").
+
+**Club twins (#1027, round 3).** `assist-wording.json` carries `staysClass`, generated from `AssistContract.wordingThatStaysClass`: every wording key whose words say class and has no `…ForAMeeting` (or `…FromTheMeetingsMenu`) twin, with the reason. Both apps' `ClubNounTests` fail on a class key that is on neither list, and on a stale entry. A new sentence that says class is therefore given its club twin, or its reason, when it is made.
+
+**Planner refusals (#1027, round 4).** A planner refusal is one wording key per platform with a `…ForAMeeting` twin; the teacher's copy is chosen where the refusal is answered, never by the model's copy.
 
 ### What does NOT exist here: File with no window
 
@@ -7898,7 +8673,7 @@ the `mac` issue:** the section row keeps **Change Deploy Time (…)…**, which
 Deploy… greyed while one is set, Cancel live).
 
 **There were two until #527 (2026-11-13).** A reference section's row also
-kept **Cancel Scheduled Deploy…**, which the menu bar greys, on the reasoning
+kept **Remove Scheduled Deploy…** (then Cancel Scheduled Deploy…), which the menu bar greys, on the reasoning
 (written for #488 on 2026-10-15) that Windows did not turn such a schedule off
 by itself and the row was the teacher's only way to stop it. That reasoning
 was already stale when #527 was opened: since #241 every read of the working
@@ -8080,43 +8855,36 @@ Preview's ending is the one that reads a sentence: it compares the answer with
 **Writes with no new undo entry, and Undo's three endings (#550, the mac's
 #531, 2026-10-16).** Five paths note a write that adds no entry, and each is
 pinned:
-- **Make Room for Classes**, when it wrote anything. Since #550 a new page
-  whose save FAILS is carried past and named, like the renames and the dates
-  already were. Until then that one `Save` was not in a try, so a failure
-  after the renames threw past the note: the line said "changed nothing" about
-  a renamed section, and the teacher was told Guarded's "That couldn’t be
-  read". Only the stand-alone call carries it past. `ApplyDuplicateClass`,
-  which calls the same insertion, still notes the change and THROWS, because
-  carried past, it would find no page of its own and say "the place for the
-  copy is still taken" about a plain write failure
-  (`InsertClassesTests.MakeRoomWhoseNewPageCouldNotBeSaved_IsCarriedPastAndNotedAsAChange`,
-  `ADuplicateWhoseNewPageCouldNotBeSaved_ThrowsAndIsNotStillTaken`).
+- **Make Room for Classes**, when it wrote anything. Make Room for Classes and Duplicate Class are each one step (#899 W7b2-1 and W7b2-2, 2026-11-26): a page that cannot be planned or written changes nothing, the answer is "Nothing was changed: …" and the line says "changed nothing"; a step the door left part way says `PublishStoppedPartWay` naming each kept file. #550's failed save carried past and named, and `ApplyDuplicateClass` noting the change and throwing, are gone with the writing file by file
+  (`InsertClassesTests.MakeRoomWhoseNewPageCouldNotBeSaved_ChangesNothing`,
+  `ADuplicateWhoseNewPageCouldNotBeSaved_ChangesNothingAndIsNotStillTaken`).
 - **A partial undo.** `UndoHistory.Undo` keeps the entry when any file was
   left alone (since #564 a file an earlier press already put back no longer
   counts), so `undo_last_change` notes the change exactly when it answers
   `undidPartly`: files both put back and left alone.
-- **A publish or hide that wrote and then stopped part way**, both the page
+- **A publish or hide that wrote and then stopped part way** (on the mac
+  this path, and the re-date's below, cannot happen since #899's U3, where
+  each is ONE step staged and swapped in whole; Windows' W7 brings the same,
+  and `SectionVerbsEndingTests`' mac tests now pin "changed nothing" and
+  nothing written: documentation 09, "U3"). Both the page
   list (`AssistWorkspace.Apply`) and the whole unit (`ApplyWholeUnit`). The
   recording is abandoned on the throw, so the top entry does not move. Each
   tracks whether a file has been written yet (`wrote`, and the whole unit's
   existing `changedAnything`). On an `IOException` or
   `UnauthorizedAccessException`, `StoppedWhileWriting` notes the change and
   rethrows, so the teacher still hears `PublishStoppedPartWay`.
-- **Re-date Classes… that stopped part way** (`ApplyReDate`). After the first
-  page is written it notes the change and throws an `AssistRefusal`:
-  `PublishStoppedPartWay("the section's class dates", …)` with its way back,
-  then "The pages already re-dated:" and the pages, which are the mac's words.
+- **Re-date Classes… that stopped part way** (`ApplyReDate`). Re-date Classes… is one step (#899 W7b1): a refusal says the mac's "Nothing was changed: …"; a step the door left part way says `PublishStoppedPartWay("the section's class dates", …)` naming each kept file. The list "The pages already re-dated:" is gone with the writing page by page.
   It is an `AssistRefusal` so that both callers ANSWER it, each through its
   own `catch (AssistRefusal)`: `re_date_classes` and `roll_over_section`.
   Neither goes through `Guarded`. (The plan said the re-date's error reached
   the teacher "through Guarded", and that was wrong. Before #550 both tools
   let an `IOException` escape, and the teacher's assistant got the SDK's
   generic "An error occurred invoking '…'" protocol error. Neither tool ever
-  said "That couldn’t be read".) Any OTHER `IOException` in the re-date
-  still escapes, for example one from `TimetableMemory.Write`; that predates
-  #550. `TimetableMemory.Write` runs BEFORE the loop, so the remembered dates
-  have changed even when no page has. That is true on the mac too, and the
-  "Nothing was changed" below is about pages.
+  said "That couldn’t be read".) Since W7b1's review 2 the
+  timetable is a file of the re-date's own step, planned after the pages
+  (`TimetableMemory.PlanInto`), so the remembered dates no longer change when
+  no page has, and a read of it that fails at plan time is answered as a
+  refusal too ("What Windows has built: W7b2-11, W7b1's small lows").
 
 **A first write that fails says the mac's "Nothing was changed: {reason}"**
 (`AssistWorkspace.NothingWasChanged`, with "Plantoir doesn’t have permission
@@ -8618,9 +9386,10 @@ record says so (`LaterClassesAtADeploy.WillBeRefused`) and the runner skips its
 stop: stopping the preview for a deploy that never starts would cost the
 teacher the page they were reading (2C's implementation review, L-1;
 `ClassesDatedLaterAtDeployTests.ADeployTheWindowWillRefuse_KeepsThePreview_AndLetsTheRefusalSpeak`).
-`IsSectionBusy` counts a deploy being prepared as well as one running — since
-#728 by asking the section's run, by the caller's folder
-(`SectionDeployRun.UnderWay`). One check comes BEFORE that reading: a window already asking
+The assistant's busy question (`SectionRuns.DeployIsUnderWay`, asked by the
+assistant window since #769; `MainWindow.IsSectionBusy` until then) counts a
+deploy being prepared as well as one running, by asking the section's run by the
+caller's folder (`SectionDeployRun.UnderWay`). One check comes BEFORE that reading: a window already asking
 this question, or with any dialog up, answers `CannotAsk`, refused with
 `deployWaitsForAnOpenQuestion` and nothing stopped
 (`classesDatedLater.whenTheWindowIsBusy`). `DeployWillBeRefused()` also counts
@@ -8954,8 +9723,8 @@ and the rule's re-check passes (Preview is enabled while running), so
 `PressPreview(opposite: true)` refuses when the runner is running and the menu
 is redrawn.
 
-**No key on the second item.** The mac's is ⌥⇧⌘P; the counterpart,
-Ctrl+Alt+Shift+P, is AltGr+Shift+P on keyboards with an AltGr (Ctrl+Alt is
+**No key on the second item.** The mac's is ⌥⌘Y (⌥⇧⌘P until #990); the
+counterpart, Ctrl+Alt+Y, is AltGr+Y on keyboards with an AltGr (Ctrl+Alt is
 AltGr to Windows), a character a teacher may be typing. REJECTED for that
 reason, as Ctrl+Alt was for #488's keys.
 
@@ -9271,8 +10040,10 @@ while disabled the main button is not the default (`DefaultButton` None — only
 if it WAS Primary, so a dialog whose default is Close or Secondary keeps it)
 and carries no accent style; when it can be pressed it is the default again.
 Three kinds: `TakesEnterWhenEnabled` (every ordinary dialog),
-`NeverTakesEnter` (the wizard, below — the accent style explicitly, never the
-default) and `NotTheDefault` (All Backups' Delete…, destructive beside a Done
+`NotTheDefaultYet` (the wizard's Create Course while it is not the default,
+below: no default and no accent; until the #979 review this was
+`NeverTakesEnter`, which wore the accent without taking Enter, so the button
+looked like the default and was not) and `NotTheDefault` (All Backups' Delete…, destructive beside a Done
 that keeps Enter: only enablement changes). `DefaultButtonScanTests` holds
 every `IsPrimaryButtonEnabled` write under `Plantoir/` to `DialogButtons.cs`
 — object initialisers and bare writes inside a `ContentDialog` subclass
@@ -9280,13 +10051,15 @@ included, which is how All Backups' initialiser was found — so a new dialog
 cannot grey its main button by hand. The 21 sites the plan listed, plus 2B's
 section-verb dialog, all go through it.
 
-**The wizard's Create Course NEVER takes Enter** — measured on the mac
-(2026-10-08): as the default, an Enter typed in the Course code field created
-a course named by the code with the rest of the form unread. `DefaultButton`
-is None from the start; the button wears the accent while it can be pressed;
-the cursor starts in Course code (`Opened` focuses it; the suggestion list
-opens only on typing). After the work, its Close is the ordinary kind and
-takes Enter — there is nothing left to type.
+**The wizard's Create Course took no Enter until #979** — measured on the mac
+(2026-10-08): as the default from the start, an Enter typed in the Course
+code field created a course named by the code with the rest of the form
+unread. `DefaultButton` is None from the start; the button wears the accent
+only while it is the default (the #979 review, as #987 did on the mac); the cursor starts in Course code (`Opened` focuses
+it; the suggestion list opens only on typing). **Since #979 it is the default
+once the form is complete and no code list is drawn**, as the mac's has been
+since #987 ("The question dialogs' keys (#979)", below). After the work, its
+Close is the ordinary kind and takes Enter — there is nothing left to type.
 
 **Class Dates reads, THEN remembers.** "Read the Dates" (Secondary) and
 "Remember These Dates" (Primary), the mac's words. Remember is live only once
@@ -9350,10 +10123,11 @@ pages locked again" line through `ReferenceCourseUpkeep.TrailLine` when it did
 anything; a failure is logged and the teacher may still open. The note is
 shown on the sidebar's `XamlRoot` — the sidebar always exists in a window
 (there is no collapsed-sidebar state here as on the mac, where the note had to
-move to the main window). `ObsidianRouteSourceTests` holds
+move to the main window). `ObsidianRouteSourceTests` held
 `FolderActions.OpenInObsidian(` to the sidebar's two branches plus ONE named
 exception, Course Settings' How I Teach row, which opens a PAGE of a LIVE
-course. Verified by hand once (2026-10-15, a throwaway UI test, Obsidian's
+course; since #1003 both of those go through the route too, and the only
+caller is the route's world ("Windows never closes Obsidian unasked (#1003)"). Verified by hand once (2026-10-15, a throwaway UI test, Obsidian's
 vault registry backed up and restored byte for byte): a page unlocked by hand,
 the section toolbar's button, the page locked again BEFORE the note, "locked 1
 page of ICS3U again — it is kept for reference" on the trail, Obsidian opened.
@@ -9480,6 +10254,139 @@ and the empty pane's "New Course…" came with 2A.
   repair's own titles, `SiteHealthRepair.ButtonTitle`, were left as they are —
   #491 named the dismissing button, and the mac's repair titles are the same
   words, left as they were by its sweep.
+
+## The question dialogs' keys (#979, the mac's #973 and #987)
+
+The Windows half of the mac's "Return does nothing on risky questions" (#973)
+and "Question sheets and alerts after the HIG review" (#987), in
+[09](09-mac-app.md#question-sheets-and-alerts-after-the-hig-review-987).
+Every question dialog the app shows (43 with two or more buttons) was listed
+with its buttons, default, Escape and what closing it means, beside the mac's
+for the same question; the ones that changed are named below. Apple's HIG was read on the day (Alerts, revised 2024-02-02; Buttons,
+2025-12-16), and Microsoft's Dialog controls page (2026-07-15) for what
+WinUI itself does.
+
+**Measured first, on the Windows VM** (Windows 11 ARM64 in Parallels, the
+x64 app under emulation; `QuestionDialogKeysUiTests` at 0b1711f90, before any
+change): **the quit question opened with the focus on Quit Anyway**, so
+Enter quit the app with a deploy under way. #987 had taken its default away
+(`DefaultButton` None) and nobody had pressed Enter on it. The reason is in
+WinUI's own `ContentDialog::SetInitialFocusElement`: the first focus goes to
+the first focusable control in the content, else the default button, else
+the first focusable button in the row, which is Primary, the go-ahead; and
+a focused button takes Enter and Space. So every question with no default
+and nothing focusable in it (the quit question, Remove the scheduled
+deploy, Remove a downloaded assistant, the synced folder) opened on its
+go-ahead. The same run: Escape while a course was being made closed the
+wizard and stopped the making; Enter on a complete form made nothing.
+
+**The rule** (`DialogButtons.AskWithNoDefault`): a question where a teacher
+could lose work has no default button, and when it opens the focus moves to
+its Close button, the cancelling one, which Escape already presses
+(`ContentDialog::ExecuteCloseAction` is a click of that button, so
+`CloseButtonClick` runs for Escape too). Enter and Space then press the
+visible, focused Cancel; Escape is Cancel; nothing is hidden and no key is
+caught. Asked this way: the quit question, the synced folder, Remove (course
+or section), Delete a backup, an archive, or the backups ticked, Remove the
+scheduled deploy, Remove a downloaded assistant (D22), the assistant's
+put-back (D1), a Course Settings list entry's Remove, and Get Ready's
+go-ahead (D39, Russell's ruling Q-B). Of these, the six deletes and removals,
+the put-back and Get Ready had **Cancel as the default** until #979, which
+the HIG's Alerts page advises against ("Note that you don't want to make a
+Cancel button the default button"). Get Ready's undo makes Undo the default
+while it would put a page back, as the mac's sheet does
+(`.defaultButton(isEnabled: !putBack.isEmpty)`), and asks with no default
+when nothing would go back. The questions where going ahead loses nothing
+keep the go-ahead as the default (Add on the guidance question, Show on
+today's class, Add Them and Reopen for Obsidian, Download, Restore, Close
+Obsidian and Rename, Open in Obsidian, Rename, Save Report…), as the mac's
+do.
+
+**Closing without an answer is Cancel.** A ContentDialog closes by its
+buttons, by Escape (the Close button's click) or by `Hide()` from code, and
+every question's caller reads anything but `Primary` (or `Secondary` where
+there is one) as not going ahead, so the mac's #973 rule holds here by
+construction. Two closings by code are deliberate and unchanged: the guidance
+question taken down by the quit question is put back unanswered (above,
+"The question"), and a console question whose run ended is closed with
+nothing sent.
+
+**The New Course wizard.** Create Course is the default once the form is
+complete and no code list is drawn (`QuestionKeys.CreateCourseIsTheDefault`,
+the mac's `createCourseIsTheDefault`; the mac's `formIsComplete` is
+everything Create accepts, a name, and a working folder). The list's being
+drawn or put away is followed through
+`AutoSuggestBox.IsSuggestionListOpenProperty`. **Escape does nothing while
+the course is being made** (Russell, 2026-11-18, on the mac's #987 review);
+a click on the visible Cancel still stops it, and once the course is made
+Escape closes the wizard. No key is caught for it. The first build withheld
+Escape on the template's `LayoutRoot` (`PreviewKeyDown`); the #979 review
+called that a hidden key catcher, and it went. **The route now** (the
+review's): while the course is being made, Cancel is the **Secondary**
+button (`BeginProgress` empties `CloseButtonText` and sets
+`SecondaryButtonText`, so it sits where Cancel sat; `SecondaryButtonClick`
+stops the run with `StopByUser`), and `Closing` refuses a close whose
+`Result` is `None` while `QuestionKeys.WizardEscapeIsCancel` says no: the
+Windows form of the mac's `.interactiveDismissDisabled(creator.isCreating)`.
+A click on Cancel is an answer (`Secondary`), so it closes; Escape is a close
+with no answer, so it is refused. **Measured on the Windows VM before relying
+on it** (8e099e291): with no Close button, Escape still closes a ContentDialog
+with result `None` (WinUI's `ExecuteCloseAction` hides the dialog whether or
+not there is a Close button), and the refusal holds it while the course is
+made; a click on the Secondary Cancel stops the work and closes the wizard,
+and 45 s later no front page was written; once the course is made, Escape
+closes the wizard again. Rejected: disabling Cancel (a click must still stop
+the work, and Escape would still close the dialog, leaving the course being
+made with no window).
+
+**The go-ahead never holds the first focus** (the #979 review's LOW on
+`AskWithNoDefault`): the helper first moved the focus to Cancel in `Opened`,
+which WinUI raises after it has already focused the go-ahead, so an Enter
+queued in between could have pressed it. Now, until the dialog is open, the
+Primary button's style is one based on its own with `IsTabStop` false, so
+WinUI's own first focus (the first focusable button in the row) is Close
+itself; `Opened` puts the button's own style back, so Tab reaches it as
+before, and focuses Close again. No timed wait. The helper is called after
+anything that sets the Primary style (`EnablePrimary`), since it keeps the
+style it finds.
+
+**The important update offer** (#453: Install and Reopen alone, no Close
+button) **lost its Escape catcher** in the same review: a `PreviewKeyDown`
+on the dialog that called `Hide()`. Since WinUI closes a ContentDialog with
+no answer on Escape anyway (measured above), Escape still answers "not now"
+with nothing caught: `UpdateOfferUiTests`, through the Debug feed seam.
+
+**Undo Getting Ready is greyed when nothing would go back**, as the mac's
+`.defaultButton(isEnabled: !putBack.isEmpty)`; pressing it then changed
+nothing and only ended the undo.
+
+**Tests.** `QuestionDialogScanTests` (unit): no Cancel is the default; no
+`ContentDialogButton.None` outside the helper, except the two dialogs that
+open with the cursor in a field of their own (the wizard, Class Dates'
+typed route); the questions asked with no default counted per file; the
+wizard's two rules; since the review, that the wizard holds Escape back by
+refusing the close and catches no key, that the update offer catches no
+key, that Undo is greyed when nothing would go back, and that the scan sees
+dialogs built with a target-typed `new() { }` (it saw only
+`new ContentDialog { }`, and so missed UpdatePrompts' `Plain`).
+`QuestionDialogKeysUiTests` (real keys): the quit
+question opens on Cancel and Enter and Escape both keep working; Remove
+opens on Cancel, Tab can still reach Remove, and neither key removes; an
+Enter typed straight behind Delete never removes (a race by nature: a pass
+on the old code would prove nothing); Enter with the code list drawn makes
+nothing and on a complete form makes the course; Escape while the course is
+made does nothing, Cancel is the Secondary button then, and Escape closes
+the wizard afterwards; a click on Cancel while it is made stops it and
+closes the wizard. Three of the first four failed before the change; all six,
+and `UpdateOfferUiTests`, pass at 8e099e291 on the VM.
+
+**Ruled by Russell** (#979, 2026-11-19): WinUI puts Close, the cancelling
+button, on the right and the go-ahead on the left, always (Microsoft: "The
+'do it' action button(s) should appear as the leftmost buttons. The safe,
+nondestructive action should appear as the rightmost button"), where the
+mac's rows lead with Cancel and trail with the action: Windows keeps its own
+order. And on a question with no default the focus starts on Cancel, so
+Enter or Space cancels here, where on the mac Return does nothing: kept.
 
 ## Diagrams and graphs (#485 E1, v1.7.0): the runtime carries the engines (#503)
 
@@ -9866,6 +10773,20 @@ are Chromium input events, not the OS keyboard. WebView2 Runtime
   (`KaTeX_Main`, `KaTeX_Math`, `KaTeX_Size1`); the only addresses refused
   were Google Fonts' stylesheet and, from the YouTube page being left, one
   YouTube logging call.
+
+### What the preview's browser sends on its own (#913)
+
+**What the preview's browser sends on its own (#913, measured 2026-11-25).** The section preview is Microsoft Edge WebView2. In the first Windows VM (Windows 11 Pro ARM64 in Parallels, the app win-x64 under emulation, runtime 158.0.4370.33), Plantoir was started with a throwaway `--state-dir` and `--auto-preview EXC2O 1` on the example course; Chromium's net-log (Default mode, through `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` in the launching shell only) and the Windows DNS Client log for the run's WebView2 processes covered the app's start to 300 seconds after the page loaded, on a first start (empty profile) and a second start, before and after the settings below. The method and the helpers are `windows-app/notes/806-win-webview.md` and `vm-tools/guest/913-measure.ps1`. The capture was reduced in the VM to hosts, request kinds and counts, and whether a page address of the site rode on a request; the raw log was deleted there.
+
+**Turned off, by documented settings.** The preview's view sets `CoreWebView2Settings.IsReputationCheckingRequired = false`, so Microsoft Defender SmartScreen does not check the pages it shows; and the preview's own environment sets `CoreWebView2EnvironmentOptions.IsCustomCrashReportingEnabled = true`, so crash reports are not sent to Microsoft (`windows-app/Plantoir/Views/PreviewBrowserEnvironment.cs`, which cites Microsoft's pages). Neither could be shown by a run: no SmartScreen host appeared in any run (the pages are on 127.0.0.1), and no crash happened. `PreviewBrowserPrivacySourceTests` holds both in place.
+
+**Edge's experiment configuration.** On a first start the preview's browser made 2 HTTPS GETs to `config.edge.skype.com` (path `/config/v1/Edge/<runtime version>`; it is named Edge's experiment and configuration fetch from that path). The runs checked each request's address, its query string and its Referer, and found no page address there. On the second start it made none within the window. It is left on. Microsoft's WebView2 policy page documents the machine- or user-wide policy `ExperimentationAndConfigurationServiceControl` as the switch for the Experimentation and Configuration Service (https://learn.microsoft.com/en-us/deployedge/microsoft-edge-webview-policies); that page does not name this host, and no counted run had the policy set, so that it stops this fetch has not been shown. The policy reaches every WebView2 app for that machine or user, is an IT administrator's setting, and also stops Microsoft's configuration payload, which "may also contain a list of actions to take on certain domains for compatibility reasons"; the page says "Microsoft doesn't recommend this setting". Russell's ruling, 2026-11-25: not touched.
+
+**The component updater.** On every start measured (a first and a second start before the settings and after them, and one more first start), the preview's browser POSTed to `edge.microsoft.com/componentupdater/api/v1/update` (named from its path): after the settings, 8 requests with 13,812 bytes of request bodies on a first start, 1 request with 5,238 bytes on the second. The runs checked each request's address, its query string and its Referer, and found no page address there. The request bodies were not captured, only their sizes, so what they carry is not known. It is left on: no Microsoft WebView2 page documents a setting for it; the only route would be a Chromium switch Microsoft does not list, which may stop working in any runtime update without a sign. Russell's ruling, 2026-11-25: not touched.
+
+**Proxy auto-detection.** On every start measured, the preview's browser asked the local network for the name `wpad` (6 lookups on a first start, 5 on the second; the only name the DNS Client log saw from a WebView2 process). This is a question to the local network, not to Microsoft, and no request to it followed in any run. It is left on: the documented flags that stop it (`no-proxy-server`, `proxy-server`) are ones Microsoft says production apps should not use, and on a network that hands out its proxy this way we would expect the site's own fonts and cdnjs to stop loading (expected, not tested). Russell's ruling, 2026-11-25: not touched.
+
+**Not measured:** Windows' own diagnostic data for WebView2 (Microsoft's page says it is governed by the teacher's Windows Diagnostic data setting, and that required data is collected regardless of it, https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy), the WebView2 Runtime's updater (Microsoft Edge Update, a separate service), anything after the 300-second window, and a teacher following a link to a site off the computer. The site's own hosts (Google Fonts, cdnjs) are the site's and were reached, as they must be.
 
 ### verify-deploy.ps1
 
@@ -10298,7 +11219,14 @@ elevated):
 5. A trim to the measured set (`trim.remove` / `mustKeep`): from
    1,874,323,927 B to 533,231,069 B. The VC++ runtime DLLs from the runtime
    MSI (`trim.vcRuntime`) go beside the tools, because a PC without the
-   redistributable lacks VCRUNTIME140, VCRUNTIME140_1 and MSVCP140.
+   redistributable lacks VCRUNTIME140, VCRUNTIME140_1 and MSVCP140. The
+   website builder's runtime does the same for Node since #965
+   (`vcruntime140.dll` beside `runtime\node\node.exe`; "The Visual C++
+   runtime beside node.exe (#965)", below). **Both are app-local copies, and
+   Windows Update never patches them**: they are refreshed only when a new
+   Plantoir (or a new Swift pin) ships. Revisit `swiftWindows` →
+   `trim.vcRuntime` and `windowsNodeVcRuntime` together whenever Node,
+   Python, the Swift pin or a native module moves.
 6. The mac's own wasm SDK pin (92,760,992 B), unpacked with `tar.exe`, and
    binaryen version_133 x86_64-windows (111,045,528 B), of which only
    `wasm-opt.exe` is kept, OUTSIDE the toolchain's `bin`.
@@ -12263,6 +13191,8 @@ and the dialog's order behind a runnable-code finding. No new trail line:
 an engine that is missing already surfaces as the `geogebraSketchesNotReady`
 folder problem.
 
+**Measured again, 2026-11-25** (#806 items 11 and 12, #816 item 13). The first Windows VM (Windows 11 Pro ARM64 in Parallels, the app win-x64 under emulation), Edge 158.0.4370.33 headless, `dev` 45be52fbf's x64 Debug build and its runtime (Node 22.23.4, Python 3.14.10). A temp working folder with EXC2O from `setup.ps1 --install-example`, verify.sh's GeoGebra Fixture, GeoGebra Second (with the 150-point lines sketch) and Quiz GeoGebra plants, and the saved copy of `plantoirvrfy578` seeded in the course's `.geogebra-cache` under its fence's key, so nothing was asked of geogebra.org; built with `preview.ps1 EXC2O 1 --build-only` (62 s). `browser-checks/geogebra_applet.mjs`, unchanged, on a clone with the publish's own `_headers`, served on `[::1]`, with the check's own throwaway Edge profile: OK in 33 s, in both phases. The reset icon pressed for real on the commands sketch and the file sketch brought each back as it opened (5 objects and a = 3; A,B,f,m) and took a drag again; 393 presses of Shift+Tab and Space (388 isolated) while the 150-line sketch ran left all 150 points, and its reset brought back all 150. While the first sketch opened, with the engine's first request held, its card said the contract's two lines at contrast 12.13 and 7.24 in light and 16.27 and 13.28 in dark, the 640 x 360 card lay on the 640 x 360 box, and the figure stayed 433.58 px tall throughout; it drew in 1,080 ms (964 isolated). A sketch whose file was refused went back to its button. 0 refusals by the policy, 0 requests off the site. The helper is `vm-tools/guest/806-geogebra.ps1`; the touch-laptop press is not possible in a VM.
+
 **The npm audit: `windows-app\audit-runtime.ps1`** (#685). It is opt-in and
 named in RELEASING.md step 2 beside verify.sh's line. It is not a `dotnet
 test` fact, because the advisory database changes daily and a default gate
@@ -12674,6 +13604,591 @@ which makes this the lowest-risk splice. It was not chosen: python.org never
 built or tested that pairing, and 3.11.9 stays nine releases behind on
 CPython's own security fixes.
 
+## The Visual C++ runtime beside node.exe (#965)
+
+Written 2026-11-19 for [#965](https://github.com/russellgordon/plantoir/issues/965),
+and corrected the same day for Russell's second ruling: the file sits beside
+`node.exe` **and** beside each of the two modules that import it. The
+contract half is `contracts/toolchain.json` → `windowsNodeVcRuntime` (the
+file, its version, size and SHA-256, the places it is carried, the libraries
+every Windows has, how Windows finds it, what is not carried, the licence,
+what was rejected). The mac owes
+nothing: its builder runs in the Linux image.
+
+**What happened.** On a clean Windows 11 (Parallels, ARM64, x64 emulation,
+`C:\Windows\System32\vcruntime140.dll` absent) the released 1.9.3 installed
+and opened, and the first preview stopped with `ERR_DLOPEN_FAILED` at the
+Typst compiler's `.node` (the first-install rehearsal, #976, on every clean
+machine tried). The installed app carried one copy of `vcruntime140.dll`, in
+`runtime\python`, which is on no PATH the launchers set.
+
+**How Windows finds a module's libraries.** Node loads a `.node` file through
+libuv's `uv_dlopen`, which calls `LoadLibraryExW` with
+`LOAD_WITH_ALTERED_SEARCH_PATH`. With that flag the libraries the module
+imports are looked for first in the **module's own folder**, then System32,
+the 16-bit system folder and the Windows folder, then the current folder,
+and last on PATH. `node.exe`'s folder is not on that list except through
+PATH. (This section first said Windows looks in the loading program's
+folder; that is the order without the flag, and it is wrong for Node.) So a
+copy beside `node.exe` alone is found only because the launchers put
+`runtime\node` on PATH, and only after any older copy in System32; a copy
+beside the module is found first, by any Node however started. Measured on
+clean machines below (run A: beside `node.exe` only and no `runtime\node` on
+PATH, both modules fail).
+
+**What the modules import, measured 2026-11-19** by reading the import and
+delay-load tables of every native file in the runtime (fetched on the
+development PC from `dev`, all `x64`):
+
+| File | Visual C++ runtime imported | Everything else |
+|---|---|---|
+| `lightningcss.win32-x64-msvc.node` (linked with MSVC 14.43) | `VCRUNTIME140.dll` | Windows' own (kernel32, ntdll, advapi32, bcrypt, bcryptprimitives, UCRT `api-ms-win-crt-*`) |
+| `typst-ts-node-compiler.win32-x64-msvc.node` (MSVC 14.42) | `VCRUNTIME140.dll` | Windows' own |
+| `simple-git.win32-x64-msvc.node` | none | Windows' own |
+| both `sharp-win32-x64*.node` | none | `libvips-42.dll` and `libvips-cpp*.dll` beside it (which import only Windows' own and UCRT), and `node.exe` (delay-loaded) |
+| `node.exe` 22.23.4 | none | Windows' own |
+| `workerd.exe` (wrangler's local Workers runtime; an executable, not a module) | `MSVCP140`, `VCRUNTIME140`, `VCRUNTIME140_1` | not covered by a copy beside `node.exe`: an executable looks in its own folder. Plantoir's Pages deploy is not known to start it; not measured on a clean machine |
+
+So exactly one file is carried: `vcruntime140.dll`. `vcruntime140_1.dll`
+and `msvcp140.dll` are imported by no module (Russell's ruling: carry only
+what is imported).
+
+**What landed.**
+- `fetch-runtime.ps1` → `Install-NodeVcRuntime` copies `vcruntime140.dll`
+  (taken from Microsoft's own Visual C++ Redistributable since #1010, below;
+  until then from `runtime\python`, the Python zip's copy, 14.51.36247.0;
+  now version 14.52.37029.0, newer than the 14.43 and 14.42 toolsets the
+  modules were built with) to three places, each checked by SHA-256 and size
+  before and after:
+
+  | Place (under `runtime\`) | Why |
+  |---|---|
+  | `node` | beside `node.exe`, the first ruling; reached through PATH |
+  | `quartz\node_modules\lightningcss-win32-x64-msvc` | beside `lightningcss.win32-x64-msvc.node`, found first |
+  | `quartz\node_modules\@myriaddreamin\typst-ts-node-compiler-win32-x64-msvc` | beside `typst-ts-node-compiler.win32-x64-msvc.node`, found first |
+
+  The module folders are `$NodeVcRuntimeModuleFolders`, held to the
+  contract's `besideModules`; a folder that holds no `.node` file refuses
+  the run, so a Quartz or npm change that moves a module fails the fetch
+  instead of shipping a copy beside nothing. The manifest records
+  `nodeVcRuntime` (the version) and `nodeVcRuntimeLayout`
+  (`beside-node-and-modules`). A runtime made before #965, or with the
+  `node.exe` copy alone (this branch's first version, on the PC and the dev
+  VM), is repaired in place: the file copied, downloaded only when the cache
+  does not hold it (#1010). A different file at the pinned addresses refuses
+  until the contract and the `$NodeVcRuntime*` and `$VcRedist*` lines move
+  with it.
+- `Plantoir.csproj` → `CheckNativeRuntimeManifest` refuses a runtime whose
+  manifest has no `nodeVcRuntime` at that version, or no
+  `nodeVcRuntimeLayout` of `beside-node-and-modules`, so a release cannot
+  ship without every copy.
+- The installer needs no change: `runtime\` is published whole (robocopy
+  `/MIR`) and packed whole (`Source: "{#PublishDir}\*"`, `recursesubdirs`).
+  `[InstallDelete]` already empties `{app}\runtime\node` before the new one
+  is copied; `runtime\quartz\node_modules` is not emptied, so an upgrade
+  adds the two module copies beside what 1.9.3 left, which is the whole of
+  the change there.
+- **The work folder's mirror, and why both places are kept.** A preview
+  loads the modules from the section's work folder, whose `node_modules` is
+  a hardlink MIRROR of `runtime\quartz\node_modules` (`build_site.py` →
+  `toolchain_paths.link_directory`; never a junction, which Windows refuses
+  to traverse from the app's processes). The mirror is made when the section
+  is first built and not remade after. On a fresh install the first build
+  mirrors the module copies with everything else (run E below). After an
+  upgrade over 1.9.3, a section 1.9.3 already built keeps its old mirror,
+  which has no module copies (run C below fails there, `ERR_DLOPEN_FAILED`);
+  in that folder the copy beside `node.exe`, on the PATH the launchers set,
+  is the one found (run D). So neither place alone covered every teacher:
+  the module copies cover any Node however started and an older System32
+  copy, the `node.exe` copy covered mirrors made before this change.
+- **An upgraded mirror gains the module copies (#1006).** Since #1006 every
+  build on Windows brings each file in `windowsNodeVcRuntime` → `files` into
+  an EXISTING mirror at each `besideModules` folder under
+  `quartz\node_modules`, as a hardlink to the runtime's copy (a copy if the
+  link is refused), replacing a different file of that name and touching
+  nothing else (`build_site.py` → `ensure_node_dependencies`, in the ALWAYS
+  path; `toolchain_paths.bring_module_libraries_into_mirror`). So a section
+  1.9.3 built has the copies beside its modules from its first build under
+  the new app, and an older `vcruntime140.dll` in System32 no longer comes
+  before them there. It is a few stats per build, not a remade mirror
+  (remaking it would walk the whole `node_modules` tree, tens of thousands of
+  files, on every build), and it does nothing off Windows, where
+  `node_modules` is a symlink to the image's own and no copies exist. It
+  never stops a build: a runtime without the copies, a mirror without a
+  module's folder, or an unreadable contract leaves the mirror as it is.
+  Pinned by `scripts/test_mirror_module_libraries.py` (a mirror laid out as
+  1.9.3 left it gains both copies through the build's own dependency step).
+  The `node.exe` copy stays beside them.
+- `THIRD_PARTY_LICENSES.md` has the licence row. Since #1010 (Russell's
+  second ruling on #1006, 2026-11-19) it names the Distributable Code section
+  of the Visual Studio Community 2026 licence only, with Russell Gordon as the
+  licence holder; the Build Tools licence is a supplement with no
+  Distributable Code section and gives no right to redistribute. The file is
+  on the Distributable List for Visual Studio 2026 (any file in `VC\redist`,
+  unmodified, with the program; the same package and its individual
+  binaries from Microsoft's download pages, for licensed Visual Studio
+  users).
+- `NativeModuleImportsTests`: every `.node` file in a fetched runtime, and
+  every library beside it that it pulls in, finds each import **beside
+  itself** or on `windowsSystemLibraries`, a named list that deliberately
+  holds no Visual C++ runtime name (a test says so); a copy beside
+  `node.exe` no longer counts for a module. The rule is its own function
+  (`NativeModuleImports.Unreachable`), and a plain fact runs it on a made-up
+  runtime on every PC: a module whose library is beside `node.exe` only is
+  reported, the same module with the library beside it is not. On a fetched
+  runtime: every copy is the contract's file byte for byte, the manifest
+  carries the version and the layout, and each `besideModules` folder holds a
+  `.node` that imports the file. This fails on a pre-#965 runtime, or one
+  with the `node.exe` copy alone, on ANY PC, the development PC included,
+  which loading the modules there could not do (its System32 has the
+  redistributable). Source checks hold the recipe's pin lines, its folder
+  list and layout, and the build's two guards to the contract.
+
+**What was proven first, 2026-11-19 (early morning), for the `node.exe` copy alone.** On the PC (`dev` runtime fetched 2026-11-14),
+`fetch-runtime.ps1` at this branch repaired the existing runtime in place
+(manifest `nodeVcRuntime` 14.51.36247.0, the copy's SHA-256 the contract's),
+and `publish.ps1 -WithoutAssistantEngine` (unsigned, nothing uploaded) put it
+in the published `runtime\node` that the installer packs; the Windows unit
+suite on the branch was 4,059 passed, 6 failed (`dev`'s known six), 1
+skipped, the six new tests passing. On the clean VM (snapshot 00) the
+UNSIGNED installer, downloaded through Edge, was held by SmartScreen
+("PlantoirSetup.exe isn't commonly downloaded. Make sure you trust
+PlantoirSetup.exe before you open it."), so the rehearsal stopped at step 1
+(`runs/win-rehearsal-2026-11-19-044259`); a signed release is not held this
+way. So the fix was proven from a clean machine another way
+(`runs/win-rehearsal-2026-11-19-045704`, `proof-965/`): the released, signed
+1.9.3 installed by the rehearsal and stopped at step 6 on #965 as before;
+then, with PATH as the launchers set it and no `vcruntime140.dll` in
+System32, lightningcss and typst-ts-node-compiler failed to load
+(`ERR_DLOPEN_FAILED`) and the other three loaded; with only this one file
+placed beside `node.exe` all five loaded, and the installed `preview.ps1
+EXC2O 1 --build-only` built the example course (271 pages, 336 files, exit
+0). Not proven: the end-to-end rehearsal PASSED with a signed installer
+carrying the fix (it needs a signed candidate build).
+
+**What was proven, 2026-11-19 (midday), for the ruled layout.** Two clean
+machines: snapshot 00 (`russellgordon`, an administrator) and 11, the
+standard user (`student`, not an administrator). On each, the released,
+signed 1.9.3 was installed by the rehearsal and stopped at step 6 on #965 as
+before (`runs/win-rehearsal-2026-11-19-110529` and
+`runs/win-rehearsal-2026-11-19-114136-standard-user`, kept running with
+`--keep`). Then a script placed the contract's file (SHA-256 checked, signed
+by Microsoft) in `{app}\runtime\<place>` for each place in `besideNode` and
+`besideModules`, exactly where the branch's installer puts it, and loaded
+every `.node` in the runtime with `node.exe`, with no `vcruntime140.dll` in
+System32 (`runs/proof-965-finish/`, `proof-00.out`, `proof2-00.out`,
+`proof-standard-user.out`, `proof2-standard-user.out`). The same on both
+machines:
+
+| Run | Copies | PATH | lightningcss and Typst | `preview.ps1 EXC2O 1 --build-only` |
+|---|---|---|---|---|
+| A | beside `node.exe` only | no `runtime\node` | `ERR_DLOPEN_FAILED` | - |
+| B | beside `node.exe` only | as the launchers set it | load | - |
+| C | beside the modules only | no `runtime\node` | load | exit 1, `ERR_DLOPEN_FAILED`: the work folder's mirror is 1.9.3's, made before the copies (an upgrade) |
+| D | all three (the ruled layout) | no `runtime\node`, then as the launchers set it | load | exit 0 on the old mirror (271 pages, 336 files) |
+| E | beside the modules only | the launcher's own | - | exit 0 on a new mirror (a fresh install), which carries both module copies |
+| F | all three | the launcher's own | - | exit 0 on a new mirror |
+
+A shows Node does not look beside `node.exe` for a module's libraries;
+C and E show what the mirror changes. On the PC, `fetch-runtime.ps1` at this
+branch repaired the runtime fetched by the first version in place (manifest
+`nodeVcRuntimeLayout` `beside-node-and-modules`, all three copies the
+contract's SHA-256), and `publish.ps1 -WithoutAssistantEngine` (unsigned,
+nothing uploaded) carried all three into the published `runtime`, each with
+the contract's hash (PC run `965-finish`, which also ran the unit suite:
+4,370 passed, exactly the six known failures, 2 skipped). Not
+proven: an end-to-end rehearsal PASSED, which needs a signed candidate build
+(Edge holds an unsigned branch build at "isn't commonly downloaded"); and a
+PC whose System32 has an OLDER `vcruntime140.dll` than 14.51, where the copy
+beside the module is reasoned to win, not measured.
+
+**Updates are ours now.** An app-local copy is not patched by Windows Update.
+It is refreshed only when a new Plantoir ships, so revisit
+`windowsNodeVcRuntime` when Node, Python or a native module moves (beside the
+Swift tools' own copies, `swiftWindows` → `trim.vcRuntime`). On a PC that has
+the redistributable, a module loads the copy beside it (its own folder comes
+first, ahead of System32) and the system's is untouched. Within one Node
+process Windows keeps one library per name, so the second module to load
+gets the copy the first one loaded; the copies are the same file, so that is
+harmless. (Python's own copy in `runtime\python`, 14.51 under Python's
+licence, is loaded by `python.exe`, never by Node.)
+
+**Where the file comes from (#1010).** Written 2026-11-19 for
+[#1010](https://github.com/russellgordon/plantoir/issues/1010), after
+Russell's ruling that the copy is to come from Microsoft's own Visual C++
+Redistributable, not from Python's zip (a source Microsoft's redistribution
+page does not name). The contract half is `windowsNodeVcRuntime` →
+`redistributable` and `source`.
+
+- **The download.** Microsoft's "Latest supported Visual C++ Redistributable
+  downloads" page (https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist,
+  read 2026-11-19) gives the permalink `https://aka.ms/vc14/vc_redist.x64.exe`,
+  which always serves the LATEST v14 redistributable (the page lists no
+  version, "because it's updated frequently"). A hash pin on it would refuse
+  on Microsoft's next release, so the recipe downloads the versioned address
+  the permalink resolved to on 2026-11-19
+  (`download.visualstudio.microsoft.com/download/pr/78d061c5-…/VC_redist.x64.exe`,
+  14.52.37029.0, 18,863,624 B) and tries the permalink only when that stops
+  answering; either way the bundle's SHA-256 and size must be the pin's.
+- **Taken apart, never run.** Running the redistributable installs into
+  System32 and asks for administrator rights (Microsoft's "Redistribute
+  Visual C++ files" page: "If you aren't running from an elevated command
+  prompt, you'll need to respond to a User Account Control prompt").
+  Its documented `/layout` option, measured at Medium integrity on the PC,
+  exited 0 and copied only the bundle itself: the packages are embedded, so
+  nothing came out. The bundle is a WiX Burn bundle whose attached container
+  is a cabinet at offset 629,952 (18,223,522 B); its Burn manifest names
+  payload `a4` as `packages\vcRuntimeMinimum_amd64\cab1.cab` (1,060,683 B),
+  and that cabinet holds `vcruntime140.dll` under its MSI file key
+  `vcruntime140.dll_amd64`. `Get-MicrosoftVcRuntime` checks the bundle,
+  copies the container out at the pinned offset and length (`MSCF` and its
+  own length field checked), and takes the two levels out with Windows' own
+  `expand.exe`, the approach `swift_windows_fetch.py` already uses for the
+  Swift installer. The file is checked by SHA-256 and size, kept in
+  `windows-app\Vendor\vc-runtime` (outside `runtime\`, which the installer
+  packs whole; not committed; written under a temporary name, checked, then
+  renamed), and checked again at each place. A cached file that is not the
+  pin is deleted and fetched again. The file is obtained BEFORE anything is
+  made in `runtime\`, ahead of the base phase: a refused bundle on a fresh
+  fetch then leaves `runtime\` untouched, where after the ~600 MB base phase
+  it would leave a runtime with no manifest that a re-run cannot repair in
+  place (the independent review of 867ef7859).
+- **Measured 2026-11-19** on the development PC: about 2 s for the download,
+  the checks and both `expand` steps; the same at Medium integrity (a
+  scheduled task in the desktop session, not elevated) as from SSH (High).
+  The file is 14.52.37029.0, 176,488 B, SHA-256 `eb1ee979…4915a0`, with a
+  valid Authenticode signature (signer "Microsoft Windows Software
+  Compatibility Publisher", O=Microsoft Corporation). It differs in bytes
+  from the copy pinned until then (Python's, 14.51.36247.0, 178,616 B,
+  `d1f4225d…9ce7`), so the pin moved to Microsoft's file and every existing
+  runtime is repaired in place on its next `fetch-runtime.ps1`.
+- **Rejected.** `msiexec /a` on the MSI (a second step to the same file,
+  which the payload cabinet already holds); the permalink alone (see above);
+  keeping Python's copy as the source (the ruling).
+
+**Rejected.** Adding `runtime\python` to PATH in the three launchers (smaller,
+but it leans on Python's copy and on every Node being started by a launcher).
+The copy beside `node.exe` alone, this issue's first version: a module finds
+it only through PATH and only after an older copy in System32 (run A below);
+it is kept beside the module copies because the first ruling asked for it.
+Fetching `VC_redist.x64.exe` and unpacking it was rejected at first (a
+second unpacker for a file Python's zip already carried) and became the
+source in #1010, on Russell's ruling; see "Where the file comes from" above.
+
+## The Licence Agreement page in the installer (#1010)
+
+Written 2026-11-19 for
+[#1010](https://github.com/russellgordon/plantoir/issues/1010) (piece
+1010b), from Russell's four rulings of 2026-11-19 evening on the issue. The
+Visual Studio Community 2026 licence, which is where the right to
+redistribute `vcruntime140.dll` comes from (above), asks a distributor to
+"require distributors and external end users to agree to terms that protect
+the Distributable Code at least as much as these license terms". The
+installer is where a teacher meets Plantoir first, so that is where the
+terms are agreed to.
+
+**What a teacher sees, on a first install by hand.** Inno Setup's own
+License Agreement page, first in the wizard (the welcome page is off, so it
+comes before Select Destination Location), titled **Licence Agreement**:
+"Please read the following important information before continuing.", then
+"Please read the following Licence Agreement. You must accept the terms of
+this agreement before continuing with the installation.", a scrolling box
+with the text, and two choices, **I accept the agreement** and **I do not
+accept the agreement**. Neither is chosen when the page opens and Next is
+disabled until "I accept the agreement" is chosen; choosing "I do not
+accept" disables it again. One page and one choice more than before; the
+pages after it are unchanged.
+
+**What the box says** (`windows-app/installer-licence.txt`, UTF-8, one line
+per paragraph so Inno wraps it to the box): "Plantoir", the copyright line
+"Copyright 2026 Russell Gordon" (the year and name About shows), "Plantoir's
+own code is released under the MIT License:" and the MIT text; "Software by
+other people", naming `THIRD_PARTY_LICENSES.txt` in the folder Plantoir is
+installed in and the notice on GitHub; and "Microsoft Visual C++ runtime",
+the terms for `vcruntime140.dll` as drafted in the design and ruled (use it
+only as part of Plantoir; do not copy it out, change it, or reverse engineer,
+decompile or disassemble it, except where the law allows; "as is"). That
+paragraph says "The MIT License that covers Plantoir's own code does not
+apply to it." (it said "The MIT License above" until the second review of
+1010b, which put the same words in the notice too, below, where no MIT text
+comes above them), and the MIT
+paragraph opens by scoping it to Plantoir's own code, so the MIT grant's
+"without restriction" and the limits on Microsoft's file do not contradict
+each other (ruling 2). No machinery words (rule 1): "website builder".
+
+**One MIT text in three places.** The repository now has a root `LICENSE`
+(the standard MIT text, "Copyright 2026 Russell Gordon"; ruling 3); README's
+"License" section points at it; and the page carries the same words.
+`InstallerLicencePageTests.ThePageCarriesTheLicenceFileWordForWord`
+compares them paragraph by paragraph, with line breaks joined, because
+`LICENSE` is wrapped at 80 columns, as licence files usually are, and the
+page's text is not.
+
+**How it is built** (`windows-app/installer.iss`):
+
+- `LicenseFile=installer-licence.txt` in `[Setup]`. Inno shows the page only
+  when the wizard is visible: its `ShouldSkipPage` skips `wpLicense` when the
+  install mode is not normal, that is under `/SILENT` and `/VERYSILENT`
+  (Inno's own source, `Setup.WizardForm.pas`; its help: under `/SILENT` "the
+  wizard and the background window are not displayed"). So Plantoir's own
+  update, which runs the installer `/VERYSILENT /PLANTOIRUPDATE=1`, never
+  shows it. **A teacher already on 1.x is updated to 2.0.0 silently and is
+  not asked** (Russell, 2026-11-19, ruling 5): no page and no prompt on an
+  update, then or later. A newer installer downloaded and run by hand is a
+  visible install, so it shows the page again and asks again; only the
+  update path skips it.
+- `InitializeWizard` sets `WizardForm.LicenseNotAcceptedRadio.Checked :=
+  False` (and the accept radio too, for symmetry). Inno opens the page with
+  "I do not accept the agreement" checked; Microsoft's Windows desktop UX
+  guide, "First Experience", read 2026-11-19, says settings "with legal
+  implications, such as end user licensing agreements (EULAs)" are opt-in
+  and "can't have default selections". Inno enables Next on this page only
+  while `LicenseAcceptedRadio.Checked` (`UpdateCurPageButtonState`) and in
+  the accept radio's own click handler, so with neither checked Next is
+  disabled until the teacher chooses.
+- `InitializeWizard` then sets `WizardForm.LicenseNotAcceptedRadio.TabStop
+  := True` (the first review of 1010b, its one MEDIUM). Delphi's radio
+  button sets its Tab stop to match `Checked` (Inno's form gives the stop to
+  the checked refusal; `Setup.WizardForm.dfm`, read 2026-11-19), so clearing
+  both choices took the pair out of the Tab order, and a keyboard-only
+  teacher could reach them only by Alt+A or Alt+D (measured below). The stop
+  goes on the **refusal**, not the acceptance, because Windows chooses a
+  radio button when the keyboard moves the focus onto it: with the stop on
+  "I accept the agreement", one Tab from the text accepted the agreement and
+  enabled Next (measured below). Microsoft's guidance, read 2026-11-19
+  (Windows UX guide, "Radio Buttons" and "Keyboard"): a group of radio
+  buttons "behaves like a single control" with a single Tab stop and the
+  arrow keys move within it, and "keyboard navigation shouldn't change
+  control values"; Win32 radio buttons cannot be focused by the keyboard
+  without being chosen, so the stop sits where that change is the safe one,
+  the state Inno itself opens with. The page still opens with neither
+  chosen.
+- `[Messages]` sets all five messages the page shows (Default.isl's
+  "License Agreement" wizard page section: `WizardLicense`, `LicenseLabel`,
+  `LicenseLabel3`, `LicenseAccepted`, `LicenseNotAccepted`). Two say
+  "License" in Default.isl (the title and the sentence above the box) and
+  are spelled "Licence" here (ruling 4); the other three are Default.isl's
+  own words, set too so the whole page is written in one place and an Inno
+  upgrade cannot change it unseen. The message keys keep Inno's spelling;
+  they are names, not words a teacher reads.
+- `[Files]` copies the repository's `THIRD_PARTY_LICENSES.md` into `{app}`
+  as `THIRD_PARTY_LICENSES.txt`, so the notice travels with the files it
+  describes and a double-click opens it in Notepad. (The page cannot hold the
+  notice's tables readably.)
+- **The notice carries the Microsoft terms too** (the second review of
+  1010b, its one MEDIUM). The terms for `vcruntime140.dll` were on the
+  installer's page only, so a copy of the file in the portable zip, which
+  has no page, travelled without them, against ruling 6. The same paragraph
+  is now in `THIRD_PARTY_LICENSES.md`, in its own section, "Terms for the
+  Microsoft Visual C++ runtime file, which only the Windows app carries",
+  which opens by saying the Mac app does not carry the file: the notice is
+  one file for both platforms and is read on GitHub, which README and the
+  page link to. The Mac app and plantoir.app do not ship the notice
+  (searched 2026-11-19: nothing in `mac-app/` or `website/` names it), so
+  GitHub, `{app}` and the zip are where it is read. One text in two files,
+  held equal by
+  `InstallerLicencePageTests.TheNoticeCarriesTheMicrosoftTermsInThePagesWords`;
+  `ThePortableZipCarriesTheLicencesBesideTheApp` checks that the notice the
+  zip copies contains the page's paragraph.
+- **The portable zip carries both licences beside the app** (Russell,
+  2026-11-19, ruling 6). `publish.ps1` makes `Plantoir-win-x64.zip` from the
+  published folder as before, then adds the repository's `LICENSE` and
+  `THIRD_PARTY_LICENSES.md` to its root, the notice as
+  `THIRD_PARTY_LICENSES.txt`, the name the installer gives it. They are
+  added to the zip rather than copied into the published folder, which the
+  installer takes whole (`{#PublishDir}\*`) and would then install twice.
+  The zip's name is unchanged (a frozen asset name, `RELEASING.md`).
+
+**Tests.** `windows-app/Plantoir.Tests/InstallerLicencePageTests.cs` (twelve
+facts and one theory, source text with comments taken out, Pascal's
+settings matched whatever their spacing and case, so `Checked:=False` reads
+as `Checked := False`): the `LicenseFile` setting and
+no `InfoBeforeFile`; `InitializeWizard` clears the refusal and nothing
+checks the acceptance or enables Next, and no `ShouldSkipPage` exists;
+the Tab stop is set on the refusal, after both are cleared, and never on the
+acceptance; publish.ps1 adds `LICENSE` and `THIRD_PARTY_LICENSES.txt` to
+the zip after making it, under its frozen name; all
+five messages are set, to these words, and none says "License"; `LICENSE` is
+MIT in Russell's name and README points at it; the page carries `LICENSE`
+word for word and scoped; the Microsoft paragraph's limits and the sentence
+that MIT does not apply; the same paragraph, word for word, in the notice's
+Windows-only section, and in the notice the zip copies; the `[Files]` line; no machinery words; strict
+UTF-8. The first-install rehearsal's driver
+(`Plantoir.UiTests.FirstInstall/Steps.cs`, `AnswerLicencePage`) knows the
+page by its heading (`WindowRules.IsLicencePage`, either spelling, so a
+lost override does not strand it), records what the page opened with,
+chooses "I accept the agreement" by its UI Automation name with a click
+(`BM_CLICK`, so Inno's own click handler enables Next), and lets the
+ordinary button loop press Next. **Inno's choices are not radio buttons to
+UI Automation:** `TNewRadioButton` (like `TNewButton`) is reported as a
+`Pane`, with no selection pattern and no state (measured on the VM,
+Inno 6.7.3), so the driver finds a choice by its name and that class (or
+the RadioButton type, should a later Inno give it) and reads whether it is
+checked from the Win32 button itself (`BM_GETCHECK`). A driver that looked
+only for RadioButton controls would have stopped on every run. It stops PRODUCT STOPPED, never a silent
+pass, if the page is there and that choice cannot be found, if the page
+opened with either choice made, or if Next is still disabled 30 s after the
+choice (`WindowRules.LicenceNextLimit`). Since the first review of 1010b,
+two more: **a choice whose state cannot be read is not "not chosen"** (no
+window handle, a `BM_GETCHECK` answer other than checked or clear, or UI
+Automation failing: `WindowRules.CheckStateMeans` returns null and the run
+stops DRIVER PROBLEM, saying it could not look; since the second review,
+the same for a refusal ("I do not accept the agreement") that cannot be
+found, which had been read as not chosen: `WindowRules.ReadLicenceOpening`
+gives `CouldNotLook` for either, and `AChoiceMade` only for a choice read
+as made), and **an install of
+2.0.0 or later must have shown the page** (`WindowRules.LicencePageRequiredFor`
+reads the installed `Plantoir.exe`'s product version; a 2.0.0+ install whose
+pages seen hold no Licence Agreement page is PRODUCT STOPPED, and a version
+the driver cannot read is DRIVER PROBLEM rather than a guess). An installer
+older than 2.0.0 (1.9.3 and before) has no page and is walked as before.
+`WindowRulesTests` holds the heading, the names (the refusal is never taken
+for the acceptance), the limit, the check-state reading, the version rule
+(suffixes such as `2.0.0+1ba4ceaf6` read as 2.0.0; `1.10.0` is before it)
+and, as source text, that `Steps.cs` stops on both.
+
+**Measured on the Windows VM, 2026-11-19** (Parallels, Windows 11 Pro
+ARM64, the x64 installer under emulation; snapshot 02, the development
+machine, with Inno Setup 6.7.3 installed by `winget` for this proof and not
+kept). An unsigned installer from the branch (`publish.ps1
+-WithoutAssistantEngine`, commit bf736b7f1, 252.8 MB, about 21 minutes, 630
+s of it Inno's compression), run by hand-equivalent through UI Automation:
+
+- The wizard opened on "Licence Agreement" with both choices unchecked
+  (`BM_GETCHECK`), Next disabled, and the focus in the text box, not on a
+  choice. A click on "I accept the agreement" checked it and enabled Next at
+  once; "I do not accept the agreement" disabled Next again. The two
+  pictures are in the private tools repository's
+  `runs/1010b-captures/` (`1010b-licence-page-as-it-opens.png`,
+  `1010b-licence-page-after-accepting.png`), for Russell to see before this
+  merges.
+- The first install's pages: Licence Agreement > Select Destination
+  Location > Select Additional Tasks > Ready to Install > Installing >
+  Completing; exit 0. `THIRD_PARTY_LICENSES.txt` in the installed folder,
+  the same bytes as the repository's `THIRD_PARTY_LICENSES.md`.
+- Plantoir's update command line over it (`/VERYSILENT /SUPPRESSMSGBOXES
+  /NORESTART /NOCLOSEAPPLICATIONS /PLANTOIRUPDATE=1`, with `/LOG`): exit 0,
+  "Installation process succeeded." in setup's log, and no visible window
+  of setup or its child in 268 looks at the desktop (every 200 ms, by
+  `EnumWindows` and UI Automation) over the 62 s it ran.
+- Not measured then: a clean machine (the first-install rehearsal needs a
+  signed build), and the driver's own run over the page. The second is
+  measured now (below, "The driver over the page, end to end").
+
+**The keyboard, measured** (the first review of 1010b asked whether a
+keyboard-only teacher could reach and choose "I accept the agreement"; VM as
+above, 2026-11-19). Real keys (SendInput) to the wizard in front, the page
+opened afresh for each row, and after every key the focused control, both
+choices' `BM_GETCHECK` and Next read back (`vm-tools/guest/1010b-keyboard.ps1`
+in the private tools repository). Before: the installer built from
+1ba4ceaf6 (both choices cleared, no Tab stop). After: the installer built
+from this fix (Tab stop on the refusal). The page opens with the focus in the
+text, neither choice chosen and Next disabled, before and after.
+
+| Key, from the page as it opens | Before | After |
+|---|---|---|
+| Tab | the focus goes to Cancel, then back to the text; never to a choice (8 presses) | the focus goes to "I do not accept the agreement", which is chosen; Next stays disabled. Then Cancel, then the text |
+| Shift+Tab | Cancel, then the text; never a choice | Cancel, then "I do not accept the agreement" (chosen; Next disabled) |
+| Up arrow, from "I do not accept" | not reachable | the focus moves to "I accept the agreement", which is chosen; Next enabled |
+| Down arrow, from "I accept" | not reachable | back to "I do not accept the agreement", chosen; Next disabled |
+| Space, on "I accept" | not reachable | stays chosen; Next enabled |
+| Down arrow or Space in the text | nothing changes | nothing changes |
+| Alt+D | "I do not accept" focused and chosen; Next disabled | the same |
+| Alt+A | "I accept" focused and chosen; Next enabled | the same |
+| Up arrow, from "I accept" | not reachable | the focus leaves the pair for the text; "I accept" stays chosen and Next enabled. Inno's stock page does the same (its pair has no group boundary above it), not changed here. The Tab stop sits on the refusal because a Win32 radio button cannot take the keyboard focus without being chosen, so the button Tab lands on is chosen, and Microsoft's "Radio Buttons" guidance (read 2026-11-19) says to "Select the safest (to prevent loss of data or system access) and most secure and private option": not accepting is the safe one |
+
+Three tiny installers with this page and three `InitializeWizard` bodies
+measured the choice of stop first: with both cleared, the same as "Before";
+with the stop on "I accept the agreement", **one Tab from the text chose
+"I accept" and enabled Next**, and the up arrow then left the pair for the
+text (Windows chooses a radio button the keyboard focuses, and Inno's pair
+has no group boundary above it); with the stop on the refusal, the "After"
+column. That is why the stop is on the refusal. What a keyboard user meets
+is Inno's stock page (Tab to "I do not accept", up arrow to accept) with
+one difference: the page opens with neither chosen.
+
+Two more things measured that night. The Win32 `WS_TABSTOP` style reads
+clear on both choices before AND after the fix: Delphi moves the focus on
+Tab itself, from its own `TabStop` property, so a check of the window style
+says nothing about whether Tab reaches a control; press the key and read
+the focus. And at this fix's head (installer built from 612159ca0, 14
+minutes): the page opened as before (the two captures still show it), the
+first install by hand ran Licence Agreement > Select Destination Location >
+Select Additional Tasks > Ready to Install > Installing > Completing, exit
+0; the `/VERYSILENT` update over it showed no window of setup in 268 looks
+and its log says "Installation process succeeded."; and the zip's root
+holds `LICENSE` (1,088 bytes) and `THIRD_PARTY_LICENSES.txt` (12,847
+bytes), each the same bytes as the repository's file.
+
+**The driver over the page, end to end** (the second review of 1010b:
+`AnswerLicencePage` had never run). Neither `win-rehearsal.py` nor the
+driver could start from an installer already on the machine: the
+rehearsal restores a clean snapshot and downloads with Edge, and Edge
+holds an unsigned branch build at "isn't commonly downloaded" (#965), so a
+real rehearsal of this page waits for a signed candidate. Loosening either
+of those would weaken what PASSED means. Instead the driver has an opt-in
+mode, `PlantoirFirstInstall.exe --self-test-install <PlantoirSetup.exe>
+--out <folder>`, which runs step 2 alone (the same `Steps_.Install`, with
+the same window watch, allow-list and proof-of-looking rules) on a file
+already on the machine, and ends `SELF-TEST INSTALL DONE` (status
+`self-test-install-done`, exit 5), never PASSED; `win-rehearsal.py` does
+not know that status and would read it as DRIVER PROBLEM
+(`WindowRulesTests.TheInstallSelfTestCanNeverSayPassed`). Run on the VM's
+snapshot 02, 2026-11-19, against the installer built from 84cb5c91d
+(`vm-tools/guest/1010b-driver-install.ps1`), the driver's own lines:
+
+```text wrap
+installer page: "Licence Agreement"
+installer: "Licence Agreement" opened with "I accept the agreement" not chosen and "I do not accept the agreement" not chosen [screenshot shot-03-licence-page]
+installer: chose "I accept the agreement" on "Licence Agreement"
+installer: pressed Next on "Licence Agreement"
+installer finished; pages: Licence Agreement > Select Destination Location > Select Additional Tasks > Ready to Install > Installing > Completing the Plantoir Setup Wizard
+installed C:\Users\<account>\AppData\Local\Programs\Plantoir\Plantoir.exe, version 2.0.0
+DRIVER RESULT (...): SELF-TEST INSTALL DONE
+```
+
+84 looks, none failed, largest gap 3.8 s. Plantoir's `/VERYSILENT` update
+over that install: exit 0, no visible window of setup in 370 looks,
+"Installation process succeeded."; the installed and the zip's
+`THIRD_PARTY_LICENSES.txt` are the repository's notice byte for byte and
+hold the Microsoft terms. **Still unproven until a signed candidate
+exists:** the whole rehearsal on a clean machine (download with the mark
+of the web, SmartScreen, then steps 3 to 7), and the page on the clean
+machines 11 to 16 (a standard user, an accented name, French, hardened,
+a nearly full disk).
+
+**Rejected** (the design, `vm-tools/reference/1010-installer-licence-page-design.md`
+in the private tools repository):
+
+- **Option B, an Information page read and passed with Next**
+  (`InfoBeforeFile`). Nothing new for the rehearsal and no choice to make,
+  but there is no act of agreeing, only reading, which is weaker for the
+  Community terms' "require ... end users to agree", and Microsoft's First
+  Experience page describes setup as requiring the user to "accept" a EULA.
+- **Option C, no page: the notice installed and a Licences link in About.**
+  Closest to the Mac and to Apple's HIG, "Onboarding" ("Avoid displaying
+  licensing details within your onboarding flow"), but it is not what
+  Russell ruled ("the Windows installer gains a licence page") and asks no
+  end user to agree to anything.
+- **Inno's own default of "I do not accept" checked.** Microsoft's guidance
+  above; a legal choice has no default.
+- **Keeping Inno's "License" wording** (the design's recommendation, every
+  Windows installer a teacher has seen says it). Russell ruled "Licence", the
+  spelling the rest of Plantoir uses.
+- **An RTF licence file.** Not needed: plain text stays readable in the
+  modern wizard style, light or dark, with no colours to check.
+
+**The Mac owes nothing, and no `mac` issue is opened.** The Mac ships a
+drag-and-drop disk image with no licence screen, and it carries nothing of
+Microsoft's, so there is no third party's terms for its users to agree to.
+It inherits the root `LICENSE` (its Info.plist already says "MIT License").
+
+**The indemnity.** The Community terms also ask the distributor to
+"indemnify, defend, and hold harmless Microsoft" against claims about the
+program; that is Russell's own undertaking as the licence holder, recorded
+on #1010 to be confirmed with him before the v2.0.0 Windows release, and
+nothing in the installer or the app carries it.
+
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 
 Written 2026-10-28 for [#681](https://github.com/russellgordon/plantoir/issues/681).
@@ -12940,6 +14455,456 @@ async-local the static `Sentence()` reads, which also fills `{machine}` with
 refusal answers. And, as the mac's runner since #610, a scripted `modelReply`
 answers the FIRST request only and plain text after it — unless
 `given.modelReplyAnswers` is `everyRequest` (#720, below).
+
+## The About panel's links (#993, the mac's D46)
+
+Written 2026-11-19 for [#993](https://github.com/russellgordon/plantoir/issues/993).
+The design, the ruling (option A of `vm-tools/reference/993-about-window-design.md`)
+and the reasons are the mac's: `09-mac-app.md` → "The About window's links
+(D46, #993's second piece)". This section says where Windows does it.
+
+**What was there, and why it changed.** `AboutDialog.cs` built "Quartz",
+"sponsoring him on GitHub", "Phosphor Icons" and "Russell Gordon" as inline
+`Hyperlink`s inside a `TextBlock`'s sentences. Unlike the mac's inline
+Markdown links, these were NOT broken for a screen reader or a keyboard:
+measured on the Windows VM on 2026-11-19 with the old panel put back in a
+scratch copy, UI Automation gave all six links as enabled, keyboard-focusable
+Hyperlink elements with their own words, and Tab from Website reached Email,
+Quartz, "sponsoring him on GitHub", Phosphor Icons, Russell Gordon, Close and
+round again. The change on Windows is the ruling's last line, "the Windows
+About panel follows": the same layout and words as the mac, not a fix of a
+Windows fault. An inline `Hyperlink` takes no AutomationId (asking UI
+Automation for one throws `PropertyNotSupportedException`), which is the one
+thing the old panel could not give a test to find each link by.
+
+**Where it is now.** All six links are `HyperlinkButton`s of their own, made
+by one helper, `Link(uri, words, automationId)`, which gives each an
+AutomationId (`aboutWebsiteLink`, `aboutEmailLink`, `aboutQuartzLink`,
+`aboutSponsorLink`, `aboutIconCreditLink`, `aboutDesignCreditLink`). The
+sponsor sentence is one plain `TextBlock`, whole, with "Quartz" and "Sponsor
+Jacky Zhao on GitHub" on one line beneath it inside the callout; the credits
+are label-and-value rows (Icon, Phosphor Icons (MIT); Design, Russell Gordon;
+Made with, Claude) in the shape of the Website and Email rows. No key
+catcher, no invisible control: each key reaches a visible link. "Quartz"
+stays a constant, `QuartzName`, so the label scan's one exception (the bare
+credit name, `CourseSettingsSaveTests`) still covers it.
+
+**What pins it.** `AboutDialogLinksSourceTests` (unit, plain facts) pins the
+source: no inline `Hyperlink` and no `Inlines.Add`, six `Link(` calls each
+with its own words and AutomationId and no seventh, the credits as rows, the
+sentence whole. `AboutDialogLinksUiTests` (`[UiFact]`, opt-in) opens Help ▸
+About Plantoir through the menu bar and reads the dialog as UI Automation
+gives it to a screen reader: exactly six elements of control type Hyperlink,
+each with its own words, enabled, keyboard-focusable and on screen, then
+presses Tab from the dialog's first stop until every one of the six has held
+the focus. Measured on the Windows VM (Parallels, Windows 11 Pro ARM64, the
+app win-x64 under emulation), 2026-11-19: 1 of 1 passed, 17 s. Against the
+old panel (put back in a scratch copy on the VM, 2026-11-19) the four source
+tests fail ("a link is built inside a sentence (new Hyperlink)", "no link of
+its own reads "https://plantoir.app" (aboutWebsiteLink)", and the rows and
+the sentence not found), and the UI test fails with "the About panel has no
+aboutWebsiteLink". Read that UI failure for what it is: on the old panel only
+the test's count of six Hyperlink elements can pass; its enabled, focusable
+and Tab checks find each link by AutomationId, which an inline Hyperlink
+cannot carry, so they never get to look. That the old links were enabled,
+focusable and reached by Tab comes from a separate manual probe (above), not
+from this test. Nothing is
+pressed, so no browser or mail program opens.
+
+## Windows never closes Obsidian unasked (#1003, the mac's #995)
+
+Written 2026-11-19 for [#1003](https://github.com/russellgordon/plantoir/issues/1003).
+The rule, the words and the reasons are the mac's: `09-mac-app.md` →
+"Plantoir never closes Obsidian unasked (#995)", and the contract key
+`obsidianNeverClosedUnasked`. This section says where Windows does it.
+
+**What was wrong.** `FolderActions.OpenInObsidian` registered a course a
+running Obsidian had never seen by quitting Obsidian, with every vault open in
+it, without a word. Every route reached it: the menus, both toolbars, the
+assistant's press, a course kept for reference after its note, and Course
+Settings' How I Teach row (the last two called it directly).
+
+**Where it is now.** `FolderActions.OpenInObsidian` never closes Obsidian: a
+course Obsidian does not know, while Obsidian runs, hands nothing over and
+answers false. Every open goes through `ObsidianOpenRoute`
+(`OpenThenReportAsync`): when `ObsidianClosingRule.MustAsk` says so (Obsidian
+running and no vault in its list is the file's folder or holds it; a list that
+cannot be read holds nothing), or when the open answers false because Obsidian
+started after the check, the route asks "Close Obsidian to open {course}?"
+(`ObsidianWorld.AskClosingAsync`: the sentence and its three facts, Close
+Obsidian and Open as the default, Cancel, Escape is Cancel). The reference
+course and the How I Teach row take `OpenWithoutTheScanAsync`, the same
+question without the add-ons scan. At the answer the route reads the situation
+again (Obsidian quit, or came to know the course: it just opens); otherwise
+`FolderActions.CloseObsidianAndRegister` runs `ObsidianClosingRule.CloseAndRegisterAsync`:
+what Obsidian's list marks open is noted (`VaultsOpen`, so a hidden Obsidian's
+courses come back), Obsidian is quit and waited for, and only once it is gone
+are the defaults seeded, auto-reveal patched, the course registered and the
+other vaults reopened; the course opens last. One trail line per answer
+("asked to close Obsidian to open a course"; the ledger entry is gone).
+
+**The add-ons offer.** Its yes reads "Close Obsidian and Add Them" when it
+closes Obsidian (`ObsidianAddOnsRequest.AddButtonTitle`: open or cannot tell).
+A course opened in Obsidian while the offer was up goes to the reopen question
+instead of a quit, because the button pressed said Add Them. The reopen
+question's button is "Close and Reopen Obsidian" (Russell's ruling 1 on #995,
+2026-11-19; the contract, both apps and `help/controls.json` changed together).
+
+**When the answer cannot finish** (Obsidian did not close, or it closed and the
+course still could not be added to its list), Windows shows "Could not open
+{course} in Obsidian", one sentence and OK (`ShowCouldNotOpenAsync`, after the
+trail line), following "Could not rename course". That is Russell's ruling 2
+on #995 (2026-11-19); the words are `obsidianNeverClosedUnasked.couldNotOpen`,
+written from Windows first. The mac owes the same alert. The second sentence,
+`notAdded`, was not his: it was written in the shape of his `didNotClose`, and
+he was asked to confirm it.
+
+**What holds it.** `ObsidianNeverClosedUnaskedTests` (every `closeCases` case,
+every word against the contract, the trail lines, the close's order through
+stand-ins, and a source scan: only `FolderActions` (its definition and the
+close), `ObsidianWorld.QuitAndWaitAsync` and the rename call
+`QuitObsidianAndWait`, and `FolderActions.OpenInObsidian` calls neither) and
+the "#1003" block of `ObsidianOpenRouteTests` (the question before any close,
+Cancel, the second look, the two failures and their alert, the backstop, the
+scanned route, How I Teach). `ObsidianRouteSourceTests` now allows one caller
+of `FolderActions.OpenInObsidian(`, the world. Checked by mutation on the
+Windows VM: with the behaviours removed (the rule always "no", the backstop,
+the second look, the order of the close, the button titles, a trail line and
+an alert sentence, a quit put back into the open), every new test went red
+except the two that guard against asking too often (`NothingIsAskedWhenNothingCloses`,
+`TheAddOnsReopenNeverAsksTheClosingQuestionAfterIt`) and the word census.
+
+**Not measured.** No dialog here was seen against a real Obsidian: the VM has
+no Obsidian, and no UI test drives these dialogs. Whether Obsidian for Windows
+writes its list in time for the reopen to find the course is #581's
+measurement, unchanged.
+
+## Escape stops a running preview or deploy, and the stop questions (#1009, the mac's #988)
+
+The mac's side, and every reason behind the rulings, is
+`documentation/09-mac-app.md` → "Escape and Command-Period stop a running
+preview, deploy or plan share (#988)"; this is what Windows did with it.
+
+**What a teacher sees.** The console's Cancel (`TaskProgressView`,
+`taskCancelButton`) answers Escape while a preview builds or a deploy runs.
+A preview stops at once. A deploy asks first, by click, by UI Automation
+Invoke or by key: "Stop the deploy?", "The website may be left partly
+updated until you deploy again.", a "Don't ask again" box, **Stop Deploy**
+(the default: the accent button, and Enter) and **Cancel** (WinUI's Close
+button, rightmost, which Escape presses). Ticked with Stop Deploy, the box
+turns the deploy's question off, and Escape and Cancel then stop a deploy at
+once; ticked with Cancel, nothing is remembered and the next question opens
+unticked. File ▸ Settings ▸ Deploying opens with a **Stopping** section, two
+checkboxes ("Ask before stopping a deploy", "Ask before stopping a share of
+unit plans") and the footer "When one is off, Cancel stops that task at
+once, and so does the Escape key." Each change, from the box or the pane,
+writes one `stop question setting changed` line, the mac's words
+(`StopQuestionWording.TrailLine`); `NamedGapLedger` no longer holds it.
+
+**The words are in the contract now** (`shared-rules.json` →
+`stopQuestions`, added from Windows): on the mac they lived only in Swift,
+so this piece moved them where both apps read one copy, with fourteen
+`cases` for what each answer stops and remembers (played through
+`StopQuestionAsking` in `StopQuestionsContractTests`). The mac runs the same
+section in a class of the same name (#1009's mac side): its Swift constants
+pinned to it, and every case through its own `StopQuestionAsking`.
+
+**Windows has no Command-Period, and no counterpart was found.** Nothing in
+`contracts/` names one; Microsoft's "Dialog controls" page lists what closes
+a dialog through its Close button: the button, the system back button,
+Escape and Gamepad B. So Windows names Escape alone, and its footer is
+`stopQuestions.windowsWording.footer`, the precedent of
+`obsidianAddOnsForFigures.windowsWording` (Enter for Return).
+
+**Where the key lives: a `KeyboardAccelerator` on the visible Cancel**
+(`TaskProgressView.GiveCancelTheEscapeKey`, called by the section's view
+only). No hidden control, and no key handler gives Escape its action: the
+panel's one other key handler is the console answer box's own `KeyDown`
+(Enter sends the typed line; Escape is not looked at), and the section and
+the window add none for it.
+WinUI shows the key in the button's own tooltip, "Cancel (Esc)". (The
+one key filter since the first review is on the stop question itself, and
+it is a filter, not a key catcher: see "A held Escape" below.) Microsoft,
+"Keyboard accelerators", Resolving accelerators: an accelerator with no
+`ScopeOwner` is looked for only after the key has bubbled from the focused
+element to the root unhandled, so a control that uses Escape itself (an
+open flyout, a drop-down, a dialog) has it first. The key is decided as it
+arrives (`StopKey.GoesToCancel`, Core, unit-tested): Cancel is on screen
+(it and every parent visible), the task runs, no ContentDialog is up
+(`DialogGate.IsOpen`), the preview's site is not drawn over the console
+(`IsCovered`, set where the web view is shown: the mac's
+`progressPanelTakesTheCancelKeys`), and no editable text box has the focus
+(`FocusManager.GetFocusedElement`: a `TextBox` that is not read-only, a
+`PasswordBox`, a `RichEditBox` that is not read-only; an `AutoSuggestBox` or
+`NumberBox` focuses its inner `TextBox`). The console's output is a
+selectable `TextBlock`, not a box. The handler sets `Handled` whatever it
+decides: Microsoft's "Invoke a keyboard accelerator" says an unhandled one
+goes on to press the button through its Invoke pattern, which would stop the
+task from inside a box. A click and an Invoke reach `PressCancelAsync` with no
+focus check, so they always stop (or ask). A run is stopped once
+(`_stopSentTo`, the runner and its start): Microsoft says an accelerator
+auto-repeats while held "and this behavior cannot be modified".
+
+**Measured in the VM** (Windows 11 Pro ARM64 in Parallels, the x64 app under
+emulation, 2026-11-20): the question's first focus is the "Don't ask again"
+box (WinUI's first focus is the first focusable control in the content,
+then the default button), and Enter there presses Stop Deploy, the default,
+as Return does on the mac; Space there ticks the box. With the focus moved to
+Cancel, Enter and Space both press Cancel. A second preview started straight
+after a stopped one ended on its own with "Something went wrong" in this VM,
+so each UI test runs one preview. Explained by #1026: the earlier stop's two-second kill fallback (`ScriptRunner.CancelByUser`) asked only whether the runner was running and terminated the new run, whose stop flags were already reset, so it read as a failure. Since #1026 the fallback terminates only the run it was set for. The UI tests still run one preview each; that can now be relaxed.
+
+**Rejected.** A `KeyDown` or `PreviewKeyDown` on the window or the panel: a
+hidden key catcher. Initial focus moved to Cancel as #979's
+`AskWithNoDefault` does: this question has a default, ruled for the mac
+(Stop Deploy, Return), and a focused Cancel would take Enter from it, the
+"looks like the default and is not" fault #979's review found. A destructive
+style on Stop Deploy: ruled plain. Leaving `Handled` false when the key is
+the box's: the button would then be invoked.
+
+**Not built here, and why.** Windows has no share of unit plans yet (#824),
+so no panel asks "Stop this share?"; the words, the setting and its
+Settings row are in place for it, as the mac shows both rows.
+
+**The first review's fixes (2026-11-20).** *Every route asks.* The console's
+own "Stop" beside the answer box (`consoleStopButton`; the mac has no such
+button) used to kill the launcher (`Terminate`) with no question, skipping
+the section's `CancelDeploy` sweep and never setting `WasCancelled`, so the
+deploy read "Something went wrong". Ruled: stopping a deploy asks first by
+every route. It now goes through `PressCancelAsync`, as Cancel does: a
+deploy asks, is swept and ends "Cancelled"; a preview stops at once; the
+button stays. *One "under way" rule.* A deploy that builds first runs both
+scripts on one runner, and between them `IsRunning` is false until
+`RunAsync`'s wait on `WaitUntilFinished` resumes (`IsBetweenPhases`, row
+318b): up to 100 ms when this was written, a turn of the window's thread since
+#1016 made the wait a `TaskCompletionSource` that the run's ending completes.
+The stopping code read `IsRunning` alone, so a "Stop the deploy?" open when
+the build ended was taken down while the deploy went on, and a press in the
+gap asked nothing. Now `ScriptRunner.IsUnderWay` (running, or between
+phases: the mac's rule) is the one rule: the key, a click, the console's
+Stop, Stop Deploy, taking the question down, Cancel's row staying on screen
+(`TaskIsUnderWay`), and `MultiDestinationDeployRunner.Cancel`, which now
+marks a runner cancelled in the gap so `RunAsync` stops before the deploy
+starts. `ScriptRunner.Run` clears `IsBetweenPhases` only once the next
+script is running (or has failed to start): cleared first, its own
+notification read as the run having ended. *Settings follows the box.* An
+open File ▸ Settings ▸ Deploying shows the change at once when the
+question's "Don't ask again" turns it off (`AppSettings.StopQuestionSettingChanged`,
+listened to while the row is loaded; setting the row to the stored value
+writes no second trail line). *The contract.* `stopQuestions.knownLimits[1]`
+pointed at a closing comment that does not exist; it now says what is true:
+no panel asks the share's question, and its row stands beside the deploy's.
+
+**Measured in the VM, after the fixes** (same machine, 2026-11-20): a build
+of the 600-page test course ended 30.8 s after the question opened during
+it, and the question stayed up across the change; Stop Deploy then ended
+the deploy "Cancelled" with nothing published. **A held Escape** (one
+press, then key-downs 33 ms apart with no key-up, as a keyboard repeats;
+one `SendInput` held down sends no repeats, so a test must send them): the
+press opened the question, and a repeat then pressed its Cancel, in 1 run of
+3 with the repeats starting at 500 ms and in 4 holds of 4 (repeats from 250,
+400, 500 and 650 ms) in the next run, so a held Escape asked and took the
+question down before the teacher could read it. Fixed on the question
+itself, structurally: its `PreviewKeyDown` marks an Escape whose
+`KeyStatus.WasKeyDown` is set (a repeat) handled, as `TickTable` swallows a
+held Space's repeats; a fresh Escape, and every other key, is the dialog's
+as before. Why this is a filter and not a key catcher: it sits on the
+visible question, the control whose key Escape is; it gives no key an
+action (nothing is pressed, stopped or answered from it); and it only drops
+key-downs whose previous-state flag is set. The repeats cannot be stopped
+where they start (Microsoft, "Keyboard accelerators": an accelerator
+auto-repeats while held, "and this behavior cannot be modified"), and
+`ContentDialog` closes on an Escape key-down, so the question is the only
+place a repeat can be told from a press. With it, 4 holds of 4 left the question open, and the next fresh
+Escape was its Cancel. Rejected: a timed delay before the question takes
+keys (a guess at the repeat delay, which a teacher sets), and refusing a
+close while Escape is down (a fresh press is down too). **Escape where another control owns it**: with
+the menu bar's File menu open, it closed the menu; with a sidebar row's
+context menu open, it closed the menu; neither asked or stopped the deploy
+(the accelerator is reached only by a key that bubbled to the root
+unhandled). The main window has no ComboBox while a section's panel shows:
+the only one is in a course's settings ("Language and region"), which
+replace the panel; there, Escape with it focused, and with it open (it
+closed), asked nothing, and the deploy was still running on return.
+
+**Left as they are, for Russell or a later issue.** The question's first
+focus is the "Don't ask again" box (WinUI's rule, above), so Space ticks it
+and Enter is Stop Deploy; whether the first focus should be a button is a
+design question. Settings ▸ Deploying ▸ Stopping uses checkboxes, as the
+pane's other setting does, where the mac uses switches; whether Windows
+should use toggle switches there is the same kind of question.
+
+**Tests.** `StopQuestionsContractTests` (unit): every word against the
+contract, every case, the trail lines and the `mustRecord` example, the
+setting kept, the key rule, and by source the accelerator on the visible
+Cancel, no key handler on the panel (the question's repeat filter is
+above), the question's words with Stop Deploy as default, the
+box read only before Stop, and Stopping first in Settings ▸ Deploying; since
+the review, a run between its phases is under way and a press there asks, a
+cancel in the gap marks the run cancelled, every stop decision reads
+`TaskIsUnderWay`, the console's Stop goes through `PressCancelAsync`, and a
+changed question is announced once per change.
+`StopByKeyboardUiTests` (opt-in, `[UiFact]`, real keys in the VM): Escape
+stops a running preview; Escape on a running deploy asks, Enter and Space on
+the focused Cancel and Escape on the question keep it running and remember
+nothing, Enter with the first focus is Stop Deploy, Stop Deploy with the box
+ticked turns the question off (setting and trail line), and the next Escape
+stops a deploy at once; Escape in the console's focused answer box stops
+nothing and an Invoke on Cancel then stops the preview. Sabotaged in the VM,
+each red: no accelerator (the preview and deploy tests), the box check
+removed (the text-box test), Cancel reading the box (the deploy test).
+Since the review: the console's Stop on a deploy asks and Stop Deploy ends
+it "Cancelled"; the question opened during the build stays across the
+change to the deploy and Stop Deploy stops it; a held Escape's repeats do
+not answer the question (four holds); Escape with a menu open or a ComboBox focused is
+theirs (a measurement). Sabotaged in the VM, each red: the console's Stop
+back to `Terminate` (its test: "asked nothing"), the question taken down on
+`IsRunning` alone (its test: "taken down when the build finished");
+`IsUnderWay` as `IsRunning` alone and the announcement removed (their two
+unit tests), the repeat filter taken off (the held-Escape test, 4 holds of 4
+closed).
+
+**The second review's fixes (2026-11-20).** *Between two destinations.* A
+course that deploys to two or more places runs a leg each, and when leg 1's
+runner stops, `RunAsync` moves to leg 2 only once its wait resumes (up to
+100 ms then; since #1016, the post queued behind the runner's own ending) and
+`CurrentLegIndex` changes; only then does the section show leg
+2's runner. In that gap the panel's runner was leg 1's and not under way, so
+a "Stop the deploy?" open when destination 1 finished was taken down while
+the deploy went on, Cancel's row hid, and Escape did nothing. The panel's
+one rule now counts the whole run: `MultiDestinationDeployRunner.ShownTaskIsUnderWay`
+(the shown runner under way and not cancelled, or the run running and not
+cancelled), read by `TaskIsUnderWay` everywhere the panel decides, and the
+question is taken down by it on a runner's change and when the section
+shows the panel again (`TakeDownTheStopQuestionIfTheTaskEnded`; the whole
+run ending reaches the panel only that way). A cancel in the gap reaches no
+leg's runner, so `RunAsync` checks the run's own `WasCancelled` before each
+leg and starts no later one, and the panel's badge reads "Cancelled" from
+the run's mark too. *No stuck mark.* `IsBetweenPhases` is no longer cleared
+on entry to `Run` (the first review), so an exception after the build and
+before the deploy's `Run` would leave it set for good, and the panel would
+ask about a run that had ended. `RunAsync`'s `finally` now clears it on
+every leg, before the run's `IsRunning` goes false. *The console's Stop in
+the New Course wizard.* Since the first review it goes through
+`PressCancelAsync`; the wizard's panel has no question and no `OnCancel`,
+so it now ends the work with `ScriptRunner.CancelByUser` (Control-C, then
+the process ended after two seconds), the teacher's stop, which reads
+"Cancelled". It used to be `Terminate`, which read "Something went wrong".
+**Measured in the VM** (2026-11-20): the 600-page course deploying to a
+folder and then to Netlify reached destination 2 53 to 104 s after the
+question opened during its build, and the question was still up; Stop
+Deploy then ended it "Cancelled" with no third start of `deploy.ps1`. The
+wizard's console Stop, pressed at "Step 1 of 7", ended the work "Cancelled".
+**Tests.** `StopQuestionsContractTests`: the rule holds between two
+destinations and a press there asks (state set by hand); a real
+`RunAsync` over three stand-in destinations on a one-thread context,
+cancelled from the first leg's own ending (the gap, before the run's wait
+resumes), asks there and runs `deploy.ps1` once; an exception thrown
+between a real build and the deploy's `Run` leaves no leg between phases.
+`StopByKeyboardUiTests`: the question across the change of destination, and
+the wizard's console Stop. Sabotaged in the VM, each red: the rule without
+the whole run (both gap unit tests, "read as ended"; the UI test, "taken
+down when destination 1 finished"), no `WasCancelled` check before a leg
+(three deploys, not one), no clearing in `finally` (the leg "still marked
+between the build and the deploy"), the wizard's Stop back to `Terminate`
+("Something went wrong").
+
+**The third review's fixes (2026-11-20).** *A stopped deploy is never
+every destination deployed.* A stop between two destinations reached no
+leg's runner, the run never started leg 2, and `CurrentOutcome` counted
+finished legs only, so the outcome was `AllSucceeded`: `RecordWhatWentOut`
+stamped the section published (its " — Edited" went away) and the window
+and the assistant were told "deployed to all 2 destinations". A destination
+a stop kept the run from reaching now counts as not deployed, as the one a
+stop lands in does: the case is `shared-rules.json` → `stopQuestions` →
+`aStoppedDeploy`, added from here and played by both suites through their
+own runner's outcome and `MultiDestinationDeployRunner.Result` (the mac's
+`outcome` and `result`, changed the same way). The sentence for a stop
+between two is `deployPartiallySucceeded` naming the unreached
+destinations, the one the mac says for a stop during the second of two;
+the mac's Cancel answers only while the shown leg runs, so it has no gap
+case of its own. A leg not reached because the shared BUILD failed is still
+not counted (the build's own answer is said). *A stop after the last leg
+stops nothing.* Once the last leg's runner has ended, `IsRunning` stays
+true until `RunAsync`'s wait resumes (a post queued behind the leg's own
+ending since #1016's `TaskCompletionSource`, so a key or click already queued
+on the window's thread can land there); the panel's rule read that as under way,
+so a press there asked, and Stop Deploy marked the run cancelled: the badge
+read "Cancelled" over a deploy that had gone out everywhere. The run's half
+of the rule is now `CanStillBeStopped`: running, not cancelled, and its
+current leg under way, or announced and not yet started, or a later leg
+still to start; `Cancel()` marks nothing when it is false, and a question
+open at that moment comes down. The "not yet started" clause was found in
+the VM: `RunAsync` announces the new `CurrentLegIndex`, and the section
+shows that leg's runner, a moment before the leg's `Run`, and without it a
+question open across the change of destination came down there (the
+two-folder UI test, red: "taken down when destination 1 finished").
+*No outcome badge beside Cancel.* In the gap between two destinations
+`Render` drew leg 1's ending ("Done", or "Something went wrong" since no leg
+had yet been marked finished) beside a Cancel that still stopped the
+deploy; it now draws the working state by
+`MultiDestinationDeployRunner.ShownTaskShowsAsWorking`. *A throw in the
+ending.* `RunAsync`'s `finally` stamped, cleared the marks and set
+`IsRunning` false in sequence, so a throw from the stamp or from a listener
+skipped the rest and left the run going for good; each step now runs in a
+`finally` of the one before. *No real account from the UI class.*
+`StopByKeyboardUiTests` deployed its two-destination course to a folder and
+then Netlify, and `deploy.ps1` reads the machine's own Netlify credential
+from Windows Credential Manager, so on a PC with one it could publish for
+real; every destination in the class is now a folder in the test's own temp
+tree.
+
+**The fourth review's fixes (2026-11-20).** *After #1016.* `dev`'s #1016
+replaced `WaitUntilFinished`'s 100 ms look with a `TaskCompletionSource`
+that the run's ending completes after it has announced the ending, and the
+await in `RunAsync` resumes in a post to the window's thread. Every gap this
+piece handles (between a leg's build and its deploy, between two
+destinations, after the last leg) still exists, one turn of the window's
+thread long instead of up to 100 ms: a key or a click already queued there
+lands in it. Each gap path was re-read against the new wait and every gap
+test re-run (they cancel from inside the runner's own ending, which still
+runs before the post that resumes `RunAsync`). *A leg announced and not yet
+started.* `CanStillBeStopped` counts that leg (the third review), so a
+cancel landing there marks the run cancelled and refuses a second Stop, but
+nothing read the mark before that leg's `Run`, so the leg started anyway.
+`RunAsync` now checks `WasCancelled` immediately before each `Run` (the
+build's and the deploy's), so a leg announced after a cancel can never start.
+*The mac says one new sentence.* With three destinations stopped during the
+second, the mac's `deployPartiallySucceeded` named only the second as not
+deployed and now names the second and the third (the third review's rule
+changed the mac's `outcome` too); the contract case "stopped during the
+second of three" holds it on both platforms, and documentation 09 says so.
+*The text-box test.* `EscapeInAFocusedTextBoxIsTheBoxs_AndInvokeOnCancelStillStops`
+failed in the VM. Measured there (scratch test, unpadded course): the
+answer box kept the focus when the preview's site was drawn, so the site
+takes no focus from a box a teacher is typing in and the product was not at
+fault; but the site drew about 35 s after the start, inside the test's
+presses, and a press after it lands on a console the site covers (Escape is
+then never Cancel's, so the box rule is not tested), and stopping a serving
+preview then ended without the "stopped by the teacher" line the test waited for: `preview.ps1` exits 0 on Control-C and the outcome was read from the exit code first, so the line said "succeeded" (fixed in the fifth review's round: a stop is recorded as a stop). The test now
+runs on a deploy, where no site is drawn, held by the test (below), and an
+Invoke on Cancel asks, and Stop Deploy ends it "Cancelled". *Held
+destinations, not padding.* The two-folder test kept destination 2 going
+with 20,000 stale files for `robocopy /MIR` to remove, a guess at how long
+is long enough. A destination is now held by the test instead
+(`HeldDestination`): its section's `index.html`, "left by an earlier
+deploy", open with no sharing, so robocopy cannot replace it and retries for
+as long as the test holds it. The multi-destination test deploys to three
+folders, opens the question while destination 1 is held, lets destination 1
+go (destination 2 began 4.1 s later in the VM), and stops while destination
+2 is held: it waits on events only (a leg's start on the trail, the run's
+end shown by Deploy being offered again), and with three legs "no later leg
+started" can fail (sabotaged with every `WasCancelled` check removed:
+"destination 3 started after Stop Deploy (2 deploys started at the stop, 3
+after)"). Its no-stamp check cannot fail on the third review's outcome rule
+(sabotaged, it passed): a stop during a destination keeps the stamp off
+through the stopped leg itself, so that rule is held by the unit tests
+(`EveryStoppedDeployCaseHolds`, the two `RunAsync` gap tests), which go red
+under the same sabotage.
+**Tests.** `StopQuestionsContractTests.ACancelOnceALegIsAnnouncedKeepsThatLegFromStarting`
+(the first leg's build, the second leg's deploy; red with the checks removed).
+
+**A stop is recorded as a stop.** The "task finished" line's outcome is decided in the mac's order: "stopped by the teacher" when the teacher stopped the task (Escape, Cancel, the console's Stop, or Stop Deploy at the question), then "closed for a deploy", then "backed out at a question", and only then the exit code. The order matters on Windows because a preview stopped with Control-C exits 0: read by exit code first, a stop was written as "succeeded", and a problem report could not tell a teacher's stop from a preview that ended on its own. `ScriptRunner.FinishedOutcome` is the one place the order lives; the run's saved transcript carries the same words. The order is not data in `shared-rules.json` (`activityTrail` gives only why the outcome must tell a stop from a failure), so the cases are in the test.
 
 ## The lap cap on Windows (#720, the mac's #689)
 
@@ -13819,21 +15784,625 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
+## Plantoir Help on Windows (#886, the mac's #839)
+
+`help/` is the one source of Plantoir Help on both platforms: the page
+format, `outline.json`, the checks and the builder (`help/build_help.py`,
+standard library only, Python 3.9 syntax), owned by the Mac's #839 and
+explained in `help/README.md`. Windows' Help is built in pieces, in the order
+the v2.0.0 run's plan review set (its "amended split", which #886 records);
+886a is the only one landed.
+
+### 886a: the Help build and its tests work on Windows, and the suite runs them
+
+**The fault, reproduced.** On Windows, Python's stdout to a pipe uses the ANSI
+code page (cp1252). The checks' messages carry "▸" and "…", so the first
+failure `build_help.py` printed raised `UnicodeEncodeError` and the build
+ended in a traceback instead of naming the fault. `help/tests/test_tokens.py`
+ran 14 tests with 2 failures under the runtime's Python 3.14.10 (both menu-path
+refusals, `encodings\cp1252.py` → `'▸'`). `PYTHONIOENCODING` and
+`PYTHONUTF8` cannot fix it, though `PythonToolchainTests` sets both: every
+caller, the tests' `helpers.run_build` included, runs the script with `-I`,
+which ignores `PYTHON*` variables.
+
+**The fix.** `build_help.py` reconfigures stdout and stderr to UTF-8
+(`errors="strict"`, so an unwritable character is a failure, never a silent
+"?") when run as a script, and only where they are not UTF-8 already; on the
+Mac they are (a UTF-8 locale, and Python 3.7+ turns on UTF-8 mode in the C
+locale), so nothing is reconfigured there. Every reader of a child's output
+in `help/` (`tests/helpers.py`, `tests/test_build_help.py`,
+`tests/test_web_search.py`, `helpbook/macbook.py`'s `hiutil`) decodes UTF-8
+explicitly (`encoding="utf-8"` in place of `universal_newlines=True`, which
+decodes with the locale's encoding: UTF-8 on the Mac, cp1252 here). Both
+halves are needed, and each was proved red alone: the old `build_help.py`
+with the new tests fails `test_tokens` 2 of 14 on the traceback, and the new
+`build_help.py` with the old `helpers.py` fails the same 2 on mojibake
+("Γû╕" for "▸"). The other three readers' changes have no red case on today's
+content (their children print ASCII: search ids, a build summary); they are
+the same fault waiting for a non-ASCII line, and a cp1252 decode can also
+RAISE on five undefined bytes (0x81, 0x8D, 0x8F, 0x90, 0x9D), which is worse
+than mojibake. Rejected: setting `PYTHONIOENCODING` in the runner (ignored
+under `-I`); dropping `-I` from the callers (it is the Mac's Xcode build
+phase's protection against a stray `PYTHONPATH`); `errors="replace"` (output
+is compared by the tests, and a "?" would pass a wrong message).
+
+**The suite.** `PythonToolchainTests.SharedHelpTestFilePasses` DISCOVERS
+`help/tests/test_*.py` and runs each as `verify.sh` does (`python3
+help/tests/test_x.py` from the repository root; the files put their own
+folder on `sys.path`, so the runtime's `._pth` needs nothing), on the
+runtime's Python, with the runtime's `node` first on PATH so the search
+tests run. `TheHelpTestsAreActuallyFound` fails a discovery that finds none;
+its floor is "above zero" rather than today's seven, because `help/` is the
+Mac's and in active work, and a floor at today's count would red this gate
+the day the Mac merges two files. `TheHelpTestsGetTheRuntimesNodeWhenOneIsFetched`
+fails a runtime without `node`, whose skips would read as passes. The same
+per-file limit applies as for `scripts/` (600 s since #916, `Limit`), and a
+stopped Help file is named by its own folder (`help/tests/...`);
+`test_build_help.py` is in `KnownSlowHelpFiles`, so a timeout there names a
+busy PC as the likely cause.
+
+**Measured** on the Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200),
+runtime Python 3.14.10 and node 22.23.4, 2026-11-14, each file run alone
+from the repository root:
+
+| File | Tests | Result | Seconds |
+|---|---|---|---|
+| `test_build_help.py` | 14 | OK, 1 skipped (`hiutil`) | 92 to 94 |
+| `test_checks.py` | 23 | OK | 12 |
+| `test_macbook.py` | 10 | OK, 10 skipped (`hiutil`) | under 1 |
+| `test_markdown.py` | 27 | OK, 2 skipped (`hiutil`) | 15 |
+| `test_tokens.py` | 14 | OK (2 failures before the fix) | 7 |
+| `test_web_search.py` | 20 | OK, 2 skipped (`hiutil`) | 15 |
+| `test_words.py` | 29 | OK | 15 |
+
+About two and a half minutes in all. Without `node` the search tests skip
+too (4 in `test_build_help.py`, 6 in `test_web_search.py`). `test_build_help.py`
+is the slow one: nine of its tests each build the real `help/` (86 pages
+written, 16 stubs on 2026-11-14), 7 to 12 seconds a build. Under the
+180-second limit of that day, one filtered run made while another agent's
+build and full suite started on this PC took it past the limit (exit 124);
+alone it took half that limit, and #916's 600 s leaves it room.
+
+**`build_help.py --check` on Windows** runs clean: exit 0, two warnings
+(`sidebarRestoreQuestionRestoreSectionButton` and
+`sidebarRestoreQuestionRestoreWholeCourseButton` in `help/controls.json`
+are used by no page) and `Help: 86 pages written, 16 stubs, 151 scenes
+awaiting capture, 2 warnings, 0 publish/deploy notes, 0 failures` on
+`origin/dev` 86ae77e53. Everything it reads is in the repository (the
+menu golden `mac-app/Tests/Goldens/menu-bar.txt`, the Swift sources, the
+contract); it needs no tool. It is not wired into the Windows gate by
+itself: `test_build_help.py`'s `test_the_real_repository_checks_green`
+already runs it on the real `help/` in the gate.
+
+### What follows 886a, and what each waits for
+
+- **886b**, after the Mac's pages branch merged (it has, by 86ae77e53):
+  `--windows` and `--release-windows` in the shared builder, on the pages'
+  `{{machine}}` token; a token with no Windows column renders a visible
+  placeholder and is counted, never failed, so a Mac merge cannot red
+  Windows' build; `{{say:}}` fills `{machine}` and the word check reads the
+  rendered Windows HTML.
+- **886c**, after #790's 790b (`GuardedSite`, its proxied environment and
+  the headless probe): the Help window, `Help.Open(pageId, from)`, Help ▸
+  Plantoir Help and F1, the bundle target and its prerequisite, the trail
+  lines.
+- **886d**, after all the Mac's pages are in and Windows' #897/#900 menu
+  items have merged: the menu table, the Windows golden and the Windows
+  columns, then the Windows runs written by Fable.
+- **886e**: Help buttons on dialogs from the outline's `opensFrom`.
+- **886f**, last before the cut: Windows' own pictures at 200%, and Help's
+  lines in the one Narrator sitting.
+
+## The launchers refuse an overlapping build (#828, mac #729), and #835's scheduled-deploy words (#854, #868)
+
+The first of #828's two pieces (828a). The second, Deploy greying while
+another program holds the course, is 828b and is not described here yet.
+
+### What was built
+
+- **`preview.ps1 --for-deploy`.** A deploy's own build leg says so on its
+  command line, so another launcher's guard reads it as a deploy rather than
+  as a rebuild (`app-rules.json` → `launcherFlags.preview`). It changes
+  nothing the build does and is not handed to `build_site.py`. Without
+  `--build-only` it is refused at the flags with the contract's line, exit 1.
+- **The shared guard block** (`deploy.ps1` and `preview.ps1`, byte for byte)
+  answers `later`, `another` or `building`. A deploy's build leg is
+  `another`; any other `preview.ps1 C S --build-only` in this folder that is
+  not `--stop` is `building`. Precedence later > another > building, whatever
+  order the rows arrive in. #386's preview guard counts `later` and
+  `another` only, so the assistant's rebuild still does not refuse a preview.
+  `Get-DeployRefusalSentence` maps who and leg to the contract's sentence key;
+  `preview.ps1` asks as `deploy-build` when it carries `--for-deploy`, which
+  prints `buildingDeploy` when another build is in the way. Details in
+  [03](03-launcher-scripts.md) → "A section still being deployed is not
+  deployed again".
+- **One builder for the app's build lines**, `PreviewCommand.BuildOnlyArguments`
+  (`Plantoir.Core/Scripting/PreviewCommand.cs`), with `forADeploy` REQUIRED,
+  as the mac's `buildArguments(forADeploy:)` is: true on
+  `MultiDestinationDeployRunner`'s build leg (the window's Deploy) and
+  `AssistWorkspace.Deploy` (both assistants); false on `RebuildPreview`,
+  `Apply` and `ApplyWholeUnit`. The scheduled wrapper's build
+  (`TaskScheduling`) keeps a plain `--build-only`: its own script already
+  counts as `later`. #799's `deploy.ps1` rebuild stays plain too: the
+  `deploy.ps1` that started it is an ancestor, and anyone else sees the pair
+  as `another`. `PreviewCommandTests.EveryBuildOnlyLineComesFromTheBuilder`
+  fails on a `"--build-only"` string literal anywhere else in `Plantoir.Core`,
+  `Plantoir` or `Plantoir.Mcp` (comment lines skipped, review L3), and on
+  `--for-deploy` in the wrapper's source. Only the body of
+  `TaskScheduling.WriteWrapperScript` is exempt, not the rest of that file
+  (implementation review L5; measured: a `"--build-only"` constant planted
+  just above the method fails the test, naming its line).
+- **An older launcher is never handed the flag (review M4).** `plantoir-mcp`
+  never refreshes a folder's launchers (only the window's
+  `ToolchainReadiness.Ensure` does), and an older `preview.ps1` refuses the
+  flag: measured, `origin/dev`'s `preview.ps1 ICS4U 2 --build-only
+  --for-deploy` printed `Unknown option: --for-deploy` and exited 1. So the
+  builder adds the flag only when the folder's own `preview.ps1` contains
+  `'--for-deploy'` (one shared-open read; a missing or unreadable file means
+  no). That older launcher's guard cannot count the flag anyway, so nothing
+  is lost. This is the Windows twin of the contract's knownLimits item about
+  two copies of Plantoir of different ages; here the second, non-mirroring
+  copy is `plantoir-mcp`. Rejected: the server calling `RefreshLaunchers`
+  itself, which would write the folder from a second process while the window
+  may be running `Ensure` on it. The other half of two copies of different
+  ages (review L4, reasoned from `LauncherRunner.cs` and the guard, not
+  driven): a `plantoir-mcp` still running from before an update builds a
+  deploy's build leg without the flag, so the new guards count it as
+  `building`, not `another`, and a serving preview pressed during that
+  deploy's build leg is not refused until that assistant session restarts.
+  Pinned by
+  `AssistWorkspaceTests.ADeploysBuildLegSaysItIsADeployOnlyWhereTheLauncherTakesIt`
+  and `PreviewCommandTests.AnOlderLauncherIsNotHandedTheFlag`.
+- **`FailureExplainer`** reads the two building lines (two more markers;
+  `SectionDeployRefusal.ByAnotherBuild`, from "is already being built"), and
+  `MultiDestinationDeployRunner.RefusalAnswer` says
+  `wording.deployRefusedWhileItsSectionIsBeingBuilt` for them; the window,
+  the in-app assistant and `plantoir-mcp` all answer through it.
+- **#835's words (#854).** The `later` lines and trail line, and
+  `AssistWording.DeployRefusedWhileALaterDeployWorks` and
+  `CourseIsBeingBuiltElsewhere`, say "a scheduled deploy that is still
+  running". `FailureExplainer.LaterDeployMarker` follows the new line and
+  `OlderLaterDeployMarker` still reads the old one, for a folder holding an
+  older launcher.
+
+### The runner (`windows-app/test_launcher_rules.ps1`)
+
+- **The translator gives a case's `cwd` precedence over a `{here}` path
+  (review M1).** Rows written `{here}/preview.sh` with cwd `elsewhere` are
+  another folder's run on the mac, where lsof's answer is the folder; on
+  Windows the script's path is the only folder evidence, so `elsewhere` is
+  written into it. With the old order, exactly three rows failed, whatever
+  the guard did (measured: "a deploy's build leg in ANOTHER folder does not
+  count" on each launcher, and the preview guard's "…in ANOTHER working
+  folder does not refuse").
+- Section 5 runs the `deploy-build` leg, three Windows-only build rows (a
+  rebuild started by `preview.bat`, whose `cmd.exe /c` line names no program;
+  a quoted spaced course on a deploy's build leg; a `-Command` build, the
+  known limit), every (who, leg) pair the cases name through the launcher's
+  own `Get-DeployRefusalSentence`, and the nine pairs `launcherCasesShape`
+  describes, and the third trail line.
+- **Section 11 reads the REAL process table.** A stand-in build, really
+  running as `powershell -File <folder>\preview.ps1 ICS4U 2 --build-only
+  [--for-deploy]`, against a copy of each launcher cut off right after its
+  guard (so a guard made wrong reaches no credential, build or network):
+  `buildingDeploy` and `anotherDeploy` from `deploy.ps1`, `buildingDeploy`
+  from `preview.ps1 --build-only --for-deploy`, each with its trail line in
+  `PLANTOIR_TRAIL_DIR`; a stand-in in another folder refuses nothing; each
+  copy passes alone; the real `preview.ps1` refuses `--for-deploy` alone.
+- Must-fail, by copy-and-restore in a scratch copy of the pure sections:
+  `origin/dev`'s guard block fails 32 rows (the 7 #729 cases on each
+  launcher, the preview guard's build-leg case, the Windows build rows, and
+  the sentences and trail lines); a `Get-DeployRefusalSentence` that ignores
+  `deploy-build` fails the fixed pair on each launcher; a preview guard
+  truthy on `building` fails "a build with --build-only is not a deploy" and
+  the `preview.bat` row; the old translator fails the three M1 rows;
+  `origin/dev`'s `MultiDestinationDeployRunner` fails the source scan and
+  the two refusal-answer tests.
+
+### Measured: two builds started at once (knownLimits L-a2, the Windows number)
+
+Real processes: two `powershell -File <folder>\preview.ps1 ICS4U 2
+--build-only`, each a copy of the REAL `preview.ps1` cut off after its guard
+(it then sleeps 5 s; refused, it exits 1), started N ms apart, 10 trials per
+gap (a scratch harness, not committed). Lenovo 20QES70500
+(i5-8365U, 16 GB, Windows 11 Pro 26200), Defender on, CPU at 60% from other
+agents' builds when it began, 2026-11-13.
+
+| Started apart | Both refused | One refused | None refused |
+|---|---|---|---|
+| 0 ms | 10 | 0 | 0 |
+| 250 ms | 10 | 0 | 0 |
+| 500 ms | 10 | 0 | 0 |
+| 1000 ms | 1 | 9 | 0 |
+| 2000 ms | 0 | 10 | 0 |
+| 4000 ms | 0 | 9 | 1 |
+
+The guard's own time, from the start of `Get-ProcessTable` to its answer,
+120 runs: median 810 ms, fastest 492 ms, slowest 1,777 ms. So the window in
+which both refuse is as long as the first launcher's look takes: about one
+second on this PC (median 810 ms, up to 1.8 s under load; both refused 10 of
+10 at 500 ms and 1 of 10 at 1 s), against "a
+few milliseconds" on the Mac (both refused 20 of 20 together, exactly one at
+50 ms and up): PowerShell's start plus the `Win32_Process` query is that
+long. The overlap never got through while both were starting: each look saw
+the other. The one "none refused" at 4 s is most likely the first stand-in
+having finished its 5 s before the second's look, which needs the second's
+start and look to have taken about 1.8 s or more (the first's look plus
+5 s, less the 4 s gap), at the edge of the slowest measured; this is
+reasoned, not measured (the harness kept no timestamps for that trial). The consequence
+(review L5), written down rather than built: two rebuilds asked of one
+`plantoir-mcp` in parallel tool calls, or a rebuild and a deploy pressed
+within about a second, are BOTH refused, in words ("already being built"),
+and nothing is built or sent; asking again goes ahead. The contract's
+`knownLimits` text stays the Mac's; no tie-break was added, for the reason it
+gives.
+
+### Rejected
+
+- Fixing M1's three red rows in the guard: the guard was right, the
+  translator wrote another folder's run into this one.
+- A `--for-deploy` on the scheduled wrapper's build or on `deploy.ps1`'s own
+  rebuild (`notUsedFor`): both are already counted through their ancestors.
+- Refreshing launchers from `plantoir-mcp` (above).
+
+## A deployed folder opened in the browser (#889, the mac's #850)
+
+The mac's #850 (`09-mac-app.md` → "A deployed folder opened in the browser
+(#850)" has the design, what a teacher sees and the rulings) comes to Windows
+in two halves, as unit planning did. **889a**, this section, is Core only:
+the resolver, the address, the offer rule, the server and the registry of
+shows, with every contract case over a real socket. Nothing a teacher sees
+changed, and no `NamedGapLedger` entry was removed: the six #889 entries
+(three trail events, `stopShowingDeployedFolder`, `deployedFolderReady`,
+`deployedFolderShown`) close with **889b**, which builds the window, the
+menus, quit, the trail lines and the UI tests on the surface below, after
+884a's Copilot items (the three new `subjectMenus.cases` name
+`sectionReviseWithCopilot`).
+
+### The surface 889b calls (none of it changes for 889b)
+
+All in `Plantoir.Core/Models`:
+
+- **Whether Open in Browser is offered for a section, and why not:**
+  `DeployedFolderOffer.LookUp(course, sectionNumber, workingFolder)` →
+  `Lookup(Facts, Decision, SectionFolder)`. It reads the SAVED
+  `course_config.json`, the disk, this app's own deploy of the section
+  (`CourseActivity.IsPublishingSection`) and any other program's `publish`
+  lease on the course (`WorkLease.IsHeld`). Call it on the events
+  `offeredWhen` names, never on a clock. `Decision.Kind` is `Offered`,
+  `Greyed` (with `ReasonKey` `deployIsRunning`, `folderNotFound` or
+  `notDeployedYet`) or `Absent`; `DeployedFolderOffer.Sentence(reasonKey)`
+  is the sentence to show (`CourseActivity.AvailableOnceDeployCompleted`,
+  named as a constant by this piece, for a deploy under way).
+- **The words:** `DeployedFolderWording` (all sixteen `wording` keys;
+  `Notice(section)` fills the notice).
+- **Start, or open again:** `DeployedFolderShows.Shared.OpenAsync(sectionFolder,
+  course, section, workingFolder, from, openInBrowser)` → `OpenOutcome(Address,
+  Why)`. `sectionFolder` is `Lookup.SectionFolder`; `from` is a
+  `DeployedFolderFrom` (`Result`, `SectionMenu`, `Toolbar`, `Sidebar`);
+  `openInBrowser` is the window's handing of the address to the browser
+  (`ExternalLinks`) and says whether it took it. A null `Address` with a
+  `Why` is a failure to show `couldNotOpen` for; a null `Address` with no
+  `Why` is a Stop pressed while it started (show nothing).
+- **Stop:** `Stop(course, section, workingFolder)` (the notice's Stop and the
+  menu item: every show of the section, and a start still under way);
+  `StopEverything()` from the quit path, synchronous.
+- **What is being shown:** `ShowFor(course, section, workingFolder)` (null, or
+  the `Show` with its `Address`), `Shows`, `Count` (for
+  `QuitConfirmation.UnderWay`'s `deployedFoldersShown`, which never asks),
+  `FolderWentAway(…)` and `DismissFolderWentAway(…)` for the
+  `stoppedFolderGone` line and its Dismiss.
+- **Redraw:** the `Changed` event (a show started or stopped, a folder went
+  away). **The trail:** the `Happened` event carries a
+  `DeployedFolderHappening` (`Opened` with `From`, `AlreadyOpen`,
+  `AddressMoved`; `Stopped` with `Reason`, `Requests`, `Missing`;
+  `CouldNotOpen` with `Why`), each with the course, the section and its
+  `TrailLine`, the contract's sentence, held against the three
+  `activityTrail.mustRecord` templates by `DeployedFolderShowsTests`. 889b
+  adds the three `ActivityTrail.Event` members and writes
+  `ActivityTrail.Note(event, happening.TrailLine, course, section)`. No
+  address or path is in any of them, and this Core writes no trail line
+  itself. Both events are raised on whatever thread caused them (a
+  listener's own thread when a folder goes or a listener ends): marshal to
+  the dispatcher.
+- **The remembered port:** `AppSettings.DeployedFolderPorts` (canonical path
+  → port). 889b calls `DeployedFolderShows.Shared.RememberPortsIn(App.Settings,
+  action => dispatcher.TryEnqueue(() => action()))` once at start-up; until
+  then ports are remembered in the process only. `SettingsDeployedFolderPorts`
+  reads its own copy and writes and saves `App.Settings` only through that
+  action, on the UI thread, as the rest of the app saves it (the
+  implementation review's L3: the first version wrote `AppSettings.Current`,
+  a SECOND copy of the settings loaded from disk, from a pool thread, and its
+  save would have written over `App.Settings`' and been written over in
+  turn). A port that had to move is remembered where it moved to and tried
+  first next time, the usual one (the hash's) after it, as `address.rule`
+  says: the remembered port first, then the block from the hash.
+- **Never throws at its caller's expense:** a subscriber of `Changed` or
+  `Happened` that throws is called on its own and its exception dropped
+  (the implementation review's M1: an unguarded `Changed` on the listener's
+  own thread, when a folder went or a listener ended, ENDED THE PROCESS,
+  0xE0434352; shown again here against the unguarded copy: "Test host process
+  crashed: Unhandled exception").
+  `ASubscriberThatThrowsLeavesTheAppAliveAndTheShowStopped`.
+- **"Opened" goes on the trail only after the browser took the address**
+  (the review's L4): a Stop pressed while it started leaves no line at all,
+  and a browser that refuses a NEW show leaves one line, "could not open …
+  the browser did not open it", with nothing left running
+  (`OpenedIsSaidOnlyAfterTheBrowserTookTheAddress`).
+- **Saved settings that cannot be read** make the item absent, never offered
+  on the window's unsaved copy (the review's L7).
+
+### Who serves it: a TcpListener of the app's own
+
+`DeployedFolderServer` is a `TcpListener` on `IPAddress.Loopback` with the
+app's own small HTTP/1.1 reader, as the mac's `NWListener` is raw TCP (the
+plan's D5, upheld by its review). `ExclusiveAddressUse` is set before it
+starts, so no other program can bind the same address beside it, even asking
+to share (`ItListensOnTheLoopbackAddressAloneAndExclusively`).
+
+**Rejected, measured by the planner on this PC** (2026-11-13, Windows
+PowerShell 5.1's `HttpListener`, which is HTTP.sys as .NET 9's is): an
+`HttpListener` on `http://127.0.0.1:<port>/`, as the issue first suggested.
+Unelevated it starts on `127.0.0.1` and `localhost` (and is refused `+`), but
+HTTP.sys answers some requests ITSELF before the app sees them: `/../x` is
+**403** (the contract allows 400 or 404), a request line of 8,300 bytes and
+headers of 16,500 are **400** (the contract says 414 and 431; its limits are
+machine-wide registry values only an administrator can change), it does not
+check `Host` at all for a `127.0.0.1` prefix (so the exact check is the
+app's anyway), and it gives the app no connection to close when every place
+is taken. Four contract cases could not be met, and the contract would have
+had to loosen for Windows. `netsh int ipv4 show excludedportrange
+protocol=tcp` showed nothing reserved in or near 41000-41399 (5357,
+50000-50059, 50131; the dynamic range from 49152). Also rejected: Kestrel (a
+framework reference of several MB in a self-contained app, and its
+connection cap refuses the newcomer, which `limits` forbids) and a Python
+`http.server` (a second process, and it answers 404 for every page link:
+5,869 of 8,811 links below).
+
+**Which folder** (the plan review's M5): `DeployedFolderOffer.SectionFolder`
+mirrors `deploy.ps1`'s `Resolve-PublishFolder` plus deploy.ps1's own
+`[IO.Path]::Combine($folderAsked.TrimEnd('\','/'), "section{N}")`: the
+setting trimmed (the trim `DeployCommand.Arguments` makes before handing it
+over); a drive and a separator, or a UNC path, made full; a drive-relative
+(`C:out`) or root-relative (`\out`) path refused, so it is "not found"
+rather than a folder resolved against the app's current folder; anything
+else taken from the working folder. `DeployedFolderOfferTests` walks the
+portable `folderPublishTarget.cases`, and also cuts the launcher's own
+function out of `deploy.ps1` and runs it in Windows PowerShell 5.1 beside
+the app's on sixteen settings (`TheAppResolvesTheFolderExactlyAsDeployPs1Does`),
+so a change to either side that the other has not made fails.
+
+**How a request is answered** (`DeployedFolderResolver`) follows the mac's
+rules case for case; the Windows parts:
+
+- **790a's disk layer, reused** (the plan review's M8), not a second one:
+  `ILocalFiles` gained one member, `List(path)`, and every file is opened
+  ONCE through `WindowsLocalFiles.Open` (links followed); that handle's own
+  `GetFinalPathNameByHandle` must be inside the folder's final path
+  (`LocalSiteGuard.IsWithin`), it must be an ordinary disk file, and its
+  bytes are read from the same handle, so a junction swapped between the
+  check and the read changes nothing. `LocalSiteGuard.IsAcceptableSegment`
+  refuses devices (COM0 and LPT0 too), a colon (so no alternate data
+  stream), and a trailing dot or space; the resolver adds a leading dot and
+  `_headers` / `_redirects`.
+- **Every name is matched against its folder's listing**, exactly after NFC:
+  NTFS ignores case and expands 8.3 short names, a strict host does neither,
+  so `/concepts/` does not find `Concepts\`, and the short name of
+  `Long Folder Name` finds nothing (`AnEightDotThreeShortNameFindsNothing`;
+  8.3 names are on for this PC's C:).
+- **The raw target is read**, decoded ONCE and strictly: the request is read
+  as Latin-1 (one char per byte), so a raw UTF-8 name arrives as its bytes,
+  and broken escapes or bytes that are not UTF-8 are refused.
+- **Both link cases run through the seam on this account**, which cannot
+  make a FILE symbolic link (WinError 1314, Developer Mode off):
+  `DiskWithLinks` lays the case's links over the real disk and asks
+  `WindowsLocalFiles` at the place each leads, so the containment check on
+  the opened handle is what refuses them. Over a socket, the folder link is
+  a real junction; only `TheFileLinkCaseOverASocket` skips, by name.
+- **Every folder and file looked at on the way must be inside the folder's
+  real path**, not only the one served (the implementation review's L1): a
+  junction inside the folder that leads out answered 308 to `/junc` when the
+  outside folder held an `index.html`, which told a caller that file exists.
+  It now answers exactly as a missing path does, status and body
+  (`AJunctionLeadingOutAnswersAsAMissingPathDoes`, over a real junction; red
+  with the check taken out, `/junc: 308`).
+
+**Limits.** 64 connections; when every place is taken the connection quiet
+longest is RESET to make room (a reset, not a graceful close, which would
+wait behind bytes a stalled reader never takes); a request line over 8 KiB
+is 414, headers over 16 KiB 431; 10 s to send the headers and 30 s idle
+between requests; each piece of an answer (256 KiB) must be taken within
+30 s or the connection is reset. Sockets are `NoDelay`: an answer is its
+head and then its body, and with Nagle the second send waited for the
+client's delayed acknowledgement of the first (measured below). **Each
+listener and each connection has a thread of its own**, with blocking calls
+whose deadlines are the socket's own `ReceiveTimeout` and `SendTimeout`,
+rather than tasks on the thread pool: with the pool starved (the full suite,
+below), a task-based first version left a plain GET unanswered for 20 s and
+fired the 10 s header deadline late. At most 65 background threads a show.
+**An answer over 1 MiB (a video) is sent through a send buffer of one
+piece** rather than Windows' autotuned one: with autotuning the system took
+so much of a 200 MB answer into its buffers that 64 readers that never read
+were still not blocked at 47 s while another suite ran, so the piece
+deadline never started; with one piece they are reset at 30 s. Not for
+every answer: set on every connection it cost about 130 ms a request (the
+ENG2D crawl below took 38.8 s instead of 4.8 s), so pages keep the
+system's buffer.
+
+**The address.** `DeployedFolderAddress.CanonicalPath` is the folder's
+ON-DISK spelling (`GetFinalPathNameByHandle`, `\\?\` taken off), because the
+hash is of the spelling: `C:\Users\teacher\Sites\ics3u\section1` starts at
+41143 and its lower-case spelling at 41047 (`AWindowsPathHashesByItsSpelling`,
+against the planner's independent FNV-1a). The remembered port first, then
+the block from the hash. **A port another program holds on 127.0.0.1 OR on
+0.0.0.0 is passed over** before binding (`IsHeldByAnotherListener`, from the
+system's listener table): measured on this PC, an exclusive bind to
+`127.0.0.1:41399` SUCCEEDED while another socket held `0.0.0.0:41399`, and
+would then have taken that program's loopback connections. A second copy of
+Plantoir on the same folder finds the first copy's port held and shows the
+folder at the next one, the trail saying the address moved
+(`ASecondCopyOfPlantoirShowsTheSameFolderAtTheNextAddress`). Two sections
+can be shown at once, each at its own address (`QuittingStopsEveryShowAtOnce`).
+
+**A known limit, accepted as on the mac** (Russell, 2026-11-13): every
+account on this PC, in any session (fast user switching, Remote Desktop),
+can reach `127.0.0.1:<port>` while a folder is shown, as it can a preview.
+Shared school PCs make that more likely here than on a teacher's own Mac.
+No other computer can: a connection to this PC's network address is refused
+(`TheNetworkAddressIsRefused`, 192.168.1.81).
+
+**Lifetime.** `Stop` closes the listener and every connection and frees the
+port, and the same folder gets the same address back at once, even when a
+request the server closed first left TIME_WAIT on its side (measured: an
+exclusive rebind succeeds; `StopFreesThePortAndTheSameAddressComesBack`).
+Nothing is written to disk and no lease is taken, so a Plantoir that is
+force-killed leaves nothing to clean up: Windows closes its sockets with it.
+
+### Measured (2026-11-13, Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200)
+
+- **No firewall prompt for a loopback-only listener**, measured where a
+  prompt COULD appear: from a program path the firewall has never seen
+  (this worktree's own `testhost.exe` has a rule now, below, so a count
+  around it can no longer show a new prompt). `DeployedFolderProbe.exe`, a
+  console program of a few lines that starts the product's
+  `DeployedFolderServer` with the real block's candidates on a built site,
+  asks it for `/` and stops, copied to a newly named folder: it listened on
+  `127.0.0.1:41050` alone (`Get-NetTCPConnection` while it ran) and answered
+  200; `Get-NetFirewallApplicationFilter` listed 0 entries for its path
+  before and after, 585 rules before and after, no rule-added event (2097)
+  in the firewall's log, and the `PickerHost` processes the same two (the
+  prompts below). The same held for a copy of the test output at a new
+  path running the server's and the registry's 34 tests. Read with
+  `Get-NetTCPConnection`, `Get-NetFirewallRule`,
+  `Get-NetFirewallApplicationFilter` and `Get-WinEvent` only; nothing added,
+  nothing removed, nothing elevated. `TheListenersOwnEndpointIsTheLoopbackAddress`
+  reads the listener's own `LocalEndpoint`, and the source rule
+  `TheServerBindsTheLoopbackAddressAndNothingElse` allows one
+  `new TcpListener(IPAddress.Loopback, port)` in the server's file and no
+  wildcard, IPv6, dual-mode, `localhost`, prefix or `Bind` form (shown red
+  on a copy that bound `IPAddress.Any`, run alone so nothing listened), and
+  no `IPAddress.Any` bind in any of the deployed folder's test files.
+- **A listen on 0.0.0.0 DOES raise it, and this piece did so twice by
+  mistake**, neither from the product's listener: at 22:22, a hand
+  measurement in Windows PowerShell that bound
+  `[IPAddress]::Any` port 41399 to see whether a loopback bind could sit
+  beside it (the `powershell.exe` prompt and rules); at 22:28, a first
+  version of `APortAnotherProgramHoldsOnEveryAddressIsPassedOver` that
+  stood the other program in with a real `new TcpListener(IPAddress.Any, 0)`
+  (this worktree's `testhost.exe`; that version was never committed, the
+  first commit at 22:31 already had the stand-in). Each prompt's
+  `PickerHost` process started within two seconds of its pair of inbound
+  "Query User" BLOCK rules (TCP and UDP) in the firewall's log. Both
+  prompts are still on the desktop and the four rules are still there:
+  closing a prompt was refused to this session, and removing a rule needs
+  an administrator. The test now stands the other program in through
+  `DeployedFolderServer.ActiveListeners` and binds nothing. So: never bind
+  anything but `127.0.0.1` in a test here.
+- **The crawl** (`browser-checks/crawl_deployed_folder.py --url`, against
+  the server started in-process by the opt-in `DeployedFolderCrawlMeasurement`,
+  on copies of two sites built on this PC): ICS3U section 1, 399 pages,
+  8,811 links, 403 addresses, **0 not found** in 6.4 s; ENG2D section 2, 275
+  pages, 6,334 links, 284 addresses, 5 not found in 4.7 s, all five a link
+  to `Exercises/Media-Analysis-Practice`, a page that build does not hold (a
+  link to a page not published: missing on any host). On the final,
+  threaded server, with another suite running: 9.6 s and 5.0 s. The must-fail, the
+  same folders through `python -m http.server`: **5,869** and **3,252** not
+  found. Before `NoDelay` the ENG2D crawl took **43.9 s** (about 155 ms a
+  request: Nagle and the delayed acknowledgement); after, 5.5 s. The
+  resolver alone answers 200 pages in 481 to 573 ms. One ICS3U crawl of
+  files copied seconds before took 57.4 s; not explained, and not seen again.
+- **The deadlines over a socket:** a connection that sent only its request
+  line closed at 10 s; 64 readers of a 200 MB file that never read were all
+  reset by about 30 s (`ReadersThatStopReadingDoNotShutTheSiteOut`), while a
+  normal request was answered at once.
+- **Must-fails**, each by putting a plausible wrong version of the one rule
+  in place and running the tests (the originals copied back, the tree clean
+  after): a Host check by prefix (`Host: another port`, `Host: a name that
+  starts with the address`, through the resolver and over a socket); a
+  case-blind name match (the three `case counts` cases, both ways); no
+  containment check on the opened handle (both link cases through the seam,
+  the folder link over a socket); no join of a second press
+  (`TwoQuickPressesStartOneShowAndStopEndsIt`); a Stop while starting
+  ignored (`StopWhileStartingEndsItOnceStartedAndLeavesNothingListening`);
+  the drive-relative refusal dropped (`ADriveOrRootRelativeFolderIsNotFound`,
+  `TheAppResolvesTheFolderExactlyAsDeployPs1Does`); the 0.0.0.0 pass-over
+  dropped (`APortAnotherProgramHoldsOnEveryAddressIsPassedOver`); the
+  newcomer refused instead of making room (`AConnectionPastTheMaximumMakesRoom`
+  and the readers test); no send deadline (the readers test: 63 readers
+  still open at 47 s). **Under the full suite's load** (3,925 tests sharing
+  the thread pool) the first full run failed three of these wall-clock tests:
+  a plain GET unanswered within 20 s, the header deadline not closed by
+  15 s, the readers reset at 42.8 s instead of by 40; a second run, with
+  those classes alone, lost two answers of the resolution cases over a
+  socket (no answer in 20 s). That was the server's own work waiting for
+  pool threads, so the server moved to threads of its own (above), and the
+  server, registry and readers classes also run in their own collection
+  with parallelism off (`DeployedFolderTimings`), with the over-socket
+  resolution cases and the PowerShell 5.1 resolver test
+  (`DeployedFolderLauncherFolderTests`) since the review's L5. The readers
+  test's clock starts once all 64 places are taken, and it asserts the
+  contract's case as written (A stalled reader closed within 40 s, and not
+  before the 30 s piece deadline), then every reader gone within 30 s more.
+  **Not measured** (the review's L2): a program listening dual-mode on
+  `[::]:<port>` is not passed over the way one on 0.0.0.0 is; measuring it
+  needs a non-loopback bind, which raises the firewall's prompt. And one fault the tests
+  found in the first version:
+  a request that found the folder gone stopped the show from inside its own
+  answer, so the browser got a reset instead of the 404; the folder going is
+  now reported after the answer has gone.
+
+### What 889b owes
+
+The window, menus, quit and trail on the surface above: the toolbar's and
+Section ▸ Open in Browser opening the preview while one shows and the
+deployed folder otherwise (`previewHelp` / `help` / the greyed reason as the
+tooltip and the Narrator name), Open in Browser beside Show in File Explorer
+under a finished folder deploy (single and multi-destination) with
+`renderNote` in place of `publishedFolderRenderNote`'s sentence, the section
+row's context menu, the notice with Stop and `stopHint`, `stoppedFolderGone`
+with Dismiss, the `couldNotOpen` dialog; `subjectMenus`' item, situation
+keys and three cases; `QuitConfirmation.UnderWay` gaining
+`deployedFoldersShown` and the quit path calling `StopEverything`; the three
+`ActivityTrail.Event` members written from `Happened`; the six ledger
+entries removed; and the UI tests, through a browser seam that never opens a
+real browser. No `--serve-deployed-folder` flag: the crawl runs against the
+in-process server.
+
+Also owed by 889b, from the surface above and the fixes review:
+
+- **Once at start-up**, `DeployedFolderShows.Shared.RememberPortsIn(App.Settings,
+  action => dispatcher.TryEnqueue(() => action()))`, and
+  `DeployedFolderShows.Diagnostic = App.LogDiagnostic`. Without the first,
+  ports are remembered for the session only.
+- **Marshal both events** (`Changed`, `Happened`) to the dispatcher before
+  touching a control: they arrive on a listener's thread when a folder goes
+  or a listener ends. A handler that throws is dropped and written to the
+  diagnostic log; it does not end the app, but its redraw is lost.
+- **The fixes review's L-c, to build:** the press that STARTED a show stops
+  it when the browser refuses only if no other press has joined it; a press
+  handed a show re-checks `ShowFor` afterwards, so it never opens the
+  address of a show that was stopped meanwhile.
+
+**889b, built** (2026-11-20): every place opens through `Services/DeployedFolderOpening.OpenAsync`, which reads the offer again at the press and hands the address to `ExternalLinks.Open` (a `--state-dir` run records it in `links-opened.txt` and opens nothing: the UI tests' browser seam). The toolbar's button decides preview or folder by `_previewUrl` at the press. `DeployedFolderShows.Changed` is carried to the view's dispatcher and redraws the chrome and the menus. The trail is written in `App` from `Happened`, on whatever thread raised it (`ActivityTrail.Note` touches no control). L-c is in the Core: `_joinedStarts` counts presses that joined a start under way, and the starter's refusing browser stops the show only when none did.
+
+**The offer is read on events (#889, lane B review lows).** The offer is not read on a clock or on a redraw; an event asks for one read, a second event during a read asks for one more after it, so the last event is the one drawn. The section row's right-click menu still looks the offer up as it opens (an event), on the window's thread.
 
 ## Undo and Redo: the journal Windows owes (#899, piece U1)
 
 The mac's journal core is described in `documentation/09-mac-app.md` →
 "Undo and Redo: one list for the app (#899)", with what was measured and
-what was rejected. **Do not start it until U1's fix reviews have cleared**:
-the format changed after U1's two reviews and again after its two fix
+what was rejected. U1 merged into `dev` at cadd8eb11 on 2026-11-14 and the
+`windows` issue for it is #949, so steps 1 to 8 below may be built (this
+paragraph said "do not start it until U1's fix reviews have cleared" until
+then). The format changed after U1's two reviews and again after its two fix
 reviews (Russell's rulings 17 to 20 and the director's rulings on them),
 before any Windows reader existed, so that it would not change again under
-one, and the issue says when that is settled. The third round (2026-11-14)
-changed no byte a v1 line holds: it stated what a reader does with a
-`cleared` line, a `note`'s required keys and a segment with no time, and
-what `rule.deployed` reads. The Fable sweep the same day added four
-sentences a reader needs, with cases, and no byte of a v1 line changed
-either: the second bullet below. Steps 1 to 8 may start once U1 merges.
+one. The third round (2026-11-14) changed no byte a v1 line holds: it stated
+what a reader does with a `cleared` line, a `note`'s required keys and a
+segment with no time, and what `rule.deployed` reads. The Fable sweep the
+same day added four sentences a reader needs, with cases, and no byte of a
+v1 line changed either: the second bullet below. What Windows has built so
+far, and the pieces still to come, are the two sections after this one.
 
 Windows inherits free: the format (`contracts/file-formats.json` →
 `undoJournal`, which a reader is meant to be built from alone), the rule and
@@ -13845,6 +16414,74 @@ and `knownLimits`, which says what is deliberately not fixed), the 20 traces in
 against a reference model of the same rules. It reads the traces with CR LF
 taken as LF, so a checkout with `core.autocrlf=true` is current (measured
 red before the fix by converting the three files to CR LF).
+
+**U2b (the mac, branch `issue/899-u2b-op-kinds`) defines the six reserved op
+kinds** (`replaceText`, `editJSON`, `move`, `createTree`, `removeTree`,
+`external`) and runs `recompute`, all in the contract: their rules in
+`undoJournal.opKinds` (and `opKinds.wholeOps`), 64 more `checkCases` rows,
+`listingCases` (a folder's listing, the one text both platforms must make
+byte for byte: lines in the order of the paths' UTF-8 BYTES, never
+`string.Compare` or a culture's order), 15 `stackCases` and 6
+`recoveryCases`. What Windows must get right that the Swift cannot show: a
+`move` is one `MoveFileEx` WITHOUT `MOVEFILE_REPLACE_EXISTING`, judged as a
+pair (never delete the destination alone); a folder taken out is renamed
+aside and deleted only once every change has gone in; `editJSON` compares
+as JSON (true is not 1) and writes back with `JsonSerializer` only if the
+result reads back as the file with that one member changed; an `external`
+`preference:` names Windows' own settings store; and until the app has a
+runner for a `recompute`'s maintainer, its step is not available. A W1
+reader written before U2b treats every one of these kinds as unreadable,
+which is still safe (a barrier); the rows say what it should answer once it
+reads them. The mac's reasons and what was rejected are in
+`documentation/09-mac-app.md` → "The kinds U2 adds, and `recompute` run".
+
+After U2b's hard review (2026-11-19) five more things bind Windows, each
+with cases: a read of the teacher's file that FAILS (access denied, an I/O
+error, a OneDrive placeholder not yet downloaded) is `cannotTell`, refused
+without clearing the list and retried by recovery, never "changed since"
+(`checkCases` with `cannotBeRead`; on Windows deny read with an ACL);
+`editJSON` changes only the member's bytes (`undo-json-cases.json` → `editJSONCases`, the exact
+bytes, with a Python reference: do not re-serialise the file with
+`System.Text.Json`); places are compared without regard to case; a
+listing never holds a `.DS_Store` (and the Windows twin, `desktop.ini` and
+`Thumbs.db`, is a question for the Windows port to raise, not assumed); and
+a folder set aside by a dead process is renamed back only when its listing
+is the step's, never deleted (`undo.rule.recovery`, `recoveryCases` with
+`withATree`). The door for a step given as ops refuses before anything
+changes when the step would not read back readable, names a path outside
+the working folder (links resolved), or names a blob it was not given.
+
+Three more rules from the second and third reviews bind Windows, each in
+the contract: **who settles a front-page step** (a dead step with a
+`recompute` is settled only by a recovery that re-derives what it settles;
+a recovery inside another write's lock leaves it in flight; `rule.recovery`,
+`recoveryCases` with `recoveredBy`); **containment is checked at every
+change**, not only at the door (every place inside the working folder with
+junctions and links resolved, at plan time and immediately before each
+rename or write; a place that leads outside is `changedSince`;
+`rule.stagedThenSwapped`, `stackCases`); and **a folder set aside is the
+teacher's own** (renamed back whenever its place is free, whatever it holds,
+and in the way when it changed; left untouched and recorded when its place
+is taken; the trail event `undo found a folder set aside`, written by
+recovery since W6 (one line before each rename; it was held in
+`NamedGapLedger` under #899 until then); `recoveryCases`
+with `changeTheFolderSetAside` and `somethingInItsPlace`).
+
+Two more from the fourth review and Russell's ruling of 2026-11-19 bind
+Windows, in `rule.recovery` and `recoveryCases`: **a folder taken out is
+never deleted in place** (once every change has gone in, rename it from
+its `-orig` name to its `-gone` name with one `MoveFileEx` without
+`MOVEFILE_REPLACE_EXISTING`, then delete it; recovery deletes a `-gone`
+remnant as a staged file and never puts it back; `recoveryCases` with
+`halfDeleteTheGoneFolder`, a delete cut short at the kill point
+`whileDeletingAFolder`); and **a folder set aside whose place something
+else holds is renamed to a visible name beside it**, `<name> (kept by
+Undo)`, then `(kept by Undo 2)` and on, never over anything, with the trail
+line written just before the rename (`recoveryCases` with
+`visibleNameTaken` and `recoveryStopsAfterTheTidy`, a recovery that dies
+after it has tidied and before it writes to the list). A place that cannot
+be read (access denied) is neither free nor taken: leave the folder, say
+nothing, try again.
 
 Six things in the format are easy to get wrong and are the reason it was
 revised:
@@ -13913,9 +16550,35 @@ It owes, in this order (the contract review's recommendation):
    exclusive open retried on a timer (W3; polling on the mac gave up 663 of
    1,600 begins with 8 processes at once). Readers open with
    `FileShare.ReadWrite | FileShare.Delete`, retry a sharing violation for a
-   bounded time and never call the list unreadable for it (W2).
+   bounded time and never call the list unreadable for it (W2). Built in
+   W2a with `LockFileEx`; the named mutex was rejected there for its thread
+   affinity ("What Windows has built: W2a").
 4. The checks: `checkCases`, then `stepCases` and the staged swap that
-   retries a refused rename and names the file still in use (W5).
+   retries a refused rename and names the file still in use (W5). Two
+   rows came with the mac's U2a (the Fable sweep of U1, F1 and F2), and
+   both are behaviour, not format: `stagingFailsAt` (a staging write that
+   fails, as on a full disk, removes the staged file it made and every
+   other, swaps nothing, and refuses with its own word `couldNotWrite`,
+   never `fileIsInUse`; the list is left as it was), and `step: twoLines`
+   with the page's front matter removed by hand (a line op that cannot be
+   placed is `changedSince`, and every page in the way is reported before
+   any content found missing; `contentMissing` is only a blob the list no
+   longer holds). On Windows the staging write can fail for the same
+   reasons (`ERROR_DISK_FULL`, `ERROR_ACCESS_DENIED` on a read-only
+   folder), and a `FileStream` opened with `FileMode.CreateNew` leaves its
+   file behind exactly as the mac's exclusive create did: delete it in the
+   catch. Keeping the original is `couldNotWrite` too when it fails for
+   room or permission (on the mac a volume without hard links copies it);
+   any other failure at the swap (keeping the original, or the rename
+   onto the target) stays `fileIsInUse`. A `couldNotWrite` swap during
+   recovery is retried on the same schedule as a file in use. A file of
+   the list that exists and cannot be opened or read throws: only a file
+   that is GONE (`FileNotFoundException`, a segment pruned since it was
+   listed) is passed over, and a blob that cannot be read is never
+   `contentMissing` (which clears the list).
+   Every read of the list must throw rather than crash, and a throw is an
+   unreadable list for that attempt (shadow goes ahead, live refuses
+   before anything changes; the mac's F4).
 5. Write-ahead and recovery, and the `recoveryCases`, including
    `interrupted` (a file changed by hand stops recovery putting the whole
    step back: what can be verified is put back and the list is cleared),
@@ -13933,7 +16596,8 @@ It owes, in this order (the contract review's recommendation):
 8. `deployedCases`: a pure function, for U6's offer to deploy. It needs the
    section's destinations as Windows knows them (primary and additional, by
    type) and whether each has a site marker, read from the same
-   `firstDeployMarkers` paths the scheduled deploy reads.
+   `firstDeployMarkers` paths the scheduled deploy reads. Built
+   2026-11-14 (W5): "Step 8 built: was it deployed?" below.
 
 Until each is built it is a named gap. What goes red on that side the day
 U1 merges, measured by reading the tests rather than running them: the
@@ -13952,3 +16616,1665 @@ and only `begin`, `undoing` and `redoing` need the expensive flush
 byte-order mark (`String(contentsOf:)` does, as `File.ReadAllText` does),
 and the traces' writer does the same, so the BOM page in the fixture is
 rewritten without it on both platforms.
+
+### Step 8 built: was it deployed? (#899 piece W5, 2026-11-14)
+
+`Plantoir.Core/Undo/UndoWebsite.cs` answers `undo.rule.deployed` and
+nothing else: given the pages an Undo or a Redo changes (each with whether
+students can see it before and after), whether it also changes what a page
+says, the section's published-pages record, the destinations it deploys to
+now and which of them have a site marker, it says `OfferToDeploy`,
+`NoOffer` or `CannotTell`. It reads no journal, writes nothing, shows
+nothing and offers nothing; nothing calls it until W10 (U6) makes the
+offer. No statics and no clock: `Answer` is pure, and `Inputs(course,
+section)` is the one reader of the disk, taking the course it reads.
+
+**The record it reads, and why that one.** The contract means
+`courses\<CODE>\.publish_state\section<N>.published-pages\`, one fragment
+`yyyyMMddTHHmmssZ-<destination>.json` per destination a deploy reached,
+read by its `places` only. On Windows it is written by `deploy.py`'s
+`record_published_pages` after each Netlify (`-netlify.json`) or
+Cloudflare (`-cloudflare.json`) upload, and by `deploy.ps1`'s
+`Record-PublishedPages` after a folder publish (`-folder.json`, the
+folder branch never entering `deploy.py`), each copying the build's
+`.visible-pages.json` only when its `buildId` matches `.build-id`. So the
+app's button, a scheduled deploy and a deploy typed at the command line
+leave the same trace, and #799's per-host builds (each host built for its
+own address) each leave their own fragment after their own upload. #799's
+freshness records (`BuildFreshness`, the build-started marker, the
+preview stamp) say whether the LAST BUILD reflects the course, not what any
+website shows, so they are not this record. `LinksChecklist.PublishedPlaces`
+reads the same folder as a UNION of every fragment of every destination,
+which is the right question for "has this page ever been on a site" and
+the wrong one here: it is not reused, and a must-fail below shows why.
+
+**Inputs, as Windows spells them.** The destinations are
+`CourseConfiguration.AllDeployDestinations` (primary first, then
+additional), mapped `netlify` (or absent) → `netlify`, `cloudflare_pages`
+→ `cloudflare`, `local_folder` → `folder` (the plan review's L7: the
+fragment says `folder`). A type no deploy accepts maps to nothing and is
+not read, since `deploy.ps1` refuses it. The markers are
+`DeployCommand.FirstDeployMarkerPath`'s, the ones the scheduled deploy
+reads. Only the newest fragment of each destination read is OPENED: a
+year of deploys is hundreds of fragments, and an older one cannot change
+the answer.
+
+**What the cases do not say, and what Windows does** (tests named
+`Proposed_`, proposed to the Mac as authored cases, not written into the
+contract): a record folder that cannot be listed is `CannotTell` for every
+destination (none: `NoOffer`); a fragment is read by its `places`
+whatever its `version` says, absent included; a fragment whose `places`
+is missing, not a list, or holds a non-string is unreadable, and so is
+one whose bytes are not valid UTF-8 or whose text holds half of a
+surrogate pair (only matters when it is the newest; before the W5
+review's M1 those two threw out of `Inputs` instead); an op path not of
+the shape `courses/<CODE>/<place>.md`, or one holding half of a surrogate
+pair (NTFS allows it in a name, and it has no normalization form C), is
+`CannotTell`; a change to what a page says
+in a section never deployed is `NoOffer` (the rule's own NO OFFER sentence
+comes first); a destination type no deploy accepts is not read. Also
+pinned, from the rule's words: a missing record folder is no fragments; a
+fragment held open by another program, or with a byte-order mark; two web
+hosts in different states, each read on its own.
+
+**Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200):
+the 18 `deployedCases` pass twice, through `Answer` and through a real
+course folder read by `Inputs` (`UndoWebsiteContractTests`). Each of
+nineteen plausible wrong implementations, put in place one at a time,
+turns named cases red; the list is in #899's closing comment for W5.
+Among them: reading every destination (the contract review's I1 case),
+the union of fragments, ordinal without NFC (the composed and decomposed
+name), the primary destination only, a folder counted as always deployed
+(which is what `firstDeployMarkers` says of a folder for the scheduled
+deploy's question, and wrong here), and an answer read from the journal
+(which no deploy writes: every offer case red).
+
+### What Windows has built: W1, reading the journal (#899, #949)
+
+Piece W1 (branch `issue/899-w1-reading-the-journal`, 2026-11-14) is the
+READING half of steps 1, 2 and 4 above. Nothing in it writes a journal,
+takes the lock or changes a page; nothing a teacher sees changed; no menu,
+no switch, no trail line (it makes no teacher-visible behaviour, so rule 5
+has nothing to record), and no tool, description, schema or phrasing of the
+built-in assistant moved. Everything is in `windows-app/Plantoir.Core/Undo/`
+and nothing in the app calls it yet.
+
+- **`UndoFormat`**: one line read with `JsonDocument`, never a typed
+  deserialiser, and never throwing. Bytes are decoded as STRICT UTF-8 (a line
+  that is not is unreadable, and the blob names in its bytes are kept). A
+  line, step or op it cannot read comes back marked unreadable with whatever
+  could be read of its seq and its blob names, so the fold KEEPS it. Every
+  sentence of `unknown`, `eventKeys`, `events.note`, `stepKeys` and `opKinds`
+  is one test in `UndoFormatTests`, the four Fable-sweep sentences included
+  (an unknown `maintainer` and an unknown `holds` are barriers; `madeBy`,
+  `class` and `action.key` are open strings; an unknown key on a known op is
+  ignored; `madeBy` split at its ends).
+- **`UndoFold`**: the lines into steps. `UndoFold.Moves` is the contract's
+  `folding.moves` table as text, and `UndoFoldMovesContractTests` compares it
+  with the JSON row for row (a row the mac adds is red here) and exercises
+  every row, the state each must reach read from the row. A clearing marks a
+  step in flight, which leaves the list when its work ends in done or undone;
+  a barrier with no seq stands between the step numbered by the highest seq
+  before it and the next.
+- **`UndoLimits.Offer`**: what Undo and Redo act on, with the 50 steps and 30
+  days judged when the list is read, the step time as the latest `madeAt`
+  so far, and the moment judged at as the clock or a step time up to a day
+  ahead of it; a newer step in flight refuses both, or greys both when its
+  process is gone and its folder cannot be reached.
+- **`UndoPruning`**: pruning (one oldest run; a dead process's step in flight
+  there closed `unsettled`, a running one stopping the run; nothing for age
+  while the clock is behind the journal) and deletion (segments from the
+  oldest end only; one holding a line this version cannot read kept until its
+  own newest `at`, or the first later segment's, is past 60 days; a blob kept
+  while anything on the list or anything unreadable in a kept segment names
+  it), both as PURE decisions. W2a carries them out under the lock (below).
+- **`UndoEntries` and `UndoCheck`**: the `editLine` entry model (the block
+  found by `PageVisibilityReader.FenceIndices`, used unchanged, the plan
+  review's L5; the entry rule is the reference model's `Layout`), its pure
+  `Move` in either direction, the state of one op against what is on the disk
+  now, and `UndoCheck.Plan`, the all-or-nothing check of a whole step that
+  works out every file's new bytes and writes nothing. U1's F2 is built in
+  from the start: a line op that cannot be placed is `changedSince`, and a
+  page in the way is reported before missing content.
+- **`UndoCurrent.Read`, and what Windows does with a read that fails.** The
+  check reads asking only to READ and sharing everything
+  (`FileShare.ReadWrite | FileShare.Delete`), never with write or delete
+  access. A page held with no read sharing, a cloud file not available
+  offline or a network error is `CannotReadNow`, refused, named, nothing on
+  the list changed (the plan review's M3). Since U2b's contract (2026-11-19)
+  it ends in one of two ways: a sharing or lock violation (32, 33) as the
+  contract's `fileIsInUse` ends, every other failed read as its `cannotTell`
+  (refusal `cannotTellNow`); see "What U2b's rows met here" above. It is NEVER `changedSince`, which would clear the
+  whole list under ruling 13 for a file that was merely busy. The contract
+  has no case for it yet: the tests are named `Proposed_*`, and the proposed
+  authored cases (with a failing staging write and the read-only bit) are a
+  `mac` issue. A holder that shares reading (Word, many editors) does not stop
+  a read, measured (the review's M2): only a swap is refused under it, which
+  is W2's.
+- **`FolderIdentityFile`**: `folder-id` and `computer-id`, written lower case
+  with one LF and no BOM, made exclusively (temp, then `CreateHardLinkW` onto
+  the name, 183 meaning another made it; `FileMode.CreateNew` in one write
+  where there are no links), read leniently, an empty file under ten seconds
+  old by the injected clock a creator at work, a damaged one set aside only
+  while it is still the same file (volume serial and file index) and put back
+  if it holds an identifier.
+- **`UndoJournal`**, an INSTANCE (the plan review's H1): its folder, clock
+  (`System.TimeProvider`, the smallest seam: it is in the BCL, so nothing was
+  added to `Plantoir.Core`'s references), liveness, reach and switch are all
+  constructor arguments, and nothing in `Undo/` is static state. Only the
+  app's start-up will hand it the real state folder (W4). Segments are read
+  with delete sharing; a sharing violation is retried for a bounded time
+  (two seconds in the app, zero in tests) and then the reading is the LAST
+  state read, marked not fresh, never "unreadable" and never reset. Lines are
+  split at LF only (a CR before it is JSON white space); bytes after the last
+  LF are a torn line and are not counted. Liveness is `WorkLease.OwnerIsAlive`'s
+  rule (`UndoJournalChecks.ProcessIsAlive`; `WorkLease.StartMoment` did not
+  need to change); a step with no readable `process` is judged gone for the
+  offer and for pruning, so nothing stays in flight for ever, but
+  `UndoJournalChecks.RecoveryMaySettle` says recovery never settles it (the
+  review's M3, below).
+  Reach is "the folder is at `pathAtTheTime` and its `folder-id` is the
+  step's"; U7 adds the recent folders.
+
+**Walked from the contract, never retyped:** `checkCases` (30, each page
+written to the disk from `text` or `bytesHex` and read back through
+`UndoCurrent.Read`), `folding.moves` (20 rows), `stackCases` (all 46) and
+`undo-traces.json` (all 20 traces, all 612 calls, every `expect`, `head` and
+`redo`, and `afterUndoingAll` and `final` as page hashes, the pages written
+from `utf8Hex`). The stack cases and traces run through `UndoScribe`, a
+TEST-ONLY stand-in for W2's door that appends the lines the contract says a
+door writes; every decision it acts on is the product's (`Offer`, `Plan`,
+`Decide`, `Deletable`, `NextSeq`), and the journal is read back from the disk
+after every line. The traces' writer (`settingEntry`) and the op derivation
+(`line_ops`) are test-only too (`UndoLineOps`), ported from
+`scripts/make_undo_traces.py`; W2 moves the writer into the product as
+`JournaledSetting`. When W1 landed the scribe had no lock, no flush and one
+process; since W2a (below) it writes every line, blob and pruning through the
+real lock, writer and `Prune`, and since W2b every step, undo and redo goes
+through the real door and staged swap, and the writer and op derivation are in
+the product (`JournaledSetting`, `UndoLineOps`; "What Windows has built: W2b"
+below). Each count is asserted at or above its value today, so a
+list cannot silently fall to zero.
+
+**What U2b's rows met here (2026-11-19).** With the mac's U2b in the
+contract, this reader takes its six kinds for kinds it does not know, as
+the plan has W1 do, so their rows are held on the named-gap ledger against
+#899 for W6 (`NamedGapLedger` → `UndoCheckCases`, `UndoStackCases`,
+`UndoTraces`): 60 `checkCases` (every row of a U2 kind whose verdict is not
+`notReadable` both ways), U2b's 19 `stackCases` (each needs a call or a key
+the replay does not know) and the 15 traces that hold a `move`.
+
+A held row is not skipped, and each of these is proved by a test on a real
+held row (`TheDayAHeldCheckCaseIsAnsweredAsTheContractSaysItFails`,
+`TheDayAHeldStackCasePlaysThroughItFails`, `TheDayAHeldTracePlaysThroughItFails`):
+
+- A held check case must still be read as an op this reader cannot read and
+  still be answered `notReadable` both ways. It fails as the gap closing the
+  day its op is read, or the day it is answered as the contract says, and as
+  a real failure if it is answered anything else.
+- A `current` this test cannot place yet (a move's `atFrom`/`atTo`, a
+  `tree`, a `preference`, U2's shapes, which W6 places) is judged on a
+  placeholder, and only while the op cannot be read: an unreadable op is
+  settled before anything at its path is read, and two placeholders a
+  readable op would tell apart (nothing there, a folder) must agree. So the
+  nine such rows that expect `notReadable` both ways (a move onto itself,
+  with a path, to an absolute path and so on, "createTree whose path climbs
+  out", "external with a path") are met here and are not held. An op this
+  reader CAN read with such a `current` fails, naming the shape, until the
+  test places it. (Until the review of 2026-11-19 a held case of such a
+  shape returned after checking only that its op was unreadable, which a
+  correct W6 reader of those nine still satisfies, so they could never have
+  come off the ledger.)
+- A held stack case must still stop at the call or key it is held for; a
+  held trace is asserted call by call exactly as any other and must stop at
+  its FIRST `move`, at that call's number. Either fails as the gap closing
+  the day it plays through, and as a real failure if anything else stops it.
+
+**What the held traces no longer check, for W6 to restore.** Until U2b's
+contract put a `move` in them, W1 replayed all 20 traces call by call to
+their final hashes. Held, the 15 are asserted only up to their first
+`move`, and trace-002, trace-012 and trace-020 open with one, so they check
+nothing at all here; the ledger entry's reason says so, so the coverage
+comes back when W6 replays them whole.
+
+U2b's two `cannotBeRead` rows on kinds W1 reads ("a page that is there and
+cannot be read just now (no permission)", "whole file: cannot be read just
+now") were W1's and are built: a read refused for any reason but a sharing
+or lock violation (32, 33) is now `cannotTell`, refused `cannotTellNow` with
+the list kept, in the mac's order (a page in the way, then a page that
+cannot be read, then content missing, each pinned by a test); a sharing or
+lock violation stays "in use", which `rule.recovery` names apart. The mac
+answers `cannotTell` for every failed read but a missing file or folder;
+the 32/33 split is Windows' own, because there a page held by another
+program is the everyday case and `fileIsInUse` names it. The contract rows
+make the page unreadable through `UndoCurrent.Read`'s seam (access denied),
+so they run under any token; a real deny-read ACE is
+`APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow`. It runs
+and passes over SSH on the PC (run `899u2b-win-11`): a deny ACE on READING
+a file stops the administrator's token there, unlike a deny on LISTING a
+folder, which it passes (`DenyBitesFact`). Its `DenyReadBitesFact` probe
+still skips it, saying why, on any account whose token reads past it.
+
+There are now three deny-rule probes, one each for listing a folder, reading a
+file and replacing a file (`DenyReplaceBitesFact`, #953). Each probe tests the
+exact operation its tests need, because they do not all fail in the same
+places. Over SSH on the PC, the account is an elevated administrator with the
+backup and restore privileges enabled. A rename passes deny rules on both the
+file and its folder there, but a read-only attribute still stops it. A test
+that needs a deny rule to bite must therefore use the probe that matches its
+operation, not borrow another one. Any part of the test that does not depend
+on a deny rule should be split out as a plain fact, so that it still runs
+everywhere.
+
+**Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
+.NET 9, the system NTFS volume, other agents of the run sharing the CPU, so
+the spread is wide): a whole read, fold and offer of one segment, by a scratch
+harness outside the gate (`work\899w1\measure`), 11 runs each, the first in a
+fresh process:
+
+| Segment | Steps | First | Then (median, min to max) |
+|---|---|---|---|
+| 1.00 MiB of one-page steps | 1,665 | 413 ms | 253 ms (128 to 302) |
+| 1.04 MiB of 233-page steps | 28 | 119 ms | 95 ms (80 to 106) |
+| 4.00 MiB of one-page steps | 6,642 | 538 ms | 433 ms (386 to 493) |
+| 4.03 MiB of 233-page steps | 109 | 339 ms | 178 ms (126 to 311) |
+
+Linear in the bytes and the lines, and slower than the mac's first reads
+(50.8 ms at 1 MB, 170.9 ms at 4 MB, M4 Pro), which read on from where they
+stopped: W1 reads whole, every time. Reading on (built in W2a, `UndoJournal.Read`;
+its numbers are in "What Windows has built: W2a" below) is what makes the
+ordinary step cheap; measure the door's first step against these.
+Scanning every line for blob names, which only an unreadable line needs, was
+made lazy after the first measurement (1 MiB one-page: 281 ms to 253 ms
+median, inside the noise). The undo test classes run in about 25 s together
+(the 20 traces about 19 s alone).
+
+**Must-fail proofs** (each wrong implementation put in place, the filtered
+undo tests run, the file put back and touched; 308 tests in the filter):
+a reader that SKIPS what it cannot read (20 red: format, reading, pruning and
+stack cases); a culture-aware compare (1: the "same title in another Unicode
+form" check case); `File.ReadAllText` for the current page (10: check cases,
+the traces, the ReadWrite-holder test); a failed read taken as changed since
+(5: every `Proposed_*` read test); a clearing that checks its reason (8); a
+step's time as its own `madeAt` only (1: "a clock set back for one step");
+deletion that forgets what an unreadable line keeps (2); a clearing that
+leaves a step in flight alone (6); any `recompute` maintainer read as
+readable (4); the next number counted from readable lines only (4).
+
+**Rejected:** a typed deserialiser (the mac's first bug: it threw and the line
+was skipped); a fourth verdict word of Windows' own for a failed read (M3: the
+contract's `fileIsInUse` already said what happens, and since U2b its
+`cannotTell` says it for every failed read but a held file); probing a page with an
+exclusive open to find holders (M2: every page Obsidian has open would be
+refused); `File.ReadAllText` anywhere in a check (it drops a BOM and replaces
+bad bytes without a word); a culture-aware compare anywhere (it calls a
+precomposed é equal to a decomposed one); a static journal, a static clock or
+a static switch (H1: test classes run in parallel); changing
+`PageVisibilityReader` for the BOM case (L5: its publish-path callers pass
+text with no BOM).
+
+**The implementation review's fixes (2026-11-19).** The review (Opus,
+2026-11-14, `reviews\899-w1-impl-review.md` of the v2.0.0 Windows run)
+found 1 HIGH and 4 MEDIUM; each has a test that failed before its fix:
+
+- **H1, a good `folder-id` set aside.** `SetAside` took the file's identity
+  at the moment of the call and compared the file with itself, so the
+  "still the file inspected" guard always passed, and a good identifier
+  another process had just made could be moved aside and lost (measured by
+  the review: 3,000 of 3,000 moved under a concurrent maker), greying Undo
+  for that folder for good. `Read()` now takes the identity (volume serial,
+  file index) from the SAME handle it read the bytes through, and
+  `SetAside(inspected)` opens the name once with delete access (sharing
+  everything), compares THAT handle with the identity inspected, reads it
+  again, and renames through it (`SetFileInformationByHandle`,
+  `FileRenameInfo`, never replacing). The first fix compared by path and
+  then moved by path, which the review's second round showed still lets
+  another process set the damaged file aside and make a good one between
+  the two, so the good one was moved (and a move back fails once a third has
+  made its own). Through the handle, what is moved is provably the file
+  inspected, wherever it now is. `AFileSetAsideByAnotherProcessBetweenThe
+  CheckAndTheRenameIsNeverTheGoodOne` runs exactly that interleaving
+  through a seam between the check and the rename, and a second seam
+  straight after the rename lets a third process make its own identifier
+  if the name is free. The third maker is what makes the test bite: without
+  it the compare-by-path code moved the good file aside, saw it was not the
+  file inspected and moved it back unharmed, so the test passed with the
+  fix reverted (found by the fix review). With it, that code fails (VM run
+  on 41831de19, 2026-11-19: the name held the third identifier, the good
+  one stranded aside), and the handle rename passes. A creator still writing
+  holds its file with no sharing, so the open fails and nothing moves. The
+  mac's equivalent (compare and rename by descriptor) is #1004, item 1.
+- **M1, a page gone with its drive.** A page whose folder is not there reads
+  `Absent`, which is `changedSince`, and ruling 13 would clear the whole list.
+  `UndoCheck.Plan` takes `folderIsReachable` and asks it again when every page
+  in the way is absent; when the folder cannot be reached the answer is
+  `FolderCannotBeReached` (greyed, nothing cleared). W2's door must pass it.
+  This follows the rule the mac adopts in U2b (#899): a failed read or a
+  folder that cannot be reached is "cannot tell now", refused without
+  clearing the list.
+- **M2, a stale reading.** A reading that is not fresh holds the LAST state
+  read (empty on a first read) beside the segments on the disk now, and
+  deletion decided from that mix made live blobs deletable. Pruning and
+  deletion now take one `UndoReading` (fold and segments from the same read)
+  and decide nothing from one that is not fresh; `UndoJournal.Offer(reading)`
+  greys both Undo and Redo for it rather than saying "Nothing to undo".
+- **M3, a process that cannot be identified.** Judged gone for pruning, which
+  is right, but recovery (W3) writes pages, and a live process of another
+  version might still be swapping files: `RecoveryMaySettle(null)` is false.
+  Proposed to the mac as a `recoveryCases` row.
+- **M4, a `madeAt` that does not parse.** Its time was the oldest moment
+  there is, so it expired at once: no barrier, pruned on the next step. It
+  now does what the mac's `effectiveTimes` does: it carries the previous
+  step's time, or has none, and a step with none never ages out (it stands
+  as a barrier and is not pruned for age). The first fix took the begin's
+  `at`, else the clock, which made that step and every later one never age
+  out; the second round removed it. A `madeAt` (or `at`) with an offset such
+  as `+00:00` IS a moment, read into UTC as the mac's `UndoMoment.date`
+  reads it; before, Windows made such a step unreadable. Settling this for
+  both in the contract is #1004, item 4.
+
+**The mac's U2a read rule**, applied at the same time: a file of the list that
+is there and cannot be opened or read is never an empty or shorter list. A
+segment that cannot be read, a folder that cannot be listed, or a NEWEST
+segment gone since the listing makes the reading not fresh; only an older
+segment pruned since the listing is passed over. A blob that is there and
+cannot be read throws `UndoListUnreadableException` (never content missing,
+which clears the list), and so does a content folder that cannot be listed.
+Neither folder is asked `Directory.Exists` first, which answers false for a
+folder it could not look at: only `DirectoryNotFoundException` is "not
+there". Here Windows is stricter than the mac today: a newest segment gone,
+and these listings, are #1004 items 2 and the closing paragraph.
+`UndoJournal` takes an `open` seam for the tests of each.
+
+**Known differences to KNOW** (not to do): a key twice in one object is read
+as unreadable at that level (JSON does not say which is meant); a
+`writeFile`'s `beforeSha`/`afterSha`, when present, must be 64 lower-case hex
+characters; FAT and exFAT file indexes across a re-open were NOT measured (no
+such volume on this PC), which matters only to reading on: W2a reads those
+volumes, and network shares, whole every time (below).
+
+### What Windows has built: W2a, the lock and the store (#899, #949)
+
+Piece W2a (branch `issue/899-w2a-lock-store-pruning`, 2026-11-20) is the
+first half of the write side: the one lock, the append, segments, blobs,
+reading on, and pruning CARRIED OUT (W1 only decides). Nothing a teacher sees
+changed and nothing in the app calls it: the switch stays off, no trail line
+(no teacher-visible behaviour), no tool or phrasing of the built-in assistant
+moved. The plan it was built from is `vm-tools/reference/899-w2a-plan.md`.
+
+- **`UndoLock`** (`rule.oneLock`). `CreateFileW` on `undo\.lock`
+  (`OPEN_ALWAYS`, read/write/delete sharing, `FILE_FLAG_OVERLAPPED`, never
+  wrapped in a `FileStream`, so .NET never binds it to the thread pool's
+  completion port: the earlier run's P2 crash), then
+  `LockFileEx(LOCKFILE_EXCLUSIVE_LOCK)` on byte 0 WITHOUT
+  `LOCKFILE_FAIL_IMMEDIATELY`, the OVERLAPPED in unmanaged memory with its own
+  manual-reset event until the handle closes. A wait that runs out cancels
+  (`CancelIoEx`) and then waits for the request's own answer
+  (`GetOverlappedResult`); a grant that beat the cancel is let go at once, so
+  a take that said busy never leaves the lock held. The lock is the handle's,
+  not the thread's: two journals in one process exclude each other and a
+  hold may be let go on another thread. Paths past 259 characters take the
+  `\\?\` form. *Rejected:* a named mutex (thread affinity; `Local\` is per
+  session), an exclusive open retried on a timer (a poll), `FileStream.Lock`
+  (no form that waits).
+- **`UndoProcessMemory`**: what the contract says a PROCESS remembers, the
+  shadow try-once (after a shadow wait runs out, later shadow takes try once
+  with `LOCKFILE_FAIL_IMMEDIATELY` until the lock is next taken) and the
+  closings it could not write. An object the composition root will own (W4),
+  never a static (the plan review's H1); a journal given none makes its own.
+- **`UndoJournal.WithLock`** (the mac's `withLock`): the folder made, the lock
+  taken (2 s live, 50 ms in shadow, both read from the rule's sentence by
+  `UndoLockTests`), a torn last line cut (only bytes after the last LF, then
+  `FlushFileBuffers`), the journal read FRESH, pending closings written first
+  (an `applied` dropping the redo branch then), the body, and every line
+  made durable. **A reading inside the lock that is not fresh refuses the hold**
+  (`UndoJournalFailure.ListNotReadable`): nothing is written or deleted from
+  a stale fold (the W1 review's M2, carried into the write side).
+  `WriteClosingOrKeep(line, wait)` keeps a closing the lock refused; the
+  10-second wait the mac's door uses is the door's to pass (W2b).
+- **`UndoJournalWriter`**: one JSON object per line, keys sorted at every
+  level, `v` 1 and `at` (whole seconds, UTC) stamped when the caller has not,
+  UTF-8 with no BOM, an explicit LF (never `WriteLine`, which is CR LF here),
+  each line ONE `WriteFile` on an unbuffered stream. A new segment once the
+  newest is at or past 4 MiB, made with `FileMode.CreateNew`. **Every hold
+  that wrote ends with `FlushFileBuffers`**: the mac `fsync`s every hold and
+  `F_FULLFSYNC`s `begin`/`undoing`/`redoing`; Windows has one flush that
+  reaches the disk, measured at 0.90 ms median (below), so every hold gets
+  it rather than only the three (a change from the plan, which flushed only
+  those). `Sync()` is the same flush, for a door that must make a line
+  durable before it goes on inside one hold.
+- **Blobs** (`WriteBlob`, `WriteBlobs`): one already there that hashes to its
+  name is used as it is; otherwise `content\aa\.tmp-<guid>` made with
+  `CreateNew`, flushed to the disk, then `File.Move(overwrite: false)`; 80 or
+  183 means the name is there, so it is read and hashed (a torn one is
+  deleted and the write tried once more); 50 or 87 from the move falls back
+  to an exclusive create of the name (the contract's exFAT rule). A blob that
+  cannot be stored removes its temporary file and throws
+  `CouldNotStoreContent`. `WriteBlobs(contents, parallelism)` writes many at
+  once, because each blob's flush is per file: see the 233-page numbers.
+- **Reading on** (`UndoJournal.Read`, the twin of the mac's `UndoFoldCache`,
+  per journal instance). Per segment it keeps the parsed lines, the end read
+  to, the 64 bytes before that end, and the file's identity (volume serial and
+  file index from the OPEN handle, `UndoFileIdentity`). It reads on only when
+  every kept segment is still there (or gone from the oldest end only), the
+  same file, at least as long, with the same 64 bytes before the end, and no
+  segment has appeared below the newest read; anything else reads whole.
+  It **refolds from the kept lines on every read** rather than updating a
+  kept fold: a reading a caller holds never changes under it, and a deleted
+  oldest segment's barriers are forgotten by construction
+  (`undoJournal.files`). FAT, exFAT and network volumes (not NTFS or ReFS, or
+  a UNC path) are read whole every time, and so is a journal given the test
+  `open` seam. Nothing of a failed read is kept.
+- **`UndoJournal.Prune(writer)`**, inside the lock, never failing the caller:
+  W1's `Decide` on the writer's fold (fresh, plus its own lines), each
+  `pruned` or `interrupted` (`unsettled`) appended; then W1's `Deletable` on
+  that fold and the blobs on the disk: blobs, any `.tmp-` a dead writer left
+  (blobs are written under the lock, so only a dead process leaves one), then
+  segments from the oldest end, stopping at the first that will not delete,
+  and the writer refolds. The staged files a step closed `unsettled` may have
+  left are tidied in the same hold since W2b (below).
+- **`UndoJournalLocation.Folder`**: `AppDataRoot.Current\undo`, following
+  `--state-dir`; the only place Undo reads `AppDataRoot`. Nothing calls it
+  before W4.
+- **The scribe moved onto the store.** `UndoScribe` (test-only, W1) now
+  appends, stores blobs and prunes through `WithLock`, the writer and
+  `Prune`, so all the stack cases and traces W1 walks (the held ones still
+  held for W6) run through the real lock, append, segments, blobs, reading on
+  and deletion.
+
+**Tests** (each written failing first): `UndoLockTests` (8),
+`UndoStoreTests` (18), `UndoPruningCarriedOutTests` (4), every contract
+sentence they prove asserted from the JSON. Six must-fail proofs, each red
+alone and green restored, by a script on the PC
+(`vm-tools/guest/899-w2a-mustfail.json`): CR LF written; a reader without
+delete sharing; `LOCKFILE_FAIL_IMMEDIATELY`; reading on without the tail
+check; no fresh check inside the lock (deletion from a stale fold); no
+torn-line cut.
+
+**Measured** on a Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200),
+Release build, by `windows-app/Plantoir.UndoHarness` (in no solution;
+`vm-tools/guest/899-w2a-pc-run.ps1 -Mode harness`), first in
+`C:\vm-setup\...\scratch` and then in a scratch folder inside the PC's
+signed-in OneDrive (`C:\Users\lenov\OneDrive`, OneDrive.exe running, Files
+On Demand on), removed afterwards. Outside / inside OneDrive:
+
+| What | Outside OneDrive | Inside OneDrive |
+|---|---|---|
+| 2 processes × 200 holds, live (2 s) | 400 of 400, seqs distinct, highest wait 193 ms | 400 of 400, 300 ms |
+| 8 × 200, live | 1,600 of 1,600, distinct, highest wait 958 ms | 1,600 of 1,600, 1,090 ms |
+| 2 × 200, shadow (50 ms, try-once) | 200 of 400 | 17 of 400 |
+| 8 × 200, shadow | 14 of 1,600 (85 on an earlier run) | 51 of 1,600 |
+| A holder killed, the waiter granted after | median 24 ms, highest 45 (5 rounds) | median 34 ms, highest 42 |
+| One line appended / `FlushFileBuffers` | 0.39 / 0.90 ms median (p95 0.63 / 1.20) | 0.48 / 0.85 ms (0.79 / 1.13) |
+| A whole hold (lock, cut, read on, line, flush) | median 10.7 ms, p95 16.4 | 11.9 ms, 17.3 |
+| First read / read on, nothing new / read on after one step (0.5 s later) / whole read, 106 KB | 10.5 / 0.7 / 3.2 / 13.5 ms | 11.9 / 0.7 / 3.8 / 8.9 ms |
+| the same at 1 MB | 40 / 2.7 / 6.5 / 66 ms | 47 / 3.1 / 5.8 / 77 ms |
+| at 4.2 MB (2 segments) | 156 / 6.6 / 54 / 166 ms | 207 / 15 / 43 / 181 ms |
+| at 10.6 MB (3 segments, the mac's simulated year peak) | 360 / 35 / 56 / 359 ms | 419 / 29 / 64 / 383 ms |
+| A 233-page whole-file step's 466 blobs (2 KB each) in one hold, one at a time | 1,273 ms; a 2 s waiter beside it granted at 1,265 ms | 1,521 ms; granted at 1,522 ms |
+| the same, 4 at a time / 8 at a time | 409 / 387 ms | 429 / 418 ms |
+| One blob's parts, median: create and write / flush / close / no-replace move | 0.56 / 0.81 / 0.12 / 0.79 ms | 0.54 / 0.82 / 0.11 / 0.78 ms |
+
+Read from it:
+
+- **The lock queues**: no live hold was refused with 8 processes at once, in
+  OneDrive too; the mac's poll lost 663 of 1,600. A killed holder's lock goes
+  to the waiter in tens of milliseconds.
+- **Shadow under contention gets very little through**, by the contract's
+  own rule: once a process's 50 ms wait runs out it only tries once until it
+  next gets the lock, and with seven others queued it rarely does. The
+  earlier run's P1 (752 of 1,600) did not have the try-once. Nothing is lost
+  by it (shadow records nothing a teacher relies on), and contention like
+  this is far beyond a classroom's.
+- **Reading on matters from about 1 MB**: at the year's peak a read on costs
+  35 to 64 ms against 360 to 420 ms read whole. Refolding every kept line on
+  every read is about 30 ms of that at 10 MB, kept over a fold updated in
+  place for the reasons above. A read on just after another process wrote is
+  slower than half a second later (8.6 against 3.2 ms at 106 KB): the file is
+  being looked at right after it is written (Defender), measured, not fixed.
+- **A whole-file step's blobs dominate a hold**: written one at a time, 466
+  blobs held the lock 1.3 to 1.5 s, close to the 2 s a live waiter gives up
+  at; each blob's flush and move are about 0.8 ms each and do not shrink.
+  Four at a time holds it about 0.4 s. **W2b's door writes a step's blobs
+  with `WriteBlobs(contents, 4)`**; eight buys almost nothing more. The mac
+  measured 34 to 36 ms for the same step.
+- **OneDrive changes nothing W2a relies on**: in 120 s of a hold a second
+  inside it (115 holds, a blob each, every third blob deleted), the segment's
+  file index never changed, no read was ever refused for sharing (with no
+  retry at all), no delete failed, no conflict copy or other stray file
+  appeared, and the segment stayed a plain local file (`Archive` only, no
+  reparse point). The journal itself never lives there (`%LOCALAPPDATA%`).
+
+**What W2b needs from this.** The staged swap's OneDrive measurement is
+W2b's: the POSIX-semantics rename onto a page OneDrive is syncing, hard
+links (the identifier files use one), and pages that are Files On Demand
+placeholders (the OneDrive folders on this PC, `Documents` and `Pictures`,
+are reparse points: pages in them may not be on the disk at all until
+read). Blob writes are about 2.7 ms each one at a time, so a door should
+write a step's blobs together (`WriteBlobs`, 4), and the `begin` in the
+same hold. A closing refused by a busy lock is kept with
+`WriteClosingOrKeep`.
+
+### What Windows has built: W2b, the staged swap and the door (#899, #949)
+
+Piece W2b (branch `issue/899-w2b-staged-swap-door`, on W2a, 2026-11-20) is
+the half of the write side that changes pages: the staged swap, the door
+every step, undo and redo goes through, and the stack cases, traces and
+`stepCases` through that real door. Nothing a teacher sees changed and
+nothing in the app calls it: the switch stays off, no trail line, no tool or
+phrasing of the built-in assistant moved. The plan it was built from is
+`vm-tools/reference/899-w2b-plan.md`. Recovery is W3's: until it exists a
+dead process's step stays in flight exactly as the fold reads it (the
+door's hook points for it are marked in `UndoDoor`).
+
+- **`UndoSwap`** (`rule.stagedThenSwapped`). Every new content is STAGED
+  beside its target as `.<name>.plantoir-undo-<seq>-<apply|undo|redo>-new`
+  (`FileMode.CreateNew`, flushed); a staging write that fails removes the file
+  it was writing and every other, swaps nothing and refuses `couldNotWrite`
+  (U1's F1; `stepCases` `stagingFailsAt`). Then each target in the order the
+  check met it: the containment check (below); the target RE-READ with
+  delete sharing and never write access, which must still hold what the
+  check saw (a page deleted by hand just before its swap is changed since and
+  is not made again); a read-only page refused `couldNotWrite`, never forced
+  (the plan review's M4: today's publish refuses one too); the original kept
+  as `-orig` by `CreateHardLinkW` (a copy where the volume has no links, a
+  copy that fails for room or permission being `couldNotWrite`); the target's
+  attributes (Hidden, System, Archive, not indexed) and creation time copied
+  onto the staged file, because whatever the staged file carries the page
+  becomes (M4; Quartz dates a page with no `created:` by its file); then ONE
+  rename, the POSIX-semantics rename (`SetFileInformationByHandle`,
+  `FileRenameInfoEx`, `REPLACE_IF_EXISTS | POSIX_SEMANTICS`, the source opened
+  with DELETE), and `MoveFileEx(REPLACE_EXISTING | WRITE_THROUGH)` only when
+  that answers 87 or 50 (a network share, M5). A page that had no file is made
+  with a move that never replaces. A refused rename is tried six times 10 ms
+  apart (a paced retry, the director's fact 2 on #899: 0 of 2,000 lost with 10
+  tries), then `fileIsInUse` (an access-denied on a page that is not
+  read-only, or a sharing violation) and the swaps already made are reversed
+  from their originals. After the rename the kept original, a hard link and
+  so the page AS IT WAS at the rename, is read back and must be what the
+  check saw (the plan review's L4): an edit made in place between the re-read
+  and the rename shows there, and the step is reversed, which puts the edit
+  back, and refused as changed since; an original that cannot be read back is
+  `cannotTellNow`, never changed since. Once every swap is in, the originals
+  and anything staged are removed. An original whose reversal did not go in
+  is never removed: it is the page's old content under its staged name, for
+  recovery.
+- **Containment, links resolved** (`UndoPlaces`). Every place is checked to
+  be inside the working folder by the final path of an open handle
+  (`GetFinalPathNameByHandleW` on the deepest part that is there), never by
+  the spelling of the path, at the plan and again just before each re-read
+  and each rename. A folder on the path replaced by a junction to outside the
+  working folder since the check is changed since, and nothing is read, kept
+  or renamed through it.
+- **`UndoDoor`** (the mac's `JournaledWrite` and `UndoJournal.move`).
+  `Perform(UndoStepDraft)`: a step given as each file's before and after,
+  its ops worked out by the line model where it reproduces the change both
+  ways, otherwise `writeFile` (`UndoLineOps.ForAFile`, moved into the product
+  from the test with `JournaledSetting.SettingEntry`, the traces' writer).
+  `Perform(UndoOpsDraft)`: the one entry for every kind, a step given as its
+  ops, vetted first (it reads back readable, every path stays inside the
+  folder through its links, every blob is given or held) and planned forward
+  as a Redo plans it; an op of a kind this version cannot read yet (U2b's six
+  until W6) is refused `notReadable` before anything is written. Both:
+  phase one, ONE hold: the `folder-id` read or made, the blobs
+  (`WriteBlobs(contents, 4)`, W2a's measurement), the next number from the
+  fresh fold, the `begin` naming every op with this process's host, pid,
+  name and start moment (`WorkLease.StartMoment`, now internal), flushed;
+  phase two, outside the lock, the swap; phase three, `applied` (the redo
+  branch dropped then) or `failed` (phase begin, reason refused), with
+  pruning in the same hold, written by `WriteClosingOrKeep` with a 10-second
+  wait (the mac's `UndoSwitch.finishWaitSeconds`; the plan review's L6) and
+  kept by the process when the lock stays busy. `Undo()` and `Redo()`: the
+  offer inside the lock; every op checked outside it with nothing written
+  (`UndoCheck.Plan`, which now also gives the changes in the order it met
+  them, with what each held); inside again, still the one to move,
+  `undoing`/`redoing` flushed; the swap; `undone`/`redone` or `failed` with
+  its phase. `changedSince` and `contentMissing` clear the list for an Undo
+  (rulings 13 and 22) and drop the redo branch from that step up for a Redo
+  (ruling 20), whether the check or the swap found them; `fileIsInUse`,
+  `couldNotWrite` and `cannotTellNow` change nothing on the list; a folder
+  that cannot be reached is not available (ruling 10). A `recompute` is run by
+  a maintainer runner the door is given (`IUndoMaintainers`; W6 supplies the
+  app's): with none for its maintainer a step is not available, never undone
+  with its re-derivation skipped. `ClearTheListAsTheSwitchGoesLive` is the one
+  clearing at the flip. The test seams (`UndoSeams`: stop at a kill point, a
+  staging write that fails at an index, a hook before each swap) are an
+  object a caller makes, never a static.
+- **A step's blobs and its begin are one hold, and that hold never prunes**
+  (W2a's review, LOW 2). `WriteBlob` uses a blob already on the disk as it
+  is, and a blob nothing on the list names is deletable; a pruning between
+  storing (or finding) it and the begin that names it would delete it. The
+  door stores blobs only inside its begin hold and prunes only in the
+  closing hold, after the begin keeps them. `AStepsBlobsAndItsBeginAreOneHoldSoNoPruningCanTakeABlobItReuses`
+  goes red with a pruning put into the begin hold.
+- **Pruning's staged-file tidy.** When pruning closes a dead process's step
+  `interrupted` (reason `unsettled`) and the journal is live and the step's
+  folder can be reached, every `.plantoir-undo-<seq>-<apply|undo|redo>-…` file
+  beside the files it names is removed in the same hold; a folder that cannot
+  be reached keeps them for W3's first recovery that reaches it
+  (`knownLimits.stagedFilesOfAFolderAway`). Folders under a staged name are
+  U2's (W6) and are not touched.
+- **The scribe goes through the door.** `UndoScribe` now makes every step,
+  undo, redo and the clearing at the flip through `UndoDoor`; only the calls
+  that stand for ANOTHER process or version (`begin:held`, `finish:held`,
+  `begin:dead@B`, `foreign*`, `stepFromAnotherVersion:*`, `cleared:<reason>`,
+  `note`) write their lines raw, as the contract describes them. Every stack
+  case and trace W1 walks (the W6-held ones still held) runs through the
+  real door, lock, store and swap. `stepCases` (5) run in
+  `UndoStepContractTests` with the file in use at a swap a REAL holder
+  (`FileShare.ReadWrite`, no delete: the re-read succeeds, the rename is
+  refused 32) and the staging failure the seam (a real full volume needs an
+  administrator).
+- **W2a's review LOWs, fixed here**, each with a test that fails without it:
+  the writer folds into a COPY of the reading (`UndoFolded.Copy`), so a
+  not-fresh read on another thread never hands out an object a hold is
+  changing (1); the blobs-and-begin hold above (2); `AWaiterIsWokenByTheRelease`
+  waits on a real signal that the waiter's request is queued
+  (`UndoLock.Take`'s `whenQueued`), not a 300 ms delay (3);
+  `AReaderReadsOnWhileAWriterAppends` asserts a reading mid-writing and a
+  read-on (4); `UndoJournal`'s process memory is a required argument (5);
+  whether a folder reads on is judged by the file system of the volume the
+  folder is REALLY on (`GetVolumeInformationByHandleW` on a handle to it, a
+  final path through a share being "network"), not the drive letter's, so a
+  state folder reached through a link onto exFAT or a share reads whole (6;
+  its test makes a directory link on C: to `\\localhost\C$\…` and skips,
+  saying why, where the account cannot).
+
+**Tests:** `UndoSwapTests` (11), `UndoDoorTests` (11), `UndoStepContractTests`
+(6), every stack case and trace through the door; the Undo classes 546 on the
+PC (run `w2b-h1`: 545 passed, 1 skipped, the deny-listing ACE probe of W5). The whole unit suite on 8070e021c (run `w2b-full`): 4,730 tests, exactly the six known failures.
+Sixteen must-fail proofs, each red alone and green restored
+(`vm-tools/guest/899-w2b-mustfail.json`, runs `w2b-c2` and `w2b-h1`): MoveFileEx
+in place of the POSIX rename; a failed staging write leaving its file (two
+tests); attributes not copied; read-only not classified; no re-read (proved on
+a page deleted by hand: an edit in place is ALSO caught by the L4 hash, so
+the first proof of it stayed green); no L4 hash; no containment check at the
+swap; a refused swap not reversed; no unsettled tidy; and one for each LOW.
+
+**Measured** on a Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200),
+Release, by `Plantoir.UndoHarness` (`vm-tools/guest/899-w2b-pc-run.ps1 -Mode
+harness`), outside OneDrive (`C:\vm-setup\…\scratch`) and in a scratch folder
+made inside the PC's signed-in OneDrive (`C:\Users\lenov\OneDrive`, OneDrive.exe
+running, Files On Demand on) and removed after; nothing else there was
+touched (its top level was the same before and after).
+
+| What | Outside OneDrive | Inside OneDrive |
+|---|---|---|
+| A 1-page step through the door (begin, swap, applied), median of 20 | 15.9 ms | 25.9 ms |
+| Its undo | 20.7 ms | 33.8 ms |
+| A 233-page step (editLine ops, no blobs), median of 5 | 1,072 ms | 1,906 ms |
+| Its undo | 1,179 ms | 1,975 ms |
+| The swap alone, per page (233 pages) | 4.6 ms | 7.4 ms |
+| A swap onto a plain page | swapped, 43 ms (first in the folder) | swapped, 37 ms |
+| onto a page open in a program that shares delete (Obsidian's way) | swapped, 4.9 ms | swapped, 6.1 ms |
+| onto a page open in one that does not (Word's way) | `fileIsInUse` after the retries, 113 ms, page untouched | `fileIsInUse`, 105 ms, untouched |
+| onto a 4 MB page written a moment before (OneDrive uploading it) | swapped, 17 ms | swapped, 21 ms |
+| A hard link to a page | made | made |
+| Anything added beside the pages within 60 s (conflict copies, strays) | none | none |
+| A page made a cloud-only placeholder (unpinned, freed by OneDrive after 160 to 184 s: `Archive`, `Unpinned`, `RecallOnDataAccess`) | (none outside) | `cannotTellNow` in 4.5 ms: the re-read was refused 395 (`ERROR_CLOUD_FILE_ACCESS_DENIED`); the page untouched and still a placeholder, nothing staged, the list kept |
+| A hard link to such a placeholder | (none outside) | made; but a read through the link, and a read by the page's own name, were both refused 395 |
+
+**The two-process test**, a CHILD process making (or undoing) a 233-page step
+through the door, killed with `Process.Kill` at each point, every page then
+read by the parent:
+
+| Killed at | Pages old / new / torn | Staged files left | The journal says |
+|---|---|---|---|
+| after the begin | 233 / 0 / 0 | none | step 1 begun |
+| before the 117th swap | 117 / 116 / 0 | 233 (`1-apply`) | begun |
+| after the last swap, before `applied` | 0 / 233 / 0 | none | begun |
+| the moment the first page was seen changed (a race, no seam) | 230 / 3 / 0 | 234 | begun |
+| an undo, before its 117th swap | 116 / 117 / 0 | 233 (`1-undo`) | undoing |
+| an undo, the moment its first page changed | 86 / 147 / 0 | 234 | undoing |
+
+The same six inside OneDrive: the same counts, every page whole. So a death
+anywhere leaves every page wholly old or wholly new, never torn, and the
+journal names the step in flight and which way it was going; what it leaves
+is exactly what W3's recovery has to settle (put back or complete, by
+content) and tidy (the staged `-new` files and `-orig` links of that step's
+label).
+
+Read from it:
+
+- **A 233-page step costs about a second outside OneDrive and two inside**,
+  against the mac's 34 to 36 ms, and almost all of it is per-file work
+  OUTSIDE the lock (the begin hold of an editLine step is a single line): a
+  create, a flush and a close per staged file, a hard link, a re-read, an
+  attribute copy, a rename and a read-back per page. Nothing waits on the
+  lock for it; the teacher waits. Measured, not tuned: parallel staging is
+  the obvious lever if W7's actions find it slow.
+- **The POSIX-semantics rename is what makes Obsidian's open pages
+  swappable**: a holder that shares delete is swapped under in 5 to 6 ms, in
+  OneDrive too; one that does not is refused, the page untouched and named,
+  and the list left as it was.
+- **OneDrive changed no outcome** for a page that is on the disk: every case
+  came out as outside it, about 1.6 times slower, with no conflict copy and
+  nothing else beside the pages a minute later.
+- **A cloud-only placeholder is `cannotTellNow`, never changed since.** In
+  this measurement the harness ran over SSH, a logon session OneDrive's
+  client does not serve, so OneDrive would not download the page for it and
+  every read was refused 395. The swap refused at the re-read, before
+  anything was kept or renamed, with a word that keeps the list and is tried
+  again (`rule.recovery`). What a read in the TEACHER's own session does (the
+  page downloaded on the first read, then swapped as any other) is NOT
+  measured: it needs the PC's desktop session, and goes on W11b's list with
+  the two-process UI test. Either way no outcome can clear the list for a
+  page that was merely not on the disk: the re-read, and the read-back of the
+  kept original, answer `cannotTellNow` for a read that fails.
+
+**Known differences to KNOW** (not to do): the swap replaces a page's
+identity, so an explicit ACL or an alternate data stream (a `Zone.Identifier`)
+on a page is not carried over (the plan review's M4; rare for course pages,
+and APFS's rename behaves alike); an editor holding a page open and writing
+through that handle AFTER the rename writes into the old file, which the tidy
+then removes (Obsidian writes by opening the path afresh, so this is the
+L4-shaped race the hash catches only before the rename).
+
+**U3 (the mac, `issue/899-u3-daily-page-actions`) puts every daily page
+action through the door, one step each**, recorded in shadow: documentation
+09 → "U3: every daily page action through the door". What Windows inherits:
+
+- `contracts/undo-action-steps.json`, each action's step as the mac's real
+  code made it (20 steps: key, maker, the files' whole text before and
+  after, the op kinds);
+- `undo-traces.json` → `actionTraces`, 120 traces made from those steps by
+  `scripts/make_undo_traces.py` beside the unchanged 20 `traces`.
+  `UndoTraceContractTests` reads `traces` only, so nothing on Windows reads
+  the new key yet (W7's);
+- one sentence in `undo.rule.recovery`: in shadow, recovery removes the
+  staged files of a step it closes interrupted when every op of the step
+  changes a file in place, because since U3 a shadow step is staged like a
+  live one.
+
+What Windows owes (W7): each daily action planned whole and made through
+its door as ONE step (a whole unit, the links checklist with its records,
+Publish Class for a Date with its kept record, the window's Duplicate with
+its room), the step keys of the 09 table, and the action traces replayed.
+
+### What Windows has built: W3, recovery (#899, #949)
+
+Piece W3 (branch `issue/899-w3-recovery`, on W2b, 2026-11-20) settles a step
+whose work stopped part way, by `undo.rule.recovery`. Nothing a teacher sees
+changed and nothing in the app calls it: the switch stays off, the built-in
+assistant's surface did not move. The plan is
+`vm-tools/reference/899-w3-plan.md`.
+
+- **`UndoRecovery.Run`**, inside the lock (the mac's `UndoRecovery.run` and
+  `settle`). For each step in flight, oldest first, whose process can be
+  identified (a pid of 1 to 2^31-1: a pid of 0 or less is never read as a
+  known process, the W1 review's low) and is gone, or that THIS process gave
+  up on (below): readable, its folder reachable (ruling 10, else left), every
+  `recompute` with a runner. Live, every staged file of its number is removed
+  first (its `-orig` files too: the list holds the content to put back).
+  Then each file is judged by CONTENT (`UndoCurrent.Read`, `UndoCheck.StateOf`;
+  a place that now leads outside the folder is in the way): all where the work
+  started, `failed` (`nothingTookEffect`); all where it was going, completed
+  (`applied` with the redo branch dropped, `undone`, `redone`); some of each,
+  what took effect put back by `UndoCheck.Plan` the other way and `UndoSwap`
+  (label `<seq>-<work>-recover`), `rolledBack` (`partlyTookEffect`); any in
+  the way, the verified ones put back, `interrupted` (`changedByHand`, the
+  paths) and `cleared` (`interrupted`); a put-back that cannot be planned
+  (content missing), `interrupted` (`couldNotPutBack`) and cleared. A file in
+  use or that cannot be read now, a refused put-back, or the list unreadable:
+  left, to be tried again. In shadow nothing is written into a folder; a step
+  that partly took effect is `interrupted` (`partlyTookEffect`) and cleared.
+  Then, live, every step closed `interrupted` has its staged files removed
+  once per process when its folder can be reached
+  (`knownLimits.stagedFilesOfAFolderAway`).
+- **The schedule** (in `UndoProcessMemory`, per process, never a static):
+  at once at an Undo, a Redo and `UndoDoor.Recover()`; on the ordinary path
+  at the process's first lock, then one minute after a refusal, doubling, at
+  most an hour. A step that pruning would close in this hold is tried at once
+  whatever the schedule, so a step is never closed `unsettled` while one more
+  try could settle it.
+- **Where it runs.** The begin hold (on the schedule; a plain write on the
+  course of a gone process's step that keeps a file true is refused
+  `anotherChangeIsUnderWay`, the mac's U2b LOW 1); `Perform(UndoOpsDraft)`
+  recovers and re-derives first; the hold that finds what Undo or Redo acts
+  on (at once, re-deriving; a gone step that keeps a file true and could not be
+  settled makes Undo and Redo not available, never "under way" for ever);
+  `UndoDoor.Recover()` (W4's launch call); and **before every prune**:
+  `UndoJournal.Prune` throws in a hold where recovery has not run
+  (`UndoJournalWriter.RecoveredThisHold`), and the door prunes only through
+  `RecoverThenPrune` (W2b's review, LOW 7: a reachable dead step that died
+  mid-swap is put back whole, never closed `unsettled` with its originals
+  removed). Re-derivation runs after the hold that settled, outside the lock,
+  whichever way the step was settled; never in shadow.
+- **A step this process gave up on** (W2b's review, LOW 1). `UndoSwap`
+  reports a reversal that did not go in (`Refused.LeftPartWay`: a page still
+  holds the step's content, its original left under its staged name). The
+  door then writes NO closing, never `failed` for a half-applied step, and
+  notes the step abandoned in the process's memory; so does a closing that
+  could neither be written nor kept. Recovery settles an abandoned step of
+  this process by content at the next lock although the process is alive; no
+  other process does while it lives. No new refusal word, no contract change.
+- **The trail.** `ActivityTrail.Event.UndoRolledBack` (`undo rolled back`),
+  in the mac's words: `ICS3U/1 · the undo list put back 2 files left part way
+  by a change that stopped`, and `…, found 1 file changed by hand since, and
+  cleared the list`. The door is given a sink (`trail:`); W4's start-up passes
+  `UndoTrail.ToTheActivityTrail`. Written only live. The ledger entry is gone.
+
+**W2b's review LOWs, fixed here, each with a test that fails without it.**
+(1) above. (2) While a swap is under way every staged new content holds an
+attributes-only handle (no sharing check, so no program is kept from it), and
+the original of a page the step removes holds one from the keep to the
+delete: Windows will not rename or move a folder with a file open below it
+(measured: access denied), so a page's folder cannot be replaced by a junction
+between its re-read and its rename at all, and a staged file is removed by its
+handle, never through a name that leads elsewhere; a kept original holds no
+handle (it IS the page, and a handle on it would refuse an editor's save by
+replace) and is removed by name only while the name is still that file. The
+cost: a teacher renaming or moving a page's folder in the milliseconds of its
+swap is told by Windows that it is in use. (3) The containment check and the
+attribute copy come before the keep, and just before the rename the page's
+file identity (volume and file index) must still be the kept link's: an editor
+that saved by REPLACING the page in that window is changed since and its save
+kept. What remains: the microseconds between that check and the rename; and
+on a volume with no hard links (the original a copy) there is no identity to
+compare, so a save by replace after the re-read is not seen. (4) A kept
+original, and any leftover the tidy removes, is deleted with
+`FileDispositionInfoEx` and IGNORE_READONLY, never by clearing read-only on a
+link that shares the live page's attributes. (5) A blob an ops step names as
+held is asked for again inside the begin hold. (6) An ops step with no working
+folder is refused `notReadable`. (7) above. (8) OneDrive's Pinned and Unpinned
+are carried by the attribute copy (they stick on any NTFS file, measured).
+
+**Tests:** `UndoRecoveryContractTests` (every `recoveryCases` row from the
+JSON: 20 run through the real door, swap and recovery, `fileInUseDuringRecovery`
+a real `FileShare.ReadWrite` holder; the 21 rows of U2b's kinds held on the
+ledger for W6, each still stopping at its key), `UndoRecoveryTests` (14 methods, 16 cases),
+six new `UndoSwapTests`. The Undo classes on the PC: 611 passed, 1 skipped (the deny-listing ACE probe of W5).
+The whole unit suite on 0284c2613 (run `w3-full2`): 4,796 tests, exactly the six known
+failures. Twenty-three must-fail proofs, each red alone and green restored
+(`vm-tools/guest/899-w3-mustfail.json`, runs `w3-full1` and `w3-full2`): recovery doing
+nothing (17 contract rows red); a refused put-back retried at every lock (a test and a
+contract row); an Undo waiting its turn; the wait never doubling; a step past the limits
+waiting its turn; pruning without recovery; a reversal not reported; an abandoned step not
+settled; a pid of 0 read as a process; a plain write settling a step that keeps a file true;
+nothing re-derived; no closed-step tidy; no tidy before judging (3 cases); no trail line;
+LOWs 2 to 6 and 8, one each (two for LOW 4, two for LOW 2). The first run also caught a
+trail wiring scan this piece had to satisfy (`ActivityTrailWiringTests`: the sink now names
+its event).
+
+**The kill harness** (`Plantoir.UndoHarness recovery-kill`, Release, the PC
+above, `vm-tools/guest/899-w3-pc-run.ps1 -Mode recovery`, run `w3-r1`), outside
+OneDrive (`C:\vm-setup\…\scratch`) and in a scratch folder made inside the PC's
+signed-in OneDrive and removed after (nothing else there touched). A CHILD
+process made a 233-page step (or undid it, or redid it) through the door and
+was killed with `Process.Kill` at each of 14 points: after the begin, before
+the 1st, the 117th and the 233rd swap, before `applied`, and at the moment its
+first page was seen changed (a race, no seam); after `undoing`, before the
+117th swap, before `undone`, at random; the same four for a redo. A SECOND
+process then ran the app's recovery (`UndoDoor.Recover`). Each point twice:
+(A) that recovery ran to its end; (B) it was itself killed at its 58th
+put-back swap (where it had that many to make: 5 of the 14 points) and a THIRD
+process recovered again.
+
+| | Outside OneDrive | Inside OneDrive |
+|---|---|---|
+| Runs, every page then wholly old or wholly new, ALL one way, the way the journal says the step stands, the step not in flight, nothing staged left | 28 of 28 | 28 of 28 |
+| Points whose two runs (A, and B with the recovery killed and run again) came to the same pages and the same list | 11 of 11 (the three at-random points are not compared) | 11 of 11 |
+| Recovery that found nothing to put back (killed after the begin, before the 1st swap, after `undoing`/`redoing`), the whole process | 212 to 245 ms | 388 to 675 ms |
+| Recovery completing a step whose swaps were all in (before `applied`, `undone`, `redone`) | 221 to 227 ms | 418 to 899 ms |
+| Recovery putting back 116 pages (killed before the 117th swap), `rolledBack` | 748 to 767 ms | 1,457 to 1,839 ms |
+| Recovery putting back 232 pages (killed before the 233rd swap) | 1,173 ms | 2,650 ms |
+
+Outcomes, the same in both places: killed after the begin or before the 1st
+swap, `failed`, every page old; part way through, `rolledBack`, every page
+old; after the last swap, `applied`, every page new (and the step on the
+list); an undo part way, put forward again, the step `done`; an undo after its
+last swap, `undone`; a redo part way, put back, `undone`; a redo after its
+last swap, `done`. A recovery killed part way left its own `-recover` files,
+which the next recovery removed before it judged the step.
+
+Read from it:
+
+- **Recovery holds the lock while it puts pages back**, as the contract says
+  (the one exception to never changing a page under the lock: two processes
+  cannot repair one step at once). A 232-page put-back held it 1.2 s outside
+  OneDrive and 2.7 s inside it, so a live process waiting its 2 s for the
+  lock at that moment would be refused (`lockBusy`, nothing changed) and the
+  teacher would try again. Only after a crash, once; recorded for W4,
+  which runs recovery on its own thread beside the first window; W4's
+  section below says what a waiter behind a long put-back does.
+- **A recovery killed part way is no worse than the first death**: every one
+  of the ten killed recoveries (five in each place) was finished by the next with the same pages
+  and the same list.
+
+### What Windows has built: W4, the switch (#899, #949)
+
+Piece W4 (branch `issue/899-w4-switch`, on W3, 2026-11-20) wires the list to
+the app's two processes and keeps it switched off. Nothing a teacher sees
+changed. The plan is `vm-tools/reference/899-w4-plan.md`.
+
+- **The switch.** `UndoSwitch.UndoJournalIsLive` is `false`, a
+  `static readonly` field rather than a setting, because a half-covered Undo
+  is worse than none: the step it silently passes over is the one a teacher
+  needed back. Nobody turns it on early from a test, a command line or the
+  settings file. `static readonly` rather than `const` only so the live paths
+  compile without an unreachable-code warning. W11a flips it, and
+  `UndoWriterScanTests.TheSwitchStaysOffWhileWritersWait` fails while any
+  writer still waits for a piece.
+- **One list per process, found the same way by both programs.**
+  `UndoForThisProcess` is the composition root (the plan review's H1): the
+  only code that reads the switch and `UndoJournalLocation`. It is made the
+  first time it is asked for, which both programs do only after `--state-dir`
+  has been applied, so the window, the window's own `plantoir-mcp` (handed
+  `--state-dir` by `McpClient`, #641) and an outside door's `plantoir-mcp`
+  (handed none) all find one list: `%LOCALAPPDATA%\Plantoir\undo`, or
+  `undo\` under the redirected state folder. A test makes its own instance
+  with its own folder, mode and trail and never touches the process's.
+- **Recovery at launch.** `UndoAtLaunch.Recover()` runs W3's
+  `UndoDoor.Recover()` on a thread of its own, so the window's UI thread never
+  waits on the lock and `plantoir-mcp` answers its client meanwhile. It never
+  throws: a list that cannot be had (busy behind another process's put-back,
+  unreadable, its folder not makeable, a failure nobody foresaw) leaves every
+  step for the next hold of any process, and the window's startup log says so.
+  In the window it runs after the marketing scenes (which must never open the
+  list); a deploy set for later leaves `Program.Main` before it and never
+  opens the list.
+- **Shadow, as `rule.shadow` defines it.** With the switch off, a failure of
+  the list never stops or changes what a teacher asked for: ANY exception from
+  the list in shadow, the unforeseen included, lets the change go ahead
+  unrecorded at the begin; a closing that cannot be written or kept leaves the
+  change as it is; giving a step up never reads the list and never throws.
+  Recovery in shadow records what it finds and writes nothing into a working
+  folder, so a step killed part way leaves its staged files beside the pages
+  (`staged=8` below); that is moot until W7 puts actions through the door.
+  A shadow step that goes ahead unrecorded still has the files a rule keeps
+  true re-derived (the section's front page), as the mac's
+  `performAndRederive` does on `appliedWithoutARecord`: every door the
+  process makes is given the app's own runner (`UndoSectionFrontPage`).
+  The exception, as on the mac's `JournaledWrite.perform(ops:)`: a step given
+  only as its ops is refused (`couldNotRecordTheStep`) before anything changes
+  in either mode, since the door cannot carry out an ops step it has not
+  recorded. (The W4 plan first said the ops entry would go ahead in shadow;
+  the mid-piece sweep corrected it.)
+- **A waiter behind a long put-back.** W3 measured a 232-page put-back holding
+  the lock 1.2 s outside OneDrive and 2.7 s inside, past the 2 s live wait.
+  Every waiter gives up after its bounded wait (`rule.oneLock`) and nothing is
+  lost: a live step is refused before anything changes
+  (`couldNotRecordTheStep`, the teacher told the step could not be recorded,
+  the page untouched), a shadow step goes ahead unrecorded (only its own
+  pages), an Undo or Redo answers the list unavailable, a launch's recovery
+  leaves the step for the next hold, and a closing waits its 10 s and is then
+  kept in the process's memory. When the put-back finishes the step is settled
+  and the refused step can be made. Proved without timing:
+  `UndoForThisProcessTests.AWaiterBehindALongPutBackGivesUpAndNothingIsLost`
+  holds a recovery inside its put-back on an event.
+- **Staged files and folder renames while a swap runs** (W3's review, LOW 5).
+  A swap holds handles on its staged files, which keep their folder in place
+  (W2b), so renaming the course folder or a parent of it while a swap runs is
+  refused: File Explorer shows "Folder In Use", and OneDrive retries its own
+  move later. No data is lost; the rename succeeds once the swap is over. How
+  long that is: the swap's span, measured in W2b on the Lenovo i5-8365U at
+  233 pages 1.07 s outside OneDrive and 1.9 s inside, almost all of it outside
+  the lock.
+- **The writer scan on Windows** (`UndoWriterScanTests`, the mac's). Every
+  product `.cs` under `Plantoir`, `Plantoir.Core`, `Plantoir.Mcp` and
+  `PtyDriver` with a writing call (the shapes are in the class's summary;
+  comments are taken out, strings kept, since a launcher's name is a string)
+  is listed with its count and one of three kinds: `door` (5, the list
+  itself), `notAStep` with its reason (37: the trail, leases, the toolchain
+  mirror, models, problem reports, the app's state, a deploy), or `waitsFor`
+  with the Windows piece that wires it (W7 mirrors U3, W8 U4, W9 U5, W11a U7;
+  33 files). 75 files at W4. `TaskScheduling.cs` waits for W8 by ruling 23,
+  where the mac's entry still says held (M10).
+- **W3's review lows.** LOW 2: a gone process's step that keeps a file true is
+  never closed `unsettled` by the pruning of a hold that cannot re-derive
+  (`UndoJournalWriter.LeftForARederivingRecovery`). LOW 3: a step this process
+  gives up is noted by what the door knows (list, number, where its work
+  stands, its own pid), never by a reading of the list, which at those moments
+  could not be read. LOW 4: an Undo whose newest step is a gone process's that
+  recovery has just tried and left (a file in use, a page it cannot read now)
+  answers that refusal, naming the file, never "another change is under way"
+  until the step ages out. The sweep: the files entry, like the ops entry,
+  refuses a step holding a recompute this process has no runner for.
+
+**Measured, `899w4-p1`, Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro
+26200).** A harness child made an 8-page shadow step in the list under the
+state folder and was killed, then the real program was started and the list
+read by a third process until the step left flight:
+
+| State folder | Killed at | Started | Settled after | Step became | Pages |
+|---|---|---|---|---|---|
+| `--state-dir` (scratch) | half way through the swap | `plantoir-mcp.exe --state-dir` | 2.3 s | interrupted | 4 old, 4 new, none torn, 8 staged left (shadow) |
+| `--state-dir` (same list) | after its begin | `Plantoir.exe --state-dir`, desktop session | 3.7 s | failed (nothing took effect) | 8 old |
+| default `%LOCALAPPDATA%\Plantoir` | half way through the swap | `plantoir-mcp.exe` | 0.9 s | interrupted | 4 old, 4 new, none torn, 8 staged left |
+| default (same list) | after its begin | `Plantoir.exe`, desktop session | 1.6 s | failed | 8 old |
+
+Each second program found the step the first had settled in the same list
+(five lines, steps 1 and 2 closed). The "settled after" times include the
+process's start and a half-second read interval; they are not a measure of
+recovery. The default `undo` folder did not exist before and was removed
+after; `settings.json` was put back.
+
+**Held out of W4, to be built as a shared piece (Mac first, since both change
+`contracts/`):**
+
+1. Recovery puts a page back from a kept `-orig` whose hash matches the
+   journal's record (Russell's ruling of 2026-11-20, 15:20 on #899; the
+   `recoveryCases` rows "a step dies part way and its content is then missing"
+   and "an undo of a step with a page now missing its content" become rolled
+   back). On Windows it goes in `UndoRecovery.Settle`: the live tidy at its top
+   (`UndoSwap.TidyLeftovers` before the plan) must stop removing the `-orig`
+   files until after the plan, and the `default:` arm of the plan switch (the
+   put-back that cannot be planned, closed `interrupted`
+   (`couldNotPutBack`)) must first offer each missing content from the
+   matching `-orig`. The Undo path's missing-content answer
+   (`UndoDoor.AnswerARefusal`, `ContentMissing`) follows the same rows.
+2. The trail line for LOW 4 (an Undo refused because a gone step's file is in
+   use): a new `activityTrail.mustRecord` event, added to
+   `contracts/shared-rules.json` and `ActivityTrail.Event` together. On
+   Windows it is written in `UndoDoor`'s Undo/Redo path where `leftNewest`
+   returns the refusal, through the door's `_trail`, and routed by
+   `UndoTrail.ToTheActivityTrail` beside `UndoRolledBack`.
+
+### What Windows has built: W6, the op kinds (#899, #949)
+
+Piece W6 (branch `issue/899-w6-op-kinds`, on W4, 2026-11-20) reads, checks,
+moves and recovers every op kind the mac's U2b gave the journal. Nothing a
+teacher sees changed: the switch is off, and no action writes these kinds
+before W7 (U3) and W8 (U4).
+
+- **Whole ops.** A move, a tree and an external op are judged and changed as
+  a whole against the disk, never folded into another op's file
+  (`opKinds.wholeOps`); a step where two ops share a place is a barrier. A
+  move is judged as a PAIR: an undo after a deploy wrote a new marker where a
+  rollover's was takes nothing back and keeps both. A move is one
+  `MoveFileEx` WITHOUT `MOVEFILE_REPLACE_EXISTING`, the pair re-read just
+  before it. A move that changes only case (`a.json` to `A.json`) is a step
+  this version cannot read, because places compare without case: NTFS would
+  otherwise see both places as one.
+- **Links on Windows.** The mac's `lstat` is three questions here
+  (`UndoLinks`): a reparse point whose tag is a NAME SURROGATE (a junction,
+  a symbolic link, WSL's links) is a link, never followed, "something
+  else"; a reparse point that is not (OneDrive's Files On Demand files and
+  folders) is the teacher's own and is read like any other, so a folder in
+  OneDrive is not a change since merely for being in OneDrive (rejected: any
+  `FILE_ATTRIBUTE_REPARSE_POINT` as a link, which would have read every
+  OneDrive folder as changed and cleared the list). A placeholder whose
+  content is not on the disk fails its read, which is cannot tell.
+- **Trees.** A folder to make is built beside its place under its staged
+  `-new` name and renamed in, never over anything. A folder to take out is
+  renamed aside to `-orig` FIRST and its listing checked there, then, once
+  every change is in, renamed to `-gone` and deleted, so a delete cut short is
+  finished by recovery and never put back half emptied. Files inside are
+  removed by handle with the read-only attribute ignored (a file may be a hard
+  link to a page elsewhere). A folder with a file another program holds open
+  cannot be renamed on Windows: taking it out is refused `fileIsInUse`, the
+  folder whole in its place, the list kept (`UndoOpKindsContractTests`).
+- **A folder set aside by a stopped step** is never deleted: put back when its
+  place is free, otherwise kept as `<name> (kept by Undo)`, `(kept by Undo 2)`
+  and on, the trail line `undo found a folder set aside` written just before
+  the rename. A pruning hold has no trail sink, so a folder it puts back says
+  nothing there; recovery and the closed-step tidy say it.
+- **editJSON** changes only the member's bytes (the mac's byte scanner, ported):
+  a new value spelled byte for byte as the mac's `JSONSerialization` writes it,
+  a key written twice on the path, or a whole number of 2^53 or more, refused.
+  Values are compared through doubles as on the mac, not with
+  `JsonNode.DeepEquals` (exact decimals would disagree with the mac at 2^53+1).
+  Three things were measured on the mac (macOS 26.7.3, 2026-11-20) through the
+  mac's own code (`vm-tools/guest/899-w6-mac-editjson-runner.swift`: the mac's
+  `UndoJSON`, `UndoJSONMember` and `UndoJSONBytes` verbatim, run as its contract
+  runner runs them) and are now contract rows (`undo-json-cases.json` → `editJSONCases`, 8 new, 16
+  in all, the mac's `UndoJournalContractTests` green on them and red on a
+  changed row):
+  - **Key order** (`UndoMacKeyOrder`) is not ordinal: a key is read as pieces
+    (a run of digits, or one character); punctuation first in a fixed order (a
+    space, then `_ - , ; : ! ? . ' " ( ) [ ] { } @ * / \ & # % ` ^ + < = > | ~ $`),
+    then digit runs by their number (9 before 10), then letters ignoring case;
+    keys equal so far are told apart at the first piece that differs, a
+    lowercase letter before its capital and a run with fewer zeros in front
+    first (`1A`, `01a`; `ab`, `aB`, `Ab`). 6,000 random sets of printable ASCII
+    keys came out in exactly this order. Rejected: ordinal (`"10","9","B","a"`
+    where the mac writes `"9","10","a","B"`). A key with anything beyond
+    printable ASCII is refused (fix round two, below).
+  - **Numbers** are C's `%.17g` (`UndoJson.SpellNumber`): 0.1 is
+    `0.10000000000000001`, 1e-07 `9.9999999999999995e-08`, a whole number below
+    2^53 its digits, negative zero `0`. Rejected: .NET's shortest round trip
+    (`"R"`), which wrote `0.1` and `1E-07`.
+  - **The read-back** goes through the mac's reader, which reads a spelling in
+    fixed notation with more than 17 digits (leading zeros of the whole part
+    dropped) as an `NSDecimalNumber` whose double is its digits summed in 16-bit
+    pieces and then divided by ten once per place (`UndoJson.ReadAsTheMacReads`:
+    1,729 of 1,729 such spellings bit for bit, and 4,244 of 4,244 others the
+    nearest double). So a member set to 0.0001234 (spelled
+    `0.00012339999999999999`, read back there as `0.00012340000000000002`) is
+    refused on both platforms, as changed since; 0.08129913717470501 is written.
+    A file's numbers are read the same way when a member is judged. A spelling
+    past the measured digits is refused (fix round two, below).
+- **A file starting with a UTF-8 byte-order mark** is read as the mac reads it
+  (Foundation passes over the mark; measured), so its member is judged as on
+  the mac (the verdict before a write), and it is never moved, as on the mac,
+  whose scanner starts at the mark: refused as changed since. A space before
+  the mark is not JSON on either. No contract row can carry it: the mac's
+  runner reads each case through `JSONSerialization`, which drops a mark at the
+  start of a string (measured), so `UndoOpKindsContractTests` pins it.
+- **external.** `preference:<name>` is a member of the app's own settings
+  (`UndoAppSettingsPlaces`), read from `settings.json` as it is on the disk now
+  (following `--state-dir`), as the app's typed settings read it, never from a
+  process's copy, which may be older (`plantoir-mcp.exe` holds its own). A set
+  replaces exactly that member with exactly the value (a list or a dictionary
+  replaced whole), into the file as it is now: read, the one member changed,
+  the result checked to read back as the value, then written whole by a
+  temporary `settings.json.undo-writing` and one rename that replaces, so it
+  happened or did not; on a mismatch (a number for a text setting) nothing is
+  written and the set is refused couldNotWrite, the file byte for byte as it
+  was. A file the app's own reader cannot read is never written over. The copy
+  the process runs on is then given the same member, so its next save keeps
+  it. Rejected (the first review of W6, MEDIUM): `PopulateObject` on
+  `AppSettings.Current` and its `Save()`, which appended to lists, merged
+  dictionaries, saved before checking, and wrote a process's older copy of
+  every other setting over the file. A name the store does not have is cannot
+  tell; a typed setting cannot be set to "not set" (refused couldNotWrite).
+  **Owed by W8**, which decides which settings a step records: a set made by
+  one process is not seen by another process's copy until that process loads
+  again, so a set recovery makes in `plantoir-mcp.exe` is undone by the app's
+  next save of its own copy unless W8 has the app re-read the member (or keeps
+  every external op in the app's process). Nothing writes an external op
+  before W8.
+- **The front page's runner** (`UndoSectionFrontPage`, from W4's review)
+  serves the recovery cases' re-derivations.
+
+**Measured, `899w6-b2`, Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro
+26200).** One step of every kind (two pages' lines, a hunk, a member, a
+preference in the app's real settings store (since the fix round: `AcceptedSyncedFolders`, a list), a folder removed, a folder made, a marker moved:
+8 swaps), its apply, its undo and its redo, each made by a child process
+killed at every step (its begin, before each of the 8 swaps, while a folder
+taken out was being deleted, before its closing: 33 points), then recovered
+by a second process, and again with that recovery killed before its first
+put-back swap (42 of the 66 were killed there) and a third recovering:
+
+| Place | Runs | Every place wholly before or after, all one way, as the list says | Nothing staged left | A and B agree |
+|---|---|---|---|---|
+| `C:\vm-setup\…\scratch` | 66 | 66 | 66 | 33 of 33 |
+| `%OneDrive%\plantoir-w6-scratch-…` (OneDrive running) | 66 | 66 | 66 | 33 of 33 |
+
+Settled as, in each place: done 26, undone 22, rolled back 14, failed 4 (no step was left in flight or interrupted). A run's
+three processes took 0.5 to 1.3 s end to end. The scratch folders were
+removed after the run.
+
+### editJSON refuses what is not measured to match the mac (fix round two)
+
+The rule: **for an editJSON op, Windows either writes exactly the bytes the mac
+would write, proven by a contract row run on both platforms, or it does not
+write at all.** `UndoMacKeyOrder`, `SpellNumber` and `ReadAsTheMacReads` are
+re-implementations of Foundation, so anything they have not been MEASURED to
+match is refused before a byte is written: "cannot tell" when the member is
+judged (the list is kept), and no bytes when it is moved. Measured on this
+Mac (macOS 26.7.3, 2026-11-20) through the mac's own code
+(`vm-tools/guest/899-w6-mac-editjson-runner.swift`, the mac's `UndoJSON`,
+`UndoJSONMember` and `UndoJSONBytes` verbatim, and `JSONSerialization` itself):
+
+- **Keys beyond printable ASCII.** The mac sorts them by Unicode collation
+  (`😀, 9, 10, １０, a, A, Ａ, a<tab>b, ab, e, E, é, f, ss, ß, z, Ω, 日本`: an
+  emoji first, `é` between `E` and `f`, a full-width `Ａ` beside `A`, `ß` after
+  `ss`, a tab passed over). It takes canonically equivalent keys for one (`é`
+  as one character and as `e` with a combining accent; the Kelvin sign and
+  `K`), so a key path part can find a member Windows would call missing and add
+  beside it; and it reads a key starting with a byte-order mark as the key
+  without it. So Windows refuses a new value holding such a key, a key path
+  part holding one, and any object on the path holding one (the top level
+  included). The app's own `settings.json` (`external`), which the mac never
+  touches, still takes them.
+- **Text starting with a byte-order mark.** The mac's reader drops the mark
+  (escaped or not; one inside the text stays), so the mac reads such a member
+  as the text without it and refuses to write such text (its read-back
+  disagrees). Windows answers cannot tell, and refuses to write it, which is
+  what the mac does there. No row can carry a new value with the mark (the
+  mac's runner drops it when it reads the contract), so a Windows test pins it.
+- **Numbers.** With an exponent: at most 17 digits read as the nearest double
+  (fix round two measured 4,000 random spellings whose exponents' values ran
+  from -330 to 310, but the code then accepted ANY exponent, which was more
+  than was measured; fix round three measured the exponent itself, below),
+  and more than 17
+  are a decimal number there (`1.2345678901234567890123e-5` is
+  `1.2345678901234573e-05`, not the nearest). Without an exponent: 18 to 38
+  digits agree with `ReadAsTheMacReads` (30,000 random spellings, every one);
+  from 39 they disagree, and with 120 or more digits after the point the mac
+  cannot read the file at all. Digits are counted from the first that is not a
+  leading zero of the integer part. A spelling past those counts makes the
+  whole file cannot tell, because the mac may not read the file at all. A
+  negative number beyond a double's range (`-1e400`, `-1.8e308`) is minus
+  infinity on the mac, which is not exact: cannot tell as the member, and
+  judged as usual beside it, the same here. A positive one (`1e400`) and text
+  holding half a surrogate pair (`\ud800`) make the file unreadable on both:
+  changed since.
+
+18 contract rows, every result and verdict measured: 7 in `undo-json-cases.json` → `editJSONCases`
+(the six refusals below and one pinning how new text is written: UTF-8, a
+control character escaped as `\b`, `\f`, `\u0001`, DEL and the line and
+paragraph separators as they are) and 11 in `undo.checkCases`. **13 rows carry
+what the mac does and Windows refuses**, held in `NamedGapLedger` by name
+(`UndoEditJsonCasesRefusedHere`: 6, each must be refused, never bytes of its
+own; `UndoCheckCasesRefusedHere`: 7, each must be answered cannot tell both
+ways), with the reason that Windows refuses these until its key order and
+number reading are measured to match. The Python reference model holds the
+same 13 (`REFUSED_HERE_EDIT_JSON`, `REFUSED_HERE_CHECK` in
+`scripts/test_make_undo_traces.py`). They are held on v2.0.0 like every #899
+entry; closing them means measuring Foundation's collation and decimal reading
+on Windows, or a ruling that Windows may refuse them in the release.
+
+One limit of the mac's own runner, found while proving the rows: it compares a
+row's result with Swift's `!=` on strings, which is canonical equivalence, so
+it cannot tell the Kelvin sign from `K` or a decomposed `é` from a precomposed
+one (a sabotaged Kelvin row stayed green). Those rows' exact bytes come from
+the scratch runner, which prints them through `JSONSerialization` with every
+scalar kept; the mac's runner went red on a changed collation row and on a
+changed verdict.
+
+**What a teacher on Windows would meet** (from W7 and W8 on, when actions
+record editJSON steps): an Undo or Redo of a settings change refused as
+"cannot tell", the list kept and the file untouched, where the mac would undo
+it, when the course's settings file holds such a key or number. **Which of
+Plantoir's own files could hold one:** the editJSON targets the mac's U4 plans
+are `course_config.json` (Course Settings, Set School Year, renames, New
+Course, Keep a Copy for Reference). Every key its schema names
+(`contracts/file-formats.json` → `courseConfigKeys`) is printable ASCII, the
+keys of its maps included (`section1` and on; `shared`, `per_section`;
+destination types), and the apps write whole numbers and booleans there,
+never an exponent. So no file Plantoir writes holds one: only a file a person
+or another tool edited by hand (an accented key added, a number pasted with 20
+digits, a mark in front of a value) can. Folder, page and course names with
+accents are values there, never keys, so they are unaffected.
+
+### An exponent the mac cannot read (fix round three)
+
+The third review of W6 found the same kind of hole as review 2's M2, for the
+exponent: Windows read `1e-0001`, `1.5e+0010` or `0e99999` and judged or moved
+the member beside it, while the mac cannot read such a file at all and answers
+changed since. **The rule now, on both platforms:** Windows judges and
+rewrites a member only where the mac's `JSONSerialization` reads the same file
+to the same value; a spelling the mac cannot read makes the file not one JSON
+object (changed since, every move refused). It is one rule in the contract,
+`undo.numberSpellingRule` (`exponentCharactersAtMost` 4,
+`digitsWithAnExponentAtMost` 17, `digitsWithoutAnExponentAtMost` 38), which
+`UndoJson` (`MacExponentCharactersAtMost`, `TheMacReadsTheExponent`) and
+`scripts/make_undo_traces.py` (`MAC_EXPONENT_CHARACTERS_AT_MOST`,
+`_exponent_read_by_the_mac`) hold as constants that their tests compare with
+the contract's (`TheNumberLimitsAreTheContractsRule`,
+`test_the_number_limits_are_the_contracts_rule`), and 37 rows,
+`undo.numberSpellingCases`, that both run (`EveryNumberSpellingCase`,
+`test_number_spelling_cases`), plus one `checkCases` row, "another member
+written 1e-0001": changed since both ways.
+
+**Measured** on this Mac (macOS 26.7.3, Apple silicon), `swift` scripts
+calling `JSONSerialization.jsonObject` on `{"a":<n>,"b":1}` (no xcodebuild;
+the probe is `vm-tools/reference/899-w6-mac-json-exponents.swift`):
+
+- The mac reads an exponent written with **at most 4 characters after the `e`
+  or `E`, its sign and leading zeros included**, and cannot read the file when
+  there are more, whatever the value or the digits before it: `1e0005`,
+  `1e+005`, `1e-005`, `1e-999`, `0e9999`, `-1e9999` are read; `1e00005`,
+  `1e+0005`, `1e-0001`, `1e-0500`, `1e-1000`, `0e99999` are not. 103,528 of
+  103,528 random spellings with 5 to 7 such characters (mantissas of 1 to 22
+  digits) could not be read.
+- Within 4 characters, with at most 17 digits, every reading is the nearest
+  double: every exponent string of 1 to 4 characters (13,330: with and without
+  a sign, every leading-zero form) on 14 mantissas at a double's range's edges
+  (`4.9406564584124654`, `2.4703282292062328` and `...27`, `1.7976931348623159`,
+  `17976931348623157` and others), and 200,000 random spellings: 140,193
+  nearest doubles, 121,381 above a double's range (not readable, as Windows
+  already refused a positive infinity), negatives beyond it minus infinity, 0
+  disagreements. With more than 17 digits the mac read a decimal number (6,044)
+  or nothing (15,474): cannot tell here, as before, unless the exponent itself
+  is too long, which is settled first (not JSON).
+- So: `-1e999` is minus infinity, `1e-999` is 0, `2.4703282292062327e-324` is
+  0 and `...28e-324` is `5e-324`, `1.7976931348623159e308` is not readable.
+
+What is NOT measured: how Windows' own `double.Parse` rounds was not compared
+with the mac outside the 37 rows (both are IEEE nearest; the rows pin the
+edges); a lone `e` or `e+` with no digits is not JSON on any reader. The mac's
+runner does not read `numberSpellingCases` (an `undo` key it does not know is
+ignored there), so those rows are run by Windows and Python only; the new
+`checkCases` row is run by the mac's replay too, and its verdict follows from
+the measured fact that the mac cannot read the file and from the mac's own row
+"editJSON: the file is not JSON": the Mac gate is what proves it (no
+xcodebuild in this piece).
+
+
+### Contract files Windows PowerShell must read (the integration fix)
+
+Windows PowerShell 5.1's `ConvertFrom-Json` refuses a whole file when any object in it has two keys equal ignoring case (`X1` and `x1`), or an empty key. `windows-app/test_launcher_rules.ps1` and `test_stop_preview.ps1` read `shared-rules.json` with it, so a case row that must hold such keys lives in a file of its own that no PowerShell reads: `contracts/undo-json-cases.json` (`editJSONCases`, `editJSONCasesHow`). `ContractFilesWindowsPowerShellReadsTests` runs the real reader on every other contract file and names the one exception; `scripts/test_make_undo_traces.py` holds the same exception list. Rejected: spelling the offending values as strings each reader decodes (four readers changed and a row no longer readable as JSON), and changing how the runners read `shared-rules.json` (the rows would still be unreadable to any PowerShell that later reads the file).
+
+### Pruning stops at a step it keeps (the final sweep of W3 and W4)
+
+`UndoJournal.Prune` stopped writing for a step left in flight for a
+re-deriving recovery (W3's review, LOW 2) but went on with the `pruned` lines
+`UndoPruning.Decide` had queued behind it, so newer steps were pruned while an
+older one was kept, against "one oldest run only, never a step newer in
+sequence than one kept". The run now stops there
+(`UndoRecoveryReviewFixesTests.PruningStopsAtAStepLeftForARederivingRecovery`).
+The mac has no such hole: its `UndoRecovery.prune` has no arm that keeps a
+step, and closes such a step `interrupted` as the contract's limits say. No
+contract row covers a kept step (the stack cases have none), so the test pins it.
+
+### What Windows has built: W4c, kept originals (#899, #949)
+
+- W4c (the Mac's U3c on Windows) is built: recovery and the door's Undo and Redo put a page back from the step's own kept original (`-orig`, `-<n>-orig`) when its SHA-256 is exactly the journal's, write both of the page's contents back into the list inside the lock before the swap, keep beside the page what the list will not take, and answer "cannot tell now" (list kept) for a kept original that cannot be read just now. Every tidy (recovery's first, the settled one, a could-not-put-back closing, a closed step's, pruning's) keeps a kept original that is the only copy of what it holds. A swap never removes, overwrites or reuses a kept name: it takes the next free `-<n>-orig`, kept exclusively.
+- Four trail events: "undo could not put back a change that stopped", "undo kept what a page held", "undo kept what it replaced", "undo refused for a change left part way".
+- The ledger: the 4 `ActivityTrailEvents`, 12 `UndoStackCases` ("U3c: …") and 10 `UndoRecoveryCases` held under `Reason899W4c` now run from the JSON; the reason is gone. Still held: `Reason899W4cWithW7` (2 rows, W7's rollover calls) and `Reason899W4cKeptAlert` (`keptTitle`, `kept`, `showKept`; gone since W7b2-9 built the alert, 2026-11-25, below).
+
+#### W4c: kept originals (the Mac's U3c)
+
+- `UndoCheck.Plan(keptOriginal:, keptOriginalUsed:)`: for a `writeFile` whose blob the list no longer holds, `UndoRecovery.KeptOriginal` looks through the step's own kept originals beside that page (any label: apply, undo, redo, `-recover`) and gives the bytes of the first whose SHA-256 is the one wanted. Never by name or file times. One that cannot be read now (`UndoCurrent.CannotReadNow`: a permission, another program holding it, a OneDrive placeholder) is reported; the door and recovery then answer `cannotTellNow`, the list kept.
+- `UndoRecovery.StoreWhatKeptOriginalsGive` (inside the lock, before the swap): the kept bytes as their blob, and what the page holds as the other direction's blob when it hashes to the recorded sha. It answers `UndoWhatTheListCouldNotTake`: `OutgoingOf` (the swap keeps those pages' originals: `UndoSwap.Swap(keepingTheOriginalsOf:)`), and `KeptOriginalsHolding` (no tidy removes a kept original with those bytes: `TidyLeftovers(keepingCopiesHolding:)`).
+- `UndoSwap.TidyLeftovers(keepingOnlyCopies:, unlessTheListHolds:, keepingCopiesHolding:)`: a kept original FILE goes only when its bytes are its page's (`IsACopyOfItsPlace`) or exactly what the list gives for its page undone or redone from what the page holds now (`UndoRecovery.ListHolds`).
+- Settle's order: the first tidy keeps every kept original that differs from its page; the plan; at a ready plan, the tidy with `ListHolds`, then the store, then the put-back's swap (keeping originals only for an undo or a redo, which stay on the list); after the step is written, the settled tidy and, for any kept original left, "undo kept what a page held" with "because it differs from what the list recorded" or "because the list no longer holds a copy of it". A could-not-put-back closing writes "undo could not put back a change that stopped", naming the kept originals read after its tidy.
+- The swap's keep: `-orig`, then `-2-orig` and on, the first name `UndoLinks.Look` finds empty; `UndoStagedFile.Keep` never copies over a name a hard link was refused for (80 or 183), and its copy is exclusive.
+- `UndoTrailLine` carries `Kept` and `NoLongerInTheList` so a test matches the line against the disk.
+- Test seams: `UndoSeams.PutBackFailsAt` (the Mac's `putBackFailsAt`). The replays' `contentCannotBeStored` and `beforeContentGoneAndCannotBeStored` put a real deny entry (create files and folders) on the list's content folder or one prefix folder; `makeTheKeptOriginalUnreadable` and `keptOriginalUnreadable` deny reading the kept file (`UndoDenials`, removed before the checks).
+
+#### Where W7 connects
+
+Today's class's "Show on Front Page" does not go through the door on Windows yet (W7). The part-way outcome W7 needs is the door's `Refused` with `LeftPartWay`, then recovery, whose "undo kept what a page held" line names the kept file. The alert keys `keptTitle`, `kept` and `showKept` stay held until W7 wires the action and the alert is built from the measurement below. Since 2026-11-25 both are done: W7b2-6 put Show on Front Page through the door and W7b2-9 built the alert ("What Windows has built: W7b2-6" and "W7b2-9", below). By Russell's ruling of 2026-11-25 (a) the alert's button opens the folder and the kept file stays hidden; it does not select the file.
+
+### What Windows has built: W7a, the step for a daily action (#899, #949)
+
+- `UndoActionStep` (`Plantoir.Core/Undo/UndoActionStep.cs`, the mac's `JournaledStep`): an action plans each file (`Write`), reads through the plan (`ReadText`), names the front page as a `recompute` (`KeepsTheFrontPageTrue`), and `Make()` hands ONE draft to `UndoDoor.Perform(UndoStepDraft)`: key, `pageCount`, `madeBy`, `class: A`, course, section, `holds`. Each before is read when the file is FIRST planned. A step that cannot be named (no `courses\` above the folder, a path out through a link, a target that is a link) is staged and swapped in together without the list in shadow, with one trail line; live, refused before anything is written. A target that is a folder, or a file unreadable at plan time, stops the action before anything is written.
+- Refusals: `UndoStepRefusedException` (nothing written: the caller says "Nothing was changed: …") and `UndoStepLeftPartWayException` (a file could not be put back: the message names each kept original with `undo.wording.keptBesideIt`; the caller says `publishStoppedPartWay`). `UndoOutcome.LeftPartWay` is new on the door.
+- Publish Pages and Hide Pages (`AssistWorkspace.Apply(PublishPlan …)`): one step, keys `publishPages` / `hidePages`; the front page is re-derived once after the step by the door (never a file of the step), or by the step itself when the door made none. `UndoHistory` is told each file's before and after as `Save` told it, the re-derived front page included.
+- `madeBy` from `AssistWorkspace.Surface`: `menu`, `builtInAssistant:<id>`, `outsideAssistant::<id>`; the id is one GUID per workspace (the window's conversation, or the `plantoir-mcp.exe` session).
+- "undo could not record a step" (`ActivityTrail.Event.UndoCouldNotRecordAStep`, `UndoTrail.CouldNotRecordWords`, the mac's `couldNotRecordLine`): written by the door when the list cannot take a step given as files (went ahead, nothing was changed, stopped part way), and by the step for a step it cannot name. Its ledger row and `Reason899` are gone.
+
+The bullets above, plus: the door is the product's through `UndoForThisProcess.Current.Door()` (the list under `AppDataRoot.Current\undo`, following `--state-dir`); `AssistWorkspace.UndoList` is a test's seam only. With the switch off, every page Publish and Hide write is the same text as before (`File.WriteAllText`'s UTF-8 without a byte-order mark); the only change a teacher can see is that a failure is now all or none.
+
+#### For W7b
+
+- Entry points: `AssistWorkspace.NewUndoStep(key, course, section)`, then `step.ReadText` / `step.Write` / `step.KeepsTheFrontPageTrue`, then `MakeTheUndoStep(step)` inside the action's `UndoHistory.Record`, and in its `catch (IOException or UnauthorizedAccessException)` `StoppedWhileWriting(error is UndoStepLeftPartWayException, error)`.
+- Still to go through it: every action W7b lists (writer scan entries `waitsFor: W7`; `LaterClassesKept.Keep` stays for Deploy's and the links checklist's records; since 2026-11-26 both records go through the door and `Keep` is gone: "W7b2-7" and "W7b2-8", below).
+- The planners read through the step while `_planningThrough` is set: an action that plans several things in one step sets it for its planning, as `Apply` and `ApplyWholeUnit` do.
+
+### What Windows has built: W7b1, the class pages' daily actions (#899, #949)
+
+The bullets above. Correction to W7a's "For W7b": the planners read through the step while `PlanningThrough` is set (an `AsyncLocal`, per flow; never `_planningThrough`, which W7a's round four replaced): an action that plans several things in one step sets it for its planning, as `Apply` and `ApplyWholeUnit` do (LOW 5). With the switch off a teacher meets the same files and the same answers as before W7b1, except that a failure is now all or none and says "Nothing was changed: …" where nothing was.
+
+- A Windows step left part way is never said as "couldn’t be read" or as plainly done: every converted action says "Nothing was changed" or the part-way sentence naming each kept file; Class Dates says the dates are remembered and names the hidden file (the mac's sheet words).
+- A refused swap leaves no empty folder it made.
+- Re-date Classes and Roll Over are each one step on Windows: one Undo puts back the pages and the timetable they were re-dated onto.
+
+**A new page's bytes are the Mac's (#1039, #1040).** A page Windows writes from a C# raw string literal (the class page skeleton) is made LF by `AssistWorkspace.PageTextFromLiteral` before it is saved, because a raw literal takes its line ends from the checkout that compiled it: built from a `core.autocrlf true` checkout, the skeleton was CRLF on every line but the unit tag's two. A new curriculum block opens with `## Curriculum connection`, the Mac's heading (the Mac's output is the `addCurriculumMentions` step in `contracts/undo-action-steps.json`, which `CurriculumMentionsTests` reads). Until #1039 Windows opened it with "Today's work points here:"; pages that carry that line keep it, since a block is found by its `%%curriculum-start%%` and `%%curriculum-end%%` markers, never by its first line. The only other raw literal in `Plantoir.Core` that reaches a file, `TaskScheduling.TaskXml`, is Task Scheduler's own XML, not a teacher's page.
+
+### What Windows has built: W7b2-4, the How I Teach page (#899, #949)
+
+- **A course-level step.** `AssistWorkspace.NewCourseUndoStep(actionKey, courseCode)` is `NewUndoStep` without a section: the step's header carries `course` and `holds: "course"` and no `section`. The backup's stand-in section (the lowest) is still what the backup and the part-way sentence name; the step does not carry it.
+- **Start the How I Teach Page.** The exclusive create (`FileMode.CreateNew`) is replaced by a check at plan time plus the door's refusal: the page is planned new; if the step's before (read as it is planned) is not absent, the page that is there is opened and nothing is made; if one appears after that, the swap refuses it as `changedSince` and the page that appeared is opened. The row derives the working folder from the course folder (`<wf>\courses\<code>`); a course not inside one is written plainly in shadow, staged and swapped all or none, as every step does.
+- **Write How I Teach.** The step plans the page FIRST (its before read then), and only then checks the page against the plan (`movedOn`, after the backup), so the before the step holds is the page the plan read, or the swap refuses it. A `changedSince` refusal from the door says today's sentence (`howITeachChangedSincePlanned`), and so does any refusal of a NEW page when a page is now there (review 1, LOW 2: one that appears after the door's last check is refused by the rename itself, `replace: false`, which the door reads as "in use"; the tool tells the case apart by the plan having seen no page, as the row does, so no change outside this piece was needed). A step left part way says the bare `publishStoppedPartWay` sentence naming the kept file, with no way back, in every surface: the mac's `saidWhenTheStepStopped(..., aSectionsCopyPutsItBack: false)`, since the page sits at the top of the course and Restore Section puts back one section only (review 1, MEDIUM; before, Plantoir's own window added "Restore Section 1… puts the section back"). Any other failure is "Nothing was saved: …" (`AssistWorkspace.NothingWasSaved`), the mac's `nothing: "Nothing was saved"` for this tool and the opening of every How I Teach refusal (review 1, LOW 1). The same words again plan no change: no step, no write, no today's-undo entry, the same "saved" answer and the same trail line as before.
+- **What a teacher meets differently.** A page that cannot be written now answers "Nothing was saved: …" (the tool) or "The How I Teach page could not be made: nothing could be written beside “How I Teach.md” (…)" (the row), where before the tool threw the system's message and the row put the system's message after "could not be made:". A page that appears in the instant between the tool's last check and its write is no longer written over.
+
+- **Correction for `documentation/12-windows-app.md`, "The How I Teach row, and the CHECK items of #360" (about line 6405).** It still says "The row writes with `FileMode.CreateNew`". Replace that sentence with: "The row writes the page as ONE undo step (`startHowITeachPage`, made by `sheet`, held by the course) and opens THE PAGE (`FolderActions.OpenInObsidian` gained a `page` argument), never the vault. The exclusive create is a check at plan time plus the door's refusal: a page there when the step reads its before is opened and nothing is made; one that appears after that is refused by the swap (`changedSince`, or the rename's own `replace: false` in the last instant) and opened." The test sentence after it stands.
+- **Write How I Teach, review 2.** The appeared-meanwhile sentence for a refusal other than `changedSince` is said only when the plan saw NO page (`planned.ExistingPath is null`) and one is there now; a started page with no words (what Start the How I Teach Page leaves) was seen by the plan, so its refusals say "Nothing was saved: {reason}".
+
+### What Windows has built: W7b2-10, W7b1's proof gaps (#899, #949)
+
+- The traces of a converted step whose bytes are Windows' own (`WindowsOwnJson`, `WindowsOwnFileInTheStep`) run the real Windows action. They are judged state by state on Windows' own hashes, each mapped from the mac's hash of the same state. The one file more is judged on Windows' bytes as the step leaves it.
+- The `w7-redate-kill` harness run drives `ApplyReDate` itself.
+
+### What Windows has built: W7b2-5, Get Ready for the Start of the Year (#899, #949)
+
+- The start of the year's write (12, the Undo / W7 section): one step, its files in the order of their places in the working folder (the mac's `AssistPublishPlanner.planWrites` sorts its paths, so `Concepts/Loops.md` comes before `section1/All Classes/…`); Windows' plan lists classes first, measured on the fixture (the first run failed on exactly this order), so the step sorts by the path relative to the working folder with forward slashes, ordinal. The sheet's lists, the declined sentence and Undo Getting Ready keep the plan's order (`written`), so what the teacher reads is unchanged.
+- A failure now changes nothing. A refusal answers `Nothing was changed: <reason>` (trail: "nothing was changed (writeFailed)"); a part-way stop answers `RefusalForAStepThatStopped(…, "the pages put into draft", …)`, naming each kept file (trail: "the pages could not all be written (writeFailed); backup …"). Both return `Changed: false` with nothing in `Written`, so the sheet holds no undo for them. `StartOfYearWording.WriteFailed` is no longer said by Windows; the mac still says it on any failure (its `prepareForStartOfYear` catch). The brief asked for the "Nothing was changed" family; a difference from the mac's sentence. `writeFailed` IS a contract sentence (`shared-rules.json` → `startOfYear.wording`), which Windows carries in `StartOfYearWording` and no longer says (corrected with the W7b2-6 fold: this bullet said "in no contract").
+- `NewUndoStep` takes an optional `madeBy` for a sheet's own button.
+
+### What Windows has built: W7b2-11, W7b1's small lows (#899, #949)
+
+- In the section on Re-date Classes… as one step: the section's front page is recomputed after the step by its rule (`sectionFrontPage`), so it is repointed AND dated (`PointedAndDated`); before W7b1 Windows only repointed it (`SectionIndex.Repointed`). A teacher's front page therefore changes its date line too after a re-date or rollover, as on the mac.
+- A held timetable: the plan-time read of `.internal/timetable/section<N>.json` is said as "Nothing was changed: another program, such as a syncing service, is using this section’s class dates. Try again in a moment." (Russell's ruling, 2026-11-25); another refused read as "this section’s class dates could not be read. Windows said: …" without the path; a folder in its place without "Windows said". This is reached only on the second and later change of an assistant chat: from the Section menu, and on a chat's first change, the course backup reads the timetable first and refuses with .NET's message (its own issue).
+
+### What Windows has built: W7b2-6, Show on Front Page as one step (#899, #949)
+
+- Show on Front Page's outcomes: a refusal before anything changed is `CouldNotSave` (its sentence, "The front page could not be saved, so it still shows {shown}.", is true: all or none). A step the door left PART WAY (the page holds the new class, its earlier content kept beside it as `.index.md.plantoir-undo-*-orig`) is `ShownWithWhatItHeldKept`, never `CouldNotSave`. Its trail line is the mac's: `put today's class on the front page — {to} in place of {from}. What “index.md” held just before is kept beside it as the hidden file “{kept}”` (event `PutTodaysClassOnTheFrontPage`). Every other trail line is unchanged.
+- Today's in-memory undo (`UndoHistory`, Undo Last Change) was never told of this write and still is not: the step is made directly (`step.Make()`), not through `MakeTheUndoStep`, so Undo Last Change behaves as before.
+- Windows still does not read the page back after the write (the mac's `show` re-reads it and answers `couldNotSave` when the line does not name the class). Unchanged here: the brief keeps every outcome as it was.
+
+### What Windows has built: W7b2-9, the kept-file alert for Show on Front Page (#899, #949)
+
+- **The kept-file alert (beside Show on Front Page as one step, above).** When Show on Front Page is left part way (`Outcome.ShownWithWhatItHeldKept`), the section window shows ONE alert: `TodaysClassOnTheFrontPage.KeptAlertFor` describes it in plain values (`AlertDescription`, `KeptAlert`), and `SectionDetailView.ShowAlertAsync` only renders that description, a `ContentDialog` shown through `ShowDialogSafelyAsync`:
+  - **Title:** `keptTitle`, filled with the class the page now shows (`TodaysClassOnTheFrontPage.KeptTitle`).
+  - **Message:** one `kept` sentence for each kept name, then the hidden-items sentence (`KeptMessage`).
+  - **Close button:** `OK`, which is also `DefaultButton = Close`. Enter and Escape both give OK.
+  - **Primary button:** `Open Folder` (`OpenKeptFolder`), a visible, labelled button on the left.
+- Open Folder (`KeptAlert.PressedAsync`) calls `TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync(keptOriginals, sayGone, openFolder)`. This is the seam the tests can see:
+  - Any kept file that is no longer there is said first, with `keptGone`, one sentence per name, in a content-only alert with OK (`GoneAlert`).
+  - Then the FOLDER that holds the kept files still there is opened once, through the path bar's `FolderActions.OpenFolder`.
+  - The file itself is never selected or revealed. There is no Show in File Explorer button, and the file stays hidden (Russell's ruling of 2026-11-25 (a)).
+  - When the file is gone, nothing is opened.
+- This copies the Mac's `FolderActions.showInFinder(files:)`: its plan and its order, alert first, then Finder.
+- The words read the contract. `keptTitle`, `kept` and `keptGone` are retyped as C# and pinned against `wording` by `TheSentencesAreTheContracts`, the house pattern. The app reads no contract at runtime. The two Windows words are new keys beside `wording`, not inside it:
+  - `keptOnWindows.hiddenItems`: "To see it, open View in File Explorer and turn on Hidden items." (true on Windows 10 and 11 alike; the director's wording, awaiting Russell's confirmation).
+  - `keptOnWindows.showKept`: "Open Folder". It is also pinned equal to `shared-rules.json` → `workingFolderPathBar`'s open action `windowsLabel`.
+  - **Why beside `wording`:** the Mac's `TodaysClassOnTheFrontPageTests.testTheWordingIsTheContracts` compares the WHOLE `wording` dictionary with its own (`XCTAssertEqual(ours, wording)`). A Windows key inside it would turn the Mac red. The section's `fill` sentence said Windows' button "reads 'Show in File Explorer' … to be measured"; it now points at `keptOnWindows`.
+  - "File Explorer" is the name of Windows' program and is listed in `plainWordsExceptions`; `NoKeptAlertSentenceSaysATechnicalWord` checks the filled sentences with that name taken out.
+- The ledger no longer holds `keptTitle`, `kept`, `showKept` and `keptGone`: `Reason899W4cKeptAlert` and its `TodaysClassWording` row are gone.
+- The two corrections W7b2-9's notes listed (the start of the year's "in no contract" clause, and the straight apostrophe in the quoted held-timetable sentence) are made above, in the W7b2-5 and W7b2-11 sections, and in PROGRESS.
+
+### What Windows has built: W7b2-7, a sheet's answer record as one step (#899, #949)
+
+**W7b2-7: the sheets' records.** A record a sheet writes to remember a teacher's answer is one step of that one file, `madeBy` `sheet`, `todaysUndoKeepsIt: false`, as the mac's `NotToday.write` and `KeptRecord.write` (each a `JournaledStep` of its own, `UndoStepMaker.sheet`). Not Today goes `SectionDetailView` → `AssistWorkspace.DeclineTodaysClass` → `TodaysClassOnTheFrontPage.RecordNotToday(…, step)`. The answer at Deploy goes `SectionDetailView.AskAboutClassesDatedLaterAsync` → `LaterClassesKept.KeepAtDeploy(_window.Workspace.WorkspacePath, code, directory, section, keeping)`; the view names the working folder, the record names its maker. Publish Class for a Date keeps planning the record into its own step through `LaterClassesKept.PlanInto` and makes no second step (W7a's `PublishClassForADateKeepsTheClassItPublishesInTheSameStep`). A record that cannot be written returns false and nothing is thrown, as the mac's `try?`: the answer stands and the question is asked once more. A step left part way has written the record and returns true; it has no sentence of its own (the trail's door line names the kept file), as on the mac. Windows' bytes differ from the mac's, measured and named in `WindowsActionsOnTheMacFixture.WindowsOwnJson`:
+- Not Today: Newtonsoft indented, `"key": value`, members version, day, class, the computer's line ends and a closing newline; `version` is the string "1" (as `file-formats.json` → `frontPageNotToday.keys.version` writes it), the mac's the number 1. Same members: day, class.
+- Kept classes: System.Text.Json indented, members version, answeredAt, kept; each place without `.md` (as `laterClassesKept.keys.kept` says), where the mac's recorded step names the page with `.md`. Same members: version, answeredAt.
+
+The links checklist's Publish wrote the kept record plainly (`LaterClassesKept.Keep`) until W7b2-8, below, planned it into the press's own step with `LaterClassesKept.PlanInto`; `Keep` and the writer-scan entry for `LaterClassesKept.cs` are gone.
+
+### What Windows has built: W7b2-8, the links checklist's Publish and Not Now as one step each (#899, #949)
+
+**W7b2-8: the links checklist's press.** `LinksChecklistDialog.OfferAsync` → `AssistWorkspace.PublishAndRemember(sheet)`: refuses while a deploy holds the course, backs up once, opens today's-undo recording, makes ONE step `NewUndoStep("answerTheLinksChecklist", …, madeBy: "sheet")`, and `PlanThePress` plans into it: the class plan's pages (`SetDraft`), the pages a ticked class brings dated by it (`SetCreated`, read through the step so a page planned twice is read as planned), the going page rows with the offer's dates, then `LinksChecklist.PlanAnswered`, then `KeepTheClassesItPublished` (`LaterClassesKept.PlanInto`, reading the classes as the step leaves them). Both records are `todaysUndoKeepsIt: false`, as they were never in today's undo. No `KeepsTheFrontPageTrue`: the mac's `AssistPublishPlanner.planWrites` names no recompute and the checklist never repoints the front page. A refusal before anything is written says the mac's sentences since W7b2-3 (below): a page that cannot be read is the unreadable-page sentence naming the course, a section page changed since it was checked is `linksChecklist.wording.pageChangedSince`, and anything else is "Nothing was changed: …". A step left part way is `wording.publishStoppedPartWay` with "the pages you ticked" (`LinksChecklistWording.PagesYouTicked`, read from `shared-rules.json` → `linksChecklist.wording.pagesYouTicked` since U4b2-9 put the words in the contract), with no Restore Section sentence after it, as the mac's sheet says none. Not Now: `NotNow` → `LinksChecklist.RecordTheAnswer(step, …)`, one step of the record; a record that cannot be written costs only the record (the checklist is offered again), as the mac's `try?`. Windows' answered-record bytes are its own (System.Text.Json, indented, members version, answeredAt, offered, leftUnticked in that order); every member holds the mac's value, named in `WindowsOwnJson`.
+
+### What Windows has built: W7b2-1, Make Room for Classes as one step (#899, #949)
+
+- Make Room's step: file order is the order first planned. For the mac's fixture (unit 1, at day 2) that is `Unit 1, Day 4.md` (the first rename's new name), `Unit 1, Day 3.md` (its old name, removed, then the second rename's new name), `Unit 1, Day 2.md` (removed, then the new blank page), `Unit 2, Day 1.md` (its link, then its date). This is the mac's order exactly; no difference to name. Four `writeFile`, no recompute.
+- Two differences from the mac's `ClassInsertionPlanner.apply`, both sanctioned by the brief's invariant (review 1, L1): a page Make Room cannot READ (another program holding it with no read sharing) refuses the whole action, "Nothing was changed: …", where the mac's `JournaledStep.readText` gives nil and the mac carries it past (a rename named not renamed, a link page or a move skipped) and makes the rest. And the link pass reads the section's pages in `Pages()` order and then the planned ones, where the mac reads `step.markdownFiles` sorted by path (review 1, L2): a page already planned by a rename keeps its place, so the begin line's order can differ from the mac's only when two link pages not otherwise planned are listed in a different order by `PagePaths.MarkdownPages` than by path; the fixture has one such page, so this is unproven either way.
+- Shadow, killed part way through the swap (harness `beforeSwap@1`): the second process leaves a shadow step alone (no list is offered in shadow), so the folder can be left with some pages made and some not, which for Make Room can be one lesson under two names (old Day 4's lesson at both Day 4 and Day 5) until the teacher restores the backup the reply named (review 1, L4). Live, recovery puts every page one way. Each page is always whole. The file-by-file path left the same mix after a crash.
+- #550's carried-past failed write and #422's "with links not updated" count are gone for Make Room: a write that would fail now refuses the whole step. The trail line `MakingRoomDidNotFinishEveryPage` still says what was carried past at plan time; its "with links not updated" count is always 0 now.
+- Shadow, a later class that is a symbolic link: Windows writes the step plainly (no step recorded), a plain copy at the new name and the link itself removed, the file it led to untouched. The mac's clause of `undo.rule.shadow` (U4b2-1) refuses that step before anything changes. Held by name in `UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15` until pieces U4b2-14 and 15 settle moved links. Live, Windows refuses it too (the step cannot name a link).
+
+### What Windows has built: W7b2-2, Duplicate Class as one step, the room and the copy together (#899, #949)
+
+- Duplicate Class's step: file order is the order first planned, the mac's exactly for its fixture (unit 1, duplicate Day 1): `Unit 1, Day 4.md` (new, the first rename's new name), `Unit 1, Day 3.md` (removed, then the second rename's new name), `Unit 1, Day 2.md` (removed, then the blank page, then the copy: one file), `Unit 2, Day 1.md` (its link, then its date). Four `writeFile`, no recompute. No difference to name.
+- A page that cannot be read or written refuses the whole duplicate, where the old path carried a failed write past and then wrote the copy or refused it with the room half made. The #200 A guard still fires when a rename is SKIPPED (its new name taken by a page made after the plan was shown, or a new page's place taken); a page that cannot be read no longer skips a rename (it refuses the step), so `DuplicateClassTests.ALinkRewrittenInsideTheLessonCannotFoolTheGuard` builds the skip with a page of the teacher's own at Day 5 (Days 1-4 and 6 laid, so the plan renames 6, 4 and 3, and only 6 -> 7 happens) instead of the mac's unreadable page.
+
+### What Windows has built: W7b2-3, the menu's Duplicate as Next Class as one step (#899, #949)
+
+- Duplicate as Next Class's step: one file, `Unit 2, Day 2.md`, new, one `writeFile`, no recompute: the mac's exactly. No difference to name.
+- The plan-time check (`step.Exists`) cannot be pinned alone by a test: the plan made again after the backup (#351) sees any page at the new name first (it plans the next day instead and the copy is refused as "changed while saving"), and nothing runs between the two. It stays as the guard the exclusive create was, for a page the planner does not count as a class. The door's two refusals are pinned (must-fail row 2).
+- A one-new-page step cannot be left part way by the door: a refusal of its only swap has nothing before it to put back. The part-way answer is pinned on `RefusalForAMenuCopyThatStopped` with a constructed `UndoStepLeftPartWayException`.
+- What each platform tells the teacher when a page cannot be read during a duplicate (W7b2-2 review 1, L3):
+  - Duplicate Class (the assistant's, W7b2-2): Windows refuses the whole duplicate, "Nothing was changed: …" with the reason (a permission in plain words, else the system's sentence), nothing moved. The mac's `ClassInsertionPlanner` carries the unreadable page past as not renamed (`JournaledStep.readText` gives nil), then the duplicate finds the copy's place still taken, makes the room alone and says `wording.thePlaceForTheCopyIsStillTaken`, naming the backup. `DuplicateClassTests.ALinkRewrittenInsideTheLessonCannotFoolTheGuard` built its skip with the mac's unreadable page until W7b2-2, and with a page of the teacher's own since.
+  - Duplicate as Next Class (the menu's, this piece): the source is read at plan time on both platforms; an unreadable source is `wording.noPageCalledFromTheMenu` on both. No other page is read.
+- The links checklist (W7b2-8 review 1, L3, a sentence only): Windows writes the answered record's `offered` and `leftUnticked` in the sheet's row order, where the mac's `LinksChecklistAnswered.write` sorts them; both readers read them as sets. Named in `WindowsOwnJson`.
+
+### The pieces still owed for #899 on Windows, and what each waits for
+
+The plan (`plans/899-plan.md` of the v2.0.0 Windows run) as amended by its
+review: W2 is split in two (M8), and W4 no longer records publish and hide in
+shadow (M1: #949 says Windows records nothing in shadow before U3), so that
+recording and the trail event `undo could not record a step` move to W7.
+
+| Piece | What | Waits for |
+|---|---|---|
+| W2a | BUILT (2026-11-20, above): `UndoLock` (`LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY` on a `CreateFileW` overlapped handle .NET never binds), the store in `UndoJournal.WithLock` and `UndoJournalWriter` (segments, the LF-only append, the torn line cut inside the lock, reading on, blobs by a no-overwrite rename), pruning and deletion carried out, `UndoJournalLocation` | W1 merged |
+| W2b | BUILT (2026-11-20, above): `UndoSwap` (staged, then the POSIX-semantics rename, `MoveFileEx` only on 87/50; re-read, read-only refused, attributes and creation time kept, the kept original read back; staged files removed on every failure path, F1), `UndoPlaces` (containment by a handle's final path), `UndoDoor` (step, undo, redo, refusals, clearing, dropping; blobs and begin in one hold), `JournaledSetting`; `stepCases`, the stack cases and traces through the real door; pruning's tidy of an unsettled step's staged files | W2a merged |
+| W3 | BUILT (2026-11-20, above): `UndoRecovery` (settle by content, put back, `rolledBack`, `interrupted` and cleared, shadow), the refused-swap schedule, recovery before every prune, the abandoned own step, the closed-step tidy, re-derivation on settle, `undo rolled back`; `recoveryCases` (20 run, 21 held for W6); the kill harness; W2b's review LOWs | W2b merged |
+| W4 | BUILT (2026-11-20, above): where the list lives (following `--state-dir`), the writer scan, the switch (off), and recovery at every launch of the app and of `plantoir-mcp.exe` (`UndoAtLaunch.Recover`); `madeBy` from `AssistWorkspace.Surface` (L1) moved to the W7 row | W2a merged; no longer after W3 |
+| W4c | BUILT (2026-11-21, above): the Mac's U3c: recovery and the door's Undo and Redo put a page back from the step's own kept original (SHA-256 exactly the journal's), both of a page's contents written back into the list inside the lock before the swap, nothing that is an only copy deleted by any tidy, a swap keeps a kept name exclusively and takes the next free `-<n>-orig`; four trail events; `Reason899W4c` left the ledger | W6 |
+| W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
+| W6 | BUILT (2026-11-20, above): the six op kinds U2b defines (`replaceText`, `editJSON`, `move`, `createTree`, `removeTree`, `external`); running `recompute` stays with W7 | the mac's U2 |
+| W7a | BUILT (2026-11-21, above): `UndoActionStep`, a daily action as ONE step through the door with its files planned whole; Publish Pages, Hide Pages, a whole unit and Publish Class for a Date through it (keys `publishPages`, `hidePages`, `publishClassForADate`); `madeBy` from `AssistWorkspace.Surface`; `UndoOutcome.LeftPartWay`; `undo could not record a step`; the replay of `actionTraces` (150 traces, 18 U4a ones and rollover and `moves` ones held by name); kept files marked Hidden (the Explorer measurement) | W4c |
+| W7b, W7c | W7b1, W7b2-4, W7b2-5, W7b2-6, W7b2-9, W7b2-10 and W7b2-11 BUILT (2026-11-25, above: Show on Front Page through the door and its kept-file alert among them); W7b2-7, W7b2-8, W7b2-1 and W7b2-2 BUILT (2026-11-26, above: Not Today, Classes Dated Later kept at Deploy, the links checklist, Make Room for Classes and Duplicate Class, each one step). W7b2-3 BUILT (2026-11-26, above: the Section menu's Duplicate as Next Class as one step), so every W7b2 action is converted and none is held in the ledger. W7c is OWED, with what W7a handed on (above, "For W7b"; pruning's folder line is done). W7 as first planned: every daily page action through the door, `madeBy` from `AssistWorkspace.Surface` (L1; the plan puts it beside the shadow recording, a `--door menu|builtIn` argument from the helper's role), publish and hide recorded (M1), `undo could not record a step`; replay `undo-traces.json` → `actionTraces` (120, from `undo-action-steps.json`: an `action` call is a step given as each file's before and after, its ops worked out by the door's rule, and the trace pins the op kinds), and the one sentence U3 added to `rule.recovery` (shadow recovery removes the staged files of a closed step whose every op changes a file in place) ; from U3b, the rollover as ONE step (documentation 09, "U3b: the rollover as one step"): the new op kind `moveApart` (judged as `move`; an Undo or Redo that finds it changed since leaves it, names it in `leftApart`, and goes on: Russell's ruling of 2026-11-19 on Q3, #959), the `external` family `scheduledDeploy:<name>` with Windows' own value for its Task Scheduler job (removed by the rollover; set back only while its moment is ahead, otherwise left apart and named), a recorded step's `moves` in `undo-action-steps.json`, an action trace's `deploy` call and `leftApart`, and the 4 `moveApart` checkCases and 8 U3b stackCases (calls `rollOverOntoANewWebsite`, `rollOverOntoNewWebsitesOnTwoHosts`, `rollOverTurningOffASchedule`, `theScheduleCannotBeSetNow`; keys `leftApart`, `schoolYear`, `cloudflareMarkers`). From U3b's second round: a step's `moveApart` records move as a GROUP (any one changed since leaves every one apart, so a section is never split across two websites); a schedule the swap cannot set at an Undo or Redo (the scheduler refuses the task) is left apart and named, never a refusal; a job whose moment is not recorded is never set back; a refused swap removes the empty folders it made; the legacy Netlify record in the built output is brought into `.netlify_sites` BEFORE the step (never a refusal: Russell, 2026-11-20 evening); refused, nothing changed, only when a record cannot be read, written or removed; a step then refused moves it back, or says what moved. From U3b's fix round three: ONE question decides every record, which one a deploy reads now (`undo.netlifyRecordCases`, 20 rows run through deploy.py's own `load_netlify_marker` by `scripts/test_netlify_record_a_deploy_reads.py`, which Windows' Python already runs; W7 runs the rows through its own reader too): a current record that parses wins, else a legacy one that parses (migrated into the current place; a current record that does not parse is first moved to `section<N>.unreadable.json` and never moved again), else none; a record that names no site (`null`, `{}`, `[]`, a string, an empty `id`) is no website, so nothing is brought in or moved and the section is said to have had no website. Only what a deploy reads moves, plus a legacy record that parses and differs from the current one: that one is the LEFTOVER `section<N>.from-built-output.json` (`.2`, `.3`… when the name is taken, never a refusal) and is set aside by the step as the new op kind `setAside` (judged as `move`, standing apart ON ITS OWN, never one of the group: 3 checkCases, 4 stackCases, calls `rollOverSettingALeftoverAside` and `removeTheKeptLeftover`, key `leftoverMarkers`); a legacy record saying the same as the current one, compared parsed, is only removed; a record a deploy cannot parse is NOT moved (it stays in the built output), and `section<N>.unreadable.json` is no `setAside` leftover. Corrections in documentation 12, "The rollover, U3b fix round four". A schedule put back whose task will only start at the next login is named in `startsAtTheNextLogin` (an Undo outcome of its own, sentence `undoScheduleStartsAtTheNextLogin`, 1 stackCase, call `theScheduleStartsOnlyAtTheNextLogin`), never as left apart. Until W7 a reader that does not know `moveApart` reads the step as a barrier, which is safe; the rows (and the wording key) belong on the named-gap ledger against #899 for W7 | the mac's U3 (U3a landed the daily actions; U3b the rollover), and #900 and #927 where they rewrite a writer |
+| W8 | settings (`editJSON`, never `writeFile`, on `course_config.json`), renames, New Course, reference courses; rollover and restore | the mac's U4; #897 B; #909 and #873 |
+| W9 | Delete Backup and Delete Archive to the Recycle Bin | the mac's U5 and Windows' 785a (#912) |
+| W10 | the offer to deploy after an Undo or Redo | the mac's U6, and W5 |
+| W11a | the flip, holds, reach, titles, `undo_last_change`'s body, today's three histories retired | the mac's U7; #904/#829 |
+| W11b | Edit ▸ Undo and Redo, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, typing first, the two-process UI test | W11a |
+
+### The rollover, U3b fix round four: corrections to the W7 row (#899, 2026-11-20)
+
+Corrections to the W7 row's U3b passage ("From U3b's fix round three: ..."),
+made true by fix round four:
+
+- `undo.netlifyRecordCases` is now 20 rows (was 13). New field
+  `currentEndsWithAByteThatIsNotUTF8` (the byte FF follows the row's text).
+  `site` is the id a deploy GOES ON WITH: `site_marker.get("id")`, null when
+  absent or empty, or when the record is not an object.
+- The section's website is that site. A Netlify record that names no site
+  (`null`, `{}`, `[]`, a string, an empty `id`) is not a website: a rollover
+  moves nothing of it and says the section was on no website. A record whose
+  bytes cannot be read at all stays "still pinned" (cannot tell now).
+- Only what must move, moves. With no site, nothing is brought in or moved.
+  With the legacy record's site, it is brought into the current place (a
+  current record there that does not parse first moved to
+  `section<N>.unreadable.json`, NEVER moved again). With the current record's
+  site, a legacy record that parses and differs is brought in as
+  `section<N>.from-built-output.json` and set aside by the step (`setAside`);
+  one that says the same is removed; one that does not parse stays in the
+  built output. Delete from the row: `section<N>.unreadable.json` as a
+  `setAside` leftover, and "a section<N>.json that does not parse" set aside.
+- Every kept name of a step comes from one chooser (Mac:
+  `DeployCommand.KeptNames`): the file's own name with `.previous-<stamp>`
+  before `.json`, then `.2`, `.3`… after the stamp, the first neither on disk
+  nor already chosen in the step. A record's kept name that is taken no
+  longer leaves the record pinned.
+- The "starts at the next login" trail line is written only after the whole
+  swap has gone in (Mac: `UndoExternalPlaces.noteItStartsAtTheNextLogin`,
+  called by the journal after `.swapped`), never inside the write.
+
+No contract row Windows runs today changed (Windows has no walk over
+`netlifyRecordCases`; `scripts/test_netlify_record_a_deploy_reads.py` runs
+there through `PythonToolchainTests` and passes on the new rows), so nothing
+new is held in `NamedGapLedger.cs`.
+
+### What W8 copies from U4a
+
+- **Save of Course Settings is ONE step**: one `editJSON` per top-level member whose VALUE the Save changes (keys sorted), each `before` the value in the file read when the step is planned, absent (no `before`) when the member was absent. Each member's bytes move by the member rule (`editJSONCases`); a file that is missing, not one JSON object, or that the member rule cannot move is one `writeFile` of today's whole bytes. A step refused because one of its own members changed between plan and make is planned again from the file, up to three times. A Save that changes no value writes nothing and makes no step. Revert writes nothing.
+- **Add folder**: one `createTree` per folder made (the folder and the two scaffold pages), the highest missing folder of its path the tree's root; all or none; the list's own change is Save's step.
+- **Set School Year**: one step, one `editJSON` on `reference_school_year`.
+- **Undo takes back only its members**: another window's Save of another member, or a build adding a folder, is left; a member of the step changed again refuses the Undo, names `course_config.json`, clears the list.
+- **Bytes**: a changed member is spelled compactly (`"hidden" : ["Media"]`); every value is the same as before.
+
+### The lows fixed with U4a that W4c and W7 copy
+
+1. **The `undo could not record a step` line (U3 sweep, finding 2).** Written only once the shadow write has answered, worded by what happened: went ahead ("The change went ahead (the list is not in use yet)."), nothing was changed ("Nothing was changed."), stopped part way ("The change stopped part way; what a file held before is kept beside it."), made with its closing line not yet written ("The change was made; its record is finished at the next chance."). Mac: `UndoUnrecordedChange`, `UndoTrailHook.couldNotRecord(action:course:section:why:after:)` around `writePlainly` and `makeWithoutARecord`, and the shadow swap in `JournaledWrite.perform`. Before, the line said "went ahead" before a write that could still refuse (always for a page that is a link).
+2. **Switch-off refusals (finding 3).** `undo.rule.shadow` said at U4a: with the switch off, a daily action whose file is a link, a folder or unreadable is refused before anything changes, as is one whose file changed between plan and make; a refusal part way keeps what a file held beside it. Before U3 those wrote (a link was replaced by a regular file). Windows refuses the same for a folder, a file it cannot read, and a file changed between plan and make, but NOT for a page that is a link: before Undo, Windows wrote a linked page through its link (`File.WriteAllText`) and the link stayed a link, so with the switch off such a step is written through the link, all or none, by the plain staged swap at the file the link leads to, the link left as it is, with one trail line (`undo could not record a step`); with the switch off nothing behaves differently from before Undo (the final sweep of W4c and W7a, item 1; `UndoActionStepTests.WithTheSwitchOffALinkedPageIsWrittenThroughItsLinkAndStaysALink`). Until U4b2-1 `undo.rule.shadow`'s sentence on a link was the Mac's; since 2026-11-25 the rule says of both platforms that a linked page is written through its link (below, "What W7b2 and W8 take from U4b2-1"). Live, Windows refuses such a step before anything is written.
+3. **Duplicate Class (finding 4).** When the copy is refused and the room alone then cannot be made, the reply is "Nothing was changed: …", never "a blank class page is waiting".
+4. **An Undo or Redo never deletes an only copy (U3c review 3, LOW 3).** Under the lock, before the swap: each page's outgoing bytes that the step's other direction needs (a writeFile op's after for an Undo, its before for a Redo) go into the list when it lacks them; when the list will not take them they are kept beside the page and the other direction is made from that kept file.
+5. **One kept copy per content (LOW 1).** After a move that kept outgoing bytes beside a page, the step's kept copies beside that page are thinned to one per distinct SHA-256 (the newest move's kept for its content).
+6. **Show in File Explorer for a kept file that is gone (LOW 2)**: say `keptGone` in an alert with OK and show nothing. (Built by W7b2-9, 2026-11-25, where the button reads Open Folder: `keptGone` is said and no folder is opened.)
+
+### Not readable on Windows yet (no ledger row added)
+
+- `actionTraces` for `saveCourseSettings`, `addFolder`, `setSchoolYear` (W7's reader).
+- `undo-action-steps.json` `members` and `trees` (W7).
+- `undo.wording` (no Windows reader; W4c and W7 say these sentences).
+
+### Ledger rows changed
+
+- `Reason899W4cWithW7`: one stack row renamed (the rollover of only its records, a leftover and the year), one added ("a later rollover's Undo that leaves its record apart keeps an earlier page's kept original beside it, untouched").
+- `Reason899W4cKeptAlert`: `keptGone` added to the held `TodaysClassWording` keys.
+
+### What W7b2 and W8 take from U4b2-1, a linked page is written through (#899, 2026-11-25)
+
+- `undo.rule.shadow` now states ONE rule for both platforms: a linked page is written through its link and stays a link; a folder (a link to a folder included) or a file that cannot be read is refused before anything changes; a part-way stop keeps what the file held beside the file the link leads to. Windows' `UndoActionStepTests.WithTheSwitchOffALinkedPageIsWrittenThroughItsLinkAndStaysALink` and `APlainWriteLeftPartWayIsSaidAsPartWayAndNamesTheKeptFile(throughALink: true)` are the twins of the Mac's `UndoSweepFindingsTests` cases.
+- Insert Class on Windows (`ApplyInsertClasses`, `AssistWorkspace.cs` about lines 4214 to 4226) goes ahead today when a later class is a link: it saves a plain copy at the new name and deletes the link with `File.Delete`, outside the door. The Mac refuses that step before anything changes. The contract names this as the Mac's. When W7b2 converts Make Room for Classes, the held row `makeRoomForClasses` carries this, and pieces 14 and 15 decide which behaviour holds. Since W7b2-1 (2026-11-26, "What Windows has built: W7b2-1", above) Make Room for Classes is one step and the held row is gone: in shadow the step is written plainly, without the list (a plain copy at the new name, the link itself removed, the file it led to untouched), and the difference from the Mac is held by name in `UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15`, which reads the contract's clause; pieces 14 and 15 still decide. Twin on the Mac: `UndoSweepFindingsTests.testAShadowStepThatRemovesALinkedPageIsRefusedBeforeAnythingChanges`.
+- A dangling link whose folder is missing: both platforms make the folder and the file (Windows `UndoSwap.MakeTheFolderOf`; the Mac's door). Twin: `testAShadowStepOnADanglingLinkWhoseFolderIsMissingMakesTheFolderAndTheFile`.
+- Corrected with this fold: "The lows fixed with U4a that W4c and W7 copy", item 2 (above), said `undo.rule.shadow` refuses a daily action whose file is a link and called that sentence the Mac's. The link part is no longer true on either platform.
+- One difference that stays (shadow only, nothing offered): the Mac NAMES a link to a file inside the working folder in a step, at that file (a shadow record, no trail line); Windows writes every linked page plainly with a `wentAhead` trail line. A link to a file outside the working folder is plain, with a `wentAhead` line, on both. See "For U7" in the notes (`windows-app/notes/899-u4b2-1-linked-page-written-through.md`).
+
+### What W8 owes from U4b2-2, a leaves-the-folder refusal names the place that leads out (#899, 2026-11-25)
+
+W8 (Rename folder through the door) owes:
+
+- `UndoCheck.Plan`, the leaves-the-folder block (about line 375): put in `inTheWay` the FIRST of `op.PathsNamed` (`Path`, then `From`, then `To`) for which `UndoPlaces.StaysInside(whole.Root, place)` is false, not `op.PlaceName`. Today a move whose `To` alone leads out is named by its `From`, the side that is as the step left it.
+- The same rule at the two checks Windows makes again just before each change, read in `windows-app/Plantoir.Core/Undo/UndoSwap.cs` on a03fecefd: the staging loop (about line 306) and the swap loop for a whole op (about line 370) both refuse with `new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath)` when `StaysInside(target, root)` (line 401) fails, and for a `MoveHere` that test covers `move.FromRelative` and `target.RelativePath`. So today a link made between the plan and the change that takes only the other side out names the side as the step left it (Undo, only `to` out: names `from`; Redo, only `from` out: names `to`), which is what the Mac did before review 1. W8: for a `MoveHere` target name the first of `move.Op.PathsNamed` that fails `UndoPlaces.StaysInside`, by the same function `UndoCheck.Plan` uses (the record carries `Op`, `UndoCheck.cs:573`); for any other change keep `target.RelativePath`. The file checks at lines 636 and 687 (`SwapAFile`, one path) already name the only place. No contract row reaches this window on either platform; the Mac's four `UndoDoorGuardTests` `...AtTheStagingCheck...` and `...AtTheSwapCheck...` make the link from a kill-point hook after the plan.
+- `UndoStackContractTests`: the key `refusalNamed` (the `ChangedSince` refusal's first path after the last `undo` or `redo`; compare as a string) and three calls: `moveThePageIntoAFolder` (courses/TST1O/b.md, made holding `page\n` when neither place holds it, moved to courses/TST1O/new/b.md, one `move`), `moveThePageBetweenFolders` (courses/TST1O/old/c.md to courses/TST1O/new/c.md, the same way), `linkItsNewFolderOutside` (courses/TST1O/new removed and replaced by a junction to the same `Outside` folder `linkItsOldFolderOutside` uses). Then take the six `U4b2-2` rows (three Undo, three Redo) out of the ledger.
+
+Why the held rows fail on Windows today: all six carry `refusalNamed`, which `KeysChecked` does not hold, so each fails at "a key this replay does not check: refusalNamed" before any call. Four of them (the Undo and Redo "only the old place" rows and both "both" rows) would pass on Windows as soon as the replay reads the key and knows the rows' calls, because `op.PlaceName` is `From` and `From` leads out in each; the Undo and Redo "only the new place" rows need the UndoCheck change. They are held, not left, because the key itself is unknown there (the brief's "not held if they would pass" does not apply: they would not pass).
+
+### What W8 owes from U4b2-3, a rename record lives only while its rename is unfinished (#899, 2026-11-25)
+
+- Windows as it is today (checked in `windows-app/`): `SpecialFolderRenamer.Rename` (Plantoir.Core/Models/SpecialFolderRenamer.cs:269) writes the record, overwriting any record on disk, only when there are folders to move. Its caller, `CourseSettingsView.xaml.cs:501`, clears the record unconditionally after the settings are written, including when nothing moved, so another folder's unfinished rename is lost the same way the Mac lost it before this piece. A first `Directory.Move` that fails (SpecialFolderRenamer.cs:271-277, nothing moved) throws `RenameException` with nothing changed and leaves this run's record, which then greys the one-section restore (`OneSectionRestore.cs:217-218`). A later move that fails (part way) or a failed settings write leaves the record, which is right.
+- What Windows must do (one instruction for W8): read the record already on disk before writing its own. After a refusal that changed nothing (a first move that fails with nothing moved included), put that earlier record back byte for byte, or leave no record when there was none. After a rename that stopped part way, keep this run's record. Once the rename is whole (folders moved and settings written): clear a record of this same rename; clear a record of this folder renamed to another name too, since the settings no longer name the old folder; put back any other earlier record; and touch nothing when no folder moved and the record is another folder's. If the put-back or clear fails, write a `folder renamed` trail line saying "did not rename" after a refusal and "renamed" only once the rename is whole.
+
+### What W4c owes from U4b2-4, the kept line tells same-named pages apart (#899, 2026-11-26)
+
+What Windows does today (read in `windows-app/Plantoir.Core/Undo/UndoDoor.cs` `SayWhatItKept`, and `UndoRecovery.cs` `UndoTrail.KeptWhatItReplacedWords`): the line is not yet decided page by page at all. It says "put back … from what was kept beside it" of every named page, takes no list of pages put back from a kept original, and keeps each kept file by its bare file name (`Path.GetFileName(kept)`), skipping a second kept file with the same name in another folder. W4c owes, when it brings the line up to the Mac:
+
+1. `SayWhatItKept` records each kept file as `<page's folder>/<hidden name>` (the folder of the op's relative path, `/`-separated; a page at the root gives the bare hidden name), and skips a kept file only when that whole path is already listed.
+2. The pages put back from a kept original are listed by the op's relative path (the use's path, whole), never its last part.
+3. The line works out each kept file's page as its folder plus the name between the hidden name's leading dot and its last `.plantoir-undo-`. A page is said to come "from what was kept beside it" only when that page path is in the list of 2.
+4. A page is named on the line, quoted, by its file name; when any other page the step changes (every op's path, named on the line or not) has the same file name, by its path with the leading `courses/<course>/` taken off (“Section 1/index.md”), and when the page is not under `courses/<course>/` (the top of the working folder, another course's folder) or the step has no course, by its whole path in the working folder (“index.md”, “courses/ICS3U/Section 1/index.md”). The prefix is compared exactly (ordinal), and names that differ only in capitals (`Index.md`, `index.md`) are different names, each named by its file name. The same naming is used in the opening clause and in each "What … held a moment before / holds now is kept beside it as the hidden file “…”" sentence; the hidden file itself is always its bare name.
+5. `KeptWhatItReplacedWords` must still accept a bare hidden name (a page at the top of the working folder), so `UndoTrailWordsContractTests.KeptWhatItReplacedSaysWhatTheContractSays`, which passes `.A.md.plantoir-undo-4-undo-orig` and no page list, keeps passing unchanged.
+6. The trail line's list of files (`UndoTrailLine`'s last argument in `SayWhatItKept`, today `[.. keptOfWhatItHeld, .. keptOfWhatItHoldsNow]`) stays what it is for a reader of the trail: the kept files' bare names, as now. Build the path lists for the words separately, or take the bare name of each path when building it; do not let the payload turn into paths as a side effect of item 1.
+7. The new stack case "U4b2-4: two pages named index.md in two sections, …" is held under `Reason899W4cKeptLineByPath`. It fails on Windows today, because `UndoStackContractTests`' key set has no `keptWhatItReplacedSays` and its replay knows none of the calls `wholeFileStepOnTwoPagesNamedIndex`, `firstIndexAfterContentGoneAndCannotBeStored`, `secondIndexBeforeContentGoneAndCannotBeStored` or `keepTheOriginalOfTheSecondIndex` (`stackCasesHow` says what each does). Even with those added, the line Windows writes would say "from what was kept beside it" of both pages and name each “index.md”. W4c lifts the hold once all of it is built.
+
+Example (Mac test `testTheKeptLineKeysPagesByTheirPlaceInTheWorkingFolder`): kept `courses/ICS3U/Section 1/.index.md.plantoir-undo-4-undo-orig` (held), `courses/ICS3U/Section 2/.index.md.plantoir-undo-3-apply-orig` (holds now), put back from a kept original `courses/ICS3U/Section 2/index.md` gives `ICS3U/1 · Undo put back “Section 1/index.md”, and put back “Section 2/index.md” from what was kept beside it, but the list could not keep a copy of all it needs for this change, so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it. What “Section 1/index.md” held a moment before is kept beside it as the hidden file “.index.md.plantoir-undo-4-undo-orig”. What “Section 2/index.md” holds now is kept beside it as the hidden file “.index.md.plantoir-undo-3-apply-orig”.`
+
+One held row (item 7).
+
+### What W8 owes from U4b2-5, a part-way line names folders as the disk shows (#899, 2026-11-26)
+
+- (Review 1; superseded by U4b2-6, see the next section, folded from `899-u4b2-6-rename-sentences-in-contract.md`) The rename record carries `moved`, now an ARRAY of strings, and `mayHaveMoved`, with its whole format in `contracts/file-formats.json` → `folderRenameRecord`. A part-way line names a place only when it is in `moved` or a move of this run AND the disk shows a folder there by a no-follow check (a link only when this run moved a link). A record without `moved` names no place; its possible places are told as ones it cannot tell are this rename's. A no-follow check that fails for any reason but "no such file", or a listing that fails, is told on the trail as "could not tell whether these are at the new name: <place> (<reason>)", never read as absent.
+
+- (Superseded by review 1 and U4b2-6; kept short so W8 does not build the earlier reading.) Windows' part-way ending, once W8 brings the one-step rename, follows the U4b2-6 notes (the next section): belongs (a move of this run, or in the earlier record's `moved`) AND shows (a folder by a no-follow check; a link only where this run moved a link; for a capitalisation-only rename only when the parent LISTS the new spelling). It never counts a place by the disk alone.
+- Until W8, Windows' one part-way `folder renamed` line is "renamed the folder … but could not write it to this course's settings" (`CourseSettingsView.xaml.cs` about line 497), and `carries` now says so.
+- No ledger row: no case was added, and no Windows test reads this `carries` (grep of `windows-app/Plantoir.Tests` for "folder renamed": only `SpecialFolderRenamerTests.cs:355`, which checks the event key, not `carries`).
+
+### What W4c and W8 owe from U4b2-6, the rename-under-way sentences and the rename record in the contract (#899, 2026-11-26)
+
+- W8 says the three sentences with its worker rename, from `undo.wording`:
+  - the refusal at the click of every act a rename refuses (the sheet, Save, Replace It…, archive and removal, both assistants), with `{course}` the course's display code;
+  - the reason under each greyed item;
+  - the sidebar row's work label.
+- W8 and #826 together: Replace It… refuses with `renameFolderUnderWay` while a rename of that course is under way, and the case is the sequence row "a folder in it is being renamed".
+- **No held rows.** No Windows test iterates `undo.wording` (only `keptBesideIt` and the class-dates keys are read by name: `UndoActionStepTests.cs:169`, `UndoClassDatesStepTests.cs:191`). Windows also has no replace and runs no `referenceCourses.replacing.sequence` case (#826). So no Windows test meets the new keys, and a held row would hold a row that runs nowhere. Nothing new fails or passes on Windows.
+- The rename record (`file-formats.json` → `folderRenameRecord`), for W8:
+  - Write `moved` as a JSON array of strings: every place inside the course, with forward slashes, spelled with the new name, that this run moves, plus the earlier record's `moved` when that record is of the same rename. Add `mayHaveMoved` (see below).
+  - Keep reading only `from`, `to` and `scope` as strings, and read any other key only in its own shape. Never reject the record over a key of another type: the Mac's examples include `"moved": "Ideas"` and `"written": 3`, and both are still read as a record.
+  - Windows today writes `from`, `to` and `scope` only (`SpecialFolderRenamer.RecordRenameStarting`, Newtonsoft indented plus a newline), read 2026-11-26.
+- A part-way ending, as the Mac has it (`SpecialFolderRenamer.foldersAtTheirNewName` and `partWayEnding`):
+  - **Named** as still called the new name: a place that belongs (a move of this run, or in the earlier record's `moved`) AND shows (a folder by a no-follow check; a link only where this run moved a link; for a capitalisation-only rename, only when the parent lists the new spelling).
+  - **Cannot tell** whether it is this rename's: when the earlier record is this rename's, its `mayHaveMoved`, plus, if that record has no `moved`, each new-name folder whose old name beside it is absent or unreadable. Each is a folder at the new name not already named. The trail clause is "; could not tell whether this rename moved these: …".
+  - **Unreadable**: a place whose check fails for any reason but "no such file" is told as "; could not tell whether these are at the new name: <place> (<reason>)".
+  - **What is said**: with any place named, `renameFolderRenamedOnlyInPart` and the "renamed … only in part" line. With none named but any unreadable or cannot-tell place, `renameFolderMayBeRenamedInPart` (its places are those, bare) and the "may have renamed … only in part" line. Otherwise `renameFolderStoppedPartWay` and the "did not rename" line.
+  - A start run writes `mayHaveMoved` as the cannot-tell places it reads before it moves anything, less anything in `moved`.
+- For W4c and its kept line by path (U4b2-4 review 2, LOW 2; piece 4's notes, item 4): the Mac compares file names and paths with Swift `String ==`, which treats canonically equivalent Unicode forms as equal. So `é.md` in NFC in one folder and in NFD in another counts as the same file name, and both pages are named by their path. Windows should compare in Unicode normalization form C, then ordinally.
+
+### What W8 owes from U4b2-7, a rename that is only planning holds nothing (#899, 2026-11-26)
+
+What Windows must do (W8). Today `windows-app/` has no quit wait for a folder rename at all (a grep of `windows-app` for a close or exit path naming the rename finds none), so this is the rule to build when it gets one:
+
+- A Rename folder has two phases. **Planning** reads the course and writes nothing. **Swap** begins at the moment the rename is marked as begun (the same moment Cancel greys), and from then on it moves folders and rewrites pages and settings as one step.
+- When the app is closing and the close is going ahead (after any question about work under way has been answered "quit"), every rename that is still planning is halted the same way its dialog's Cancel halts it: its cancellation is signalled, its claim on the course ends, and nothing it planned is ever written. The close does not wait for it.
+- The close waits only for a rename whose swap has begun, until it ends. This wait asks nothing and shows nothing new; the rename's own dialog keeps its spinner.
+- A close that is called off (the teacher chooses to keep working) halts nothing: a planning rename carries on.
+- The safety that makes this race-free: the check "was this rename cancelled?" and the marking of the swap as begun happen together on the UI thread, with nothing awaited between them, so a halt lands either before the swap (the rename then writes nothing) or after it (the halt is refused, the close waits).
+- Once the close is going ahead (review 1, M1): from that moment no rename may start (the Rename button of every rename dialog is disabled, in the standard disabled state, with no new sentence), and a rename that reaches the point where its swap would begin is refused there, writing nothing. Use one flag, set on the UI thread in the same step as the close decides, and test it at that one point, together with the rename's own cancellation check. Without it, the windows stay live while the close waits, and a rename pressed then, or a plan the halt did not reach, could begin its swap after the close stopped counting it, and the process would end inside the swap. Nothing clears the flag: it is set only after the question is answered, and a close that has gone ahead is never called off.
+- No ledger row: no contract case changed.
+
+### What W8 owes from U4b2-8, a rename's planning read holds none of the shared threads (#899, 2026-11-26)
+
+What Windows must do (W8), with the numbers measured here:
+
+- **The plan walk runs on a dedicated thread**: `new Thread(...) { IsBackground = true }` started per plan, or `Task.Factory.StartNew(..., TaskCreationOptions.LongRunning)`, which gives the delegate its own thread. Never a plain `Task.Run`. The reason is the same as on the Mac. A blocking file read on a vanished network volume or an evicted cloud file cannot be cancelled, and on the shared thread pool each stuck read holds a pool thread until the system gives up. Rename then Cancel repeated on a dead volume would take them one by one. .NET's pool grows slowly (about one thread every half second past its minimum), so everything else the app runs on the pool would crawl. On the Mac (Mac16,8, 12 cores), Swift's pool is exactly 12 threads wide. With the walk on the pool, the 13th held plan never started and an unrelated job never ran. With the walk on its own thread, 16 held plans all started, an unrelated job ran at once, and the process went from 7 threads to 23 while they were held and back to 7 once they were let go. A second run gave 10, 26 and 10.
+- **Cancellation is a flag the walk checks**, between folders and before and after each page is read: the dialog's Cancel sets it (a `CancellationToken` is the natural form). The rename does not wait for the walk: it returns at Cancel, gives the course back, and drops whatever the walk delivers later.
+- **A dialog whose page goes away.** When the Course Settings page that owns the rename goes away (the teacher leaves Settings, the course is closed or switched, the window closes), every rename it owns that is only planning is halted, the same as the dialog's Cancel halts it. Tie this to the page, never to a list's or a row's visibility: a list inside a virtualised, scrolling form can be unloaded or scrolled out of view while its dialog is still up, and that is not the teacher leaving the rename (Mac review 1, M1). Do not rely on the dialog's own closing event alone either: on the Mac the dialog closed with its list and its own handler was never called.
+- **A second close request during the wait.** The close-wait for a rename's swap (U4b2-7) can be asked again while it waits: a second close, or a sign-out. Once a close is going ahead (the flag U4b2-7 adds), a second request asks nothing and does not refuse: it lets the first close finish the app.
+- No ledger row: no contract case changed.
+
+### What W8 owes from U4b2-9, one comparison for a carried place, and the case-only rows (#899, 2026-11-26)
+
+- **W8's one comparison.** Windows' `UndoOp.PlacesOverlap` (`Plantoir.Core/Undo/UndoFormat.cs` about line 148) is already case-insensitive. When W8 builds the carrying move (opKinds.wholeOps' exception) and the case-only move, every "is this path at or inside that place" must be the same function: whether an edit is carried (`to` against the edit's path), which of the swap's own staged files and kept originals are inside the moved folder (left out of the pair), where they are after the folder moves, and a carried page's place before the move. Compare part by part (split on `/`), each part case-insensitively (`ToLowerInvariant` as `PlacesOverlap` does), and keep the rest as the path spells it. The trap the Mac had: an edit named `Renamed/a.md` under a move to `renamed` counted as carried, but the swap's kept original at `Renamed/.a.md.plantoir-undo-1-undo-orig` was compared as spelled, so it was not followed when the folder moved back and was left inside `media/` after an Undo that otherwise went back.
+- **`listedAs` in checkCases.** For a move's `current`: a spelling, neither `from` nor `to`, that the folder lists the item under; what `atTo` describes is made at that spelling instead of at `to`. On NTFS (case-insensitive) that is one item under a third spelling; judged by the spelling listed, that is neither side, so changed since both ways.
+- **Which held rows fail on Windows today, and why** (the PC run at the gate must show each FAILING): every case-only `checkCases` row ("move between two names that differ only in case, in the last part: …" ×3 and "move of a folder between two names …") comes to `notReadable` on Windows, because `UndoFormat.cs` about line 674 refuses a move whose `from` and `to` overlap by `PlacesOverlap`, and a case-only pair does; each row expects `canUndo`, `alreadyBack` or `changedSince`, never `notReadable`. (This reads `windows-app/` today: the U4b notes' worry that the "something else" row might PASS on Windows was about W6 reading `move`; readability refuses first. That row is gone anyway.) The three U4b case-only `stackCases` fail because Windows' replay does not know `renameAFolderInCaseOnly`.
+- **Record bytes.** Windows writes the rename record with Newtonsoft `Formatting.Indented`, whose line ends are CRLF on Windows, then one LF; `folderRenameRecord`'s first example now says so. When W8 writes the Mac's keys it need not match the Mac's bytes (the Mac escapes `/` as `\/`); both parse alike, and only the Mac compares its own bytes.
+- **`linksChecklist.wording.pagesYouTicked`.** Windows reads it since 7edb554d2 (`LinksChecklistWording.PagesYouTicked`; `UndoLinksChecklistStepTests.APressLeftPartWaySaysTheChecklistsPartWaySentence` compares it with the contract). Until then that test took "the pages you ticked" out of the Mac's `LinksChecklistPublisher.swift`.
+- **`renameFolderUnderWaySpinner`**: W8's rename sheet's progress ring gets this accessible name.
+- Review 1: W8's listing override (a step's override keys matched to the moved folder's listing), its writer's carried place and the case-only side must use the same part-by-part comparison. A capitalisation-only move tells its two sides apart by the moved item's own part alone, as spelled, and the parts above it without regard to case.
+
+### What W8 owes from U4b2-10, a folder a carried edit made is left out and removed (#899, 2026-11-26)
+
+- **W8's listing override leaves out made folders too.** When W8 judges a carrying move with its carried edits taken back (opKinds.wholeOps), a listed file whose override is "absent" is left out (as now planned), and so is every listed folder below the moved folder that holds at least one such file and nothing else: no kept file, no link, no folder that is not itself left out (work deepest first). Compare "below" with the one part-by-part, case-insensitive comparison (U4b2-9's paragraph). Such a folder may be the step's or an empty folder of the moved folder's own, and the list keeps only the listing's hash, so decide each on its own (review 1): try every set of them that leaves a folder out only with every such folder below it, from all of them down to none. The set whose listing's SHA-256 matches the move's `listingSha` is what the content lacked (two sets give two listings, so at most one matches), and a match is "holds the content". Up to eight such folders try every set (at most 256 hashes); beyond eight only all or none, so a step with more than eight, some of them the content's own, is refused as changed since, which takes nothing back.
+- **The tidy.** The swap's own last look at the moved folder, just before its rename, is the judgement that names the left-out folders. Once every swap has gone in and the step's own staged files and kept originals are removed, remove each named folder at its place after the move (deepest first), only if empty (`RemoveDirectory`, which refuses a folder with anything in it; never a recursive delete). Before removing one, delete a lone `.DS_Store` in it that is a regular file (not a reparse point), then `RemoveDirectory` (review 1). Not on a refusal: a reversed swap puts the folder back as it was.
+- **Why not hand the swap a list from the check:** that would be a second judgement of which folders the step made; the swap's last look already makes it, on the disk as it is at the rename.
+- **The new key and calls** (stackCasesHow says them in full): `moveAFolderWithAFileMadeInANewFolderInside` is `moveAFolderWithAPageEditedInside` plus a `writeFile` creating `courses/TST1O/renamed/sub/x.md` (`X\n`, its blob in the list); `addAFolderInsideTheMadeFolder` writes `courses/TST1O/renamed/sub/mine/y.md` (`Y\n`) by hand; `madeFolder` is what `sub` holds wherever the moved folder is (renamed if there, else media): names in byte order joined by ", ", `empty`, or `none`. Review 1 added the calls `moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt`, `moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt` and `finderRecordsAWindowInTheMadeFolder` and the key `foldersInside`.
+- **How each held row fails on Windows today:** `UndoStackContractTests.WalkTheCase` asserts every key of a case is in `KeysChecked` before any call; neither `madeFolder` nor `foldersInside` is there, so all seven held rows stop at "a key this replay does not check: madeFolder" (or "… foldersInside"), which `HeldCaseStillStopsAtItsGap` accepts (read in `windows-app/Plantoir.Tests/UndoStackContractTests.cs`, lines 19 to 26 and 72 to 74). Behind that, the replay does not know the five calls. The key check is per row, not a block-wide enumeration, so no unheld row turns red.

@@ -33,13 +33,13 @@ final class SpecialFoldersProtectionTests: XCTestCase {
     }
 
     /// Removes a shared folder the way the teacher does, through the list
-    /// editor Course Settings builds: `removeItem(named:)` takes the name out
+    /// editor Course Settings builds: `takeOutOfTheList(named:)` takes the name out
     /// of the list, then `onRemove` runs `folderWasRemoved` — the exclusion,
     /// then the pool. Issue #183: a hand replay of those steps stays green
     /// when the shipped order changes, so these tests call its owner.
     private func removeSharedFolderThroughTheListEditor(_ name: String, in view: CourseSettingsView) {
         let editor: StringListEditorView = CourseSettingsGestureScript.editor(for: .sharedFolders, of: view)
-        editor.removeItem(named: name)
+        editor.takeOutOfTheList(named: name)
     }
 
     private func makeCourse(

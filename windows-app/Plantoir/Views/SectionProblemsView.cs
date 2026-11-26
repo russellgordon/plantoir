@@ -39,11 +39,12 @@ namespace Plantoir.Views;
 /// its headers sort.</para>
 ///
 /// <para>Fix with Claude… and Fix with Codex… sit UNDER the table, Claude's
-/// first (#736, <c>fixWith.where</c>), in <see cref="Footer"/>: each shown
-/// only while its assistant is installed (<see cref="OutsideAssistantPresence"/>,
-/// asked at launch and when the window comes to the front, never while this
-/// draws) and never on a course kept for reference, and both enabled while a
-/// ticked row is still this section's problem (<see cref="FixWithAssistant.Buttons"/>).
+/// first (#736, <c>fixWith.where</c>), in <see cref="Footer"/>: both shown on
+/// every course not kept for reference, and each enabled while its assistant
+/// is installed (<see cref="OutsideAssistantPresence"/>, asked at launch and
+/// when the window comes to the front, never while this draws) and a ticked
+/// row is still this section's problem (<see cref="FixWithAssistant.Buttons"/>;
+/// dimmed, not hidden, when the assistant is missing since #990).
 /// A press is the section view's (<c>fix</c>), which makes Revise With's
 /// refusal first and opens the door.</para>
 /// </remarks>
@@ -73,6 +74,9 @@ internal sealed class SectionProblemsView : UserControl
     private readonly Action<SectionProblemRow> _repair;
     private readonly Button _fixWithClaude;
     private readonly Button _fixWithCodex;
+    // Each button's own frame, which carries its tooltip (#1017).
+    private readonly Border _fixWithClaudeFrame;
+    private readonly Border _fixWithCodexFrame;
     private readonly TextBlock _intro;
     private readonly Grid _header;
     private readonly ListView _list;
@@ -137,8 +141,10 @@ internal sealed class SectionProblemsView : UserControl
         Footer = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
         _fixWithClaude = FixButton(FixWithAssistant.Assistant.Claude, "fixWithClaudeButton", fix);
         _fixWithCodex = FixButton(FixWithAssistant.Assistant.Codex, "fixWithCodexButton", fix);
-        Footer.Children.Add(_fixWithClaude);
-        Footer.Children.Add(_fixWithCodex);
+        _fixWithClaudeFrame = FixButtonFrame(_fixWithClaude);
+        _fixWithCodexFrame = FixButtonFrame(_fixWithCodex);
+        Footer.Children.Add(_fixWithClaudeFrame);
+        Footer.Children.Add(_fixWithCodexFrame);
         TicksChanged += ShowTheFixButtons;
         // Static, so subscribed only while shown: a subscription left behind
         // would root this view for the life of the process.
@@ -315,6 +321,27 @@ internal sealed class SectionProblemsView : UserControl
         return button;
     }
 
+    /// <summary>
+    /// The button's frame: exactly the button's box, shown and collapsed with
+    /// it, and the owner of its tooltip (#1017). WinUI 3's
+    /// <c>ToolTipService</c> has no <c>ShowOnDisabled</c> (that is WPF's),
+    /// and a disabled control "can't handle any input events on itself"
+    /// (Microsoft Learn, Control.IsEnabled), so a tooltip set on a dimmed
+    /// button itself never opens. The same page says a disabled control is
+    /// "still visible to hit testing" and that its input events "can bubble
+    /// to a parent where they can be handled": the frame is that parent, so
+    /// resting the pointer on the dimmed button shows the reason. Not a
+    /// hidden element: it draws nothing of its own and is the button's
+    /// visible container. Its Background is transparent rather than unset so
+    /// it is hit-testable over its whole box.
+    /// </summary>
+    private static Border FixButtonFrame(Button button) => new()
+    {
+        Child = button,
+        Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+        Visibility = Visibility.Collapsed,
+    };
+
     /// <summary>What a press would hand over now, from the record shown and the ticks the store holds.</summary>
     internal FixWithAssistant.Handover? CurrentHandover() =>
         _shownRecord is { } record
@@ -325,23 +352,40 @@ internal sealed class SectionProblemsView : UserControl
     private void PresenceChanged() => DispatcherQueue?.TryEnqueue(ShowTheFixButtons);
 
     /// <summary>
-    /// Shown, hidden, enabled: <c>fixWith.buttonCases</c>. A button that
-    /// cannot be pressed says why to assistive technology
-    /// (<see cref="FixWithAssistant.NotEnabledHelp"/>), since a
-    /// greyed button alone tells a Narrator user nothing.
+    /// Shown, hidden, enabled: <c>fixWith.buttonCases</c>. Since #990 both
+    /// buttons are drawn on every live course and one whose assistant is not
+    /// on this PC is DIMMED, as Revise With ▸ in the menu bar dims it. A
+    /// button that cannot be pressed says why to assistive technology
+    /// (<see cref="FixWithAssistant.HelpFor"/>: not set up, or nothing ticked),
+    /// since a greyed button alone tells a Narrator user nothing.
     /// </summary>
     private void ShowTheFixButtons()
     {
         var handover = CurrentHandover();
+        bool claudeInstalled = OutsideAssistantPresence.ClaudeIsInstalled;
+        bool codexInstalled = OutsideAssistantPresence.CodexIsInstalled;
         var state = handover is null
-            ? new FixWithAssistant.ButtonState(false, false, false)
-            : FixWithAssistant.Buttons(OutsideAssistantPresence.ClaudeIsInstalled, OutsideAssistantPresence.CodexIsInstalled,
-                                       ReferenceCourse.IsKeptForReference(_course), handover);
-        foreach (var (button, shown) in new[] { (_fixWithClaude, state.ClaudeShown), (_fixWithCodex, state.CodexShown) })
+            ? FixWithAssistant.ButtonState.None
+            : FixWithAssistant.Buttons(claudeInstalled, codexInstalled, ReferenceCourse.IsKeptForReference(_course), handover);
+        var buttons = new[]
         {
-            button.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
-            button.IsEnabled = state.Enabled;
-            AutomationProperties.SetHelpText(button, state.Enabled ? "" : FixWithAssistant.NotEnabledHelp);
+            (Button: _fixWithClaude, Frame: _fixWithClaudeFrame, Assistant: FixWithAssistant.Assistant.Claude, Shown: state.ClaudeShown, Installed: claudeInstalled),
+            (Button: _fixWithCodex, Frame: _fixWithCodexFrame, Assistant: FixWithAssistant.Assistant.Codex, Shown: state.CodexShown, Installed: codexInstalled),
+        };
+        foreach (var (button, frame, assistant, shown, installed) in buttons)
+        {
+            var visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+            button.Visibility = visibility;
+            frame.Visibility = visibility;
+            button.IsEnabled = state.CanPress(assistant);
+            // The reason twice (#990's second review): HelpText on the button
+            // for Narrator, and the tooltip the mac's help tag is, on the
+            // button's frame so it shows while the button is dimmed (#1017,
+            // FixButtonFrame; measured in documentation 12, "Revise With:
+            // dimmed in the menu bar, hidden in a row's menu").
+            string help = FixWithAssistant.HelpFor(assistant, installed, state);
+            AutomationProperties.SetHelpText(button, help);
+            ToolTipService.SetToolTip(frame, help.Length > 0 ? help : null);
         }
     }
 

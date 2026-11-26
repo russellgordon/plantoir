@@ -25,7 +25,7 @@ enum ClassInsertionPlanner {
     // MARK: - Types
 
     /// Why an insertion could not be planned or carried out.
-    enum Problem: LocalizedError {
+    enum Problem: LocalizedError, SaidInACoursesNoun {
         case unitOutOfRange
         case dayOutOfRange
         case countOutOfRange
@@ -35,13 +35,19 @@ enum ClassInsertionPlanner {
         case wrongCourse(String, String)
 
         var errorDescription: String? {
+            return sentence(noun: .class)
+        }
+
+        /// The refusal in a course's own noun (#1027): "meeting" in a club.
+        /// The model is given `errorDescription`, the class form (#267).
+        func sentence(noun: ClassNoun) -> String {
             switch self {
             case .unitOutOfRange, .dayOutOfRange:
                 return "Unit and day numbers start at 1."
             case .countOutOfRange:
-                return "Ask for at least one class."
+                return AssistWording.askForAtLeastOneClass(noun: noun)
             case .noTimetable(let code, let number):
-                return "I don’t know when \(code) Section \(number) meets, so I can’t move classes onto real days. Ask for the class dates, then record them first."
+                return AssistWording.cannotMoveClassesWithoutDates(code: code, number: number, noun: noun)
             case .noNumberedClasses(let code, let number, let shape):
                 return "\(code) Section \(number) has no pages named “\(shape)”, so there is nothing to make room in."
             case .wouldNotFit(let reason):
@@ -83,10 +89,13 @@ enum ClassInsertionPlanner {
             throw Problem.noNumberedClasses(course.code, sectionNumber, naming.shapeDescription)
         }
 
-        var problems: [String] = []
+        var problems: [PlanProblem] = []
         let unnumbered: Int = allPages.count - numbered.count
         if unnumbered > 0 {
-            problems.append("\(unnumbered) class page\(unnumbered == 1 ? " is" : "s are") not named “\(naming.shapeDescription)”, so \(unnumbered == 1 ? "it was" : "they were") left where \(unnumbered == 1 ? "it is" : "they are") — including \(unnumbered == 1 ? "its" : "their") date.")
+            let shape: String = naming.shapeDescription
+            problems.append(PlanProblem { noun in
+                AssistWording.pagesNotNamedTheCoursesWay(count: unnumbered, shape: shape, noun: noun)
+            })
         }
 
         if naming.isNumbered {
@@ -150,9 +159,11 @@ enum ClassInsertionPlanner {
 
         let needed: Int = count + shifted.count
         if runway.count < needed {
-            let missing: Int = needed - runway.count
             let from: String = firstFree?.text ?? "the end of the course"
-            problems.append("This needs \(needed) class days from \(from) onwards and the timetable only has \(runway.count). Add \(missing) more class date\(missing == 1 ? "" : "s") and ask again.")
+            let has: Int = runway.count
+            problems.append(PlanProblem { noun in
+                AssistWording.timetableTooShortFrom(needed: needed, from: from, has: has, noun: noun)
+            })
             return ClassInsertionPlan(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -309,7 +320,9 @@ enum ClassInsertionPlanner {
     @discardableResult
     static func apply(
         _ plan: ClassInsertionPlan,
-        in course: Course
+        in course: Course,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("makeRoomForClasses"),
+        into outerStep: JournaledStep? = nil
     ) throws -> ClassChangeOutcome {
         if plan.courseCode != course.code {
             throw Problem.wrongCourse(plan.courseCode, course.code)
@@ -322,7 +335,12 @@ enum ClassInsertionPlanner {
         }
 
 
-        let fileManager: FileManager = FileManager.default
+        // ONE step through the door (#899, U3): every rename, link, date and
+        // new page planned first, each read as the step will leave it, then
+        // written together, all or none. Given a step (Duplicate Class), the
+        // caller adds to it and makes it.
+        let step: JournaledStep = outerStep
+            ?? JournaledStep(course: course, section: plan.sectionNumber, maker: maker)
         let folderURL: URL = ClassPages.folderURL(forSection: plan.sectionNumber, in: course)
         let tail: String = ClassPages.siblingTimeAndOffset(
             from: ClassPages.list(forSection: plan.sectionNumber, in: course),
@@ -341,27 +359,22 @@ enum ClassInsertionPlanner {
         // 1. The renames, highest day first.
         var renamed: [String: String] = [:]
         for rename in plan.renames {
-            if !fileManager.fileExists(atPath: rename.fromURL.path) {
+            if !step.fileExists(rename.fromURL) {
                 continue
             }
-            if fileManager.fileExists(atPath: rename.toURL.path) {
+            if step.fileExists(rename.toURL) {
                 notFinished.notRenamed.append(rename.from)
                 continue
             }
-            guard let text = try? String(contentsOf: rename.fromURL, encoding: .utf8) else {
+            guard let text = step.readText(rename.fromURL) else {
                 notFinished.notRenamed.append(rename.from)
                 continue
             }
             // The title inside the file follows the file name: a page whose
             // name and title disagree is worse than either being wrong alone.
             let retitled: String = PageFrontmatter.settingTitle(in: text, to: rename.to)
-            do {
-                try retitled.write(to: rename.toURL, atomically: true, encoding: .utf8)
-            } catch {
-                notFinished.notRenamed.append(rename.from)
-                continue
-            }
-            try? fileManager.removeItem(at: rename.fromURL)
+            step.write(retitled, to: rename.toURL)
+            step.remove(rename.fromURL)
             renamed[rename.from] = rename.to
         }
 
@@ -373,8 +386,11 @@ enum ClassInsertionPlanner {
             for (from, _) in renamed {
                 oldNames.append(from)
             }
-            for pageURL in ClassPages.pagesOfSection(plan.sectionNumber, in: course) {
-                guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+            let pagesAsPlanned: [URL] = step.markdownFiles(
+                under: course.directoryURL, onDisk: ClassPages.pagesOfSection(plan.sectionNumber, in: course)
+            )
+            for pageURL in pagesAsPlanned {
+                guard let text = step.readText(pageURL) else {
                     continue
                 }
                 let here: Int = WikiLinkRewriter.countLinks(to: oldNames, in: text)
@@ -383,12 +399,8 @@ enum ClassInsertionPlanner {
                 }
                 let updated: String = WikiLinkRewriter.rewriting(text, renamedPages: renamed)
                 if updated != text {
-                    do {
-                        try updated.write(to: pageURL, atomically: true, encoding: .utf8)
-                        linksRewritten += here
-                    } catch {
-                        notFinished.linksNotUpdated.append(pageURL.deletingPathExtension().lastPathComponent)
-                    }
+                    step.write(updated, to: pageURL)
+                    linksRewritten += here
                 }
             }
         }
@@ -416,20 +428,15 @@ enum ClassInsertionPlanner {
             if wasRenamedHere {
                 pageURL = folderURL.appendingPathComponent(move.title + ".md")
             }
-            guard fileManager.fileExists(atPath: pageURL.path),
-                  let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+            guard step.fileExists(pageURL), let text = step.readText(pageURL) else {
                 continue
             }
             let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                 in: text, key: createdKey, to: move.to, fallbackTail: tail
             )
             if result.outcome == .written {
-                do {
-                    try result.text.write(to: pageURL, atomically: true, encoding: .utf8)
-                    moved += 1
-                } catch {
-                    notFinished.notReDated.append(pageURL.deletingPathExtension().lastPathComponent)
-                }
+                step.write(result.text, to: pageURL)
+                moved += 1
             }
             if result.outcome == .noRoomForAKey {
                 notDated.append(pageURL.deletingPathExtension().lastPathComponent)
@@ -446,7 +453,6 @@ enum ClassInsertionPlanner {
 
         // 4. The blank pages the room was made for. Checked a second time,
         //    because the plan may be minutes old and Obsidian is open.
-        try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
         // The URLs, not just how many. A caller that is about to WRITE to one
         // of these pages has exactly one safe question — "did this run make
         // that page, or was it already somebody's lesson?" — and it cannot be
@@ -456,7 +462,7 @@ enum ClassInsertionPlanner {
         // that dropped it on the floor.
         var created: [URL] = []
         for planned in plan.added {
-            if fileManager.fileExists(atPath: planned.fileURL.path) {
+            if step.fileExists(planned.fileURL) {
                 notFinished.newNotAdded.append(planned.title)
                 continue
             }
@@ -469,12 +475,12 @@ enum ClassInsertionPlanner {
                 howMany: plan.added.count,
                 tail: tail
             )
-            do {
-                try body.write(to: planned.fileURL, atomically: true, encoding: .utf8)
-                created.append(planned.fileURL)
-            } catch {
-                notFinished.newNotAdded.append(planned.title)
-            }
+            step.write(body, to: planned.fileURL)
+            created.append(planned.fileURL)
+        }
+        // The folder the new pages go in is made by the door with them.
+        if outerStep == nil {
+            try step.make()
         }
 
         var message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at \(plan.positionTitle). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
@@ -532,12 +538,12 @@ enum ClassInsertionPlanner {
         count: Int,
         numbered: [ClassPageSummary],
         timetable: [CalendarDay],
-        problems startingProblems: [String],
+        problems startingProblems: [PlanProblem],
         forSection sectionNumber: Int,
         in course: Course
     ) throws -> ClassInsertionPlan {
         let naming: ClassPageNaming = course.configuration.classPageNaming
-        var problems: [String] = startingProblems
+        var problems: [PlanProblem] = startingProblems
 
         // Below the insertion point stays; at or after it may move.
         var shifted: [ClassPageSummary] = []
@@ -580,9 +586,11 @@ enum ClassInsertionPlanner {
         runway.sort()
 
         if runway.count < count {
-            let missing: Int = count - runway.count
             let from: String = latestKept?.text ?? "the start of the course"
-            problems.append("This needs \(count) class day\(count == 1 ? "" : "s") after \(from) and the timetable only has \(runway.count). Add \(missing) more class date\(missing == 1 ? "" : "s") and ask again.")
+            let has: Int = runway.count
+            problems.append(PlanProblem { noun in
+                AssistWording.timetableTooShortAfter(count: count, from: from, has: has, noun: noun)
+            })
             return ClassInsertionPlan(
                 courseCode: course.code, sectionNumber: sectionNumber,
                 unit: 1, atDay: atNumber, naming: naming,
@@ -637,7 +645,7 @@ enum ClassInsertionPlanner {
         guard let destinations = ClassInsertionPlanner.destinationsKeepingGaps(
             for: shiftedByDate, after: runway, skippingFirst: count
         ) else {
-            problems.append("There are not enough class days after the last page to move it onto. Add more class dates and ask again.")
+            problems.append(PlanProblem { noun in AssistWording.noDaysAfterTheLastPage(noun: noun) })
             return ClassInsertionPlan(
                 courseCode: course.code, sectionNumber: sectionNumber,
                 unit: 1, atDay: atNumber, naming: naming,
@@ -917,10 +925,16 @@ struct ClassInsertionPlan {
     /// Links that would be rewritten to follow a renamed page.
     let linksToRewrite: Int
 
-    /// Anything the teacher should know before saying yes.
-    let problems: [String]
+    /// Anything the teacher should know before saying yes, in both nouns
+    /// (#1027): the card reads the course's, the model the class form.
+    let plannedProblems: [PlanProblem]
 
     // MARK: - Computed properties
+
+    /// The problems as the model reads them: always "class".
+    var problems: [String] {
+        return PlanProblem.sentences(plannedProblems, noun: .class)
+    }
 
     var changesNothing: Bool {
         return added.isEmpty && renames.isEmpty && moves.isEmpty
@@ -985,7 +999,7 @@ struct ClassInsertionPlan {
 
         if changesNothing {
             lines.append("Nothing would change in \(courseCode) Section \(sectionNumber).")
-            for problem in problems {
+            for problem in PlanProblem.sentences(plannedProblems, noun: noun) {
                 lines.append("• " + problem)
             }
             return lines.joined(separator: "\n")
@@ -1044,7 +1058,7 @@ struct ClassInsertionPlan {
             }
         }
 
-        for problem in problems {
+        for problem in PlanProblem.sentences(plannedProblems, noun: noun) {
             lines.append("• " + problem)
         }
         return lines.joined(separator: "\n")
@@ -1062,7 +1076,7 @@ struct ClassInsertionPlan {
         renames: [ClassRename],
         moves: [ClassDateMove],
         linksToRewrite: Int,
-        problems: [String]
+        problems: [PlanProblem]
     ) {
         self.courseCode = courseCode
         self.sectionNumber = sectionNumber
@@ -1073,9 +1087,49 @@ struct ClassInsertionPlan {
         self.renames = renames
         self.moves = moves
         self.linksToRewrite = linksToRewrite
-        self.problems = problems
+        self.plannedProblems = problems
     }
 
     /// How many renames or moves a plan spells out before summarising.
     static let mostShown: Int = 10
+}
+
+/// One thing a plan's teacher should know, said in both nouns (#1027): the
+/// card shows the course's own ("meeting" in a club), and the model reads the
+/// class form, as it reads every detail (#267). Both come from one wording
+/// function, called once for each noun, so the sentence is typed once.
+/// A planner's refusal said in a course's own noun (#1027 round 4): the
+/// teacher's copy of a refusal whose model copy is `localizedDescription`.
+nonisolated protocol SaidInACoursesNoun {
+    func sentence(noun: ClassNoun) -> String
+}
+
+struct PlanProblem: Equatable, Sendable {
+
+    // MARK: - Stored properties
+
+    let forAClass: String
+
+    let forAMeeting: String
+
+    // MARK: - Initializer
+
+    init(_ sentence: (ClassNoun) -> String) {
+        self.forAClass = sentence(.class)
+        self.forAMeeting = sentence(.meeting)
+    }
+
+    // MARK: - Functions
+
+    func sentence(noun: ClassNoun) -> String {
+        return noun == .meeting ? forAMeeting : forAClass
+    }
+
+    static func sentences(_ problems: [PlanProblem], noun: ClassNoun) -> [String] {
+        var sentences: [String] = []
+        for problem in problems {
+            sentences.append(problem.sentence(noun: noun))
+        }
+        return sentences
+    }
 }

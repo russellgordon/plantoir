@@ -96,7 +96,7 @@ extension SectionDetailView {
     /// (`sheetIsUp` follows AppKit's own notification), so that one flag is
     /// not asked; everything else is.
     func verbMayRunNow(_ item: SubjectMenuRules.Item, afterTheDates: Bool = false) -> Bool {
-        if verbIsRunningHere || workspace.isBeingCopied(course.code) {
+        if verbIsRunningHere || workspace.isBeingCopied(course.code) || workspace.isRenamingAFolder(course.code) {
             return false
         }
         if verbSheet != nil || linksChecklist != nil || previewAlertIsUp || healthDialog != nil || deployRefusal != nil {
@@ -213,7 +213,8 @@ extension SectionDetailView {
             runAtOnce(SectionVerbs.rebuildPreview(course: course.code, section: sectionNumber), item: item, verbs: verbs,
                       title: AssistWording.menuRebuildPreviewTitle)
         case .classDates:
-            SectionVerbs.noteRan(item, ending: "opened", counts: "", courseCode: course.code, sectionNumber: sectionNumber)
+            SectionVerbs.noteRan(item, ending: "opened", counts: "", courseCode: course.code, sectionNumber: sectionNumber,
+                                 noun: course.configuration.classNoun)
             let model: SectionVerbSheetModel = SectionVerbSheetModel(
                 kind: .classDates, course: course, sectionNumber: sectionNumber, title: "", item: item
             )
@@ -443,7 +444,8 @@ extension SectionDetailView {
             model.stage = .finished
             if let item = model.item {
                 SectionVerbs.noteRan(item, ending: "changed nothing", counts: countsLine(model),
-                                     courseCode: course.code, sectionNumber: sectionNumber)
+                                     courseCode: course.code, sectionNumber: sectionNumber,
+                                     noun: course.configuration.classNoun)
             }
         }
     }
@@ -513,16 +515,7 @@ extension SectionDetailView {
             return RollOverFromTheMenu.counts(model.rollOver.website, sent: model.rollOver.websiteSent ?? "")
         case .addClass:
             // How it was added, never the class's title (#897).
-            switch model.way {
-            case .nextInThisUnit:
-                return "the next class in this unit"
-            case .inANewUnit:
-                return "in a new unit"
-            case .asACopyOfAClass:
-                return "as a copy of a class"
-            case nil:
-                return ""
-            }
+            return SectionVerbs.addClassCounts(model.way, noun: course.configuration.classNoun)
         default:
             return ""
         }
@@ -574,6 +567,9 @@ extension SectionDetailView {
             return true
         }
         if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return true
+        }
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workspaceURL.path, courseCode: course.code) {
             return true
         }
         let anyWindowHasUnsavedSettings: Bool = course.configuration.hasUnsavedChanges
@@ -701,9 +697,7 @@ extension SectionDetailView {
             let outcome: AssistToolOutcome = await verbs.perform(
                 SectionVerbs.hidePages(course: course.code, section: sectionNumber, names: names, planning: false),
                 item: .hidePages, courseCode: course.code, sectionNumber: sectionNumber,
-                counts: hidden.count == 1
-                    ? "1 class dated later, unticked at Deploy"
-                    : "\(hidden.count) classes dated later, unticked at Deploy"
+                counts: AssistWording.untickedAtDeployCounts(count: hidden.count, noun: course.configuration.classNoun)
             )
             verbs.toolRunner.previewFollowsAChange = true
             refreshEditedMarker()

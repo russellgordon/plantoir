@@ -7,7 +7,11 @@ used to bake into the Linux image is fetched here as pinned, portable
 Windows pieces, and the app ships the folder the same way it ships llama/.
 
     runtime\node\       Node.js 22.23.4 (win-x64 zip distribution - no
-                        installer)
+                        installer), and vcruntime140.dll beside node.exe
+                        (#965; taken out of Microsoft's own Visual C++
+                        Redistributable without running it, #1010; the same
+                        file also sits beside the two .node modules in
+                        runtime\quartz that import it)
     runtime\python\     Python 3.14.10 embeddable (OpenSSL 3.5.9, #764) +
                         python-frontmatter 1.3.0, PyYAML 6.0.3, Pillow 12.3.0
                         (wheels by version AND SHA-256)
@@ -165,6 +169,65 @@ $PythonWheels = @(
     "PyYAML==6.0.3 --hash=sha256:4a2e8cebe2ff6ab7d1050ecd59c25d4c8bd7e6f400f5f82b96557ac0abafd0ac",
     "Pillow==12.3.0 --hash=sha256:fdafc9cce40277e0f7a0feabce0ee50dd2fa1800f3b38015e51296b5e814048d"
 )
+# The Visual C++ runtime beside node.exe AND beside the two modules that
+# import it (#965): contracts/toolchain.json -> windowsNodeVcRuntime.
+# lightningcss and the Typst compiler's .node files import VCRUNTIME140.dll,
+# which a clean Windows does not have. Node loads a .node file with
+# LoadLibraryExW(LOAD_WITH_ALTERED_SEARCH_PATH), so Windows looks for that
+# module's libraries first in the MODULE's own folder, then in System32 and
+# the Windows folder, and only then on PATH: node.exe's folder is reached
+# only because the launchers put it on PATH, and behind any older copy in
+# System32. So the copy beside each module is the one found, with or without
+# PATH and ahead of System32; the copy beside node.exe (Russell's first
+# ruling) stays for anything Node itself, or a PATH search, would want.
+# Where the file comes from (#1010, Russell's ruling of 2026-11-19 on #1006):
+# Microsoft's own Visual C++ v14 Redistributable for x64, the download
+# Microsoft's "Latest supported Visual C++ Redistributable downloads" page
+# links, NOT the copy inside Python's embeddable zip (that copy is Python's,
+# under Python's licence, and stays beside python.exe). The redistributable
+# is never RUN: running it installs the runtime into System32 and needs
+# administrator rights, and its /layout option copies only the bundle itself
+# (measured 2026-11-19). It is a WiX Burn bundle whose attached container is
+# a cabinet ('MSCF') at a fixed offset; that container holds the x64 minimum
+# runtime's cabinet (payload a4, packages\vcRuntimeMinimum_amd64\cab1.cab),
+# and that cabinet holds vcruntime140.dll under its file key
+# vcruntime140.dll_amd64. So: download, check the bundle's SHA-256 and
+# size, copy the container out at the pinned offset and length, and take the
+# two levels out with Windows' own expand.exe, as swift_windows_fetch.py does
+# for the Swift installer. Nothing is installed and no administrator rights
+# are needed (measured at Medium integrity, 2026-11-19).
+# The download is the versioned address on Microsoft's server that the
+# permalink resolved to on 2026-11-19; the permalink
+# (https://aka.ms/vc14/vc_redist.x64.exe) always serves the LATEST, so it
+# is tried only if the versioned address stops answering, and a newer
+# bundle there is refused by the hash below until these lines and the
+# contract move with it.
+# NativeModuleImportsTests holds these lines, spacing included, to the
+# contract (windowsNodeVcRuntime -> files and redistributable).
+$NodeVcRuntimeVersion = "14.52.37029.0"
+$NodeVcRuntimeSha256  = "eb1ee979bf02324712346e5bdbfc59c785388bc50d18cc2688aae4b0734915a0"
+$NodeVcRuntimeLength  = 176488
+$VcRedistVersion   = "14.52.37029.0"
+$VcRedistUrl       = "https://download.visualstudio.microsoft.com/download/pr/78d061c5-9ef3-42ab-98ed-3309d1095dc4/9C02C9ED120F671B900E6B9471D890E3B2414117A7E53F4AE2E855466FA2B7C9/VC_redist.x64.exe"
+$VcRedistPermalink = "https://aka.ms/vc14/vc_redist.x64.exe"
+$VcRedistSha256    = "9c02c9ed120f671b900e6b9471d890e3b2414117a7e53f4ae2e855466fa2b7c9"
+$VcRedistLength    = 18863624
+$VcRedistContainerOffset = 629952
+$VcRedistContainerLength = 18223522
+$VcRedistPayload         = "a4"
+$VcRedistPayloadLength   = 1060683
+$VcRedistMember          = "vcruntime140.dll_amd64"
+# The module folders, relative to runtime\ (windowsNodeVcRuntime ->
+# besideModules). Each must exist and hold a .node file, or the run refuses:
+# a Quartz or npm change that moves a module must move this list with it.
+# The manifest's nodeVcRuntimeLayout says the copies are in all these places,
+# so a runtime that has the node.exe copy only (this branch's first version)
+# is repaired in place too.
+$NodeVcRuntimeLayout  = "beside-node-and-modules"
+$NodeVcRuntimeModuleFolders = @(
+    "quartz\node_modules\lightningcss-win32-x64-msvc",
+    "quartz\node_modules\@myriaddreamin\typst-ts-node-compiler-win32-x64-msvc"
+)
 $EmojiFontSha256 = "39ee3c587e10e89669b9ff32703261d10d5f9c4dd5ad147b6b5a1c5200591817"
 # The vendor tarballs' hashes are the contract's own (toolchain.json ->
 # pins -> sha256, and fileSha256 for the one file kept), checked here as the
@@ -211,6 +274,11 @@ $VendorDir  = $PSScriptRoot
 $RepoRoot   = (Resolve-Path (Join-Path $VendorDir "..\..")).Path
 $Runtime    = Join-Path $VendorDir "runtime"
 $Manifest   = Join-Path $Runtime "manifest.json"
+# The checked vcruntime140.dll, kept between runs so a repair in place needs
+# no second download of Microsoft's 18 MB bundle (#1010). OUTSIDE runtime\,
+# which the installer packs whole; not committed (.gitignore). A file there
+# whose SHA-256 is not the pin is deleted and fetched again, never used.
+$VcRuntimeCache = Join-Path $VendorDir "vc-runtime"
 $VendorOut  = Join-Path $Runtime "vendor"
 # Set before ANY phase: the vendor phase alone, against an existing runtime,
 # runs this node and this python (the plan review's M4).
@@ -242,6 +310,7 @@ $BasePins   = [ordered]@{
 # the base phase cannot be redone in place); before #675 only the keys were
 # checked, and a Node bump was answered "already in place".
 $runBase = $true
+$vcRuntimeOnly = $false
 $existing = $null
 if (Test-Path $Manifest) {
     $existing = Get-Content $Manifest -Raw | ConvertFrom-Json
@@ -261,16 +330,25 @@ if (Test-Path $Manifest) {
     foreach ($key in $VendorPins.Keys) {
         if ($names -notcontains $key -or [string]$existing.$key -ne $VendorPins[$key]) { $vendorCurrent = $false }
     }
-    if ($vendorCurrent) {
+    # nodeVcRuntime (#965) is repaired IN PLACE: one file, from the cache or
+    # from Microsoft's redistributable (#1010), copied to its places.
+    $vcRuntimeCurrent = ($names -contains "nodeVcRuntime") -and ([string]$existing.nodeVcRuntime -eq $NodeVcRuntimeVersion) -and
+                        ($names -contains "nodeVcRuntimeLayout") -and ([string]$existing.nodeVcRuntimeLayout -eq $NodeVcRuntimeLayout)
+    if ($vendorCurrent -and $vcRuntimeCurrent) {
         Write-Host "[OK] Runtime already in place ($Runtime)." -ForegroundColor Green
         Write-Host "     Delete that folder and re-run to fetch it again."
         exit 0
     }
-    Write-Host "The runtime predates the current page-feature pins: fetching runtime\vendor only." -ForegroundColor Cyan
     $runBase = $false
+    if ($vendorCurrent) {
+        Write-Host "The runtime predates the Visual C++ runtime beside node.exe and its modules (#965): placing it only." -ForegroundColor Cyan
+        $vcRuntimeOnly = $true
+    }
+    else {
+        Write-Host "The runtime predates the current page-feature pins: fetching runtime\vendor only." -ForegroundColor Cyan
+    }
 }
 
-New-Item -ItemType Directory -Force $Runtime | Out-Null
 $Temp = Join-Path ([IO.Path]::GetTempPath()) ("plantoir-runtime-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force $Temp | Out-Null
 
@@ -310,8 +388,45 @@ function Get-BaseFields {
         $fields.wrangler = $WranglerVersion
         $fields.emoji    = $EmojiFontTag
     }
+    # Every caller runs Install-NodeVcRuntime BEFORE it writes these fields,
+    # so the manifest never names a copy that is not there (#965).
+    $fields.nodeVcRuntime = $NodeVcRuntimeVersion
+    $fields.nodeVcRuntimeLayout = $NodeVcRuntimeLayout
     return $fields
 }
+
+# #965: vcruntime140.dll from $From (the cache Get-MicrosoftVcRuntime filled
+# from Microsoft's redistributable, #1010) to beside node.exe and beside each module in
+# $NodeVcRuntimeModuleFolders, every copy checked by its own SHA-256 and size
+# before and after. A module's own folder is where Windows looks first for
+# the libraries of a .node file Node loads (see the pin lines above), so
+# every Node however started finds it, launcher or not, and ahead of an
+# older copy in System32. $RuntimeFolder is the runtime the module folders
+# are under (passed, not read from the script's $Runtime, so the function
+# can be lifted between its markers and run on a made-up runtime).
+# BEGIN Install-NodeVcRuntime
+function Install-NodeVcRuntime([string]$From, [string]$To, [string]$RuntimeFolder) {
+    $source = Join-Path $From "vcruntime140.dll"
+    if (-not (Test-Path -LiteralPath $source)) {
+        throw "$From has no vcruntime140.dll to place beside node.exe and its modules (#965, #1010)."
+    }
+    Assert-Sha256 $source $NodeVcRuntimeSha256 $NodeVcRuntimeLength
+    $places = @($To)
+    foreach ($relative in $NodeVcRuntimeModuleFolders) {
+        $folder = Join-Path $RuntimeFolder $relative
+        if (-not (Get-ChildItem -LiteralPath $folder -Filter "*.node" -File -ErrorAction SilentlyContinue)) {
+            throw "$folder holds no .node file (#965): the module that imports vcruntime140.dll has moved, so contracts/toolchain.json -> windowsNodeVcRuntime -> besideModules and `$NodeVcRuntimeModuleFolders here must move with it."
+        }
+        $places += $folder
+    }
+    foreach ($place in $places) {
+        $target = Join-Path $place "vcruntime140.dll"
+        Copy-Item -LiteralPath $source -Destination $target -Force
+        Assert-Sha256 $target $NodeVcRuntimeSha256 $NodeVcRuntimeLength
+        Write-Host "vcruntime140.dll $NodeVcRuntimeVersion in $place." -ForegroundColor Green
+    }
+}
+# END Install-NodeVcRuntime
 
 # $CurlOptions: how hard to try. The default is what every download here has
 # always had; GeoGebra passes the Dockerfile's own flags (see its section).
@@ -326,6 +441,143 @@ function Fetch([string]$Url, [string]$To, [string]$Sha256 = "", [string[]]$CurlO
             throw "Refused $Url : its SHA-256 is $got, the pin is $Sha256"
         }
     }
+}
+
+# #1010: copy the cabinet attached to Microsoft's redistributable out of it,
+# exactly as pinned: 'MSCF' at $Offset, the cabinet's own length field
+# (cbCabinet) equal to $Length, and the whole of it inside the file.
+function Copy-AttachedCabinet([string]$From, [string]$To, [long]$Offset, [long]$Length) {
+    $source = [IO.File]::OpenRead($From)
+    try {
+        $header = New-Object byte[] 12
+        $source.Position = $Offset
+        $read = $source.Read($header, 0, 12)
+        if ($read -ne 12 -or [Text.Encoding]::ASCII.GetString($header, 0, 4) -ne "MSCF") {
+            throw "$From has no cabinet at offset $Offset (#1010): the pinned redistributable has changed shape."
+        }
+        $cabinetBytes = [BitConverter]::ToUInt32($header, 8)
+        if ($cabinetBytes -ne $Length -or ($Offset + $Length) -gt $source.Length) {
+            throw "$From : the cabinet at $Offset is $cabinetBytes bytes, the pin says $Length (#1010)."
+        }
+        $source.Position = $Offset
+        $target = [IO.File]::Create($To)
+        try {
+            $buffer = New-Object byte[] 1048576
+            $left = $Length
+            while ($left -gt 0) {
+                $want = [int][Math]::Min([long]$buffer.Length, $left)
+                $got = $source.Read($buffer, 0, $want)
+                if ($got -le 0) { throw "$From ends inside its cabinet (#1010)." }
+                $target.Write($buffer, 0, $got)
+                $left -= $got
+            }
+        }
+        finally { $target.Dispose() }
+    }
+    finally { $source.Dispose() }
+}
+
+# #1010: one named file out of a cabinet, with Windows' own expand.exe (by
+# full path, as tar.exe is), into $Folder. Returns the file's path.
+function Expand-CabinetFile([string]$Cabinet, [string]$Name, [string]$Folder) {
+    New-Item -ItemType Directory -Force $Folder | Out-Null
+    $expand = Join-Path $env:SystemRoot "System32\expand.exe"
+    # stdout only: under $ErrorActionPreference = 'Stop', Windows PowerShell
+    # 5.1 turns a native tool's redirected stderr into a terminating error.
+    $said = & $expand $Cabinet "-F:$Name" $Folder
+    $found = Join-Path $Folder $Name
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $found)) {
+        throw "expand.exe could not take $Name out of $Cabinet (#1010): $($said | Out-String)"
+    }
+    return $found
+}
+
+# #1010: the folder holding Microsoft's vcruntime140.dll, checked by SHA-256
+# and size. From the cache when it holds the pinned file; otherwise from
+# Microsoft's Visual C++ Redistributable (see the pin lines above for why it
+# is taken apart rather than run), and the cache is filled. $Work is a
+# temporary folder the caller removes.
+function Get-MicrosoftVcRuntime([string]$Cache, [string]$Work) {
+    $cached = Join-Path $Cache "vcruntime140.dll"
+    if (Test-Path -LiteralPath $cached) {
+        $cachedSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $cached).Hash.ToLowerInvariant()
+        $cachedLength = (Get-Item -LiteralPath $cached).Length
+        if ($cachedSha -eq $NodeVcRuntimeSha256 -and $cachedLength -eq $NodeVcRuntimeLength) {
+            Write-Host "vcruntime140.dll $NodeVcRuntimeVersion from the cache ($Cache)." -ForegroundColor Green
+            return $Cache
+        }
+        Write-Host "The cached vcruntime140.dll is not the pinned file: fetching Microsoft's again." -ForegroundColor Cyan
+        Remove-Item -LiteralPath $cached -Force
+    }
+    $bundle = Join-Path $Work "VC_redist.x64.exe"
+    try {
+        Fetch $VcRedistUrl $bundle $VcRedistSha256
+    }
+    catch {
+        Write-Host "The pinned address did not give the pinned bundle ($($_.Exception.Message)); trying Microsoft's permalink." -ForegroundColor Cyan
+        try {
+            Fetch $VcRedistPermalink $bundle $VcRedistSha256
+        }
+        catch {
+            throw ("Microsoft's Visual C++ Redistributable $VcRedistVersion could not be fetched from either address (#1010): $($_.Exception.Message). " +
+                   "If the permalink now serves a newer redistributable, contracts/toolchain.json -> windowsNodeVcRuntime and the `$VcRedist* and `$NodeVcRuntime* lines here must move with it.")
+        }
+    }
+    Assert-Sha256 $bundle $VcRedistSha256 $VcRedistLength
+    $container = Join-Path $Work "vc-redist-container.cab"
+    Copy-AttachedCabinet $bundle $container $VcRedistContainerOffset $VcRedistContainerLength
+    $payload = Expand-CabinetFile $container $VcRedistPayload (Join-Path $Work "vc-redist-payload")
+    $payloadLength = (Get-Item -LiteralPath $payload).Length
+    if ($payloadLength -ne $VcRedistPayloadLength) {
+        throw "$payload : $payloadLength bytes, the pin says $VcRedistPayloadLength (#1010)."
+    }
+    $member = Expand-CabinetFile $payload $VcRedistMember (Join-Path $Work "vc-redist-runtime")
+    Assert-Sha256 $member $NodeVcRuntimeSha256 $NodeVcRuntimeLength
+    # Written under another name, checked, then renamed (the review of
+    # 867ef7859): a run killed mid-copy never leaves a partial file under
+    # the cache's own name.
+    New-Item -ItemType Directory -Force $Cache | Out-Null
+    $partial = Join-Path $Cache "vcruntime140.dll.partial"
+    Copy-Item -LiteralPath $member -Destination $partial -Force
+    Assert-Sha256 $partial $NodeVcRuntimeSha256 $NodeVcRuntimeLength
+    Move-Item -LiteralPath $partial -Destination $cached -Force
+    Assert-Sha256 $cached $NodeVcRuntimeSha256 $NodeVcRuntimeLength
+    Write-Host "vcruntime140.dll $NodeVcRuntimeVersion taken from Microsoft's Visual C++ Redistributable $VcRedistVersion." -ForegroundColor Green
+    return $Cache
+}
+
+# Microsoft's vcruntime140.dll is obtained and checked HERE, before anything
+# is made in runtime\ (the review of 867ef7859). On a fresh fetch a refused
+# bundle (the versioned address gone and the permalink serving a newer one)
+# then stops the run with runtime\ untouched, instead of after the ~600 MB
+# base phase, where it left a runtime with no manifest that a re-run cannot
+# repair in place (see the header: node would be moved inside the old node
+# folder, and git clone refuses a non-empty quartz\). Placing it is
+# unchanged: Install-NodeVcRuntime, below, in both paths.
+try {
+    $vcRuntimeSource = Get-MicrosoftVcRuntime $VcRuntimeCache $Temp
+}
+catch {
+    Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
+    throw
+}
+New-Item -ItemType Directory -Force $Runtime | Out-Null
+
+# The place-the-file-only path (#965), in a try/finally of its own like the
+# main run's below, so a refusal part-way still removes $Temp (#1006).
+if ($vcRuntimeOnly) {
+    try {
+        Install-NodeVcRuntime $vcRuntimeSource $nodeDir $Runtime
+        $fields = Get-BaseFields
+        foreach ($key in $VendorPins.Keys) { $fields[$key] = $VendorPins[$key] }
+        Write-RuntimeManifest $fields
+        Write-Host ""
+        Write-Host "[OK] Native runtime ready at $Runtime" -ForegroundColor Green
+    }
+    finally {
+        Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    exit 0
 }
 
 # NATIVE-ONLY: bind the preview server and its live-reload websocket to
@@ -520,6 +772,7 @@ try {
     # first manifest written, right after the base phases): from here until
     # the end, a failure leaves a runtime the build refuses and a re-run
     # finishes by fetching runtime\vendor alone.
+    Install-NodeVcRuntime $vcRuntimeSource $nodeDir $Runtime
     Write-RuntimeManifest (Get-BaseFields)
     if (Test-Path $VendorOut) { Remove-Item $VendorOut -Recurse -Force }
     New-Item -ItemType Directory -Force $VendorOut | Out-Null

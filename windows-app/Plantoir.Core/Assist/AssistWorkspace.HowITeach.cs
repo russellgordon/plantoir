@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -221,7 +222,8 @@ public sealed partial class AssistWorkspace
     /// <c>write_how_i_teach</c>: save what the teacher agreed to. Never over a
     /// written page without its mark; backs the course up first (once per
     /// conversation); keeps a replaced page's settings byte for byte, BOM and
-    /// CRLF included; ONE undo entry. Nothing here touches a preview: the
+    /// CRLF included; ONE step through the door and ONE undo entry, none when
+    /// the words are the page's already. Nothing here touches a preview: the
     /// page is never on the site.
     /// </summary>
     public AssistResult WriteHowITeach(string courseCode, string text, string replacing)
@@ -246,38 +248,78 @@ public sealed partial class AssistWorkspace
         try { backup = BackUpOnceForThisConversation(planned.Course, standIn); }
         catch (Exception) { /* recorded on the trail below */ }
 
-        // The backup can take a while; the page must still be the one planned.
-        string? nowPath = HowITeachPage.ExistingPath(planned.Course.DirectoryPath);
-        bool movedOn = planned.ExistingPath is null
-            ? nowPath is not null
-            : nowPath is null || Path.GetFileName(nowPath) != Path.GetFileName(planned.ExistingPath) ||
-              HowITeachPage.MarkOf(File.ReadAllBytes(nowPath)) != planned.ExistingMark;
-        if (movedOn) throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(planned.Course.Code));
-
+        // ONE step through the door (#899 W7b2-4; the mac's write_how_i_teach),
+        // held by the course: the page belongs to no section. Its before is
+        // read as it is planned, and only then is the page checked against
+        // the plan (the backup can take a while), so the before the step
+        // holds is the page the plan read, or the swap refuses it.
         bool created = !planned.ExistingIsWritten;
         using (var recording = UndoHistory.Record(_undo,
                    created ? "wrote a new How I Teach page" : "replaced the How I Teach page"))
         {
-            _undo?.Touch(path, planned.ExistingText);
-            File.WriteAllText(path, newText, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            // As the undo will READ it back (ReadAllText drops a BOM), or the
-            // undo would see the page as "edited since" and leave it alone.
-            _undo?.Wrote(path, File.ReadAllText(path));
+            var step = NewCourseUndoStep("writeHowITeach", planned.Course.Code);
+            try
+            {
+                step.Write(path, newText);
+                string? nowPath = HowITeachPage.ExistingPath(planned.Course.DirectoryPath);
+                bool movedOn = planned.ExistingPath is null
+                    ? nowPath is not null
+                    : nowPath is null || Path.GetFileName(nowPath) != Path.GetFileName(planned.ExistingPath) ||
+                      HowITeachPage.MarkOf(File.ReadAllBytes(nowPath)) != planned.ExistingMark;
+                if (movedOn) throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(planned.Course.Code));
+                MakeTheUndoStep(step);
+            }
+            catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince ||
+                                                           (planned.ExistingPath is null && HowITeachPage.ExistingPath(planned.Course.DirectoryPath) is not null))
+            {
+                // A page that appeared, or changed, after the plan read it:
+                // never written over, and said as it always was. A NEW page
+                // that appears in the last instant before the rename is
+                // refused by the rename itself ("in use" to the door), and is
+                // the same case: a page is there that the plan did not see
+                // (W7b2-4 review 1, LOW 2; the row opens it the same way).
+                // Only when the plan saw NO page: a started page with no
+                // words did not appear, and its refusals say their own
+                // reason (review 2, MEDIUM).
+                throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(planned.Course.Code));
+            }
+            catch (UndoStepLeftPartWayException partWay)
+            {
+                // The mac's saidWhenTheStepStopped with aSectionsCopyPutsItBack
+                // false: the page sits at the top of the course, outside every
+                // section, so no Restore Section puts it back and none is
+                // named (W7b2-4 review 1, MEDIUM).
+                NoteAChangeWithNoUndoEntry();
+                throw new AssistRefusal(AssistWording.PublishStoppedPartWay("the How I Teach page", ReasonItStopped(partWay)));
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                // All or none: the mac's nothing: "Nothing was saved", the
+                // How I Teach family's opening (review 1, LOW 1).
+                throw new AssistRefusal(NothingWasSaved(error));
+            }
             recording.Done();
         }
 
         int? wordsBefore = planned.ExistingIsWritten ? HowITeachPage.WordCount(planned.ExistingText!) : null;
         ActivityTrail.Note(ActivityTrail.Event.HowITeachPageWritten,
-            $"{planned.Course.Code} · " + HowITeachPage.TrailLineForAWrite(
+            ActivityTrail.Place(planned.Course.Code, 0) + HowITeachPage.TrailLineForAWrite(
                 wordsBefore, HowITeachPage.WordCount(newText), backup is null ? null : Path.GetFileName(backup)));
 
         return new AssistResult(true, AssistWording.HowITeachSaved(planned.Course.Code), backup);
     }
+
+    /// <summary>
+    /// A How I Teach write whose step wrote nothing: the mac's
+    /// <c>saidWhenTheStepStopped(nothing: "Nothing was saved")</c> for
+    /// <c>write_how_i_teach</c>, the opening of every How I Teach refusal.
+    /// </summary>
+    internal static string NothingWasSaved(Exception error) => "Nothing was saved: " + ReasonItStopped(error);
 
     /// <summary>Whether a section's page listing leaves this file out (<c>notListedAsAPage</c>).</summary>
     internal static bool ListsAsAPage(Course course, string fullPath) =>
         !HowITeachPage.IsTheHowITeachPage(fullPath, course.DirectoryPath);
 
     private static void NoteHowITeachRead(Course course, string line) =>
-        ActivityTrail.Note(ActivityTrail.Event.HowITeachPageRead, $"{course.Code} · {line}");
+        ActivityTrail.Note(ActivityTrail.Event.HowITeachPageRead, ActivityTrail.Place(course.Code, 0) + line);
 }

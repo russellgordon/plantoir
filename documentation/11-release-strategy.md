@@ -85,7 +85,7 @@ The automated PowerShell script executes:
 1. `dotnet publish` for `Plantoir.csproj` and `Plantoir.Mcp.csproj` (win-x64 self-contained).
 2. Copies `plantoir-mcp.exe` and `llama-server.exe` into the publish directory.
 3. Signs all 5 internal binaries using Azure Trusted Signing with RFC 3161 timestamp.
-4. Compiles `installer.iss` with Inno Setup to produce `dist/PlantoirSetup.exe` (`PrivilegesRequired=lowest`, installs to `%LOCALAPPDATA%\Programs\Plantoir`).
+4. Compiles `installer.iss` with Inno Setup to produce `dist/PlantoirSetup.exe` (`PrivilegesRequired=lowest`, installs to `%LOCALAPPDATA%\Programs\Plantoir`). Since #1010 the installer opens on a Licence Agreement page (`installer-licence.txt`; documentation 12, "The Licence Agreement page in the installer"), shown on every install run by hand and never under Plantoir's own `/VERYSILENT` update, so a teacher already on 1.x is updated silently and not asked (ruling 5 on #1010).
 5. Signs `dist/PlantoirSetup.exe` with Azure Trusted Signing + timestamp.
 6. Emits SHA-256 hash for release notes.
 
@@ -115,7 +115,7 @@ about which release a platform's installer last joined.
 **The names are frozen, and renaming one breaks the site's download button
 silently** — the evergreen URL keeps resolving, to nothing. `Plantoir-macOS.dmg`
 and `PlantoirSetup.exe` are what the cards ask for; `Plantoir-win-x64.zip` is
-also published, as a portable alternative nothing links to by that URL.
+also published, as a portable alternative nothing links to by that URL; since #1010 it carries `LICENSE` and `THIRD_PARTY_LICENSES.txt` beside the app.
 
 ### Updating itself: one feed per platform, on plantoir.app (#204)
 
@@ -301,13 +301,15 @@ appliesOn windows):
   RELEASING.md). `update found` says "; marked important" by the same rule.
 - **An important offer is shown even when the newest version was skipped.**
   A remembered skip was given to an offer that had a Skip button.
-- **The offer shows Install and Reopen alone.** Esc is handled by the dialog
-  itself (`PreviewKeyDown` → `Hide`), because what a `ContentDialog` with no
-  Close button does on Esc was not measured. **The handler is unproved too**
-  until the first cut that passes `--critical-versions`, which RELEASING.md
-  asks to check, and a window the teacher cannot
-  leave was rejected (Russell's ruling on the plan, 2026-10-08). Esc is "not
-  now", written on the trail, and the next daily check offers it again. An
+- **The offer shows Install and Reopen alone.** A window the teacher cannot
+  leave was rejected (Russell's ruling on the plan, 2026-10-08), so Esc must
+  close it. Until #979 the dialog caught Esc itself (`PreviewKeyDown` →
+  `Hide`), because what a `ContentDialog` with no Close button does on Esc
+  had not been measured; it has now (#979, on the Windows VM): WinUI closes
+  it with no answer, so the catcher, a hidden key catcher, was deleted, and
+  `UpdateOfferUiTests` presses Esc on an important offer from a test feed in
+  a Debug build. Esc is "not now", written on the trail, and the next daily
+  check offers it again. An
   important offer never remembers a skip.
 - **Rejected:** trapping the teacher in the offer (cancelling `Closing`), and
   honouring a skip given before the mark. Not changed: the install gate, the
