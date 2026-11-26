@@ -22850,7 +22850,7 @@ dropped from the part-way line and the sheet; it is now told as a place the
 rename cannot tell it moved, since the record does not say which places were
 links. `undo.rule.shadow` no longer promises that pieces 14 and 15 settle a
 linked PAGE: they move a link only for Rename folder's folder, and Insert
-Class on the Mac still refuses renaming a later class that is a link.
+Class on the Mac still refuses renaming a later class that is a link. Review 1: the listing's `link` line takes its hash from the same `linkSha(at:)`; two `stackCases` rows (call `renameAPerSectionFolderThatIsALink`) run Rename folder's own plan on a linked section folder, held on Windows for W8; and a dangling link is skipped, as before U4b, while a link to another place of the same rename is moved as a link.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
