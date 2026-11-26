@@ -22618,6 +22618,25 @@ another is unfinished would be a new sentence and its own contract piece,
 and U7 drops the record. Chosen over removing `rename`, which five tests in
 `SpecialFolderRenamerTests` and one in `AssistCurriculumMentionsTests` call.
 
+### U4b2: part-way-line-true
+
+A rename that stops part way names the folders at the new name as the disk
+has them, whether this run moved them or an earlier, interrupted run did. A
+run finishing an interrupted rename moves no folder, so the old reading,
+`foldersLeftAtTheirNewName(planned.moves, …)`, was always empty there and
+the run said "did not rename the folder Concepts to Ideas" (trail line and
+`renameFolderStoppedPartWay`) with every folder at "Ideas" (part nine's
+review, L1). It is replaced by one function,
+`SpecialFolderRenamer.foldersAtTheirNewName`, which walks
+`folderLocations(named: newName…)` by `lstat` (a capitalisation-only rename
+counts a folder only when its directory lists the new spelling), so both runs
+choose between `renameFolderRenamedOnlyInPart` and `renameFolderStoppedPartWay`
+by the same reading; no sentence changed. `activityTrail.mustRecord` →
+`folder renamed` → `carries` and `contracts/README.md` now say the two
+part-way states are the Mac's and name Windows' one part-way line until W8
+(folders moved, settings not written); README's 2026-09 clause that the event
+"records no link counts" now says it records pages relinked.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
