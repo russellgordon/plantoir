@@ -1294,24 +1294,78 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
                 }
             }
             // U4b2-10: a folder that holds nothing but files left out (and
-            // folders so left out) is one the step's edits made for those
-            // files, left out with them. Judged first that way and, failing
-            // that, as listed: the moved folder may have held an empty folder
-            // of its own, in which an edit then made a file.
-            let foldersLeftOut: [String] = UndoMoveSide.foldersHoldingOnly(filesLeftOut, in: listing, keeping: files)
-            if !foldersLeftOut.isEmpty {
-                var foldersKept: [String] = []
-                for folder in listing.folders where !foldersLeftOut.contains(folder) {
-                    foldersKept.append(folder)
-                }
-                let withoutThem: UndoTreeListing = UndoTreeListing(folders: foldersKept, files: files, links: listing.links)
-                if withoutThem.sha == op.listingSha {
-                    return (side: .holdsTheContent, foldersLeftOut: foldersLeftOut)
-                }
+            // folders so left out) may be one the step's edits made for
+            // those files, or one of the content's own that was empty. Each
+            // is decided on its own (review 1 of U4b2-10, MEDIUM 1): see
+            // `foldersTheContentLacks`.
+            let candidates: [String] = UndoMoveSide.foldersHoldingOnly(filesLeftOut, in: listing, keeping: files)
+            if let foldersLeftOut = UndoMoveSide.foldersTheContentLacks(
+                candidates, listing: listing, files: files, listingSha: op.listingSha
+            ) {
+                return (side: .holdsTheContent, foldersLeftOut: foldersLeftOut)
             }
-            let judged: UndoTreeListing = UndoTreeListing(folders: listing.folders, files: files, links: listing.links)
-            return (side: judged.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse, foldersLeftOut: [])
+            return (side: .holdsSomethingElse, foldersLeftOut: [])
         }
+    }
+
+    /// Review 1 of U4b2-10: the most candidate folders decided one by one.
+    static let mostFoldersDecidedOneByOne: Int = 8
+
+    /// Which of `candidates` (deepest first) the moved content did not
+    /// hold: the set that, left out of the listing with the files left out,
+    /// makes it match `listingSha`, or nil when none does. The list keeps
+    /// only the listing's hash, so the sets are tried, never read: each set
+    /// that leaves a folder out only with every candidate below it (a
+    /// folder the step made holds only folders it made), from all of them
+    /// down to none, in one fixed order. Two sets give two listings, so at
+    /// most one matches. Up to `mostFoldersDecidedOneByOne` candidates
+    /// every such set is tried (at most 256 hashes); beyond that only all
+    /// or none, so a step with more, some of them the content's own, is
+    /// refused as changed since, which takes nothing back and loses nothing.
+    static func foldersTheContentLacks(
+        _ candidates: [String], listing: UndoTreeListing, files: [UndoTreeListing.File], listingSha: String?
+    ) -> [String]? {
+        var setsToTry: [[String]] = []
+        if candidates.count <= UndoMoveSide.mostFoldersDecidedOneByOne {
+            var mask: Int = (1 << candidates.count) - 1
+            while mask >= 0 {
+                var leftOut: [String] = []
+                var position: Int = 0
+                while position < candidates.count {
+                    if mask & (1 << position) != 0 {
+                        leftOut.append(candidates[position])
+                    }
+                    position += 1
+                }
+                if UndoMoveSide.leavesOutEveryCandidateBelow(leftOut, candidates: candidates) {
+                    setsToTry.append(leftOut)
+                }
+                mask -= 1
+            }
+        } else {
+            setsToTry = [candidates, []]
+        }
+        for leftOut in setsToTry {
+            var foldersKept: [String] = []
+            for folder in listing.folders where !leftOut.contains(folder) {
+                foldersKept.append(folder)
+            }
+            let judged: UndoTreeListing = UndoTreeListing(folders: foldersKept, files: files, links: listing.links)
+            if judged.sha == listingSha {
+                return leftOut
+            }
+        }
+        return nil
+    }
+
+    /// Whether every candidate below a folder of `leftOut` is in it too.
+    static func leavesOutEveryCandidateBelow(_ leftOut: [String], candidates: [String]) -> Bool {
+        for folder in leftOut {
+            for other in candidates where UndoMoveSide.isBelow(other, folder) && !leftOut.contains(other) {
+                return false
+            }
+        }
+        return true
     }
 
     /// U4b2-10: every folder of `listing` that holds at least one of

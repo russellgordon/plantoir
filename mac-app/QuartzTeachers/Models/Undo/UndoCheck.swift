@@ -1277,8 +1277,34 @@ nonisolated enum UndoSwap {
     }
 
     /// U4b2-10: a folder a moved folder's last look left out, removed
-    /// where it now is when it holds nothing.
+    /// where it now is when it holds nothing but, perhaps, the Finder's
+    /// record of a window (`UndoTreeListing.ignoredName`, never listed,
+    /// which goes with its folder as a folder taken out takes it: review 1
+    /// of U4b2-10, MEDIUM 2). That record goes first only when it is a
+    /// regular file and the folder holds nothing else; a link of that name,
+    /// or anything else inside, leaves the folder and everything in it.
     static func removeAFolderLeftOut(_ folder: URL) {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            return
+        }
+        if names == [UndoTreeListing.ignoredName] {
+            let record: URL = folder.appendingPathComponent(UndoTreeListing.ignoredName)
+            var information: stat = stat()
+            let found: Int32 = record.withUnsafeFileSystemRepresentation { path in
+                guard let path else {
+                    return -1
+                }
+                return lstat(path, &information)
+            }
+            if found != 0 || information.st_mode & S_IFMT != S_IFREG {
+                return
+            }
+            try? FileManager.default.removeItem(at: record)
+        }
+        // Not told when it fails: every swap has gone in, and a folder that
+        // will not go holds something (a file put there since the last
+        // look), so it is left with what it holds, as `removeTheFoldersMade`
+        // leaves one. Never a refusal after the step is done.
         _ = folder.withUnsafeFileSystemRepresentation { path in
             guard let path else {
                 return Int32(-1)
