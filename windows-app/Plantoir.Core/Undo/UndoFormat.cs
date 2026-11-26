@@ -145,14 +145,30 @@ internal sealed record UndoOp
     /// them, is a step this version cannot read. That is also why a move that
     /// changes only case is never made as two renames here.
     /// </summary>
-    internal static string? PartInside(string place, string path) => throw new NotImplementedException();
+    internal static bool PlacesOverlap(string first, string second) =>
+        PartInside(first, second) is not null || PartInside(second, first) is not null;
 
-    internal static bool PlacesOverlap(string first, string second)
+    /// <summary>
+    /// The part of <paramref name="path"/> inside <paramref name="place"/>,
+    /// spelled as <paramref name="path"/> spells it: "" when it is the place
+    /// itself, null when it is neither the place nor inside it (the mac's
+    /// <c>UndoOp.partInside</c>, U4b2-9; #899 W8-2). Compared part by part
+    /// (split on <c>/</c>), each part WITHOUT regard to case, as NTFS takes
+    /// them: <c>Renamed/a.md</c> is inside <c>renamed</c>, and
+    /// <c>Mediahouse/a.md</c> is not inside <c>Media</c>. The ONE comparison
+    /// for "at or inside" (W8 COMMON, lesson 6): <see cref="PlacesOverlap"/>,
+    /// whether a move carries an edit, and every later use.
+    /// </summary>
+    internal static string? PartInside(string place, string path)
     {
-        string one = first.ToLowerInvariant();
-        string other = second.ToLowerInvariant();
-        if (one == other) return true;
-        return one.StartsWith(other + "/", StringComparison.Ordinal) || other.StartsWith(one + "/", StringComparison.Ordinal);
+        string[] placeParts = place.Split('/');
+        string[] pathParts = path.Split('/');
+        if (pathParts.Length < placeParts.Length) return null;
+        for (int index = 0; index < placeParts.Length; index++)
+        {
+            if (!string.Equals(placeParts[index].ToLowerInvariant(), pathParts[index].ToLowerInvariant(), StringComparison.Ordinal)) return null;
+        }
+        return string.Join('/', pathParts, placeParts.Length, pathParts.Length - placeParts.Length);
     }
 }
 
@@ -623,7 +639,12 @@ internal static class UndoFormat
                 if (!okMaintainer || !okSection || !string.Equals(maintainer, UndoOp.SectionFrontPage, StringComparison.Ordinal)) readable = false;
                 break;
         }
-        if (listingSha is not null) blobs.Add(listingSha);
+        // A tree's listing is one of its blobs, so the folder can be made
+        // again. A folder move's is not: "The moved content is never a blob:
+        // the item itself is what moves" (opKinds.move). Named as one, the
+        // door's vetting refused every folder move as not readable, as the
+        // mac's JournaledWrite.vet did until U4b (#899 W8-2).
+        if (listingSha is not null && kind != UndoOp.Move) blobs.Add(listingSha);
 
         var op = new UndoOp
         {
