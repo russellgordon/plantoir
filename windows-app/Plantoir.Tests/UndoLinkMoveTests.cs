@@ -62,6 +62,50 @@ public sealed class UndoLinkMoveTests : IDisposable
         return said.ToString();
     }
 
+    // ---- Measured --------------------------------------------------------
+
+    /// <summary>
+    /// Measured on the PC (NTFS): a junction made by <c>mklink /J</c> holds
+    /// its target as the full path given (LinkTarget, no <c>\??\</c>), and
+    /// MoveFileEx without MOVEFILE_REPLACE_EXISTING on it moves the junction
+    /// alone: the folder it leads to keeps its identity and listing.
+    /// </summary>
+    [Fact]
+    public void AJunctionHoldsItsFullTargetAndOneRenameMovesTheJunctionAlone()
+    {
+        string library = Path.Combine(_folder, "library");
+        Directory.CreateDirectory(Path.Combine(library, "pictures"));
+        File.WriteAllText(Path.Combine(library, "a.md"), "A\n");
+        string media = Path.Combine(_folder, "media");
+        UndoKindsForTheCases.MakeAJunction(media, library);
+        Assert.Equal(library, new DirectoryInfo(media).LinkTarget);
+        string before = Untouched(library);
+
+        Assert.Equal(0, UndoSwap.Rename(media, Path.Combine(_folder, "renamed"), replace: false));
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(media));
+        Assert.Equal(library, new DirectoryInfo(Path.Combine(_folder, "renamed")).LinkTarget);
+        Assert.Equal(before, Untouched(library));
+    }
+
+    /// <summary>The same for a folder symbolic link made with <c>../library</c>, where this account may make one: held as written, moved alone.</summary>
+    [SymbolicLinkFact]
+    public void ASymbolicLinkHoldsItsTargetAsWrittenAndOneRenameMovesTheLinkAlone()
+    {
+        string library = Path.Combine(_folder, "library");
+        Directory.CreateDirectory(library);
+        File.WriteAllText(Path.Combine(library, "a.md"), "A\n");
+        string section = Path.Combine(_folder, "section1");
+        Directory.CreateDirectory(section);
+        string media = Path.Combine(section, "media");
+        Directory.CreateSymbolicLink(media, "../library");
+        Assert.Equal("../library", new DirectoryInfo(media).LinkTarget);
+        string before = Untouched(library);
+
+        Assert.Equal(0, UndoSwap.Rename(media, Path.Combine(section, "renamed"), replace: false));
+        Assert.Equal("../library", new DirectoryInfo(Path.Combine(section, "renamed")).LinkTarget);
+        Assert.Equal(before, Untouched(library));
+    }
+
     // ---- The format -----------------------------------------------------
 
     /// <summary>Readable with exactly one of sha, listingSha and linkSha; linkSha is never a blob, and must be a blob's name.</summary>
