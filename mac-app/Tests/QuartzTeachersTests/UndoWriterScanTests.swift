@@ -187,7 +187,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/SharedMedia/SharedMediaFiles.swift": (2, "waitsFor: U5 (the shared Media store of #785, written by a small backup; a step that deletes or moves one keeps its files through keepForUndo)"),
         "Models/SharedMedia/SharedMediaStore.swift": (36, "waitsFor: U5 (the shared Media store of #785 and its sweep, outside every course's pages, under _backups; Undo's seam keepForUndo and releaseForUndo is U5's)"),
         "Models/SiteHealthRepair.swift": (3, "waitsFor: U4"),
-        "Models/SpecialFolderRenamer.swift": (3, "waitsFor: U7 (the rename record, written before the rename's step and cleared after it, which finishes a rename killed part way while the switch is off; the folders, pages and settings are one step through the door since U4b)"),
+        "Models/SpecialFolderRenamer.swift": (5, "waitsFor: U7 (the rename record, written before the rename's step and cleared after it, or an earlier run's record put back by `rename` (U4b2-3), which finishes a rename killed part way while the switch is off; the folders, pages and settings are one step through the door since U4b)"),
         "Models/ToolchainCopyMarker.swift": (3, "notAStep: the toolchain mirror"),
         "Models/ToolchainFingerprints.swift": (7, "notAStep: the toolchain mirror's index"),
         "Models/Undo/JournaledStep.swift": (1, "door: an action's step (U3), written through JournaledWrite, and the front page's rule (UndoKeptFiles); a step that cannot be named is staged and swapped through UndoSwap since U3a's second round"),

@@ -425,6 +425,20 @@ enum SpecialFolderRenamer {
     /// caller's to plan into the same step (`CourseSettingsView.renameFolder`
     /// plans `course_config.json` too); this form, for a caller with no
     /// settings to change, makes the step itself.
+    ///
+    /// **The rename record is this run's only while this run is unfinished**
+    /// (#899 U4b2-3). A rename that moves folders writes the record before
+    /// the step is made. Once the step is made, the rename is whole and the
+    /// record goes; a refusal changed nothing, so the record goes too. In
+    /// both cases a record that was there before this run (another folder's
+    /// interrupted rename, which this run's record replaced on disk) is put
+    /// back as it was, because nothing clears a record another run wrote.
+    /// Only a step that stopped part way (`leftPartWay`) or was killed
+    /// (`stoppedByATest`, as a process that died) leaves this run's record,
+    /// so the rename can be recognised and finished
+    /// (`interruptedRenameTarget`). A success that FINISHES the recorded
+    /// rename (no folder left to move, the record naming this same rename)
+    /// clears that record, as `renameFolder` does.
     @discardableResult
     nonisolated static func rename(
         _ oldName: String,
@@ -443,11 +457,70 @@ enum SpecialFolderRenamer {
             section: nil, maker: UndoStepMaker.sheet("renameFolder"), holds: "course"
         )
         apply(planned, to: step)
+        let marker: URL = renameMarkerURL(courseDirectory: courseDirectory)
+        // Read before anything is written: the record an earlier run left,
+        // if any, which this run must hand back untouched.
+        let earlierRecord: Data? = try? Data(contentsOf: marker)
+        let thisRenameWasRecordedEarlier: Bool = recordNames(
+            earlierRecord, from: oldName, to: newName, scope: scope
+        )
+        var thisRunWroteTheRecord: Bool = false
         if !planned.moves.isEmpty {
             recordRenameStarting(from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory)
+            thisRunWroteTheRecord = true
         }
-        try step.make()
+        do {
+            try step.make()
+        } catch let stopped as JournaledStepError {
+            switch stopped {
+            case .leftPartWay, .stoppedByATest:
+                // Unfinished: the record stays, naming this rename.
+                break
+            default:
+                // Refused with nothing changed.
+                if thisRunWroteTheRecord {
+                    putBackRecord(earlierRecord, at: marker)
+                }
+            }
+            throw stopped
+        } catch {
+            if thisRunWroteTheRecord {
+                putBackRecord(earlierRecord, at: marker)
+            }
+            throw error
+        }
+        // The step is made, so this rename is whole.
+        if thisRenameWasRecordedEarlier {
+            clearRenameRecord(courseDirectory: courseDirectory)
+        } else if thisRunWroteTheRecord {
+            putBackRecord(earlierRecord, at: marker)
+        }
         return planned.outcome
+    }
+
+    /// Whether a record's bytes name this rename: the same folder, the same
+    /// target, the same scope.
+    nonisolated static func recordNames(
+        _ record: Data?, from oldName: String, to newName: String, scope: FolderScope
+    ) -> Bool {
+        guard let record,
+              let note = try? JSONSerialization.jsonObject(with: record) as? [String: String],
+              note["from"]?.caseInsensitiveCompare(oldName) == .orderedSame,
+              note["to"]?.caseInsensitiveCompare(newName) == .orderedSame,
+              note["scope"] == scope.exclusionKey else {
+            return false
+        }
+        return true
+    }
+
+    /// Leaves the record as it was before this run: the earlier run's bytes
+    /// written back, or no record at all when there was none.
+    nonisolated static func putBackRecord(_ earlierRecord: Data?, at marker: URL) {
+        if let earlierRecord {
+            try? earlierRecord.write(to: marker, options: [.atomic])
+        } else {
+            try? FileManager.default.removeItem(at: marker)
+        }
     }
 
     /// What a rename will do, read from the disk and written nowhere: each

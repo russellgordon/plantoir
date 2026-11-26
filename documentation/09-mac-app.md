@@ -22521,6 +22521,27 @@ under a linked root, falls outside it: reproduced standalone, and red on the
 bench as `UndoShadowPublishTests.testAPublishIsRecordedInShadow`), 785a's 31
 days (the 40-day sweep case), and the second round's scan (11 checks).
 
+### U4b2: rename-record-owned
+
+The interrupted-rename record (`courses/.internal/renames/<CODE>.json`)
+exists only while the rename that wrote it is unfinished, through every
+writer. `CourseSettingsView.renameFolder` kept this since U4b part nine;
+`SpecialFolderRenamer.rename`, the form for a caller with no settings to
+change (no caller in the app today), wrote the record and never cleared it,
+so its first caller would have left a record that `interruptedRenameTarget`
+reads as an interrupted rename (the final sweep's L5). It now reads the
+record already there before writing its own, and once the step is made, or
+refused with nothing changed, puts that earlier record back byte for byte
+(or removes the record when there was none); only a step left part way or
+killed keeps this run's record, and a success that finishes the recorded
+rename clears it. Chosen over removing `rename`, which five tests in
+`SpecialFolderRenamerTests` and one in `AssistCurriculumMentionsTests` call
+as the one-call rename. The one difference left from `renameFolder`: that
+function, renaming another folder that moves, replaces an earlier run's
+record with its own and then clears it on success or on a refusal at its
+make, so the earlier record is lost (out of this piece's scope; in its
+notes).
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
