@@ -504,8 +504,7 @@ public sealed partial class AssistWorkspace
             var kept = ClassesDatedLater.FlaggedIn(course, section, Today(), readPage, readRecord)
                 .Where(page => published.Contains(page.Place))
                 .ToList();
-            if (LaterClassesKept.RecordKeeping(LaterClassesKept.Read(course.DirectoryPath, section, readRecord), kept) is { } record)
-                step.Write(LaterClassesKept.PathFor(course.DirectoryPath, section), record, todaysUndoKeepsIt: false);
+            LaterClassesKept.PlanInto(step, course.DirectoryPath, section, kept);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }

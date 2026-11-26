@@ -34,7 +34,7 @@ internal static class WindowsActionsOnTheMacFixture
         "publishPages", "hidePages", "publishPagesAWholeUnit", "publishClassForADate",
         "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
         "reDateClasses", "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear",
-        "showTodaysClassOnTheFrontPage",
+        "showTodaysClassOnTheFrontPage", "notTodayOnTheFrontPage", "keepClassesDatedLater",
     ];
 
     /// <summary>
@@ -62,6 +62,10 @@ internal static class WindowsActionsOnTheMacFixture
         {
             ["rememberTimetable"] = (["section", "dates"],
                 "Windows writes the timetable as it always has (System.Text.Json, indented two spaces, \"key\": value, its members section, dates, source, recorded in that order, no newline at the end), where the mac's JSONSerialization writes sorted keys with \" : \" and a closing newline; recorded is the day it is written (the mac's test fixed it at 2026-09-08), and a source not given is Windows' \"the teacher\" where the mac's is \"not recorded\". Both readers look members up by name"),
+            ["notTodayOnTheFrontPage"] = (["day", "class"],
+                "Windows writes Not Today's record as it always has (Newtonsoft's indented form, \"key\": value, its members version, day, class in that order, the line ends of the computer and a closing newline), where the mac's JSONSerialization writes sorted keys with \" : \" and no closing newline; and its version is the string \"1\", as file-formats.json -> frontPageNotToday writes it, where the mac's is the number 1. Both readers look up day and class by name, and neither reads version"),
+            ["keepClassesDatedLater"] = (["version", "answeredAt"],
+                "Windows writes the kept classes as it always has (System.Text.Json, indented two spaces, \"key\": value, its members version, answeredAt, kept in that order, each row place then date, a slash written plainly), where the mac's JSONSerialization writes sorted keys with \" : \" and escapes the slash; and each row's place is the page's place without .md, as file-formats.json -> laterClassesKept names it, where the mac's recorded step names the page with its .md (its fixture's place). Its date is the same, 2026-09-14. Both readers look members up by name"),
         };
 
     // ---- Functions -----------------------------------------------------------------
@@ -247,6 +251,26 @@ internal static class WindowsActionsOnTheMacFixture
             var offer = workspace.TodaysClassOffer(Course, 1, morning)
                         ?? throw new InvalidOperationException("the morning offers no class for the front page");
             return workspace.ShowTodaysClass(Course, 1, morning, offer).ToString();
+        }
+        // Not Today is the same sheet's other button, answered on the mac's
+        // morning for the class it offered (the mac's NotToday(day:classTitle:)
+        // is given them directly too).
+        if (stepName == "notTodayOnTheFrontPage")
+        {
+            string offered = Path.Combine(workspace.FolderPath, "courses", Course, "section1", "All Classes", "Unit 2, Day 5.md");
+            return workspace.DeclineTodaysClass(Course, 1, new DateOnly(2026, 9, 30),
+                new TodaysClassOnTheFrontPage.Offering("Unit 2, Day 5", "Unit 2, Day 4", offered)).ToString();
+        }
+        // The question at Deploy, answered with Unit 1, Day 3 left ticked at
+        // its date, at the mac's moment, on the workspace's list and door.
+        if (stepName == "keepClassesDatedLater")
+        {
+            string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);
+            string page = Path.Combine(courseDirectory, "section1", "All Classes", "Unit 1, Day 3.md");
+            var ticked = new ClassesDatedLater.Page(ClassesDatedLater.PlaceOf(courseDirectory, page), "Unit 1, Day 3", new DateOnly(2026, 9, 14), true);
+            return LaterClassesKept.KeepAtDeploy(workspace.FolderPath, Course, courseDirectory, 1, [ticked],
+                new DateTime(2026, 9, 8, 11, 0, 0, DateTimeKind.Utc), new UndoStepMaker("sheet", "keepClassesDatedLater"),
+                workspace.UndoList, workspace.UndoDoorOfATest).ToString();
         }
         var tools = new PlantoirTools(workspace);
         // The MCP server always hands a tool a progress (the SDK's own when the

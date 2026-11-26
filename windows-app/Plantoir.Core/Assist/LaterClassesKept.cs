@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Plantoir.Core.Models;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -76,6 +77,10 @@ public static class LaterClassesKept
     /// windows, and the worst outcome is being asked once more.
     /// </summary>
     /// <returns>False when the record could not be written.</returns>
+    /// <remarks>Written outside the door: the links checklist's Publish only
+    /// (<see cref="AssistWorkspace.PublishAndRemember"/>), which W7b2-8 puts
+    /// into that sheet's own step. Deploy's answer is
+    /// <see cref="KeepAtDeploy(string?, string, string, int, IEnumerable{ClassesDatedLater.Page}, DateTime?, string?)"/>.</remarks>
     public static bool Keep(string courseDirectory, int section, IEnumerable<ClassesDatedLater.Page> pages,
                             DateTime? now = null)
     {
@@ -90,6 +95,60 @@ public static class LaterClassesKept
             return true;
         }
         catch { return false; }
+    }
+
+    /// <summary>
+    /// The teacher's answer at Deploy (#726): the ticked classes kept, as ONE
+    /// step of that one record (#899 W7b2-7; the mac's
+    /// <c>KeptRecord.write</c> on a step of its own, key
+    /// <c>keepClassesDatedLater</c>, made by <c>sheet</c>), its folder made
+    /// by the swap. The caller names the working folder and the maker, as
+    /// <see cref="TimetableMemory.WriteDown(string, string, int, IEnumerable{DateOnly}, string, DateOnly, string?)"/>
+    /// does. Never told to today's undo (it never was); the bytes are
+    /// Windows' own, as <see cref="Keep(string, int, IEnumerable{ClassesDatedLater.Page}, DateTime?)"/>
+    /// writes them. Nothing dated to add, or the same answer again, makes no
+    /// step.
+    /// </summary>
+    /// <param name="workspacePath">The folder holding <c>courses\</c>, or null when the course is not inside one (the step is then made without the list, in shadow).</param>
+    /// <returns>False when the record could not be written: it costs the question once more at the next Deploy, nothing else, and the deploy goes on (the mac's <c>try?</c>).</returns>
+    public static bool KeepAtDeploy(string? workspacePath, string courseCode, string courseDirectory, int section,
+                                    IEnumerable<ClassesDatedLater.Page> pages, DateTime? now = null, string? madeBy = null)
+        => KeepAtDeploy(workspacePath, courseCode, courseDirectory, section, pages, now,
+                        new UndoStepMaker(madeBy ?? "sheet", "keepClassesDatedLater"), undo: null, door: null);
+
+    /// <summary>The same, on a test's own list and door (this process's when null).</summary>
+    internal static bool KeepAtDeploy(string? workspacePath, string courseCode, string courseDirectory, int section,
+                                      IEnumerable<ClassesDatedLater.Page> pages, DateTime? now,
+                                      UndoStepMaker by, UndoForThisProcess? undo, UndoDoor? door)
+    {
+        try
+        {
+            var step = new UndoActionStep(by, workspacePath, courseCode, section, undo: undo, door: door);
+            if (!PlanInto(step, courseDirectory, section, pages, now)) return true;
+            step.Make();
+            return true;
+        }
+        // The record is in, what it held kept beside it: the classes ARE kept
+        // (the trail's own line names the kept file, from the door).
+        catch (UndoStepLeftPartWayException) { return true; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>
+    /// Plans the record with <paramref name="pages"/> added in
+    /// <paramref name="step"/>, without making it, reading what is kept as
+    /// the step will leave it: the answer at Deploy's own step
+    /// (<see cref="KeepAtDeploy(string?, string, string, int, IEnumerable{ClassesDatedLater.Page}, DateTime?, string?)"/>),
+    /// and a file of Publish Class for a Date's step (#899 W7a), where it
+    /// makes no step of its own. Never told to today's undo. False, and
+    /// nothing planned, when there is nothing dated to add.
+    /// </summary>
+    internal static bool PlanInto(UndoActionStep step, string courseDirectory, int section,
+                                  IEnumerable<ClassesDatedLater.Page> pages, DateTime? now = null)
+    {
+        if (RecordKeeping(Read(courseDirectory, section, step.ReadTextIfAny), pages, now) is not { } record) return false;
+        step.Write(PathFor(courseDirectory, section), record, todaysUndoKeepsIt: false);
+        return true;
     }
 
     /// <summary>
