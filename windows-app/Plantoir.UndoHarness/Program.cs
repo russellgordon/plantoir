@@ -54,6 +54,9 @@ internal static class Program
                 "child-w7-make-room" => W7Runs.ChildMakeRoom(folder, args[2], args[3]),
                 "w7-plain-kill" => W7Runs.PlainKill(folder),
                 "child-w7-plain" => W7Runs.ChildPlain(folder, args[2], args[3]),
+                "w8-carrying-move-kill" => W8Runs.CarryingMoveKill(folder),
+                "child-w8-carry" => W8Runs.ChildCarry(folder, args[2], args[3], args[4]),
+                "child-w8-recover" => W8Runs.ChildRecover(folder, args[2]),
                 _ => Unknown(mode),
             };
         }
