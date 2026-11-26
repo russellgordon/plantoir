@@ -34,6 +34,8 @@ Nothing of this action. The rest of W7b2 is as the ledger's `Reason899W7b2` name
 - The op kinds are the door's and match the mac's (`editLine`, `editLine`, `recompute`): the fixture row checks them.
 - Note on the brief: the write at the old line 365 was Undo Getting Ready's put-back, not a put-back when Go stops part way (Go had none; it returned what it had written). Removing it meant routing the sheet's undo through `UndoHistory`, as the mac does; the sheet's sentences are unchanged.
 
+- **For the mac (W7b2-5 review 1 L1, added in W7b2-6).** Under the same all-or-none step, the mac's `prepareForStartOfYear` still says `writeFailed` ("Plantoir could not finish putting the pages into draft. The backup … holds the course as it was …") on a refusal AND on a part-way stop. After a part-way stop it therefore names no kept file: the `.plantoir-undo-*-orig` beside the page goes unmentioned, which is the gap Windows' invariant closes (a refusal says "Nothing was changed: <reason>", a part-way stop says `publishStoppedPartWay` naming each kept file). The mac owes the same split; this wants a `mac` issue (or a ruling that the mac keeps `writeFailed`, in which case the contract's sentence should say which case it covers).
+
 ## Self-check
 
 1. Broke each fix and watched its test fail: the must-fail lines above (run b). The one NOT-RED (the no-change guard) is explained and dropped.

@@ -1300,7 +1300,7 @@ public sealed partial class SectionDetailView : UserControl
             if (busy)
                 ActivityTrail.Note(ActivityTrail.Event.LeftTheFrontPageAsItWas,
                     $"{_course.Code}/{_sectionNumber} · left the front page as it was — it changed while the teacher was asked: {offer.Show} offered, it showed {offer.Shows}");
-            var outcome = busy ? TodaysClassOnTheFrontPage.Outcome.NoLongerOffered
+            TodaysClassOnTheFrontPage.Outcome outcome = busy ? new TodaysClassOnTheFrontPage.Outcome.NoLongerOffered()
                                : workspace.ShowTodaysClass(_course.Code, _sectionNumber, askedOn, offer);
             string? said = outcome switch
             {
@@ -1315,7 +1315,13 @@ public sealed partial class SectionDetailView : UserControl
                     Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
                     CloseButtonText = "OK",
                 });
-            return outcome == TodaysClassOnTheFrontPage.Outcome.Written;
+            if (outcome is TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept kept)
+            {
+                var alert = TodaysClassOnTheFrontPage.KeptAlertFor(offer, kept);
+                await alert.PressedAsync(await ShowAlertAsync(alert.Shows), ShowAlertAsync, FolderActions.OpenFolder);
+            }
+            // The page shows the class either way.
+            return outcome is TodaysClassOnTheFrontPage.Outcome.Written or TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept;
         }
         catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return false; }
         finally
@@ -1323,6 +1329,31 @@ public sealed partial class SectionDetailView : UserControl
             _todaysClassQuestionUp = false;
             QueueTheProblemsAlert();   // #734: it waited behind this question
         }
+    }
+
+    /// <summary>
+    /// Renders an alert's plain description (<see cref="TodaysClassOnTheFrontPage.AlertDescription"/>)
+    /// and nothing more: what it shows, which button is the default and what a
+    /// press does are the description's, tested without a screen
+    /// (W7b2-9 review 1, MEDIUM 1). Answers the button pressed, or null when
+    /// the alert could not be shown.
+    /// </summary>
+    private async Task<TodaysClassOnTheFrontPage.AlertButton?> ShowAlertAsync(TodaysClassOnTheFrontPage.AlertDescription alert)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = alert.Title,
+            Content = new TextBlock { Text = alert.Message, TextWrapping = TextWrapping.Wrap },
+            CloseButtonText = alert.CloseButton,
+            DefaultButton = alert.Default == TodaysClassOnTheFrontPage.AlertButton.Action ? ContentDialogButton.Primary : ContentDialogButton.Close,
+        };
+        if (alert.ActionButton is { } action) dialog.PrimaryButtonText = action;
+        return await ShowDialogSafelyAsync(dialog) switch
+        {
+            ContentDialogResult.Primary => TodaysClassOnTheFrontPage.AlertButton.Action,
+            ContentDialogResult.None => TodaysClassOnTheFrontPage.AlertButton.Close,
+            _ => null,
+        };
     }
 
     private async Task SayAsync(string sentence)
