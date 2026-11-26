@@ -577,6 +577,127 @@ final class OneSectionRestoreTests: XCTestCase {
                 + "2 shared pages made since the backup are now hidden from this section"
         )
     }
+
+    // MARK: - What backups leave out (#909, Russell's ruling of 2026-11-25)
+
+    /// Restore from Backup…'s "Restore Section N": a `.git`, `build`, `out`,
+    /// `dist` or `node_modules` folder inside the section, which no backup
+    /// holds, is kept beside the backups under #909's name, at its path
+    /// inside the course; the same names at the course's top and at the
+    /// working folder's top are left where they are.
+    @MainActor
+    func testTheMenusRestoreKeepsTheFoldersBackupsLeaveOut() async throws {
+        try await checkTheFoldersBackupsLeaveOutAreKept(fromTheMenu: true)
+    }
+
+    /// The assistant window's "Restore Section N…", which shares the swap.
+    @MainActor
+    func testTheWindowsRestoreKeepsTheFoldersBackupsLeaveOut() async throws {
+        try await checkTheFoldersBackupsLeaveOutAreKept(fromTheMenu: false)
+    }
+
+    /// When the kept folder cannot be made beside the backups, the set-aside
+    /// copy stays staged, where the next reading keeps it in the backups
+    /// folder: the `.git` is never removed with it.
+    @MainActor
+    func testAKeptFolderThatCannotBeMadeLeavesTheCopyStaged() async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        try fixture.write("ref: refs/heads/main", to: fixture.sectionURL(2).appendingPathComponent(".git/HEAD"))
+        let item: BackupItem = try await fixture.backUp()
+        let shelf: URL = fixture.coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: shelf.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shelf.path) }
+
+        let outcome: OneSectionRestore.Outcome = try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+
+        XCTAssertNil(outcome.leftOutFoldersKeptAt)
+        XCTAssertEqual(fixture.leftInRestoring(), 1, "the set-aside copy stays staged")
+        XCTAssertTrue(fixture.holds(text: "ref: refs/heads/main", under: ".internal/restoring"),
+                      "the section's .git is in the staged copy, not removed")
+    }
+
+    @MainActor
+    private func checkTheFoldersBackupsLeaveOutAreKept(fromTheMenu: Bool) async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        let workingFolder: URL = fixture.coursesDirectoryURL.deletingLastPathComponent()
+        let names: [String] = RestoreSwap.leftOutNamesKeptAtAnyDepth
+
+        // Left where they are: the working folder's top and the course's top.
+        var leftInPlace: [URL: String] = [:]
+        for name in names {
+            leftInPlace[workingFolder.appendingPathComponent(name).appendingPathComponent("marker")] =
+                "working folder \(name)"
+            leftInPlace[fixture.courseURL.appendingPathComponent(name).appendingPathComponent("marker")] =
+                "course \(name)"
+        }
+        // Kept beside the backups: inside the section, at its top and deeper.
+        var keptInside: [String: String] = [:]
+        for name in names {
+            keptInside["section2/\(name)/marker"] = "section \(name)"
+        }
+        keptInside["section2/Unit 1/My App/.git/HEAD"] = "ref: refs/heads/main"
+        // A link inside the section to a folder outside the course that
+        // holds a `.git`: never followed, so its target is never touched.
+        let outsideTarget: URL = workingFolder.appendingPathComponent("Elsewhere")
+        let outsideGit: URL = outsideTarget.appendingPathComponent(".git").appendingPathComponent("HEAD")
+        try fixture.write("elsewhere's own history", to: outsideGit)
+
+        for (url, text) in leftInPlace {
+            try fixture.write(text, to: url)
+        }
+        for (inside, text) in keptInside {
+            try fixture.write(text, to: fixture.courseURL.appendingPathComponent(inside))
+        }
+        let item: BackupItem = try await fixture.backUp()
+        try "ruined".write(to: fixture.page(in: 2), atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            at: fixture.sectionURL(2).appendingPathComponent("Linked"), withDestinationURL: outsideTarget
+        )
+
+        if fromTheMenu {
+            let outcome: OneSectionRestore.Outcome = try CourseRestorer.restoreSectionFromTheMenu(
+                2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+            )
+            let keptAt: String = outcome.leftOutFoldersKeptAt ?? ""
+            XCTAssertTrue(keptAt.hasPrefix("courses/_backups/ICS3U/ICS3U not in the archive "), keptAt)
+        } else {
+            try CourseRestorer.restoreSection(2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL)
+        }
+
+        XCTAssertEqual(try String(contentsOf: fixture.page(in: 2), encoding: .utf8), OneSectionFixture.sectionPage(2),
+                       "the section came back")
+        for (url, text) in leftInPlace {
+            XCTAssertEqual(try? String(contentsOf: url, encoding: .utf8), text, "left in place: \(url.path)")
+        }
+        XCTAssertEqual(try? String(contentsOf: outsideGit, encoding: .utf8), "elsewhere's own history",
+                       "a link inside the section is never followed")
+
+        let shelf: URL = fixture.coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+        let keptName: String = RestoreSwap.notInTheArchiveName("ICS3U") + " "
+        var keptFolders: [URL] = []
+        let shelfEntries: [URL] = (try? FileManager.default.contentsOfDirectory(
+            at: shelf, includingPropertiesForKeys: nil, options: []
+        )) ?? []
+        for entry in shelfEntries where entry.lastPathComponent.hasPrefix(keptName) {
+            keptFolders.append(entry)
+        }
+        XCTAssertEqual(keptFolders.count, 1, "one kept folder beside the backups, under #909's name")
+        let kept: [String: Data] = keptFolders.isEmpty ? [:] : try OneSectionFixture.snapshot(of: keptFolders[0])
+        var expected: [String: Data] = [:]
+        for (inside, text) in keptInside {
+            expected[inside] = Data(text.utf8)
+        }
+        XCTAssertEqual(kept, expected, "each left-out folder inside the section, at its path inside the course")
+        for inside in keptInside.keys {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.courseURL.appendingPathComponent(inside).path),
+                           "kept beside the backups, not left in the restored section: \(inside)")
+        }
+        XCTAssertEqual(fixture.leftInRestoring(), 0, "nothing left staged")
+    }
 }
 
 /// A course with two sections, a shared outline and a shared folder, backed

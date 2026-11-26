@@ -1284,7 +1284,7 @@ nonisolated enum RestoreSwap {
         while let entry = walker.nextObject() as? URL {
             let inside: String = relative(entry, to: aside)
             let name: String = entry.lastPathComponent
-            if leftOutNamesKeptAtAnyDepth.contains(name) {
+            if isLeftOutAndKeptAtAnyDepth(name) {
                 picked.append(inside)
                 skipIfAFolder(walker, entry)
                 continue
@@ -1310,12 +1310,70 @@ nonisolated enum RestoreSwap {
                 picked.append(inside)
             }
         }
+        return keepInANotInTheArchiveFolder(
+            picked, from: aside, courseCode: courseCode,
+            coursesDirectoryURL: coursesDirectoryURL, stamp: context.stamp()
+        )
+    }
+
+    /// Whether a name is one a backup leaves out that a restore keeps
+    /// wherever below the course's top it finds it
+    /// (`leftOutNamesKeptAtAnyDepth`). The one rule for the whole-course
+    /// restore (`keepWhatTheArchiveMayNotHold`) and the one-section
+    /// restores (`leftOutItemsKeptAtAnyDepth`): Russell's ruling of
+    /// 2026-11-25 on #909 and #911.
+    static func isLeftOutAndKeptAtAnyDepth(_ name: String) -> Bool {
+        return leftOutNamesKeptAtAnyDepth.contains(name)
+    }
+
+    /// Every item inside `folder` that `isLeftOutAndKeptAtAnyDepth` names,
+    /// at any depth, as a path inside `root` (the set-aside copy, laid out
+    /// as the course is). A folder so named is not looked inside, and a
+    /// link is never followed: a walk does not descend into one, so a
+    /// `.git` in a link's target is never touched. A link that is itself
+    /// so named is taken as the link.
+    ///
+    /// For the one-section restores, over the set-aside `section<N>/`:
+    /// each such item was in neither the backup nor the live section the
+    /// backup's files replaced, so removing it with the set-aside copy
+    /// destroyed it (measured on 2026-11-26: `.git`, `build`, `out`,
+    /// `dist` and `node_modules` inside a section, and a `.git` deeper
+    /// down, all gone after either route).
+    static func leftOutItemsKeptAtAnyDepth(in folder: URL, insideTheCopyAt root: URL) -> [String] {
+        guard let walker = FileManager.default.enumerator(
+            at: folder, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: []
+        ) else {
+            return []
+        }
+        var picked: [String] = []
+        while let entry = walker.nextObject() as? URL {
+            if isLeftOutAndKeptAtAnyDepth(entry.lastPathComponent) {
+                picked.append(relative(entry, to: root))
+                skipIfAFolder(walker, entry)
+            }
+        }
+        return picked
+    }
+
+    /// Moves each of `picked` (paths inside the set-aside copy `aside`,
+    /// which are paths inside the course) into a new folder
+    /// `courses/_backups/<CODE>/<CODE> not in the archive <stamp>/` at the
+    /// same path. Returns where, as a path inside the working folder, or
+    /// nil when nothing was picked; and false when any could not be moved,
+    /// so the copy must not be removed.
+    static func keepInANotInTheArchiveFolder(
+        _ picked: [String],
+        from aside: URL,
+        courseCode: String,
+        coursesDirectoryURL: URL,
+        stamp: String
+    ) -> (keptAt: String?, everythingMoved: Bool) {
         if picked.isEmpty {
             return (nil, true)
         }
         guard let folder = newFolderInTheBackupsFolder(
             courseCode: courseCode, name: notInTheArchiveName(courseCode),
-            coursesDirectoryURL: coursesDirectoryURL, stamp: context.stamp()
+            coursesDirectoryURL: coursesDirectoryURL, stamp: stamp
         ) else {
             return (nil, false)
         }

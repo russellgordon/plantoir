@@ -396,8 +396,9 @@ enum CourseRestorer {
         // did not finish, because it then holds the only copy of what the
         // section had.
         let aside: URL = stagingFolderBesideTheCourses(coursesDirectoryURL)
+        let leftOutKept: LeftOutFoldersKept
         do {
-            try swapSectionInPlace(
+            leftOutKept = try swapSectionInPlace(
                 sectionNumber,
                 inCourseAt: courseURL,
                 from: payload,
@@ -418,7 +419,9 @@ enum CourseRestorer {
             removeStaging(aside)
             throw error
         }
-        removeStaging(aside)
+        if leftOutKept.everythingMoved {
+            removeStaging(aside)
+        }
         let notPutBack: Int = restorePerSectionKeys(
             sectionNumber, inCourseAt: courseURL, from: payload, fromTheMenu: false
         ).pagesNotPutBack
@@ -709,8 +712,9 @@ enum CourseRestorer {
         try hooks.reached(.staged)
 
         let aside: URL = staging.appendingPathComponent("as-it-was")
+        let leftOutKept: LeftOutFoldersKept
         do {
-            try swapSectionInPlace(
+            leftOutKept = try swapSectionInPlace(
                 sectionNumber,
                 inCourseAt: courseURL,
                 from: payload,
@@ -729,6 +733,9 @@ enum CourseRestorer {
             keepStaging = kept.isStillInStaging
             throw Problem.sectionRestoreStoppedPartWay(sectionNumber, keptAt: kept.pathToSay, archived: true)
         }
+        if !leftOutKept.everythingMoved {
+            keepStaging = true
+        }
 
         let keys: (pagesNotPutBack: Int, pagesNotSaved: Int, pagesMadeSinceHidden: Int) = restorePerSectionKeys(
             sectionNumber, inCourseAt: courseURL, from: payload, fromTheMenu: true
@@ -743,7 +750,8 @@ enum CourseRestorer {
             pagesNotPutBack: keys.pagesNotPutBack,
             pagesNotSaved: keys.pagesNotSaved,
             pagesMadeSinceHidden: keys.pagesMadeSinceHidden,
-            websiteRecordDiffers: websiteRecordDiffers
+            websiteRecordDiffers: websiteRecordDiffers,
+            leftOutFoldersKeptAt: leftOutKept.keptAt
         )
     }
 
@@ -775,7 +783,7 @@ enum CourseRestorer {
         asideURL: URL,
         hooks: SectionSwapHooks,
         keepingWhatWasReplaced: ((URL) -> Void)?
-    ) throws {
+    ) throws -> LeftOutFoldersKept {
         let fileManager: FileManager = FileManager.default
         let folderName: String = "section\(sectionNumber)"
         let liveSectionURL: URL = courseURL.appendingPathComponent(folderName)
@@ -849,7 +857,36 @@ enum CourseRestorer {
             }
             throw Problem.sectionLeftAsItWas(sectionNumber, error.localizedDescription)
         }
+        // What backups leave out, inside the section, is in neither the
+        // backup nor the live files it replaced: kept beside the backups
+        // under #909's name before the set-aside copy goes, by the rule the
+        // whole-course restore follows (Russell's ruling of 2026-11-25 on
+        // #909 and #911). The course's top is never touched here.
+        let kept: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepInANotInTheArchiveFolder(
+            RestoreSwap.leftOutItemsKeptAtAnyDepth(in: asideSectionURL, insideTheCopyAt: asideURL),
+            from: asideURL,
+            courseCode: courseURL.lastPathComponent,
+            coursesDirectoryURL: courseURL.deletingLastPathComponent(),
+            stamp: ArchiveStamp.text(for: Date())
+        )
         keepingWhatWasReplaced?(asideURL)
+        return LeftOutFoldersKept(keptAt: kept.keptAt, everythingMoved: kept.everythingMoved)
+    }
+
+    /// Where a one-section restore kept the folders backups leave out that
+    /// it found inside the section (`swapSectionInPlace`), and whether every
+    /// one moved. When one did not, the set-aside copy stays in
+    /// `courses/.internal/restoring/`, where the next reading of the folder
+    /// keeps it in `courses/_backups/` (`restoreWholeCourse.recoveryCases`,
+    /// the rule for a folder with no record), never removing it.
+    struct LeftOutFoldersKept {
+
+        // MARK: - Stored properties
+
+        /// A path inside the working folder, or nil when there were none.
+        let keptAt: String?
+
+        let everythingMoved: Bool
     }
 
     /// Whether the backup's record of where this section's website is

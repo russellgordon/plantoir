@@ -167,6 +167,13 @@ enum OneSectionRestore {
         /// The backup's record of this section's website differs from the
         /// live one, which is left as it is.
         let websiteRecordDiffers: Bool
+
+        /// Where the folders backups leave out that were inside the section
+        /// (`.git`, `build` and the rest) were kept, as a path inside the
+        /// working folder, or nil when there were none (#909, Russell's
+        /// ruling of 2026-11-25). Not yet said to the teacher: the sentence
+        /// is the director's to settle.
+        var leftOutFoldersKeptAt: String? = nil
     }
 
     // MARK: - Stored properties

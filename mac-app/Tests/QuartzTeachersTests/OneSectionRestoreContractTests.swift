@@ -174,6 +174,66 @@ final class OneSectionRestoreContractTests: XCTestCase {
         XCTAssertEqual(OneSectionRestore.foldersNeverPublished, try XCTUnwrap(notPublished["folders"] as? [String]))
     }
 
+    /// Every `leftOutFoldersCases` case, by both routes (#909, Russell's
+    /// ruling of 2026-11-25): what backups leave out inside the section is
+    /// kept beside the backups; elsewhere it is left where it is.
+    @MainActor
+    func testEveryLeftOutFoldersCase() async throws {
+        let cases: [[String: Any]] = try XCTUnwrap(
+            try OneSectionRestoreContractTests.block()["leftOutFoldersCases"] as? [[String: Any]]
+        )
+        XCTAssertFalse(cases.isEmpty)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let files: [String] = try XCTUnwrap(testCase["files"] as? [String], name)
+            let kept: [String] = try XCTUnwrap(testCase["kept"] as? [String], name)
+            let inPlace: [String] = try XCTUnwrap(testCase["inPlace"] as? [String], name)
+            for fromTheMenu in [true, false] {
+                let label: String = name + (fromTheMenu ? " (the menu)" : " (the window)")
+                let fixture: OneSectionFixture = try OneSectionFixture()
+                defer { fixture.tearDown() }
+                for path in files {
+                    try fixture.write(path, to: fixture.outside(path))
+                }
+                let item: BackupItem = try await fixture.backUp()
+                if fromTheMenu {
+                    _ = try CourseRestorer.restoreSectionFromTheMenu(
+                        2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+                    )
+                } else {
+                    try CourseRestorer.restoreSection(2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL)
+                }
+
+                var foundKept: [String: Data] = [:]
+                let shelf: URL = fixture.coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+                let prefix: String = RestoreSwap.notInTheArchiveName("ICS3U") + " "
+                var keptFolderCount: Int = 0
+                let shelfEntries: [URL] = (try? FileManager.default.contentsOfDirectory(
+                    at: shelf, includingPropertiesForKeys: nil, options: []
+                )) ?? []
+                for entry in shelfEntries where entry.lastPathComponent.hasPrefix(prefix) {
+                    keptFolderCount += 1
+                    foundKept = try OneSectionFixture.snapshot(of: entry)
+                }
+                XCTAssertEqual(keptFolderCount, kept.isEmpty ? 0 : 1, label)
+                var expectedKept: [String: Data] = [:]
+                for path in kept {
+                    expectedKept[path] = Data(path.utf8)
+                }
+                XCTAssertEqual(foundKept, expectedKept, label)
+                for path in files {
+                    let there: String? = try? String(contentsOf: fixture.outside(path), encoding: .utf8)
+                    if inPlace.contains(path) {
+                        XCTAssertEqual(there, path, "\(label): left in place, \(path)")
+                    } else {
+                        XCTAssertNil(there, "\(label): not left in the course, \(path)")
+                    }
+                }
+                XCTAssertEqual(fixture.leftInRestoring(), 0, label)
+            }
+        }
+    }
+
     private static func block() throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
