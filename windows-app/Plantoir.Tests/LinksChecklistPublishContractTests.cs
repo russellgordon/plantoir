@@ -95,7 +95,7 @@ public class LinksChecklistPublishContractTests : IDisposable
         }
 
         foreach (string title in Titles(c, "madeVisibleAfterOpening")) MakeVisible(paths[title]);
-        var published = workspace.PublishLinksChecklist(sheet);
+        var published = workspace.PublishAndRemember(sheet);
 
         foreach (var (title, want) in c["expect"] as JsonObject ?? new JsonObject())
         {

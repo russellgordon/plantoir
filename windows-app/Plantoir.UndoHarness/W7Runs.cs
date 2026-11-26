@@ -362,6 +362,137 @@ internal static class W7Runs
         File.WriteAllText(timetable, "{\"section\":1,\"dates\":[\"2026-09-01\",\"2026-09-02\",\"2026-09-03\"],\"source\":\"typed in by hand\",\"recorded\":\"2026-09-01\"}");
     }
 
+    // ---- W7b2-1: Make Room for Classes, three renames and a new page in ONE step -------
+
+    /// <summary>Unit 1, Days 1 to 4 before the room is made; after it, Day 5 is new and Days 2 to 4 are rewritten.</summary>
+    private static readonly string[] RoomPages =
+    [
+        "courses/ICS3U/section1/All Classes/Unit 1, Day 5.md",
+        "courses/ICS3U/section1/All Classes/Unit 1, Day 4.md",
+        "courses/ICS3U/section1/All Classes/Unit 1, Day 3.md",
+        "courses/ICS3U/section1/All Classes/Unit 1, Day 2.md",
+    ];
+
+    /// <summary>The page laid at each of <see cref="RoomPages"/> (null: absent).</summary>
+    private static string? LaidRoomPage(int index) => index == 0 ? null : RoomPage(5 - index);
+
+    /// <summary>A class page whose body names its own lesson, so a renamed page never reads as the page laid under its new name.</summary>
+    private static string RoomPage(int day) =>
+        $"---\ntitle: Unit 1, Day {day}\ncreated: 2026-09-0{day}T07:00:00.000-0400\npublish: false\n---\nLesson {day}.\n";
+
+    private static void MakeTheRoomFolder(string run)
+    {
+        string course = Path.Combine(Root(run), "courses", "ICS3U");
+        Directory.CreateDirectory(Path.Combine(course, "section1", "All Classes"));
+        File.WriteAllText(Path.Combine(course, "course_config.json"),
+            "{\"course_code\":\"ICS3U\",\"course_name\":\"A course\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[]}");
+        for (int day = 1; day <= 4; day++)
+            File.WriteAllText(Full(run, $"courses/ICS3U/section1/All Classes/Unit 1, Day {day}.md"), RoomPage(day));
+        File.WriteAllText(Path.Combine(Root(run), Plantoir.Core.Models.Workspace.MarkerLauncher), "");
+        string timetable = Full(run, TimetablePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(timetable)!);
+        File.WriteAllText(timetable, "{\"section\":1,\"dates\":[\"2026-09-01\",\"2026-09-02\",\"2026-09-03\",\"2026-09-04\",\"2026-09-08\",\"2026-09-09\"],\"source\":\"typed in by hand\",\"recorded\":\"2026-09-01\"}");
+    }
+
+    /// <summary>Make Room as the app does it (<see cref="Plantoir.Core.Assist.AssistWorkspace.ApplyInsertClasses"/>): one class at Unit 1, Day 2.</summary>
+    private static void MakeRoomThroughTheAction(string run, UndoForThisProcess list, UndoSeams? seams)
+    {
+        var workspace = new Plantoir.Core.Assist.AssistWorkspace(Root(run), new NoLauncher())
+        {
+            UndoList = list,
+            UndoSeams = seams,
+        };
+        workspace.ApplyInsertClasses(workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1));
+    }
+
+    /// <summary>
+    /// Make Room for Classes' step (#899 W7b2-1): three renames, each planned
+    /// as a write of the new name and a remove of the old one, and one new
+    /// page where the first renamed class stood, ONE step made by the real
+    /// action, killed at afterBegin, before each swap and beforeApplied,
+    /// shadow then live, recovered by a second process. Every page whole, old
+    /// or new; live, all one way; no staged file left; nothing Hidden but a
+    /// kept copy.
+    /// </summary>
+    internal static int MakeRoomKill(string folder)
+    {
+        string reference = Path.Combine(folder, "room-reference");
+        MakeTheRoomFolder(reference);
+        MakeRoomThroughTheAction(reference, List(reference, UndoMode.Shadow), seams: null);
+        var made = new string[RoomPages.Length];
+        for (int index = 0; index < RoomPages.Length; index++) made[index] = File.ReadAllText(Full(reference, RoomPages[index]));
+        int changed = 0;
+        for (int index = 0; index < RoomPages.Length; index++) if (made[index] != LaidRoomPage(index)) changed++;
+        Console.WriteLine($"REFERENCE w7-make-room-kill pagesChanged={changed} of {RoomPages.Length}");
+
+        var points = new List<string> { "afterBegin" };
+        for (int index = 0; index < RoomPages.Length; index++) points.Add("beforeSwap@" + index.ToString(CultureInfo.InvariantCulture));
+        points.Add("beforeApplied");
+        int failures = changed == RoomPages.Length ? 0 : 1;
+        int total = 0;
+        foreach (UndoMode mode in new[] { UndoMode.Shadow, UndoMode.Live })
+        {
+            foreach (string point in points)
+            {
+                total++;
+                string run = Path.Combine(folder, "room-" + mode + "-" + point.Replace('@', '-'));
+                MakeTheRoomFolder(run);
+                string said = Child(["child-w7-make-room", run, mode.ToString(), point], kill: true);
+                string recovered = Child(["child-w7-recover", run, mode.ToString()], kill: false);
+                var states = new List<string>();
+                for (int index = 0; index < RoomPages.Length; index++)
+                {
+                    string full = Full(run, RoomPages[index]);
+                    string? text = File.Exists(full) ? File.ReadAllText(full) : null;
+                    states.Add(text == LaidRoomPage(index) ? "before" : text == made[index] ? "after" : "NEITHER");
+                }
+                UndoFoldedStep? step = List(run, mode).Journal.Read().Folded.Steps.Values.LastOrDefault();
+                int stagedNew = 0;
+                foreach (string entry in Directory.EnumerateFileSystemEntries(Root(run), "*", SearchOption.AllDirectories))
+                {
+                    string name = Path.GetFileName(entry);
+                    if (name.Contains(UndoSwap.StagedMarker, StringComparison.Ordinal) && name.EndsWith("-new", StringComparison.Ordinal)) stagedNew++;
+                }
+                int hidden = HiddenNotKept(Root(run));
+                bool eachWhole = !states.Contains("NEITHER");
+                bool reachedItsPoint = said.StartsWith("AT ", StringComparison.Ordinal);
+                bool consistent;
+                if (mode == UndoMode.Live)
+                {
+                    string expected = step?.State == UndoStepState.Done ? "after" : "before";
+                    consistent = reachedItsPoint && eachWhole && states.All(state => state == expected) && step is not null && !step.IsInFlight
+                                 && stagedNew == 0 && hidden == 0;
+                }
+                else
+                {
+                    consistent = reachedItsPoint && eachWhole && (step is null || !step.IsInFlight) && stagedNew == 0 && hidden == 0;
+                }
+                Console.WriteLine($"RESULT w7-make-room-kill mode={mode} point={point} child=[{said}] recovered=[{recovered}] " +
+                                  $"step={step?.State.ToString() ?? "none"} pages={string.Join(",", states)} stagedNew={stagedNew} hidden={hidden} {(consistent ? "WHOLE" : "NOT-WHOLE")}");
+                if (!consistent) failures++;
+            }
+        }
+        Console.WriteLine($"RESULT w7-make-room-kill total={total} failures={failures}");
+        return failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>The making-room child: the REAL Make Room for Classes, made through a door that stops at <paramref name="point"/>.</summary>
+    internal static int ChildMakeRoom(string run, string mode, string point)
+    {
+        Console.WriteLine("STARTED");
+        Console.Out.Flush();
+        try
+        {
+            MakeRoomThroughTheAction(run, List(run, Enum.Parse<UndoMode>(mode)), StopAt(point));
+            Console.WriteLine("DONE made");
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine("DONE " + error.GetType().Name + ": " + error.Message.Replace('\n', ' '));
+        }
+        return 0;
+    }
+
     /// <summary>A launcher the re-date never calls: the harness previews and deploys nothing.</summary>
     private sealed class NoLauncher : Plantoir.Core.Assist.ILauncherRunner
     {

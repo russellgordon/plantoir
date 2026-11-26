@@ -2759,7 +2759,9 @@ public sealed partial class SectionDetailView : UserControl
 
             // Ticked goes out and is kept; unticked is hidden first (#726).
             var (keeping, hiding) = ClassesDatedLater.AnswerAtDeploy(flagged, boxes.Select(row => row.Box.IsChecked == true).ToList());
-            LaterClassesKept.Keep(_course.DirectoryPath, _sectionNumber, keeping);
+            // ONE step of the record (#899 W7b2-7), made by this sheet; a
+            // record that cannot be written costs the question once more.
+            LaterClassesKept.KeepAtDeploy(_window.Workspace.WorkspacePath, _course.Code, _course.DirectoryPath, _sectionNumber, keeping);
 
             if (hiding.Count > 0)
             {
