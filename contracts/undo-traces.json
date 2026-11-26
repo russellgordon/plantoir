@@ -3068,7 +3068,7 @@
         {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
       ],
       "afterUndoingAll": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": null},
-      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "e2a097089ca1a8d1743919059c036791657687aad424b74c8632ef850be0efbe"}
+      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "c13b94339205e469e480d99af6403055884f768552e63f9179bf6ca419eaf664"}
     },
     {
       "name": "action-116",
@@ -3085,8 +3085,8 @@
         {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/.publish_state/section1.later-classes-kept.json", "others": 0, "clearedTheList": true, "head": null, "redo": null},
         {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
       ],
-      "afterUndoingAll": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "8434b8f4a1c393f29168e2a150d013c6900a2fb2f0341d543e0d02d3c53e2bca"},
-      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "8434b8f4a1c393f29168e2a150d013c6900a2fb2f0341d543e0d02d3c53e2bca"}
+      "afterUndoingAll": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "4ebc213bb47196997937f7344dd882d93911ec389d971320e3ccb4a7d9046e57"},
+      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "4ebc213bb47196997937f7344dd882d93911ec389d971320e3ccb4a7d9046e57"}
     },
     {
       "name": "action-117",
@@ -3108,7 +3108,7 @@
         {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
       ],
       "afterUndoingAll": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": null},
-      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "e2a097089ca1a8d1743919059c036791657687aad424b74c8632ef850be0efbe"}
+      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "c13b94339205e469e480d99af6403055884f768552e63f9179bf6ca419eaf664"}
     },
     {
       "name": "action-118",
@@ -3130,7 +3130,7 @@
         {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
       ],
       "afterUndoingAll": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": null},
-      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "e2a097089ca1a8d1743919059c036791657687aad424b74c8632ef850be0efbe"}
+      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "c13b94339205e469e480d99af6403055884f768552e63f9179bf6ca419eaf664"}
     },
     {
       "name": "action-119",
@@ -3147,7 +3147,7 @@
         {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
       ],
       "afterUndoingAll": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": null},
-      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "e2a097089ca1a8d1743919059c036791657687aad424b74c8632ef850be0efbe"}
+      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "c13b94339205e469e480d99af6403055884f768552e63f9179bf6ca419eaf664"}
     },
     {
       "name": "action-120",
@@ -3162,8 +3162,8 @@
         {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/.publish_state/section1.later-classes-kept.json", "others": 0, "clearedTheList": true, "head": null, "redo": null},
         {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
       ],
-      "afterUndoingAll": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "8434b8f4a1c393f29168e2a150d013c6900a2fb2f0341d543e0d02d3c53e2bca"},
-      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "8434b8f4a1c393f29168e2a150d013c6900a2fb2f0341d543e0d02d3c53e2bca"}
+      "afterUndoingAll": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "4ebc213bb47196997937f7344dd882d93911ec389d971320e3ccb4a7d9046e57"},
+      "final": {"courses/ICS3U/.publish_state/section1.later-classes-kept.json": "4ebc213bb47196997937f7344dd882d93911ec389d971320e3ccb4a7d9046e57"}
     },
     {
       "name": "action-121",
