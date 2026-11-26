@@ -34,6 +34,7 @@ internal static class WindowsActionsOnTheMacFixture
         "publishPages", "hidePages", "publishPagesAWholeUnit", "publishClassForADate",
         "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
         "reDateClasses", "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear",
+        "showTodaysClassOnTheFrontPage",
     ];
 
     /// <summary>
@@ -128,6 +129,11 @@ internal static class WindowsActionsOnTheMacFixture
             LayTheSectionNeedingReDating(workingFolder, recorded);
             return;
         }
+        if (recorded.GetProperty("name").GetString() == "showTodaysClassOnTheFrontPage")
+        {
+            LayTheMorning(workingFolder, recorded);
+            return;
+        }
         string course = Path.Combine(workingFolder, "courses", Course);
         Directory.CreateDirectory(course);
         File.WriteAllText(Path.Combine(course, "course_config.json"),
@@ -162,6 +168,33 @@ internal static class WindowsActionsOnTheMacFixture
             "\"dates\" : [\n    \"2026-09-08\",\n    \"2026-09-10\"\n  ]");
         Assert.NotEqual(remembered, twoDates);
         WriteAt(workingFolder, timetable.GetProperty("path").GetString()!, new UTF8Encoding(false).GetBytes(twoDates));
+        foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray())
+            WriteAt(workingFolder, file.GetProperty("path").GetString()!, Bytes(file.GetProperty("before")));
+    }
+
+    /// <summary>
+    /// The mac's <c>UndoActionStepsTests.morning</c> (the contract's ordinary
+    /// morning, <c>todaysClassOnTheFrontPage</c>): four classes, today's
+    /// (2026-09-30) published, and the front page as the recorded step's
+    /// before, showing yesterday's.
+    /// </summary>
+    private static void LayTheMorning(string workingFolder, JsonElement recorded)
+    {
+        string course = Path.Combine(workingFolder, "courses", Course);
+        Directory.CreateDirectory(Path.Combine(course, "section1", "All Classes"));
+        File.WriteAllText(Path.Combine(course, "course_config.json"),
+            "{\"course_code\":\"ICS3U\",\"course_name\":\"Introduction to Computer Science\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[]}");
+        File.WriteAllText(Path.Combine(workingFolder, Workspace.MarkerLauncher), "");
+        (string Title, string Created, string Publish)[] classes =
+        [
+            ("Unit 2, Day 3", "2026-09-28T07:00:00.000-0400", "true"),
+            ("Unit 2, Day 4", "2026-09-29T07:00:00.000-0400", "true"),
+            ("Unit 2, Day 5", "2026-09-30T07:00:00.000-0400", "true"),
+            ("Unit 2, Day 6", "2026-10-01T07:00:00.000-0400", "false"),
+        ];
+        foreach (var (title, created, publish) in classes)
+            WriteAt(workingFolder, $"courses/ICS3U/section1/All Classes/{title}.md",
+                    new UTF8Encoding(false).GetBytes($"---\ntitle: {title}\npublish: {publish}\ncreated: {created}\n---\n"));
         foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray())
             WriteAt(workingFolder, file.GetProperty("path").GetString()!, Bytes(file.GetProperty("before")));
     }
@@ -205,6 +238,15 @@ internal static class WindowsActionsOnTheMacFixture
             var (outcome, page, problem) = HowITeachSettingsRow.Press(Path.Combine(workspace.FolderPath, "courses", Course), Course,
                 betweenTheLookAndTheWrite: null, workspace.UndoList, workspace.UndoDoorOfATest);
             return $"{outcome} {page} {problem}";
+        }
+        // Show on Front Page is the sheet's button, pressed on the mac's
+        // morning for the day it was asked (2026-09-30), on the offer made then.
+        if (stepName == "showTodaysClassOnTheFrontPage")
+        {
+            var morning = new DateOnly(2026, 9, 30);
+            var offer = workspace.TodaysClassOffer(Course, 1, morning)
+                        ?? throw new InvalidOperationException("the morning offers no class for the front page");
+            return workspace.ShowTodaysClass(Course, 1, morning, offer).ToString();
         }
         var tools = new PlantoirTools(workspace);
         // The MCP server always hands a tool a progress (the SDK's own when the

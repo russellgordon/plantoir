@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -53,8 +54,47 @@ public static class TodaysClassOnTheFrontPage
     /// <summary>The class offered and the class the line names, both by file name.</summary>
     public sealed record Offering(string Show, string Shows, string ShowPath);
 
-    /// <summary>What Show on Front Page did.</summary>
-    public enum Outcome { Written, AlreadyShows, NoLongerOffered, CouldNotSave }
+    /// <summary>What Show on Front Page did (the mac's <c>TodaysClassOnTheFrontPage.Outcome</c>).</summary>
+    public abstract record Outcome
+    {
+        private Outcome() { }
+
+        /// <summary>The front page now shows the class asked about.</summary>
+        public sealed record Written : Outcome;
+
+        /// <summary>
+        /// The front page went in and now shows the class asked about, but
+        /// what it held just before (another program edited it as it was
+        /// saved) could not be put back over it, so it is kept beside it as a
+        /// hidden file under each name in <see cref="KeptOriginals"/> (#899
+        /// W7b2-6; the mac's <c>shownKeepingWhatItHeld</c>, U3c). Never
+        /// <see cref="CouldNotSave"/>, which would say the page is as it was.
+        /// W7b2-9 builds the one alert that names the kept file.
+        /// </summary>
+        /// <param name="KeptOriginals">Each kept file's full path.</param>
+        public sealed record ShownWithWhatItHeldKept(IReadOnlyList<string> KeptOriginals) : Outcome
+        {
+            /// <summary>Each kept file's name, as the alert and the trail say it.</summary>
+            public IReadOnlyList<string> KeptNames
+            {
+                get
+                {
+                    var names = new List<string>();
+                    foreach (string kept in KeptOriginals) names.Add(System.IO.Path.GetFileName(kept));
+                    return names;
+                }
+            }
+        }
+
+        /// <summary>The front page already showed today's class: nothing was written.</summary>
+        public sealed record AlreadyShows : Outcome;
+
+        /// <summary>The front page or today's class changed while the teacher was deciding: nothing was written.</summary>
+        public sealed record NoLongerOffered : Outcome;
+
+        /// <summary>The write was refused: nothing was changed, so the page still shows what it showed.</summary>
+        public sealed record CouldNotSave : Outcome;
+    }
 
     private static readonly Regex WrittenDay = new(@"^(\d{4}-\d{2}-\d{2})", RegexOptions.CultureInvariant);
 
@@ -166,9 +206,13 @@ public static class TodaysClassOnTheFrontPage
     /// </summary>
     /// <param name="pointerFor">The pointer facts for a class (the workspace's <c>PointerFor</c>).</param>
     /// <param name="tail">The time and offset the section's pages carry.</param>
-    public static Outcome ShowOnTheFrontPage(Course course, int section, IReadOnlyList<string> classPages, string indexPath,
-                                             DateOnly askedOn, Offering asked,
-                                             Func<string, SectionIndex.Pointer> pointerFor, string tail)
+    /// <param name="newStep">Makes the ONE step the front page is written through (#899 W7b2-6): the
+    /// workspace's, key <c>showTodaysClassOnTheFrontPage</c>, made by <c>sheet</c>. Asked only once
+    /// the page is to be written, so an answer that writes nothing makes no step.</param>
+    internal static Outcome ShowOnTheFrontPage(Course course, int section, IReadOnlyList<string> classPages, string indexPath,
+                                               DateOnly askedOn, Offering asked,
+                                               Func<string, SectionIndex.Pointer> pointerFor, string tail,
+                                               Func<UndoActionStep> newStep)
     {
         var again = Offer(course, section, classPages, indexPath, askedOn);
         if (again is null)
@@ -184,30 +228,50 @@ public static class TodaysClassOnTheFrontPage
             Note(course, section, showsIt
                 ? $"left the front page as it was — already showed today's class: {asked.Show} offered, it showed {asked.Show}"
                 : $"left the front page as it was — it changed while the teacher was asked: {asked.Show} offered, it showed {asked.Shows}");
-            return showsIt ? Outcome.AlreadyShows : Outcome.NoLongerOffered;
+            return showsIt ? new Outcome.AlreadyShows() : new Outcome.NoLongerOffered();
         }
         if (!string.Equals(again.Show, asked.Show, StringComparison.OrdinalIgnoreCase))
         {
             Note(course, section, $"left the front page as it was — it changed while the teacher was asked: {asked.Show} offered, it showed {again.Shows}");
-            return Outcome.NoLongerOffered;
+            return new Outcome.NoLongerOffered();
         }
 
+        string placed = $"put today's class on the front page — {asked.Show} in place of {again.Shows}";
         try
         {
+            // ONE step through the door (#899 W7b2-6; the mac's show(_:in:)):
+            // the teacher's own choice of class, so the page is the step's
+            // content (writeFile), never the front page's rule (recompute).
+            // Its before is read now, at plan time, by the step's Write.
             string text = File.ReadAllText(indexPath);
             var day = DayAsWritten(File.ReadAllText(again.ShowPath), section, PagePaths.IsSectionLocal(course.DirectoryPath, again.ShowPath))!.Value;
             if (SectionIndex.PointedAndDated(text, pointerFor(again.ShowPath), day, tail) is not { } written)
                 throw new IOException("the front page's class line could not be rewritten");
-            File.WriteAllText(indexPath, written, new UTF8Encoding(false));
+            var step = newStep();
+            step.Write(indexPath, written);
+            step.Make();
+        }
+        catch (UndoStepLeftPartWayException partWay)
+        {
+            // The page went in and what it held could not be put back over
+            // it: it shows the class asked about, and what it held just
+            // before is kept beside it. Never "could not be saved" (the
+            // mac's shownKeepingWhatItHeld and its trail line).
+            var keptOutcome = new Outcome.ShownWithWhatItHeldKept(partWay.KeptOriginals);
+            var line = new StringBuilder(placed);
+            foreach (string kept in keptOutcome.KeptNames)
+                line.Append($". What “{UndoSwap.PlaceOfStagedName(kept) ?? kept}” held just before is kept beside it as the hidden file “{kept}”");
+            ActivityTrail.Note(ActivityTrail.Event.PutTodaysClassOnTheFrontPage, line.ToString(), course.Code, section);
+            return keptOutcome;
         }
         catch
         {
+            // Refused before anything changed (all or none): the page is as it was.
             Note(course, section, $"left the front page as it was — could not be saved: {asked.Show} offered, it showed {asked.Shows}");
-            return Outcome.CouldNotSave;
+            return new Outcome.CouldNotSave();
         }
-        ActivityTrail.Note(ActivityTrail.Event.PutTodaysClassOnTheFrontPage,
-            $"put today's class on the front page — {asked.Show} in place of {again.Shows}", course.Code, section);
-        return Outcome.Written;
+        ActivityTrail.Note(ActivityTrail.Event.PutTodaysClassOnTheFrontPage, placed, course.Code, section);
+        return new Outcome.Written();
     }
 
     private static void Note(Course course, int section, string what) =>

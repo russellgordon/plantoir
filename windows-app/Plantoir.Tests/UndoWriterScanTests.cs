@@ -102,7 +102,7 @@ public sealed class UndoWriterScanTests
         ["Plantoir.Core/Assist/ScheduledPublishWatcher.cs"] = (1, "notAStep: a scheduled run's outcome record's folder, a world record"),
         ["Plantoir.Core/Assist/ScheduledRun.cs"] = (2, "notAStep: a deploy set for later, run by Task Scheduler with no window: the deploy is not counted (rulings 17 and 18), and the run never opens the list"),
         ["Plantoir.Core/Assist/TaskScheduling.cs"] = (16, W8 + " (ruling 23: SETTING or CANCELLING a deploy for later is a step, undone by cancelling it and redone by setting it again; its Task Scheduler task, job and wrapper script are outside every course. No laterPieces entry names its piece yet, so it waits with U4's steps outside a working folder. The mac's ScheduledDeploy entry still reads held, M10)"),
-        ["Plantoir.Core/Assist/TodaysClassOnTheFrontPage.cs"] = (3, W7 + " (the mac's TodaysClassOnTheFrontPage)"),
+        ["Plantoir.Core/Assist/TodaysClassOnTheFrontPage.cs"] = (2, W7 + " (Not Today's record and its folder, W7b2-7: the mac's TodaysClassOnTheFrontPage.NotToday.write. Show on Front Page goes through the door: W7b2-6)"),
         ["Plantoir.Core/Assist/UndoHistory.cs"] = (3, "waitsFor: W11a (today's undo itself, retired when the switch goes on; the mac's AssistChangeHistory; W7a's review 1, MEDIUM 3: a page's earlier bytes written back as they were)"),
         ["Plantoir.Core/Assist/WorkLease.cs"] = (3, "notAStep: work leases"),
         ["Plantoir.Core/Models/AgentGuidance.cs"] = (4, W8 + " (the mac's AgentGuidance)"),

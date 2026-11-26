@@ -1300,12 +1300,15 @@ public sealed partial class SectionDetailView : UserControl
             if (busy)
                 ActivityTrail.Note(ActivityTrail.Event.LeftTheFrontPageAsItWas,
                     $"{_course.Code}/{_sectionNumber} · left the front page as it was — it changed while the teacher was asked: {offer.Show} offered, it showed {offer.Shows}");
-            var outcome = busy ? TodaysClassOnTheFrontPage.Outcome.NoLongerOffered
+            TodaysClassOnTheFrontPage.Outcome outcome = busy ? new TodaysClassOnTheFrontPage.Outcome.NoLongerOffered()
                                : workspace.ShowTodaysClass(_course.Code, _sectionNumber, askedOn, offer);
             string? said = outcome switch
             {
                 TodaysClassOnTheFrontPage.Outcome.NoLongerOffered => TodaysClassOnTheFrontPage.NoLongerOffered(noun),
                 TodaysClassOnTheFrontPage.Outcome.CouldNotSave => TodaysClassOnTheFrontPage.CouldNotSave(offer.Shows),
+                // Mapped exactly as Written until W7b2-9 builds its one alert
+                // naming the kept file (keptTitle, kept, showKept, keptGone).
+                TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept => null,
                 _ => null,
             };
             if (said is not null)
@@ -1315,7 +1318,8 @@ public sealed partial class SectionDetailView : UserControl
                     Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
                     CloseButtonText = "OK",
                 });
-            return outcome == TodaysClassOnTheFrontPage.Outcome.Written;
+            // The page shows the class either way (W7b2-9: the kept-file alert).
+            return outcome is TodaysClassOnTheFrontPage.Outcome.Written or TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept;
         }
         catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return false; }
         finally

@@ -105,7 +105,7 @@ public sealed class TodaysClassContractTests : IDisposable
             if (c["expectAfterYes"] is not JsonObject after) continue;
             var outcome = workspace.ShowTodaysClass("ICS3U", section, today, offer);
             string written = File.ReadAllText(index);
-            if (outcome != TodaysClassOnTheFrontPage.Outcome.Written) failures.Add($"{name}: Yes gave {outcome}");
+            if (outcome is not TodaysClassOnTheFrontPage.Outcome.Written) failures.Add($"{name}: Yes gave {outcome}");
             if (Body(written) != after["body"]!.ToString())
                 failures.Add($"{name}: body\n  expected {System.Text.Json.JsonSerializer.Serialize(after["body"]!.ToString())}\n  got      {System.Text.Json.JsonSerializer.Serialize(Body(written))}");
             if (CreatedDay(written) != after["createdDay"]!.ToString())
@@ -137,7 +137,7 @@ public sealed class TodaysClassContractTests : IDisposable
         string before = File.ReadAllText(index);
         // After midnight: decided again for the day ASKED, still Yes-able —
         // but answered as if for tomorrow, no class is today's, nothing written.
-        Assert.Equal(TodaysClassOnTheFrontPage.Outcome.NoLongerOffered,
+        Assert.IsType<TodaysClassOnTheFrontPage.Outcome.NoLongerOffered>(
                      workspace.ShowTodaysClass("ICS3U", section, today.AddDays(3), offer));
         Assert.Equal(before, File.ReadAllText(index));
     }

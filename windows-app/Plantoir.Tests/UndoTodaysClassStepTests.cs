@@ -1,0 +1,153 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Plantoir.Core.Assist;
+using Plantoir.Core.Undo;
+
+namespace Plantoir.Tests;
+
+/// <summary>
+/// #899 W7b2-6: Show on Front Page
+/// (<see cref="TodaysClassOnTheFrontPage.ShowOnTheFrontPage"/>, reached by
+/// <see cref="AssistWorkspace.ShowTodaysClass"/>, key
+/// <c>showTodaysClassOnTheFrontPage</c>, made by <c>sheet</c>) writes the
+/// front page through ONE step, the page as the step's CONTENT
+/// (<c>writeFile</c>), never a <c>recompute</c>: the teacher's own choice of
+/// class, as the mac's <c>TodaysClassOnTheFrontPage.show</c>. Laid out on
+/// the mac's recorded morning (<see cref="WindowsActionsOnTheMacFixture.Lay"/>).
+/// </summary>
+[Collection(SharedActivityState.Name)]
+public sealed class UndoTodaysClassStepTests : IDisposable
+{
+    // ---- Stored properties ---------------------------------------------------------
+
+    private const string Key = "showTodaysClassOnTheFrontPage";
+    private const string Course = WindowsActionsOnTheMacFixture.Course;
+    private static readonly DateOnly Morning = new(2026, 9, 30);
+
+    private readonly string _root = RunOwnedTempFolders.Create("plantoir-undo-todays-class-");
+    private readonly JsonElement _recorded = WindowsActionsOnTheMacFixture.Recorded(Key);
+
+    // ---- Computed properties -------------------------------------------------------
+
+    private string Folder => Path.Combine(_root, "wf");
+    private string ListFolder => Path.Combine(_root, "state", "undo");
+    private string FrontPage => UndoDoor.FullPath(Folder, "courses/ICS3U/section1/index.md");
+
+    // ---- Initializer ---------------------------------------------------------------
+
+    public UndoTodaysClassStepTests() => WindowsActionsOnTheMacFixture.Lay(Folder, _recorded);
+
+    // ---- Functions -------------------------------------------------------------------
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_root, recursive: true); } catch { }
+    }
+
+    private AssistWorkspace Open(UndoSeams? seams = null) =>
+        new(Folder, new FakeLauncher())
+        {
+            Surface = AssistSurface.Menu,
+            UndoList = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null),
+            UndoSeams = seams,
+        };
+
+    private static TodaysClassOnTheFrontPage.Offering Offered(AssistWorkspace workspace) =>
+        workspace.TodaysClassOffer(Course, 1, Morning) ?? throw new InvalidOperationException("the morning offers nothing");
+
+    [Fact]
+    public void ShowIsOneStepWithTheFrontPageAsItsContent()
+    {
+        AssistWorkspace workspace = Open();
+        var offer = Offered(workspace);
+        Assert.Equal(("Unit 2, Day 5", "Unit 2, Day 4"), (offer.Show, offer.Shows));
+
+        var outcome = workspace.ShowTodaysClass(Course, 1, Morning, offer);
+
+        Assert.IsType<TodaysClassOnTheFrontPage.Outcome.Written>(outcome);
+        Assert.Equal([Key], WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
+        JsonObject step = WindowsActionsOnTheMacFixture.NewestBegin(ListFolder)!["step"]!.AsObject();
+        Assert.Equal("sheet", (string?)step["madeBy"]);
+        var ops = new List<string>();
+        foreach (JsonNode? op in step["ops"]!.AsArray()) ops.Add((string)op!["kind"]! + " " + (string?)op["path"]);
+        Assert.Equal([UndoOp.WriteFile + " courses/ICS3U/section1/index.md"], ops);
+        Assert.Equal(_recorded.GetProperty("files")[0].GetProperty("after").GetString(), File.ReadAllText(FrontPage));
+    }
+
+    /// <summary>A write the door refuses before anything changes: <c>CouldNotSave</c>, true, because the page is as it was.</summary>
+    [Fact]
+    public void ARefusedWriteIsCouldNotSaveWithThePageAsItWas()
+    {
+        byte[] before = File.ReadAllBytes(FrontPage);
+        AssistWorkspace workspace = Open(new UndoSeams { StagingWriteFailsAt = index => index == 0 });
+
+        var outcome = workspace.ShowTodaysClass(Course, 1, Morning, Offered(workspace));
+
+        Assert.IsType<TodaysClassOnTheFrontPage.Outcome.CouldNotSave>(outcome);
+        Assert.Equal(before, File.ReadAllBytes(FrontPage));
+        Assert.Empty(WindowsActionsOnTheMacFixture.AppliedBegins(ListFolder));
+    }
+
+    /// <summary>
+    /// The door leaves the page holding the new class with what it held
+    /// kept beside it (another program writes into it as it is saved, and
+    /// putting it back fails): <c>ShownWithWhatItHeldKept</c>, naming the
+    /// kept file, never <c>CouldNotSave</c>, which would be false.
+    /// </summary>
+    [Fact]
+    public void APartWayStopIsShownWithWhatItHeldKeptNeverCouldNotSave()
+    {
+        var partWay = new UndoSeams
+        {
+            BetweenKeepingAndRenaming = (_, fullPath) =>
+            {
+                using var inPlace = new FileStream(fullPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                byte[] edit = Encoding.UTF8.GetBytes("written by hand\n");
+                inPlace.Write(edit);
+                inPlace.SetLength(edit.Length);
+            },
+            PutBackFailsAt = index => index == 0,
+        };
+        AssistWorkspace workspace = Open(partWay);
+
+        var outcome = workspace.ShowTodaysClass(Course, 1, Morning, Offered(workspace));
+
+        Assert.IsNotType<TodaysClassOnTheFrontPage.Outcome.CouldNotSave>(outcome);
+        var kept = Assert.IsType<TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept>(outcome);
+        string onDisk = Path.GetFileName(Assert.Single(Directory.GetFiles(Path.GetDirectoryName(FrontPage)!, ".index.md.plantoir-undo-*-orig")));
+        Assert.Equal([onDisk], kept.KeptNames);
+        Assert.Contains("![[Unit 2, Day 5]]", File.ReadAllText(FrontPage), StringComparison.Ordinal);
+    }
+
+    /// <summary>The page already shows today's class by the time Show is pressed: <c>AlreadyShows</c>, no step, the page untouched.</summary>
+    [Fact]
+    public void AnAlreadyShowsAnswerMakesNoStep()
+    {
+        AssistWorkspace workspace = Open();
+        var offer = Offered(workspace);
+        File.WriteAllText(FrontPage, _recorded.GetProperty("files")[0].GetProperty("after").GetString()!, new UTF8Encoding(false));
+        byte[] before = File.ReadAllBytes(FrontPage);
+
+        var outcome = workspace.ShowTodaysClass(Course, 1, Morning, offer);
+
+        Assert.IsType<TodaysClassOnTheFrontPage.Outcome.AlreadyShows>(outcome);
+        Assert.Empty(WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
+        Assert.Equal(before, File.ReadAllBytes(FrontPage));
+    }
+
+    /// <summary>Asked yesterday, answered after midnight: <c>NoLongerOffered</c>, no step, the page untouched.</summary>
+    [Fact]
+    public void ANoLongerOfferedAnswerMakesNoStep()
+    {
+        AssistWorkspace workspace = Open();
+        var offer = Offered(workspace);
+        byte[] before = File.ReadAllBytes(FrontPage);
+
+        var outcome = workspace.ShowTodaysClass(Course, 1, Morning.AddDays(3), offer);
+
+        Assert.IsType<TodaysClassOnTheFrontPage.Outcome.NoLongerOffered>(outcome);
+        Assert.Empty(WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
+        Assert.Equal(before, File.ReadAllBytes(FrontPage));
+    }
+}
