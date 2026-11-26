@@ -24,3 +24,30 @@ Rulings: Russell, 2026-11-25, on each issue. Found by Windows Undo W7b1.
 Under the assistant's page-writing section, add:
 
 > **A new page's bytes are the Mac's (#1039, #1040).** A page Windows writes from a C# raw string literal (the class page skeleton) is made LF by `AssistWorkspace.PageTextFromLiteral` before it is saved, because a raw literal takes its line ends from the checkout that compiled it: built from a `core.autocrlf true` checkout, the skeleton was CRLF on every line but the unit tag's two. A new curriculum block opens with `## Curriculum connection`, the Mac's heading (the Mac's output is the `addCurriculumMentions` step in `contracts/undo-action-steps.json`, which `CurriculumMentionsTests` reads). Until #1039 Windows opened it with "Today's work points here:"; pages that carry that line keep it, since a block is found by its `%%curriculum-start%%` and `%%curriculum-end%%` markers, never by its first line. The only other raw literal in `Plantoir.Core` that reaches a file, `TaskScheduling.TaskXml`, is Task Scheduler's own XML, not a teacher's page.
+
+## Runs
+
+Every line below is copied from a log in `vm-tools/runs/1039-1040/` (ignored by git, kept on the main Mac). The first runs, earlier the same day, printed only to the writer's terminal, and the VM's own log (`C:\vm-setup\unit-run.txt`) went when the park restored snapshot 02. So these runs were made again, on 2026-11-25, to leave logs; their results match the first runs.
+
+- **Machine:** VM A (`Windows 11`), dev snapshot 02, behind `vm-tools/runs/VM.lock`; parked and unlocked afterwards.
+- **Checkout:** `core.autocrlf` is `true`; `git ls-files --eol` gives `i/lf w/crlf attr/text` for `windows-app/Plantoir.Core/Assist/AssistWorkspace.cs` (`autocrlf.txt`).
+- **Head:** `VM A now at 3fbe4eb13 Notes for #1039 and #1040` (`head-sync.txt`); the code is the same as at 0bffb95ca, since 3fbe4eb13 adds only this notes file. `refetch-runtime.ps1` ended `REFETCH-DONE` (`head-refetch.txt`).
+- **Builds** (`guest/1027-build.ps1`, `head-build.txt`): `windows-app\Plantoir\Plantoir.csproj` (x64), `windows-app\Plantoir.Tests\Plantoir.Tests.csproj` and `windows-app\Plantoir.UiTests\Plantoir.UiTests.csproj`, each `Build succeeded.`
+- **Classes** (`head-suite.txt`), filter `NewClassesTests`, `CurriculumMentionsTests`, `ClubNounTests`, `UndoAcrossToolsTests`: `Passed!  - Failed:     0, Passed:    53, Skipped:     0, Total:    53`; `PASSED - 53 passed, 0 skipped, 53 total.`
+
+## Must-fail lines
+
+Each failing test's name, message and line were printed from the VM's unit log by `vm-tools/guest/1039-1040-failures.ps1` (committed in `vm-tools` at ee0a50b). The scratch branches were local and are deleted.
+
+**Run 1:** scratch commit 063b0be75. `ClassSkeleton` returns `ClassSkeletonLiteral(...)` without `PageTextFromLiteral`, and the new block opens with "Today's work points here:" again. Filter `NewClassesTests`, `CurriculumMentionsTests`. Logs `mustfail-1-sync.txt`, `mustfail-1-suite.txt`, `mustfail-1-failures.txt`. `FAILED - 3 of 27 failed (24 passed, 0 skipped).`
+
+- `NewClassesTests.TheSkeletonFromACrlfCheckoutStillBecomesLfText`: `Assert.Equal() Failure: Strings differ`, `NewClassesTests.cs:line 334`
+- `CurriculumMentionsTests.ANewBlockIsTheBlockTheMacWrites`: `Assert.Equal() Failure: Strings differ`, `CurriculumMentionsTests.cs:line 216`
+- `NewClassesTests.ANewClassPageIsWrittenWithLfWhateverCheckoutBuiltTheApp`: `Assert.DoesNotContain() Failure: Item found in collection`, `NewClassesTests.cs:line 313`
+
+**Run 2:** scratch commit 257416f57. `PageTextFromLiteral` returns its argument unchanged. Filter `NewClassesTests`. Logs `mustfail-2-sync.txt`, `mustfail-2-suite.txt`, `mustfail-2-failures.txt`. `FAILED - 2 of 16 failed (14 passed, 0 skipped).`
+
+- `NewClassesTests.TheSkeletonFromACrlfCheckoutStillBecomesLfText`: `Assert.DoesNotContain() Failure: Item found in collection`, `NewClassesTests.cs:line 333`
+- `NewClassesTests.ANewClassPageIsWrittenWithLfWhateverCheckoutBuiltTheApp`: `Assert.DoesNotContain() Failure: Item found in collection`, `NewClassesTests.cs:line 313`
+
+Line 333 fails on any checkout, because the test puts CRLF into the literal itself. Lines 313 and 334 catch a skipped normalising step only on a CRLF checkout such as VM A's; on an LF checkout they pass either way.
