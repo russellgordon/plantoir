@@ -1262,6 +1262,7 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
             // U4b2-9, L1).
             var files: [UndoTreeListing.File] = []
             var matched: Set<String> = []
+            var filesLeftOut: [String] = []
             for file in listing.files {
                 var given: UndoItem? = nil
                 for (path, item) in overriding where UndoOp.partInside(path, of: file.path) == "" {
@@ -1274,6 +1275,7 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
                 }
                 switch given {
                 case .absent:
+                    filesLeftOut.append(file.path)
                     continue
                 case .file(let data):
                     files.append(UndoTreeListing.File(path: file.path, sha: UndoHash.sha256(of: data)))
@@ -1291,9 +1293,78 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
                     return (side: .holdsSomethingElse, foldersLeftOut: [])
                 }
             }
+            // U4b2-10: a folder that holds nothing but files left out (and
+            // folders so left out) is one the step's edits made for those
+            // files, left out with them. Judged first that way and, failing
+            // that, as listed: the moved folder may have held an empty folder
+            // of its own, in which an edit then made a file.
+            let foldersLeftOut: [String] = UndoMoveSide.foldersHoldingOnly(filesLeftOut, in: listing, keeping: files)
+            if !foldersLeftOut.isEmpty {
+                var foldersKept: [String] = []
+                for folder in listing.folders where !foldersLeftOut.contains(folder) {
+                    foldersKept.append(folder)
+                }
+                let withoutThem: UndoTreeListing = UndoTreeListing(folders: foldersKept, files: files, links: listing.links)
+                if withoutThem.sha == op.listingSha {
+                    return (side: .holdsTheContent, foldersLeftOut: foldersLeftOut)
+                }
+            }
             let judged: UndoTreeListing = UndoTreeListing(folders: listing.folders, files: files, links: listing.links)
             return (side: judged.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse, foldersLeftOut: [])
         }
+    }
+
+    /// U4b2-10: every folder of `listing` that holds at least one of
+    /// `filesLeftOut` and nothing else but folders that are themselves
+    /// left out: no file of `files`, no link, no other folder (an empty
+    /// folder the teacher put there keeps it, and every folder above it).
+    /// Deepest first, as the listing spells them; inside by the one
+    /// comparison, `UndoOp.partInside`.
+    static func foldersHoldingOnly(
+        _ filesLeftOut: [String], in listing: UndoTreeListing, keeping files: [UndoTreeListing.File]
+    ) -> [String] {
+        var deepestFirst: [String] = listing.folders
+        deepestFirst.sort { first, second in
+            let firstDepth: Int = first.split(separator: "/").count
+            let secondDepth: Int = second.split(separator: "/").count
+            if firstDepth != secondDepth {
+                return firstDepth > secondDepth
+            }
+            return first < second
+        }
+        var leftOut: [String] = []
+        for folder in deepestFirst {
+            var holdsAFileLeftOut: Bool = false
+            for path in filesLeftOut where UndoMoveSide.isBelow(path, folder) {
+                holdsAFileLeftOut = true
+            }
+            if !holdsAFileLeftOut {
+                continue
+            }
+            var holdsSomethingKept: Bool = false
+            for file in files where UndoMoveSide.isBelow(file.path, folder) {
+                holdsSomethingKept = true
+            }
+            for link in listing.links where UndoMoveSide.isBelow(link.path, folder) {
+                holdsSomethingKept = true
+            }
+            for other in listing.folders where UndoMoveSide.isBelow(other, folder) && !leftOut.contains(other) {
+                holdsSomethingKept = true
+            }
+            if !holdsSomethingKept {
+                leftOut.append(folder)
+            }
+        }
+        return leftOut
+    }
+
+    /// Whether `path` is inside `folder`, below it (never the folder
+    /// itself), by the one comparison.
+    static func isBelow(_ path: String, _ folder: String) -> Bool {
+        guard let inside = UndoOp.partInside(folder, of: path) else {
+            return false
+        }
+        return !inside.isEmpty
     }
 }
 

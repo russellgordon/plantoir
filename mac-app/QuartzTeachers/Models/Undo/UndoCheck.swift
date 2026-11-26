@@ -808,6 +808,11 @@ nonisolated enum UndoSwap {
         // again, when empty, by a swap that is refused (the review of U3b,
         // LOW 4: a refused step left an empty kept folder behind).
         var foldersMade: [URL] = []
+        // U4b2-10: each folder a moved folder's last look left out (one the
+        // step's carried edits made, holding nothing of the content), where
+        // it is once moved, deepest first: removed, when empty, once every
+        // swap has gone in and the tidy has run.
+        var foldersLeftOutOfAMove: [URL] = []
 
         /// Makes the folder a place goes in, noting each level it made.
         func makeTheFolder(for url: URL) {
@@ -1147,7 +1152,8 @@ nonisolated enum UndoSwap {
                         leftOut[inside] = item
                     }
                 }
-                let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: from, overriding: leftOut)
+                let fromReading = UndoMoveSide.readNamingFoldersLeftOut(op, at: from, overriding: leftOut)
+                let atFrom: UndoMoveSide = fromReading.side
                 var atTarget: UndoMoveSide = UndoMoveSide.read(op, at: target.url)
                 if op.isCaseOnlyMove, let spelled = UndoMoveSide.spellingListed(from: from, to: target.url) {
                     // One item under two spellings (U4b): it goes in only
@@ -1173,6 +1179,9 @@ nonisolated enum UndoSwap {
                         refusal = .fileIsInUse(path: namedAs)
                     } else {
                         followTheMove(from: from, to: target.url)
+                        for inside in fromReading.foldersLeftOut {
+                            foldersLeftOutOfAMove.append(target.url.appendingPathComponent(inside))
+                        }
                     }
                 }
             case .makeTree:
@@ -1252,6 +1261,16 @@ nonisolated enum UndoSwap {
         // 3. Every swap went in: the kept originals are no longer needed.
         if tidy() {
             return .stoppedByATest
+        }
+        // A folder the step made for a carried edit goes with the edit, if it
+        // is empty now; `rmdir` never removes one holding anything.
+        for folder in foldersLeftOutOfAMove {
+            _ = folder.withUnsafeFileSystemRepresentation { path in
+                guard let path else {
+                    return Int32(-1)
+                }
+                return rmdir(path)
+            }
         }
         for target in targets {
             if case .setExternal = target.change {
