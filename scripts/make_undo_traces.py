@@ -1010,7 +1010,7 @@ def move_state(op, at_from, at_to, listed_as=None):
     `.another`), whatever the item holds."""
     if listed_as is not None and is_case_only_move(op) and listed_as not in (op["from"], op["to"]):
         return "neither"
-    def side(item):
+    def side(item, is_at_from):
         reading = tree_reading(item)
         if reading[0] == "absent":
             return "free"
@@ -1019,8 +1019,14 @@ def move_state(op, at_from, at_to, listed_as=None):
         if "linkSha" in op:
             # U4b2-14: a link moved as itself, judged by its target.
             return "holds" if reading == ("link", op["linkSha"]) else "else"
+        if "linkShaBefore" in op:
+            # U4b3 relink: a link whose text the move changes, each side
+            # judged by its own text (`from` by linkShaBefore, `to` by
+            # linkShaAfter), never followed.
+            text = op["linkShaBefore"] if is_at_from else op["linkShaAfter"]
+            return "holds" if reading == ("link", text) else "else"
         return "holds" if reading == ("tree", op["listingSha"]) else "else"
-    source, destination = side(at_from), side(at_to)
+    source, destination = side(at_from, True), side(at_to, False)
     if source == "free" and destination == "holds":
         return "after"
     if source == "holds" and destination == "free":
@@ -1275,7 +1281,13 @@ def hands_over_as_a_move(op):
     folder's, a capitalisation-only one, a moveApart or a setAside."""
     if op.get("kind") != "move" or "listingSha" in op or is_case_only_move(op):
         return False
-    return "sha" in op or "linkSha" in op
+    return "sha" in op or is_a_links_move(op)
+
+
+def is_a_links_move(op):
+    """UndoOp.isALinksMove (U4b3 relink-1): a plain link's move (linkSha)
+    or a relinking one (linkShaBefore and linkShaAfter)."""
+    return "linkSha" in op or "linkShaBefore" in op
 
 
 def place_left(op):
@@ -1342,8 +1354,9 @@ def move_carries(move, edit):
     without regard to case (U4b2-9)."""
     if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
         return False
-    if "linkSha" in move:
-        # A link's move carries nothing (review 1 of U4b2-14).
+    if is_a_links_move(move):
+        # A link's move carries nothing (review 1 of U4b2-14), a relinking
+        # one included (U4b3 relink).
         return False
     if part_inside(move["to"], edit["path"]) is None:
         return False

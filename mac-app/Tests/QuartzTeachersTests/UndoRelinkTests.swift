@@ -4,9 +4,9 @@ import XCTest
 /// U4b3 of #899, the third stretch: a RELINKING move, a symbolic link's
 /// move that changes the text it holds (`linkShaBefore` at `from`,
 /// `linkShaAfter` at `to`, both blobs). Insert Class makes one when a later
-/// class links to a class page the step renames (relink-5). No step
-/// readable from the journal holds one yet (`UndoOp.shapeIsKnown` refuses
-/// it until relink-2), so the check and the swap are called directly here.
+/// class links to a class page the step renames (relink-5). The check and
+/// the swap are called directly (relink-1), and a step holding one is read
+/// from the journal, undone and redone through the list (relink-2).
 final class UndoRelinkTests: XCTestCase {
 
     // MARK: - Stored properties
@@ -270,11 +270,13 @@ final class UndoRelinkTests: XCTestCase {
         XCTAssertEqual(stagedLeft(under: laid.root), [])
     }
 
-    /// Inert: a journal line holding a relinking move is still one this
-    /// version cannot read, and the two texts travel as keys of their own,
-    /// never as `linkSha`.
-    func testARelinkFromTheJournalIsStillUnreadable() throws {
-        let laid: LaidRelink = try layARelink(named: "inert", leads: .inside)
+    // MARK: - Readable (relink-2)
+
+    /// A journal line holding a relinking move is one this version reads:
+    /// the two texts travel as keys of their own, never as `linkSha`, and
+    /// the op read back is the op written.
+    func testARelinkFromTheJournalIsReadable() throws {
+        let laid: LaidRelink = try layARelink(named: "readable", leads: .inside)
         let line: Data = try JSONEncoder().encode(laid.op)
         let object: [String: Any] = try XCTUnwrap(JSONSerialization.jsonObject(with: line) as? [String: Any])
         XCTAssertNil(object["linkSha"])
@@ -282,9 +284,74 @@ final class UndoRelinkTests: XCTestCase {
         XCTAssertEqual(object["linkShaAfter"] as? String, laid.op.linkShaAfter)
         XCTAssertEqual(object["blobs"] as? [String], [try XCTUnwrap(laid.op.linkShaBefore), try XCTUnwrap(laid.op.linkShaAfter)])
         let read: UndoOp = try JSONDecoder().decode(UndoOp.self, from: line)
-        XCTAssertFalse(read.isReadable)
-        XCTAssertFalse(UndoOp.shapeIsKnown(laid.op))
-        XCTAssertTrue(laid.op.isALinksMove)
+        XCTAssertTrue(read.isReadable)
+        XCTAssertTrue(UndoOp.shapeIsKnown(laid.op))
+        XCTAssertTrue(read.isALinksMove)
+        XCTAssertEqual(read.linkShaBefore, laid.op.linkShaBefore)
+        XCTAssertEqual(read.linkShaAfter, laid.op.linkShaAfter)
+    }
+
+    /// A step holding a relinking move, made through the door with both
+    /// texts, then undone and redone through the list: each side holds its
+    /// own text byte for byte each time, and whatever the texts name,
+    /// inside or out, a file or nothing, is never read, written or made.
+    func testARelinkStepIsMadeUndoneAndRedoneThroughTheList() throws {
+        for leads in Leads.allCases {
+            let laid: LaidRelink = try layARelink(named: "through-the-list-\(leads)", leads: leads)
+            let outsideBefore: [String: String] = try outsideNow()
+            let insideBefore: String? = try? text(section + "Unit 1, Day 3.md", root: laid.root)
+            let blobs: [Data] = [Data(laid.oldText.utf8), Data(laid.newText.utf8)]
+            let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [laid.op], blobs: blobs, root: laid.root, action: "insertClass")
+            let places: UndoMemoryPlaces = UndoMemoryPlaces()
+            XCTAssertEqual(JournaledWrite.perform(ops: draft, in: laid.journal, mode: .live, places: places), .applied(seq: 1), "\(leads)")
+            XCTAssertEqual(linkText(section + "Unit 1, Day 5.md", root: laid.root), laid.newText, "\(leads)")
+            XCTAssertFalse(standsAnything(section + "Unit 1, Day 4.md", root: laid.root), "\(leads)")
+
+            XCTAssertEqual(laid.journal.undoNewest(resolveRoot: { _ in laid.root }, places: places), .undone(seq: 1), "\(leads)")
+            XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: laid.root), laid.oldText, "\(leads)")
+            XCTAssertFalse(standsAnything(section + "Unit 1, Day 5.md", root: laid.root), "\(leads)")
+
+            XCTAssertEqual(laid.journal.redoNewest(resolveRoot: { _ in laid.root }, places: places), .redone(seq: 1), "\(leads)")
+            XCTAssertEqual(linkText(section + "Unit 1, Day 5.md", root: laid.root), laid.newText, "\(leads)")
+            XCTAssertFalse(standsAnything(section + "Unit 1, Day 4.md", root: laid.root), "\(leads)")
+
+            XCTAssertEqual(stagedLeft(under: laid.root), [], "\(leads)")
+            XCTAssertEqual(try outsideNow(), outsideBefore, "\(leads)")
+            XCTAssertEqual(try? text(section + "Unit 1, Day 3.md", root: laid.root), insideBefore, "\(leads)")
+        }
+        try checkTheOutsideBytes()
+    }
+
+    /// The same move with `linkSha` given as well is a shape this version
+    /// cannot read: the door refuses it before anything changes, and a step
+    /// another version wrote holding it is a barrier on top of the list,
+    /// never undone, never a reason to clear the steps below it.
+    func testARelinkWithLinkShaGivenAsWellIsABarrier() throws {
+        let laid: LaidRelink = try layARelink(named: "barrier", leads: .inside)
+        var both: UndoOp = laid.op
+        both.linkSha = laid.op.linkShaBefore
+        XCTAssertFalse(UndoOp.shapeIsKnown(both))
+        let line: Data = try JSONEncoder().encode(both)
+        XCTAssertFalse(try JSONDecoder().decode(UndoOp.self, from: line).isReadable)
+        let blobs: [Data] = [Data(laid.oldText.utf8), Data(laid.newText.utf8)]
+        let places: UndoMemoryPlaces = UndoMemoryPlaces()
+        let before: [String: String] = try folderNow(laid.root)
+        let refused: JournaledWriteOutcome = JournaledWrite.perform(
+            ops: UndoContractKinds.draft(ops: [both], blobs: blobs, root: laid.root, action: "insertClass"),
+            in: laid.journal, mode: .live, places: places
+        )
+        XCTAssertEqual(refused, .refused(.notReadable))
+        XCTAssertEqual(try folderNow(laid.root), before)
+
+        // The readable step first, then the barrier written raw on top.
+        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [laid.op], blobs: blobs, root: laid.root, action: "insertClass")
+        XCTAssertEqual(JournaledWrite.perform(ops: draft, in: laid.journal, mode: .live, places: places), .applied(seq: 1))
+        let ops: String = "[" + String(decoding: line, as: UTF8.self) + "]"
+        try UndoContractKinds.appendAStepChangingNothing(ops: ops, root: laid.root, journal: laid.journal)
+        let made: [String: String] = try folderNow(laid.root)
+        XCTAssertEqual(laid.journal.undoNewest(resolveRoot: { _ in laid.root }, places: places), .notAvailable)
+        XCTAssertEqual(try folderNow(laid.root), made)
+        XCTAssertEqual(try laid.journal.read().records.count, 2, "the list is kept")
     }
 
     // MARK: - Helpers

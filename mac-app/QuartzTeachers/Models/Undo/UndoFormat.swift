@@ -1057,10 +1057,16 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         switch kind {
         case .move, .moveApart, .setAside:
             // No `path`: `from` and `to` follow path's rules, differ, and
-            // neither holds the other. Exactly one of a file's `sha`, a
-            // folder's `listingSha` and a link's `linkSha` (U4b2-14): a
-            // reader that knows no `linkSha` finds neither of the other two,
-            // so it cannot read the op rather than misread it.
+            // neither holds the other. Exactly one content form: a file's
+            // `sha`, a folder's `listingSha`, a link's `linkSha` (U4b2-14),
+            // or a relinking link's pair `linkShaBefore` and `linkShaAfter`
+            // (U4b3 relink-2). A reader that knows no `linkSha` finds none
+            // of the others, so it cannot read the op rather than misread
+            // it. The relink's pair is never spelled `linkSha` plus one new
+            // key for the same reason: a reader that knows `linkSha` but not
+            // the new key would read a plain link's move and Redo it with
+            // the OLD text; finding none of `sha`, `listingSha` and
+            // `linkSha`, it cannot read the op instead.
             guard op.path == nil, let from = op.from, let to = op.to else {
                 return false
             }
@@ -1074,6 +1080,12 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             }
             var contents: Int = 0
             for given in [op.sha, op.listingSha, op.linkSha] where given != nil {
+                contents += 1
+            }
+            if op.linkShaBefore != nil || op.linkShaAfter != nil {
+                if !UndoOp.relinkShapeIsKnown(op, kind: kind) {
+                    return false
+                }
                 contents += 1
             }
             return contents == 1
@@ -1133,6 +1145,28 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         case .move, .moveApart, .setAside, .external:
             return false
         }
+    }
+
+    /// The shape of a relinking move (U4b3 relink-2, opKinds.move): a
+    /// `move`, never a `moveApart` or `setAside` and never a
+    /// capitalisation-only rename, carrying BOTH `linkShaBefore` and
+    /// `linkShaAfter`, each a blob name, the two different (a link whose
+    /// text did not change is a plain link's move), and `blobs` holding
+    /// exactly those two, so an Undo has the old text and a Redo the new.
+    static func relinkShapeIsKnown(_ op: UndoOp, kind: UndoOpKind) -> Bool {
+        if kind != .move || op.isCaseOnlyMove {
+            return false
+        }
+        guard let before = op.linkShaBefore, let after = op.linkShaAfter else {
+            return false
+        }
+        if !UndoOp.isBlobName(before) || !UndoOp.isBlobName(after) || before == after {
+            return false
+        }
+        guard let blobs = op.blobs, blobs.count == 2 else {
+            return false
+        }
+        return blobs.contains(before) && blobs.contains(after)
     }
 
     /// Whether `edit` is an edit (a `writeFile`, an `editLine`, a

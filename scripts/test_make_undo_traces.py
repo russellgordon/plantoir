@@ -490,6 +490,17 @@ def overlap(first, second):
     return traces.places_overlap(first, second)
 
 
+def relink_shape_is_known(op):
+    """UndoOp.relinkShapeIsKnown (U4b3 relink-2, opKinds.move)."""
+    if op.get("kind") != "move" or traces.is_case_only_move(op):
+        return False
+    before, after = op.get("linkShaBefore"), op.get("linkShaAfter")
+    if not is_blob_name(before) or not is_blob_name(after) or before == after:
+        return False
+    blobs = op.get("blobs")
+    return isinstance(blobs, list) and len(blobs) == 2 and before in blobs and after in blobs
+
+
 def readable_op(op):
     """UndoOp.shapeIsKnown, as the contract's opKinds and unknown say."""
     kind = op.get("kind")
@@ -498,7 +509,7 @@ def readable_op(op):
     for key in ("blobs",):
         if key in op and not (isinstance(op[key], list) and all(is_blob_name(name) for name in op[key])):
             return False
-    for key in ("beforeSha", "afterSha", "sha", "listingSha", "linkSha"):
+    for key in ("beforeSha", "afterSha", "sha", "listingSha", "linkSha", "linkShaBefore", "linkShaAfter"):
         if key in op and op[key] is not None and not is_blob_name(op[key]):
             return False
     if kind in ("move", "moveApart", "setAside"):
@@ -506,8 +517,16 @@ def readable_op(op):
             return False
         if overlap(op["from"], op["to"]) and not traces.is_case_only_move(op):
             return False
-        # Exactly one of sha, listingSha and linkSha (U4b2-14).
-        return [key in op for key in ("sha", "listingSha", "linkSha")].count(True) == 1
+        # Exactly one content form: sha, listingSha, linkSha (U4b2-14), or
+        # the relinking pair linkShaBefore and linkShaAfter counted as ONE
+        # (U4b3 relink): both given, different, and blobs exactly the two;
+        # a move only, never a capitalisation-only one.
+        forms = [key in op for key in ("sha", "listingSha", "linkSha")].count(True)
+        if "linkShaBefore" in op or "linkShaAfter" in op:
+            if not relink_shape_is_known(op):
+                return False
+            forms += 1
+        return forms == 1
     if kind == "external":
         target = op.get("target")
         if "path" in op or not isinstance(target, str) or ":" not in target:
@@ -659,6 +678,17 @@ class ContractCaseTests(unittest.TestCase):
             op["sha"] = traces.sha(op.pop("contentText"))
         if "linkTarget" in op:
             op["linkSha"] = traces.sha(op.pop("linkTarget"))
+        if "linkTargetBefore" in op or "linkTargetAfter" in op:
+            # U4b3 relink: the two texts, their hashes, both blobs (unless
+            # the case gives its own blobs).
+            names = []
+            if "linkTargetBefore" in op:
+                op["linkShaBefore"] = traces.sha(op.pop("linkTargetBefore"))
+                names.append(op["linkShaBefore"])
+            if "linkTargetAfter" in op:
+                op["linkShaAfter"] = traces.sha(op.pop("linkTargetAfter"))
+                names.append(op["linkShaAfter"])
+            op.setdefault("blobs", names)
         if "listing" in op:
             tree = op.pop("listing")
             op["listingSha"] = traces.listing_sha(tree)
@@ -667,6 +697,18 @@ class ContractCaseTests(unittest.TestCase):
         for key in [key for key, value in op.items() if value is None and key in ("beforeSha", "afterSha")]:
             del op[key]
         return op
+
+    def test_a_relink_beside_link_sha_is_not_readable(self):
+        """U4b3 relink-2: linkSha given beside the pair is a shape this
+        version cannot read (no shared row yet: Windows reads linkSha and
+        ignores the pair until its piece 21b)."""
+        before, after = traces.sha("Unit 1, Day 3.md"), traces.sha("Unit 1, Day 4.md")
+        relink = {"kind": "move", "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+                  "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+                  "linkShaBefore": before, "linkShaAfter": after, "blobs": [before, after]}
+        self.assertTrue(readable_op(relink))
+        self.assertFalse(readable_op(dict(relink, linkSha=before)))
+        self.assertFalse(readable_op(dict(relink, kind="moveApart")))
 
     def test_check_cases(self):
         cases = shared_undo()["checkCases"]

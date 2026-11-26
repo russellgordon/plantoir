@@ -23771,6 +23771,38 @@ is the first. `UndoWebsite.siteMarkers` still asks `fileExists`, so a marker
 that cannot be looked at reads as absent, on both platforms; that is left
 for the next piece.
 
+### U4b3 relink: a link's text changed within a step
+
+A link's move may change the text the link holds (#899, 2026-11-26;
+`undoJournal.opKinds.move`): `linkShaBefore` is the text at `from` before
+the step, `linkShaAfter` the text at `to` after it, the two different, and
+both texts are the op's only blobs (an Undo makes the old link, a Redo the
+new). The pair is never `linkSha` plus one new key: a reader that knows
+`linkSha` but not the new key would read a plain link's move and Redo it
+with the OLD text, whereas a reader that finds none of `sha`, `listingSha`
+and `linkSha` cannot read the op at all, which is the safe failure.
+`UndoOp.shapeIsKnown` takes exactly one content form, the pair counting as
+one (`relinkShapeIsKnown`: a `move` only, never a capitalisation-only move,
+a `moveApart` or a `setAside`; both blob names, different, `blobs` exactly
+the two). Each side is judged by its own text with `lstat` and `readlink`,
+never followed; both links standing is neither state, so nothing is taken
+back and no link the teacher may have made is removed. It is swapped as:
+make the new link under a staged name beside its place, rename it in
+exclusively, then remove the old link once re-read; a later failure
+reverses it the same way the other way round. Nothing is ever written
+through either link. For every other rule it is a link's move
+(`UndoOp.isALinksMove`): it carries no edit, and it may leave or fill a
+handed-over place. Nine `checkCases` rows ("U4b3 relink, …", keys
+`linkTargetBefore` and `linkTargetAfter`) pin both sides both ways and the
+shape barriers on the Mac and in the Python model (`move_state` judges each
+side by its own text; `readable_op` counts the pair as one). The seven
+whose verdict is not `notReadable` are held for Windows under
+`Reason899W8RelinkedLink`; the two barrier rows pass there unheld. A link
+whose `linkSha` is given beside the pair is unreadable on the Mac
+(`UndoRelinkTests`, "Readable"), but it is no shared row yet: Windows today
+reads `linkSha` and ignores the pair, so such a row could neither pass nor
+be held there until its piece 21b.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

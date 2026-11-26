@@ -484,9 +484,16 @@ nonisolated enum UndoContractReplay {
             }
         }
         if current["cannotBeRead"] as? Bool == true {
-            // Unreadable just now: no permission (`cannotBeRead`).
-            _ = chmod(url.path, 0)
-            madeUnreadable.append(url)
+            // Unreadable just now: no permission (`cannotBeRead`). A link
+            // is read with lstat and readlink, which never ask the link's
+            // own permissions (and chmod would follow it), so its folder's
+            // are taken away instead (U4b3 relink-2).
+            var unreadable: URL = url
+            if string(current["link"]) != nil {
+                unreadable = url.deletingLastPathComponent()
+            }
+            _ = chmod(unreadable.path, 0)
+            madeUnreadable.append(unreadable)
         }
     }
 
@@ -602,6 +609,22 @@ nonisolated enum UndoContractReplay {
                 // U4b2-14: a link's move, judged by the bytes it holds.
                 given["linkSha"] = UndoHash.sha256(of: Data(target.utf8))
                 given["linkTarget"] = nil
+            }
+            // U4b3 relink: a link's move that changes its text, each text
+            // given; both hashes in `blobs` unless the case gives its own.
+            var relinkNames: [String] = []
+            if let target = string(given["linkTargetBefore"]) {
+                given["linkShaBefore"] = UndoHash.sha256(of: Data(target.utf8))
+                relinkNames.append(UndoHash.sha256(of: Data(target.utf8)))
+                given["linkTargetBefore"] = nil
+            }
+            if let target = string(given["linkTargetAfter"]) {
+                given["linkShaAfter"] = UndoHash.sha256(of: Data(target.utf8))
+                relinkNames.append(UndoHash.sha256(of: Data(target.utf8)))
+                given["linkTargetAfter"] = nil
+            }
+            if !relinkNames.isEmpty && given["blobs"] == nil {
+                given["blobs"] = relinkNames
             }
             if let tree = given["listing"] as? [String: Any] {
                 let made: UndoTreeListing = listing(from: tree)

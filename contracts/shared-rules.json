@@ -50467,6 +50467,196 @@
         "why": "U4b2-14: a link that leads out of the working folder (here to the folder that holds the working folder, which is always there) is moved as a link like any other; its target is neither read nor touched, and the check that its place stays inside the working folder resolves only the folders above it."
       },
       {
+        "name": "U4b3 relink, a link's move that changes its text: the new link at its new place, the old place free: as the step left it",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 4.md"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "link": "Unit 1, Day 4.md"
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "U4b3 relink: each side is judged by its own text, read with lstat and readlink and never followed: `to` by linkShaAfter, `from` by linkShaBefore."
+      },
+      {
+        "name": "U4b3 relink, a link's move that changes its text: the old link at its old place, the new place free: as before",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 4.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 3.md"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "U4b3 relink, a link's move that changes its text: the new place holding a link with the OLD text: changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 4.md"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "link": "Unit 1, Day 3.md"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "U4b3 relink: `to` is judged by the text the step gave it, never by the text the link had, so a reading of both sides by one text (linkSha's) could not tell this from the step's own state."
+      },
+      {
+        "name": "U4b3 relink, a link's move that changes its text: the old place holding a link with the NEW text: changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 4.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 4.md"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "U4b3 relink, a link's move that changes its text: a plain file at the new place: changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 4.md"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "Today we start.\n"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "U4b3 relink: a file is never the link, whatever it holds."
+      },
+      {
+        "name": "U4b3 relink, a link's move that changes its text: both links standing: changed since, nothing removed",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 4.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 3.md"
+          },
+          "atTo": {
+            "link": "Unit 1, Day 4.md"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "U4b3 relink: both links standing is neither state, so an Undo or a Redo never removes a link the teacher may have made."
+      },
+      {
+        "name": "U4b3 relink, a link's move that changes its text: the new place cannot be read just now: cannot tell",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 4.md"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "link": "Unit 1, Day 4.md",
+            "cannotBeRead": true
+          }
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "U4b3 relink, a link's move that changes its text: the two texts the same: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 3.md"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "link": "Unit 1, Day 3.md"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable",
+        "why": "U4b3 relink: a link whose text does not change is a plain link's move (linkSha); a pair of equal texts is a shape this version cannot read."
+      },
+      {
+        "name": "U4b3 relink, a link's move that changes its text: one text missing from blobs: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 5.md",
+          "linkShaBefore": "9d94e443288b7ac6c7dc70c937fa5146f73e035c1f33ccea38c0e675a40345a1",
+          "linkShaAfter": "e26600527ab512521ad427b3a2a87988e0ddbddcdfe7be409e8bb90c4c17a17d",
+          "blobs": [
+            "9d94e443288b7ac6c7dc70c937fa5146f73e035c1f33ccea38c0e675a40345a1"
+          ]
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "link": "Unit 1, Day 4.md"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable",
+        "why": "U4b3 relink: an Undo needs the old text and a Redo the new, so both are in blobs (linkShaBefore is the SHA-256 of \"Unit 1, Day 3.md\", linkShaAfter of \"Unit 1, Day 4.md\")."
+      },
+      {
         "name": "editJSON: a whole number beyond 2^53 in the file cannot be compared exactly: cannot tell, never a guess",
         "op": {
           "kind": "editJSON",
@@ -50718,7 +50908,7 @@
         "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
       }
     ],
-    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), a link's move as the target the link holds (linkTarget: the op's linkSha is the SHA-256 of its UTF-8 bytes, U4b2-14), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those; listedAs (U4b2-9, a capitalisation-only move only) is a third spelling of the same place, neither from nor to, that the folder lists the item under: what atTo describes is made at that spelling instead (on a case-insensitive volume one item under a spelling that is neither side's; on a case-sensitive one a third place, so both sides are free). For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. A move's sides are judged as the plan judges them, by the pair and by whether each place still stays inside the working folder once the links on the way are resolved (a place that leads out is changed since, both ways; a link's move resolves only the folders above its link, U4b2-14). Places, and the places two ops name, are compared without regard to case, part by part, and so is whether an edit is at or inside a move's `to` (U4b2-9: one comparison for both).",
+    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), a link's move as the target the link holds (linkTarget: the op's linkSha is the SHA-256 of its UTF-8 bytes, U4b2-14), a relinking link's move as its two texts (linkTargetBefore, held at `from` before the step, and linkTargetAfter, held at `to` after it: the op's linkShaBefore and linkShaAfter are their SHA-256s, and its blobs both, unless the case gives its own blobs, U4b3 relink), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those; listedAs (U4b2-9, a capitalisation-only move only) is a third spelling of the same place, neither from nor to, that the folder lists the item under: what atTo describes is made at that spelling instead (on a case-insensitive volume one item under a spelling that is neither side's; on a case-sensitive one a third place, so both sides are free). For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed; a link, read with lstat and readlink, which never ask its own permissions, by its folder's taken away). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. A move's sides are judged as the plan judges them, by the pair and by whether each place still stays inside the working folder once the links on the way are resolved (a place that leads out is changed since, both ways; a link's move resolves only the folders above its link, U4b2-14). Places, and the places two ops name, are compared without regard to case, part by part, and so is whether an edit is at or inside a move's `to` (U4b2-9: one comparison for both).",
     "listingCases": [
       {
         "name": "an empty folder: an empty listing",
