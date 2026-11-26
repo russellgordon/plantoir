@@ -52433,7 +52433,8 @@
         "onTheList": [],
         "cleared": "changedSince",
         "clearedSeq": 1,
-        "nothingMovedOutside": true
+        "nothingMovedOutside": true,
+        "refusalNamed": "courses/TST1O/old/a.md"
       },
       {
         "name": "U4b2-2: only the move's new place leads out of the working folder (the folder it was moved into, replaced since by a link to outside): Undo moves nothing out, is refused as changed since and names the new place, never the old one",
@@ -52452,22 +52453,6 @@
         "refusalNamed": "courses/TST1O/new/b.md"
       },
       {
-        "name": "U4b2-2: only the move's old place leads out of the working folder (the folder it was moved out of, replaced since by a link to outside): Undo is refused as changed since and names the old place",
-        "calls": [
-          "moveThePageAside",
-          "linkItsOldFolderOutside",
-          "undo"
-        ],
-        "expectLast": "changedSince",
-        "head": null,
-        "redo": null,
-        "onTheList": [],
-        "cleared": "changedSince",
-        "clearedSeq": 1,
-        "nothingMovedOutside": true,
-        "refusalNamed": "courses/TST1O/old/a.md"
-      },
-      {
         "name": "U4b2-2: both of the move's places lead out of the working folder (each folder replaced since by a link to outside): Undo is refused as changed since and names the old place, the first in the order path, from, to",
         "calls": [
           "moveThePageBetweenFolders",
@@ -52481,6 +52466,52 @@
         "onTheList": [],
         "cleared": "changedSince",
         "clearedSeq": 1,
+        "nothingMovedOutside": true,
+        "refusalNamed": "courses/TST1O/old/c.md"
+      },
+      {
+        "name": "U4b2-2, Redo: undone, then only the move's new place leads out of the working folder (the folder it was moved into, replaced since by a link to outside): Redo moves nothing out, is refused as changed since, names the new place, and only the redo branch goes",
+        "calls": [
+          "moveThePageIntoAFolder",
+          "undo",
+          "linkItsNewFolderOutside",
+          "redo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "nothingMovedOutside": true,
+        "refusalNamed": "courses/TST1O/new/b.md"
+      },
+      {
+        "name": "U4b2-2, Redo: undone, then only the move's old place leads out of the working folder (the folder it was moved out of, replaced since by a link to outside): Redo moves nothing out, is refused as changed since, names the old place, and only the redo branch goes",
+        "calls": [
+          "moveThePageAside",
+          "undo",
+          "linkItsOldFolderOutside",
+          "redo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "nothingMovedOutside": true,
+        "refusalNamed": "courses/TST1O/old/a.md"
+      },
+      {
+        "name": "U4b2-2, Redo: undone, then both of the move's places lead out of the working folder: Redo is refused as changed since and names the old place, the first in the order path, from, to, and only the redo branch goes",
+        "calls": [
+          "moveThePageBetweenFolders",
+          "undo",
+          "linkItsOldFolderOutside",
+          "linkItsNewFolderOutside",
+          "redo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
         "nothingMovedOutside": true,
         "refusalNamed": "courses/TST1O/old/c.md"
       },

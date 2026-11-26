@@ -255,6 +255,95 @@ final class UndoDoorGuardTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), ["c.md"])
     }
 
+    /// U4b2-2 review 1, MEDIUM 1: the link is made AFTER the plan, before
+    /// the staging (`afterTheCheck`), and takes only the move's new place
+    /// out: the check made just before the change names the new place, the
+    /// one that leads out, never the old.
+    func testUndoRefusedAtTheStagingCheckNamesTheNewPlaceThatLeadsOut() throws {
+        let outcome: UndoOutcome = try refusedBetweenThePlanAndTheChange(redo: false, at: .afterTheCheck, named: "s-u")
+        XCTAssertEqual(firstPathNamed(by: outcome), "courses/TST1O/new/b.md")
+    }
+
+    /// The same, the link made just before the swap (`beforeSwap(0)`).
+    func testUndoRefusedAtTheSwapCheckNamesTheNewPlaceThatLeadsOut() throws {
+        let outcome: UndoOutcome = try refusedBetweenThePlanAndTheChange(redo: false, at: .beforeSwap(0), named: "w-u")
+        XCTAssertEqual(firstPathNamed(by: outcome), "courses/TST1O/new/b.md")
+    }
+
+    /// Redo, the link made after the plan, before the staging, taking only
+    /// the move's old place out (where a Redo takes the page from): it is
+    /// named, never the new place, which is as the Undo left it.
+    func testRedoRefusedAtTheStagingCheckNamesTheOldPlaceThatLeadsOut() throws {
+        let outcome: UndoOutcome = try refusedBetweenThePlanAndTheChange(redo: true, at: .afterTheCheck, named: "s-r")
+        XCTAssertEqual(firstPathNamed(by: outcome), "courses/TST1O/old/a.md")
+    }
+
+    /// Redo, the link made just before the swap.
+    func testRedoRefusedAtTheSwapCheckNamesTheOldPlaceThatLeadsOut() throws {
+        let outcome: UndoOutcome = try refusedBetweenThePlanAndTheChange(redo: true, at: .beforeSwap(0), named: "w-r")
+        XCTAssertEqual(firstPathNamed(by: outcome), "courses/TST1O/old/a.md")
+    }
+
+    /// For an Undo, a move of courses/TST1O/b.md into courses/TST1O/new,
+    /// undone with `new` replaced by a link to outside at `point`; for a
+    /// Redo, a move of courses/TST1O/old/a.md to courses/TST1O/a.md, undone
+    /// and then redone with `old` replaced so. Either way the plan has
+    /// passed before the link is made, the page is then reached only
+    /// through the link, and nothing is moved through it.
+    func refusedBetweenThePlanAndTheChange(redo: Bool, at point: UndoKillPoint, named name: String) throws -> UndoOutcome {
+        let made = try UndoContractReplay.scratch(under: parent, named: name)
+        let root: URL = made.root
+        let from: String = redo ? "courses/TST1O/old/a.md" : "courses/TST1O/b.md"
+        let to: String = redo ? "courses/TST1O/a.md" : "courses/TST1O/new/b.md"
+        let linkedFolder: String = redo ? "courses/TST1O/old" : "courses/TST1O/new"
+        let pageName: String = redo ? "a.md" : "b.md"
+        let journal: UndoJournal = try makeTheMove(from: from, to: to, root: root, journalFolder: made.journalFolder)
+        if redo {
+            XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .undone(seq: 1))
+        }
+        // Where the page is now: the place the link will take out.
+        let movesTo: String = redo ? to : from
+        let outside: URL = parent.appendingPathComponent("outside", isDirectory: true)
+        var linked: Bool = false
+        var linkFailure: String? = nil
+        UndoKillPoints.hook = { reached in
+            if reached == point && !linked {
+                linked = true
+                do {
+                    _ = try self.linkOutside([linkedFolder], root: root)
+                    // The page went with the folder; it is reached through
+                    // the link now.
+                    try Data("page\n".utf8).write(to: outside.appendingPathComponent(pageName))
+                } catch {
+                    linkFailure = "\(error)"
+                }
+            }
+            return false
+        }
+        defer {
+            UndoKillPoints.hook = nil
+        }
+
+        let outcome: UndoOutcome = redo
+            ? journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+            : journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+
+        XCTAssertTrue(linked, "the link was made at \(point)")
+        XCTAssertNil(linkFailure)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), [pageName], "nothing moved through the link")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(movesTo).path))
+        return outcome
+    }
+
+    /// The first place a changed-since refusal names, or nil.
+    func firstPathNamed(by outcome: UndoOutcome) -> String? {
+        if case .refused(.changedSince(let firstPath, _), _) = outcome {
+            return firstPath
+        }
+        XCTFail("not refused as changed since: \(outcome)")
+        return nil
+    }
+
     /// One step of one move through the door: the page (made first,
     /// holding `page`) from `from` to `to`.
     func makeTheMove(from: String, to: String, root: URL, journalFolder: URL) throws -> UndoJournal {
