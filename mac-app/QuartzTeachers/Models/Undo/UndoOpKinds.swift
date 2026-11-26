@@ -1082,10 +1082,16 @@ nonisolated extension UndoCheck {
     /// never an `overridingTo` entry: those name paths inside a moved
     /// folder and what U4b's carried edits leave there, and an empty item
     /// at "" would read as a carried edit's file at the move's own place.
+    ///
+    /// `fromIsHandedOver` is its other half, going back (U4b3 door-2): a
+    /// file's or a link's move that LEFT a handed-over place, taken back
+    /// after the op that filled the place has been taken back by the same
+    /// plan. Its `from` is judged free, whatever stands there now, because
+    /// the filler's taking-back is swapped in before it.
     static func wholeState(
         of op: UndoOp, root: URL, places: UndoExternalPlaces,
         overridingTo: [String: UndoItem] = [:], overridingFrom: [String: UndoItem] = [:],
-        toIsHandedOver: Bool = false
+        toIsHandedOver: Bool = false, fromIsHandedOver: Bool = false
     ) -> UndoOpState {
         switch op.knownKind {
         case .move, .moveApart, .setAside:
@@ -1115,7 +1121,10 @@ nonisolated extension UndoCheck {
                     return spelled == .to ? .after : .before
                 }
             }
-            let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(from), overriding: overridingFrom)
+            var atFrom: UndoMoveSide = .free
+            if !fromIsHandedOver {
+                atFrom = UndoMoveSide.read(op, at: root.appendingPathComponent(from), overriding: overridingFrom)
+            }
             var atTo: UndoMoveSide = .free
             if !toIsHandedOver {
                 atTo = UndoMoveSide.read(op, at: root.appendingPathComponent(to), overriding: overridingTo)

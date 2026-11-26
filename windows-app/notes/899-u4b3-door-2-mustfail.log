@@ -1,0 +1,12 @@
+#899 U4b3 door-2: must-fail log (2026-11-26). Each sabotage in UndoCheck.plan, built, UndoHandedOverPlaceTests run, file restored byte for byte from a copy (cmp clean).
+
+M1 the move back judged against the disk again (`fromIsHandedOver: false`):
+  RED. 19 tests, 15 failures. Shape A (both) refused changedSince Day 4; shape B (both, and the order test) refused changedSince Day 3; shape C (both) refused changedSince Day 3, others 1; the edited-new-page refusal named Day 3 with others 1, not 0.
+
+M2 the removal taken back read from the disk again (`if !placeIsFree || direction == .backward`):
+  RED. 19 tests, 6 failures. Shape B (both, and the order test) refused changedSince Day 3 at the plan.
+
+M3 today's backward order kept (`if !handovers.isEmpty && direction == .forward`):
+  RED. 19 tests, 11 failures. Shape B targets came Day 2, Day 3, Day 4, Day 2 (files, then the move); the swap was refused changedSince Day 3 (Day 3's page met the link still standing there) and the folder stayed as the step left it.
+
+RED 3 of 3.

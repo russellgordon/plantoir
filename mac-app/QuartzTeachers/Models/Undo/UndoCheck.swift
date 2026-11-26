@@ -256,19 +256,18 @@ nonisolated enum UndoCheck {
         var movingNow: Set<String> = []
         var stagedAtItsTurn: Set<String> = []
         var leadingTargets: [UndoSwapTarget] = []
-        // U4b3 door-1: going forward, each place an earlier op of the step
-        // leaves and a later op fills (a handed-over place). Empty for every
-        // step readable today (`UndoStep.wholeOpsStandAlone`), so such a
-        // step is planned exactly as before.
-        var handovers: [UndoHandover] = []
-        if direction == .forward {
-            handovers = UndoCheck.handovers(in: ops)
-        }
-        // The ops (by their place in the step) found already as wanted:
-        // no change of this plan.
+        // U4b3 door-1 and door-2: each place an earlier op of the step
+        // leaves and a later op fills (a handed-over place), in either
+        // direction. Empty for every step readable today
+        // (`UndoStep.wholeOpsStandAlone`), so such a step is planned exactly
+        // as before.
+        let handovers: [UndoHandover] = UndoCheck.handovers(in: ops)
+        // The ops (by their place in the step, `stepIndex`) found already as
+        // wanted: no change of this plan.
         var opsNotChanged: Set<Int> = []
-        // Each target's op, by its place in the step, for the order of a
-        // step with a handed-over place.
+        // Each target's op, by its place in this plan's order (`opIndex`:
+        // the step's order going forward, reversed going back), for the
+        // order of a step with a handed-over place.
         var leadingTargetOps: [Int] = []
         var wholeTargetOps: [Int] = []
         var firstOpOnPath: [String: Int] = [:]
@@ -277,15 +276,29 @@ nonisolated enum UndoCheck {
         var opIndex: Int = -1
         for op in ordered {
             opIndex += 1
-            // Its handover as the filler, when the op leaving the place is a
-            // change of this plan: the place is then judged free.
-            var fillsAPlaceHandedOver: Bool = false
+            // The op's place in the step itself, as `handovers` names it.
+            var stepIndex: Int = opIndex
+            if direction == .backward {
+                stepIndex = ops.count - 1 - opIndex
+            }
+            // The handed-over place is judged FREE for the op that comes
+            // second in this plan, when the op that comes first is a change
+            // of this plan. Going forward that is the filler, after its
+            // leaver (door-1). Going back it is the leaver, after its
+            // filler's taking-back (door-2). Skipped as already done, the
+            // first op leaves the place to be read from the disk as before.
+            var placeIsFree: Bool = false
             var inAHandoverWithALink: Bool = false
             for handover in handovers {
-                if handover.fillerIndex == opIndex && !opsNotChanged.contains(handover.leaverIndex) {
-                    fillsAPlaceHandedOver = true
+                if direction == .forward && handover.fillerIndex == stepIndex
+                    && !opsNotChanged.contains(handover.leaverIndex) {
+                    placeIsFree = true
                 }
-                if handover.aLinkMoves && (handover.fillerIndex == opIndex || handover.leaverIndex == opIndex) && !op.isWhole {
+                if direction == .backward && handover.leaverIndex == stepIndex
+                    && !opsNotChanged.contains(handover.fillerIndex) {
+                    placeIsFree = true
+                }
+                if handover.aLinkMoves && (handover.fillerIndex == stepIndex || handover.leaverIndex == stepIndex) && !op.isWhole {
                     inAHandoverWithALink = true
                 }
             }
@@ -348,11 +361,12 @@ nonisolated enum UndoCheck {
                 }
                 let state: UndoOpState = UndoCheck.wholeState(
                     of: op, root: root, places: places, overridingTo: overridingTo, overridingFrom: overridingFrom,
-                    toIsHandedOver: fillsAPlaceHandedOver
+                    toIsHandedOver: placeIsFree && direction == .forward,
+                    fromIsHandedOver: placeIsFree && direction == .backward
                 )
                 let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
                 if verdict == .alreadyBack || verdict == .alreadyRedone {
-                    opsNotChanged.insert(opIndex)
+                    opsNotChanged.insert(stepIndex)
                     continue
                 }
                 if verdict == .cannotTell {
@@ -411,8 +425,11 @@ nonisolated enum UndoCheck {
                     readPath = UndoOp.placeBeforeTheMove(path, from: from, to: to)
                     stagedAtItsTurn.insert(path)
                 }
+                // A new file going forward, or a removal taken back, at a
+                // place this plan frees first: absent, never read through
+                // the link that still stands there.
                 var item: UndoItem = .absent
-                if !fillsAPlaceHandedOver {
+                if !placeIsFree {
                     item = UndoItem.read(at: root.appendingPathComponent(readPath))
                 }
                 original[path] = item
@@ -430,7 +447,7 @@ nonisolated enum UndoCheck {
             let state: UndoOpState = UndoCheck.state(of: op, in: current)
             let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
             if verdict == .alreadyBack || verdict == .alreadyRedone {
-                opsNotChanged.insert(opIndex)
+                opsNotChanged.insert(stepIndex)
                 continue
             }
             if verdict == .cannotTell {
@@ -517,8 +534,10 @@ nonisolated enum UndoCheck {
             fileTargetOps.append(firstOpOnPath[path] ?? 0)
         }
         if !handovers.isEmpty {
-            // A step with a handed-over place: every filler goes in after
-            // the op that leaves its place (U4b3 door-1).
+            // A step with a handed-over place, in this plan's order: going
+            // forward every filler goes in after the op that leaves its
+            // place (U4b3 door-1); going back, in the step's ops reversed,
+            // every leaver's taking-back after its filler's (door-2).
             let inTheStepsOrder: [UndoSwapTarget] = UndoCheck.targetsInTheStepsOrder(
                 [leadingTargets, fileTargets, wholeTargets],
                 ops: [leadingTargetOps, fileTargetOps, wholeTargetOps]

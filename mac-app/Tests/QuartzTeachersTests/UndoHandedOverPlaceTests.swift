@@ -163,7 +163,196 @@ final class UndoHandedOverPlaceTests: XCTestCase {
         XCTAssertEqual(places, ["courses/TST1O/New", "courses/TST1O/b.md", "courses/TST1O/New/a.md", "courses/TST1O/d.md"])
     }
 
+    // MARK: - Going back (door-2)
+
+    func testShapeAGoesBackAndForthWhole() throws {
+        let laid: LaidStep = try layShapeA(leadingOut: false)
+        try checkThereAndBack(laid)
+    }
+
+    func testShapeAWithTheLinkLeadingOutGoesBackAndForthWhole() throws {
+        let laid: LaidStep = try layShapeA(leadingOut: true)
+        try checkThereAndBack(laid)
+    }
+
+    func testShapeBGoesBackAndForthWhole() throws {
+        let laid: LaidStep = try layShapeB(leadingOut: false)
+        try checkThereAndBack(laid)
+    }
+
+    func testShapeBWithTheLinkLeadingOutGoesBackAndForthWhole() throws {
+        let laid: LaidStep = try layShapeB(leadingOut: true)
+        try checkThereAndBack(laid)
+    }
+
+    func testShapeCGoesBackAndForthWhole() throws {
+        let laid: LaidStep = try layShapeC(leadingOut: false)
+        try checkThereAndBack(laid)
+    }
+
+    func testShapeCWithTheLinksLeadingOutGoesBackAndForthWhole() throws {
+        let laid: LaidStep = try layShapeC(leadingOut: true)
+        try checkThereAndBack(laid)
+    }
+
+    /// Shape B going back is planned in the step's ops reversed: Day 2's
+    /// new page taken back, the link moved Day 3 to Day 2, Day 3's page
+    /// written again, Day 4's removed.
+    func testShapeBGoesBackInTheStepsOrderReversed() throws {
+        let laid: LaidStep = try layShapeB(leadingOut: false)
+        try makeItForward(laid)
+        let targets: [UndoSwapTarget] = try readyTargets(UndoCheck.plan(laid.ops, direction: .backward, root: laid.root, journal: laid.journal))
+        XCTAssertEqual(places(of: targets), [
+            section + "Unit 1, Day 2.md", section + "Unit 1, Day 2.md", section + "Unit 1, Day 3.md", section + "Unit 1, Day 4.md",
+        ])
+        guard case .file = targets[0].change else {
+            return XCTFail("Day 2's new page is taken back first, then the link moved")
+        }
+        XCTAssertNotEqual(targets[1].change, .file)
+        XCTAssertTrue(targets[2].handedOver)
+    }
+
+    /// Shape A made, then Day 3's new page edited by hand: going back is
+    /// refused naming Day 3, and nothing is changed.
+    func testGoingBackOverAnEditedNewPageIsRefused() throws {
+        let laid: LaidStep = try layShapeA(leadingOut: false)
+        try makeItForward(laid)
+        try Data("New, edited by hand.\n".utf8).write(to: laid.root.appendingPathComponent(section + "Unit 1, Day 3.md"))
+        let after: [String: String] = try folderNow(laid.root)
+        let plan: UndoPlan = UndoCheck.plan(laid.ops, direction: .backward, root: laid.root, journal: laid.journal)
+        XCTAssertEqual(plan, .refused(.changedSince(firstPath: section + "Unit 1, Day 3.md", others: 0)))
+        XCTAssertEqual(try folderNow(laid.root), after)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: laid.root.appendingPathComponent(section + "Unit 1, Day 4.md").path), "../library/Day 3.md")
+    }
+
+    /// Shape B made, then the link moved by hand away from Day 3 and a plain
+    /// file put there: going back is refused naming Day 3, nothing changed.
+    func testGoingBackOverAFileWhereTheLinkWasIsRefused() throws {
+        let laid: LaidStep = try layShapeB(leadingOut: false)
+        try makeItForward(laid)
+        let day3: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 3.md")
+        try FileManager.default.moveItem(at: day3, to: laid.root.appendingPathComponent(section + "Elsewhere.md"))
+        try Data("Someone else's.\n".utf8).write(to: day3)
+        let after: [String: String] = try folderNow(laid.root)
+        let plan: UndoPlan = UndoCheck.plan(laid.ops, direction: .backward, root: laid.root, journal: laid.journal)
+        guard case .refused(.changedSince(let firstPath, _)) = plan else {
+            return XCTFail("the plan came to \(plan), not refused changedSince")
+        }
+        XCTAssertEqual(firstPath, section + "Unit 1, Day 3.md")
+        XCTAssertEqual(try folderNow(laid.root), after)
+    }
+
     // MARK: - Functions
+
+    /// A step laid on disk as it stands before the step: its folder, its
+    /// journal and its ops.
+    struct LaidStep {
+
+        // MARK: - Stored properties
+
+        let root: URL
+
+        let journal: UndoJournal
+
+        let ops: [UndoOp]
+    }
+
+    func layShapeA(leadingOut: Bool) throws -> LaidStep {
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "back-a")
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        let root: URL = place.root
+        let target: String = try linkTarget(named: "Day 3.md", text: "Linked.\n", root: root, leadingOut: leadingOut)
+        try layLink(section + "Unit 1, Day 3.md", leadingTo: target, root: root)
+        let ops: [UndoOp] = [
+            UndoOp.moveLink(from: section + "Unit 1, Day 3.md", to: section + "Unit 1, Day 4.md", linkSha: try linkSha(section + "Unit 1, Day 3.md", root: root)),
+            UndoOp.writeFile(path: section + "Unit 1, Day 3.md", beforeSha: nil, afterSha: try store("New.\n", in: journal)),
+        ]
+        return LaidStep(root: root, journal: journal, ops: ops)
+    }
+
+    func layShapeB(leadingOut: Bool) throws -> LaidStep {
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "back-b")
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        let root: URL = place.root
+        let target: String = try linkTarget(named: "Day 2.md", text: "Linked.\n", root: root, leadingOut: leadingOut)
+        try layLink(section + "Unit 1, Day 2.md", leadingTo: target, root: root)
+        try UndoContractReplay.write("Three.\n", to: section + "Unit 1, Day 3.md", in: root)
+        let three: String = try store("Three.\n", in: journal)
+        let ops: [UndoOp] = [
+            UndoOp.writeFile(path: section + "Unit 1, Day 4.md", beforeSha: nil, afterSha: three),
+            UndoOp.writeFile(path: section + "Unit 1, Day 3.md", beforeSha: three, afterSha: nil),
+            UndoOp.moveLink(from: section + "Unit 1, Day 2.md", to: section + "Unit 1, Day 3.md", linkSha: try linkSha(section + "Unit 1, Day 2.md", root: root)),
+            UndoOp.writeFile(path: section + "Unit 1, Day 2.md", beforeSha: nil, afterSha: try store("New.\n", in: journal)),
+        ]
+        return LaidStep(root: root, journal: journal, ops: ops)
+    }
+
+    func layShapeC(leadingOut: Bool) throws -> LaidStep {
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "back-c")
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        let root: URL = place.root
+        let target3: String = try linkTarget(named: "Day 3.md", text: "Linked three.\n", root: root, leadingOut: leadingOut)
+        let target2: String = try linkTarget(named: "Day 2.md", text: "Linked two.\n", root: root, leadingOut: leadingOut)
+        try layLink(section + "Unit 1, Day 3.md", leadingTo: target3, root: root)
+        try layLink(section + "Unit 1, Day 2.md", leadingTo: target2, root: root)
+        let ops: [UndoOp] = [
+            UndoOp.moveLink(from: section + "Unit 1, Day 3.md", to: section + "Unit 1, Day 4.md", linkSha: try linkSha(section + "Unit 1, Day 3.md", root: root)),
+            UndoOp.moveLink(from: section + "Unit 1, Day 2.md", to: section + "Unit 1, Day 3.md", linkSha: try linkSha(section + "Unit 1, Day 2.md", root: root)),
+            UndoOp.writeFile(path: section + "Unit 1, Day 2.md", beforeSha: nil, afterSha: try store("New.\n", in: journal)),
+        ]
+        return LaidStep(root: root, journal: journal, ops: ops)
+    }
+
+    /// The step made going forward, as door-1 plans and swaps it.
+    func makeItForward(_ laid: LaidStep, label: String = "1-apply") throws {
+        let targets: [UndoSwapTarget] = try readyTargets(UndoCheck.plan(laid.ops, direction: .forward, root: laid.root, journal: laid.journal))
+        XCTAssertEqual(UndoSwap.swap(targets, label: label, root: laid.root), .swapped)
+    }
+
+    /// The step taken back, made again (a Redo) and taken back again: each
+    /// goes in, and each time it is back the folder and the folder outside
+    /// are byte for byte as they were before the step, nothing staged left.
+    func checkThereAndBack(_ laid: LaidStep) throws {
+        let before: [String: String] = try folderNow(laid.root)
+        let outsideBefore: [String: Data] = try outsideNow()
+        try makeItForward(laid)
+        let made: [String: String] = try folderNow(laid.root)
+        XCTAssertNotEqual(made, before)
+        let back: [UndoSwapTarget] = try readyTargets(UndoCheck.plan(laid.ops, direction: .backward, root: laid.root, journal: laid.journal))
+        XCTAssertEqual(UndoSwap.swap(back, label: "1-undo", root: laid.root), .swapped)
+        XCTAssertEqual(try folderNow(laid.root), before)
+        XCTAssertEqual(try outsideNow(), outsideBefore)
+        try makeItForward(laid, label: "1-redo")
+        XCTAssertEqual(try folderNow(laid.root), made)
+        let again: [UndoSwapTarget] = try readyTargets(UndoCheck.plan(laid.ops, direction: .backward, root: laid.root, journal: laid.journal))
+        XCTAssertEqual(UndoSwap.swap(again, label: "1-undo", root: laid.root), .swapped)
+        XCTAssertEqual(try folderNow(laid.root), before)
+        XCTAssertEqual(try outsideNow(), outsideBefore)
+        XCTAssertEqual(stagedLeft(under: laid.root), [])
+    }
+
+    /// Everything under the root, by relative path: a link by where it
+    /// leads, a file by its bytes, a folder as a folder. Never followed
+    /// through a link.
+    func folderNow(_ root: URL) throws -> [String: String] {
+        var found: [String: String] = [:]
+        guard let walker = FileManager.default.enumerator(atPath: root.path) else {
+            return found
+        }
+        while let name = walker.nextObject() as? String {
+            let url: URL = root.appendingPathComponent(name)
+            let attributes: [FileAttributeKey: Any] = try FileManager.default.attributesOfItem(atPath: url.path)
+            let type: FileAttributeType? = attributes[.type] as? FileAttributeType
+            if type == .typeSymbolicLink {
+                found[name] = "link to " + (try FileManager.default.destinationOfSymbolicLink(atPath: url.path))
+            } else if type == .typeDirectory {
+                found[name] = "folder"
+            } else {
+                found[name] = "file " + (try Data(contentsOf: url)).base64EncodedString()
+            }
+        }
+        return found
+    }
 
     func checkShapeA(leadingOut: Bool) throws {
         let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "a")
