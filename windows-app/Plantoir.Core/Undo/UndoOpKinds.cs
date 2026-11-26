@@ -687,6 +687,28 @@ internal static class UndoLinks
         return attributes.HasFlag(FileAttributes.Directory) ? What.Folder : What.File;
     }
 
+    /// <summary>
+    /// A link's <c>linkSha</c> (<c>opKinds.move</c>, U4b2-14; #899 W8-6): the
+    /// SHA-256 of the target it holds, as stored (<see cref="FileSystemInfo.LinkTarget"/>,
+    /// never <c>ResolveLinkTarget</c>, so what it leads to is never opened),
+    /// as UTF-8, unchanged: separators are NOT normalised, so a link made on
+    /// the mac (<c>../library</c>) and one Windows stores with backslashes
+    /// differ, which is changed since, and safe. Null when the target cannot
+    /// be read: a reparse point .NET does not read as a link (WSL's own), or
+    /// an error.
+    /// </summary>
+    internal static string? LinkSha(string fullPath)
+    {
+        string? target;
+        try
+        {
+            FileSystemInfo link = File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory) ? new DirectoryInfo(fullPath) : new FileInfo(fullPath);
+            target = link.LinkTarget;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
+        return target is null ? null : Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(target)));
+    }
+
     /// <summary>A file's bytes, read sharing everything, or null when it cannot be read now.</summary>
     internal static byte[]? ReadAll(string fullPath)
     {
@@ -795,9 +817,248 @@ internal enum UndoMoveSide
     CannotRead,
 }
 
+/// <summary>Which spelling of a capitalisation-only move's one item its folder lists (#899 W8-5).</summary>
+internal enum UndoCaseOnlySpelling
+{
+    /// <summary>The folder lists it as the move's <c>from</c>.</summary>
+    From,
+    /// <summary>The folder lists it as the move's <c>to</c>.</summary>
+    To,
+    /// <summary>A third spelling, neither side's, or no entry at all.</summary>
+    Another,
+    /// <summary>The folder could not be listed just now.</summary>
+    CannotRead,
+}
+
 internal static class UndoMoveSides
 {
-    internal static UndoMoveSide Read(UndoOp op, string fullPath, Func<string, bool>? cannotRead = null)
+    /// <summary>
+    /// For a capitalisation-only move (<see cref="UndoOp.IsCaseOnlyMove"/>):
+    /// which spelling the folder holding its item lists, where the two
+    /// spellings are ONE item (the same identity at both, a link never
+    /// followed; the mac's <c>UndoMoveSide.spellingListed</c>, which compares
+    /// device and inode); null where they are not one item (nothing there,
+    /// or two items, as on a case-sensitive folder), which is then judged as
+    /// any move. The entry is matched by the moved item's own part without
+    /// regard to case, then told apart from each side AS SPELLED (U4b2-9).
+    /// </summary>
+    internal static UndoCaseOnlySpelling? SpellingListed(string fromFull, string toFull, Func<string, bool>? cannotRead = null)
+    {
+        if (UndoFileIdentity.OfPlace(fromFull) is not { } atFrom || UndoFileIdentity.OfPlace(toFull) is not { } atTo || atFrom != atTo) return null;
+        string folder = Path.GetDirectoryName(fromFull)!;
+        string fromName = Path.GetFileName(fromFull);
+        string toName = Path.GetFileName(toFull);
+        if (cannotRead?.Invoke(folder) == true) return UndoCaseOnlySpelling.CannotRead;
+        List<string> names;
+        try
+        {
+            names = [];
+            foreach (string entry in Directory.EnumerateFileSystemEntries(folder)) names.Add(Path.GetFileName(entry));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return UndoCaseOnlySpelling.CannotRead;
+        }
+        foreach (string name in names)
+        {
+            if (UndoOp.PartInside(fromName, name) is not "") continue;
+            if (string.Equals(name, toName, StringComparison.Ordinal)) return UndoCaseOnlySpelling.To;
+            if (string.Equals(name, fromName, StringComparison.Ordinal)) return UndoCaseOnlySpelling.From;
+            return UndoCaseOnlySpelling.Another;
+        }
+        return UndoCaseOnlySpelling.Another;
+    }
+
+    /// <summary>
+    /// One side of a move as it holds now. <paramref name="overriding"/> gives,
+    /// for paths inside the place (relative to it, "" the place itself), what
+    /// to take instead of what is there (the mac's <c>UndoMoveSide.read(_:at:overriding:)</c>,
+    /// U4b; #899 W8-2): a carried page as the step's own edit would leave it
+    /// once taken back, and <see cref="UndoCurrent.Absent"/> for a file left
+    /// out of the judgement (the swap's own staged and kept files). A path is
+    /// matched to the listing by <see cref="UndoOp.PartInside"/>, the one
+    /// comparison, and keeps the disk's spelling.
+    /// </summary>
+    internal static UndoMoveSide Read(UndoOp op, string fullPath, Func<string, bool>? cannotRead = null,
+                                      IReadOnlyDictionary<string, UndoCurrent>? overriding = null) =>
+        ReadNamingFoldersLeftOut(op, fullPath, cannotRead, overriding).Side;
+
+    /// <summary>
+    /// <see cref="Read"/>, naming too the folders inside the place that were
+    /// left out of the judgement with the files left out (the mac's
+    /// <c>UndoMoveSide.readNamingFoldersLeftOut</c>, U4b2-10; #899 W8-4): each
+    /// relative to the place, deepest first, as the disk spells it. Only a
+    /// side that holds the content names any.
+    /// </summary>
+    internal static (UndoMoveSide Side, IReadOnlyList<string> FoldersLeftOut) ReadNamingFoldersLeftOut(
+        UndoOp op, string fullPath, Func<string, bool>? cannotRead = null, IReadOnlyDictionary<string, UndoCurrent>? overriding = null)
+    {
+        if (op.Sha is not null) return (ReadAFile(op, fullPath, cannotRead, overriding), []);
+        if (op.LinkSha is { } linkSha) return (ReadALink(linkSha, fullPath, cannotRead), []);
+        switch (UndoTreeReading.Read(fullPath, cannotRead: cannotRead))
+        {
+            case UndoTreeReading.Absent: return (UndoMoveSide.Free, []);
+            case UndoTreeReading.CannotRead: return (UndoMoveSide.CannotRead, []);
+            case UndoTreeReading.Tree tree:
+            {
+                if (overriding is not { Count: > 0 })
+                    return (string.Equals(tree.Listing.Sha, op.ListingSha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse, []);
+                var files = new List<(string Path, string Sha)>();
+                var matched = new HashSet<string>(StringComparer.Ordinal);
+                var filesLeftOut = new List<string>();
+                foreach ((string path, string fileSha) in tree.Listing.Files)
+                {
+                    UndoCurrent? given = null;
+                    foreach ((string inside, UndoCurrent item) in overriding)
+                    {
+                        if (UndoOp.PartInside(inside, path) is not "") continue;
+                        given = item;
+                        matched.Add(inside);
+                    }
+                    switch (given)
+                    {
+                        case null: files.Add((path, fileSha)); break;
+                        case UndoCurrent.Absent: filesLeftOut.Add(path); break;
+                        case UndoCurrent.Bytes bytes: files.Add((path, UndoCheck.Sha(bytes.Content))); break;
+                        default: return (UndoMoveSide.HoldsSomethingElse, []);
+                    }
+                }
+                foreach ((string inside, UndoCurrent item) in overriding)
+                {
+                    if (matched.Contains(inside) || inside.Length == 0) continue;
+                    switch (item)
+                    {
+                        case UndoCurrent.Absent: break;
+                        case UndoCurrent.Bytes bytes: files.Add((inside, UndoCheck.Sha(bytes.Content))); break;
+                        default: return (UndoMoveSide.HoldsSomethingElse, []);
+                    }
+                }
+                // U4b2-10: a folder holding nothing but files left out (and
+                // folders so left out) may be one the step's edits made for
+                // them, or an empty one of the content's own; each is decided
+                // on its own (FoldersTheContentLacks).
+                List<string> candidates = FoldersHoldingOnly(filesLeftOut, tree.Listing, files);
+                return FoldersTheContentLacks(candidates, tree.Listing, files, op.ListingSha) is { } foldersLeftOut
+                    ? (UndoMoveSide.HoldsTheContent, foldersLeftOut)
+                    : (UndoMoveSide.HoldsSomethingElse, []);
+            }
+            default: return (UndoMoveSide.HoldsSomethingElse, []);
+        }
+    }
+
+    /// <summary>Review 1 of U4b2-10: the most candidate folders decided one by one (the mac's <c>mostFoldersDecidedOneByOne</c>).</summary>
+    internal const int MostFoldersDecidedOneByOne = 8;
+
+    /// <summary>
+    /// Which of <paramref name="candidates"/> (deepest first) the moved
+    /// content did not hold: the set that, left out of the listing with the
+    /// files left out, makes it match <paramref name="listingSha"/>, or null
+    /// when none does (the mac's <c>foldersTheContentLacks</c>). The list keeps
+    /// only the listing's hash, so the sets are tried, never read: each set
+    /// that leaves a folder out only with every candidate below it, from all
+    /// of them down to none. Two sets give two listings, so at most one
+    /// matches. Up to <see cref="MostFoldersDecidedOneByOne"/> candidates every
+    /// such set is tried (at most 256 hashes); beyond that only all or none,
+    /// so a step with more, some of them the content's own, is refused as
+    /// changed since, which takes nothing back.
+    /// </summary>
+    internal static List<string>? FoldersTheContentLacks(List<string> candidates, UndoTreeListing listing,
+                                                         IReadOnlyList<(string Path, string Sha)> files, string? listingSha)
+    {
+        var setsToTry = new List<List<string>>();
+        if (candidates.Count <= MostFoldersDecidedOneByOne)
+        {
+            for (int mask = (1 << candidates.Count) - 1; mask >= 0; mask--)
+            {
+                var leftOut = new List<string>();
+                for (int position = 0; position < candidates.Count; position++)
+                {
+                    if ((mask & (1 << position)) != 0) leftOut.Add(candidates[position]);
+                }
+                if (LeavesOutEveryCandidateBelow(leftOut, candidates)) setsToTry.Add(leftOut);
+            }
+        }
+        else setsToTry = [candidates, []];
+        foreach (List<string> leftOut in setsToTry)
+        {
+            var foldersKept = new List<string>();
+            foreach (string folder in listing.Folders)
+            {
+                if (!leftOut.Contains(folder, StringComparer.Ordinal)) foldersKept.Add(folder);
+            }
+            if (string.Equals(new UndoTreeListing(foldersKept, files).Sha, listingSha, StringComparison.Ordinal)) return leftOut;
+        }
+        return null;
+    }
+
+    private static bool LeavesOutEveryCandidateBelow(List<string> leftOut, List<string> candidates)
+    {
+        foreach (string folder in leftOut)
+        {
+            foreach (string other in candidates)
+            {
+                if (IsBelow(other, folder) && !leftOut.Contains(other, StringComparer.Ordinal)) return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// U4b2-10: every folder of <paramref name="listing"/> that holds at least
+    /// one of <paramref name="filesLeftOut"/> and nothing else but folders that
+    /// are themselves left out: no file of <paramref name="files"/>, no other
+    /// folder (a listing holds no link: a folder holding one is not a tree).
+    /// Deepest first; inside by the one comparison, <see cref="UndoOp.PartInside"/>
+    /// (the mac's <c>foldersHoldingOnly</c>).
+    /// </summary>
+    internal static List<string> FoldersHoldingOnly(List<string> filesLeftOut, UndoTreeListing listing, IReadOnlyList<(string Path, string Sha)> files)
+    {
+        var deepestFirst = new List<string>(listing.Folders);
+        deepestFirst.Sort((first, second) =>
+        {
+            int firstDepth = first.Split('/').Length, secondDepth = second.Split('/').Length;
+            return firstDepth != secondDepth ? secondDepth.CompareTo(firstDepth) : string.CompareOrdinal(first, second);
+        });
+        var leftOut = new List<string>();
+        foreach (string folder in deepestFirst)
+        {
+            if (!filesLeftOut.Any(path => IsBelow(path, folder))) continue;
+            bool holdsSomethingKept = files.Any(file => IsBelow(file.Path, folder))
+                || listing.Folders.Any(other => IsBelow(other, folder) && !leftOut.Contains(other, StringComparer.Ordinal));
+            if (!holdsSomethingKept) leftOut.Add(folder);
+        }
+        return leftOut;
+    }
+
+    /// <summary>Whether <paramref name="path"/> is below <paramref name="folder"/> (never the folder itself), by the one comparison.</summary>
+    private static bool IsBelow(string path, string folder) => UndoOp.PartInside(folder, path) is { Length: > 0 };
+
+    /// <summary>
+    /// One side of a link's move (U4b2-14; #899 W8-6; the mac's
+    /// <c>UndoMoveSide.readLink</c>), read on the link itself and never
+    /// followed, so what it leads to (outside the working folder, or nowhere)
+    /// is never read: the content is a link (<see cref="UndoLinks.Look"/>, a
+    /// name surrogate, never a OneDrive placeholder) whose target hashes to
+    /// <paramref name="linkSha"/>; a folder, a file or a link with another
+    /// target is something else; a link whose target cannot be read is
+    /// cannot tell now.
+    /// </summary>
+    private static UndoMoveSide ReadALink(string linkSha, string fullPath, Func<string, bool>? cannotRead)
+    {
+        switch (UndoLinks.Look(fullPath))
+        {
+            case UndoLinks.What.Nothing: return UndoMoveSide.Free;
+            case UndoLinks.What.Link:
+                if (cannotRead?.Invoke(fullPath) == true) return UndoMoveSide.CannotRead;
+                return UndoLinks.LinkSha(fullPath) is { } found
+                    ? string.Equals(found, linkSha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse
+                    : UndoMoveSide.CannotRead;
+            case UndoLinks.What.CannotLook: return UndoMoveSide.CannotRead;
+            default: return UndoMoveSide.HoldsSomethingElse;
+        }
+    }
+
+    private static UndoMoveSide ReadAFile(UndoOp op, string fullPath, Func<string, bool>? cannotRead, IReadOnlyDictionary<string, UndoCurrent>? overriding)
     {
         if (op.Sha is { } sha)
         {
@@ -806,6 +1067,15 @@ internal static class UndoMoveSides
                 case UndoLinks.What.Nothing: return UndoMoveSide.Free;
                 case UndoLinks.What.CannotLook: return UndoMoveSide.CannotRead;
                 case UndoLinks.What.File:
+                    if (overriding is not null && overriding.TryGetValue("", out UndoCurrent? given))
+                    {
+                        return given switch
+                        {
+                            UndoCurrent.Bytes bytes => string.Equals(UndoCheck.Sha(bytes.Content), sha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse,
+                            UndoCurrent.Absent => UndoMoveSide.Free,
+                            _ => UndoMoveSide.HoldsSomethingElse,
+                        };
+                    }
                     if (cannotRead?.Invoke(fullPath) == true) return UndoMoveSide.CannotRead;
                     return UndoLinks.HashOf(fullPath) is { } found
                         ? string.Equals(found, sha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse
@@ -813,13 +1083,7 @@ internal static class UndoMoveSides
                 default: return UndoMoveSide.HoldsSomethingElse;
             }
         }
-        return UndoTreeReading.Read(fullPath, cannotRead: cannotRead) switch
-        {
-            UndoTreeReading.Absent => UndoMoveSide.Free,
-            UndoTreeReading.CannotRead => UndoMoveSide.CannotRead,
-            UndoTreeReading.Tree tree => string.Equals(tree.Listing.Sha, op.ListingSha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse,
-            _ => UndoMoveSide.HoldsSomethingElse,
-        };
+        return UndoMoveSide.HoldsSomethingElse;
     }
 }
 

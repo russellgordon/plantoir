@@ -23,6 +23,22 @@ internal static class UndoFileIdentity
         return (information.VolumeSerialNumber, ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow);
     }
 
+    /// <summary>
+    /// The identity of the item at <paramref name="fullPath"/> itself, a link
+    /// never followed (opened with no access, for its attributes only, every
+    /// sharing allowed), or null when nothing is there or it cannot be opened.
+    /// Two spellings of one place on NTFS give the same identity (measured on
+    /// the PC, #899 W8-5: <c>Media</c> and <c>media</c> both
+    /// <c>8a81f26a:017f00000023b811</c>, before and after the rename).
+    /// </summary>
+    internal static (uint Volume, ulong Index)? OfPlace(string fullPath)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        using SafeFileHandle handle = CreateFileW(UndoLock.LongPath(fullPath), 0, ShareAll, IntPtr.Zero, OpenExisting,
+                                                  BackupSemantics | OpenReparsePoint, IntPtr.Zero);
+        return Of(handle);
+    }
+
     /// <summary>How many names the file an open handle is has on its volume (hard links), or null where the system cannot say.</summary>
     internal static uint? LinksOf(SafeFileHandle handle)
     {
@@ -71,6 +87,14 @@ internal static class UndoFileIdentity
         public uint NumberOfLinks;
         public uint FileIndexHigh, FileIndexLow;
     }
+
+    private const uint ShareAll = 0x7;
+    private const uint OpenExisting = 3;
+    private const uint BackupSemantics = 0x02000000;
+    private const uint OpenReparsePoint = 0x00200000;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetFileInformationByHandle(SafeFileHandle file, out ByHandleFileInformation information);

@@ -748,7 +748,7 @@ internal static class UndoRecovery
                 // that now leads outside the folder is in the way.
                 string place = op.PlaceName;
                 if (!states.ContainsKey(place)) order.Add(place);
-                states[place] = op.PathsNamed.Any(named => !UndoPlaces.StaysInside(root, named))
+                states[place] = UndoPlaces.FirstPlaceLeadingOut(root, op) is not null
                     ? UndoOpState.Neither
                     : UndoCheck.WholeStateOf(op, root, places ?? new UndoAppSettingsPlaces());
                 continue;
@@ -934,9 +934,7 @@ internal static class UndoRecovery
                             keepingTheOriginalsOf = notTaken.OutgoingOf;
                             keptNotTaken = notTaken.KeptOriginalsHolding;
                         }
-                        var putBackTargets = ready.InOrder.Select(change => new UndoSwapTarget(UndoDoor.FullPath(root, change.Path), change.Path,
-                                                                                                change.Expected, change.Replacement)).ToList();
-                        putBackTargets.AddRange(ready.Whole);
+                        List<UndoSwapTarget> putBackTargets = UndoDoor.TargetsOf(ready, root);
                         UndoSeams? recoverySeams = seams is null ? null : new UndoSeams
                         {
                             StopsHere = (point, index) => seams.Stops(point == "beforeSwap" ? "recoveryBeforeSwap" : point, index),
