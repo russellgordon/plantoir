@@ -5,27 +5,6 @@ Branch `issue/899-w7b2-10-w7b1-proof-gaps` from `issue/899-w7b-daily-actions` 6f
 - `origin/dev` merged before proving: "Already up to date" at 6f48d833c (it holds `dev` bfe28b848).
 - `origin/dev` merged again before hand-back: 721833253 (`dev` c367a1ad6, U4b). The c3 run below is on that merged tree.
 
-## For PROGRESS
-
-- **Every converted step's traces run the REAL Windows action** (`UndoActionTraceContractTests`), the measured ones included. The exclusion of `WindowsOwnJson` and `WindowsOwnFileInTheStep` steps is gone. A step named in either dictionary is judged through `MeasuredStates`. The lookup goes by the dictionaries, so W7b2-7's and W7b2-8's entries are covered the moment they are added, with no change to the trace test.
-  - Each state the replay reaches is recorded twice, as the hash of Windows' bytes and as the hash of the mac's bytes for that state. The states are the laid before, what the action wrote, and each hand edit, which is made to both.
-  - Each hash in the trace's `afterUndoingAll` and `final` is turned into Windows' hash of the same state, and the file is compared with that. Nothing is ever compared with the mac's bytes. A hash naming a state Windows never reached fails.
-  - After the action, the members `SameMembers` names are compared with the mac's after. A file that is not in `WindowsOwnJson` must be the mac's bytes exactly.
-  - The one file more (`reDateClasses`' timetable) is judged on Windows' own bytes alone. After every call it holds what the action wrote while the step is done, and its before while the step is undone. Its op is expected before the recomputes, and its path after the recorded files.
-- **The change-nothing tests** (review 1 L3):
-  - `CurriculumMentionsTests.AMentionAlreadyOnThePageMakesNoStepAndNoWrite`
-  - `ReDateTests.SyncingPagesAlreadyInDateMakesNoStepAndNoWrite`
-  - Each checks for no begin line, and that every file under the working folder (the list's own aside) is unchanged, a backup included (`WindowsActionsOnTheMacFixture.EveryFileBut`).
-  - The timetable's case was already `UndoClassDatesStepTests.TheSameDatesAgainMakeNoStep`.
-- **The harness drives the real Re-date** (review 3 L3).
-  - `W7Runs.ChildReDate` now plans and applies `AssistWorkspace.PlanReDate` and `ApplyReDate` on the scratch course (block F, three meetings over three classes), on the run's list and through the run's kill seams (`AssistWorkspace.UndoSeams`).
-  - The re-dated pages are measured once on a reference course that is never killed (`REFERENCE` line), never retyped. `ReDatedPage` and `NewMeetings` are gone.
-
-## For documentation 12
-
-- The traces of a converted step whose bytes are Windows' own (`WindowsOwnJson`, `WindowsOwnFileInTheStep`) run the real Windows action. They are judged state by state on Windows' own hashes, each mapped from the mac's hash of the same state. The one file more is judged on Windows' bytes as the step leaves it.
-- The `w7-redate-kill` harness run drives `ApplyReDate` itself.
-
 ## Riding lows
 
 1. **Review 1 L2** (the `rememberTimetable` traces replayed the JSON draft): closed by `MeasuredStates`, which also covers `WindowsOwnFileInTheStep["reDateClasses"]`. Proven by must-fail rows 1 to 3.

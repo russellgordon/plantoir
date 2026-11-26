@@ -12,6 +12,26 @@ Read this first; the dated entries below are history, newest first, and an earli
 - **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 76364b50b — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
 - **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
+## 2026-11-25 — #899 W7b2-10: W7b1's proof gaps (branch `issue/899-w7b2-10-w7b1-proof-gaps`)
+
+- **Every converted step's traces run the REAL Windows action** (`UndoActionTraceContractTests`), the measured ones included. The exclusion of `WindowsOwnJson` and `WindowsOwnFileInTheStep` steps is gone. A step named in either dictionary is judged through `MeasuredStates`. The lookup goes by the dictionaries, so W7b2-7's and W7b2-8's entries are covered the moment they are added, with no change to the trace test.
+  - Each state the replay reaches is recorded twice, as the hash of Windows' bytes and as the hash of the mac's bytes for that state. The states are the laid before, what the action wrote, and each hand edit, which is made to both.
+  - Each hash in the trace's `afterUndoingAll` and `final` is turned into Windows' hash of the same state, and the file is compared with that. Nothing is ever compared with the mac's bytes. A hash naming a state Windows never reached fails.
+  - After the action, the members `SameMembers` names are compared with the mac's after. A file that is not in `WindowsOwnJson` must be the mac's bytes exactly.
+  - The one file more (`reDateClasses`' timetable) is judged on Windows' own bytes alone. After every call it holds what the action wrote while the step is done, and its before while the step is undone. Its op is expected before the recomputes, and its path after the recorded files.
+- **The change-nothing tests** (review 1 L3):
+  - `CurriculumMentionsTests.AMentionAlreadyOnThePageMakesNoStepAndNoWrite`
+  - `ReDateTests.SyncingPagesAlreadyInDateMakesNoStepAndNoWrite`
+  - Each checks for no begin line, and that every file under the working folder (the list's own aside) is unchanged, a backup included (`WindowsActionsOnTheMacFixture.EveryFileBut`).
+  - The timetable's case was already `UndoClassDatesStepTests.TheSameDatesAgainMakeNoStep`.
+- **The harness drives the real Re-date** (review 3 L3).
+  - `W7Runs.ChildReDate` now plans and applies `AssistWorkspace.PlanReDate` and `ApplyReDate` on the scratch course (block F, three meetings over three classes), on the run's list and through the run's kill seams (`AssistWorkspace.UndoSeams`).
+  - The re-dated pages are measured once on a reference course that is never killed (`REFERENCE` line), never retyped. `ReDatedPage` and `NewMeetings` are gone.
+
+## 2026-11-25 — #899 W7b2-4: the How I Teach page through ONE step (branch `issue/899-w7b2-4-how-i-teach`)
+
+- #899 W7b2-4: Write How I Teach (`write_how_i_teach`, key `writeHowITeach`) and Start the How I Teach Page (Course Settings' row, key `startHowITeachPage`, `madeBy` `sheet`) each write the page as ONE `UndoActionStep` through the door, held by the course (`holds: course`, no section), as the mac's `JournaledStep(course:section: nil, holds: "course")`. Both fixture rows run the real actions and are out of the ledger; the writer-scan entries for `AssistWorkspace.HowITeach.cs` and `HowITeachSettingsRow.cs` are gone.
+
 ## 2026-11-25 — #899 W7b1: the class pages' daily actions through ONE step (branch `issue/899-w7b-daily-actions`)
 
 #### W7b1
