@@ -164,7 +164,10 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
         Assert.Equal([Key], WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
         var (madeBy, paths, kinds) = NewestStep();
         Assert.Equal("sheet", madeBy);
-        Assert.All(kinds, kind => Assert.Equal(UndoOp.WriteFile, kind));
+        // Each page's front matter is edited line by line; the two records are written whole, last.
+        Assert.DoesNotContain(UndoOp.Recompute, kinds);
+        Assert.Equal([UndoOp.WriteFile, UndoOp.WriteFile], kinds.TakeLast(2).ToList());
+        Assert.DoesNotContain(UndoOp.WriteFile, kinds.SkipLast(2));
         // The pages the class publishes and dates, in the plan's order, then the two records.
         var pagesWritten = new List<string>
         {
