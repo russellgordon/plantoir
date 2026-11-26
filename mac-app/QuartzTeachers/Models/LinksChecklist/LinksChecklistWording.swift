@@ -138,6 +138,11 @@ nonisolated enum LinksChecklistWording {
         return "\(name) changed since it was checked, so it was left as it is."
     }
 
+    /// The `{what}` of `AssistWording.publishStoppedPartWay` when a Publish
+    /// from the list stopped part way (`linksChecklist.wording.pagesYouTicked`,
+    /// #899 U4b2-9).
+    static let pagesYouTicked: String = "the pages you ticked"
+
     static func published(count: String, pages: String) -> String {
         return "\(count) \(pages) will be on the website the next time you deploy."
     }

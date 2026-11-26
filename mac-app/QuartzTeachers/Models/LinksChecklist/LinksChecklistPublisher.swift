@@ -557,7 +557,7 @@ enum LinksChecklistPublisher {
             // A file could not be put back: some of the press went in, and
             // the earlier content is kept beside its page (the second review
             // of U3a, MEDIUM a).
-            return AssistWording.publishStoppedPartWay(what: "the pages you ticked", problem: error.localizedDescription)
+            return AssistWording.publishStoppedPartWay(what: LinksChecklistWording.pagesYouTicked, problem: error.localizedDescription)
         }
         guard case JournaledStepError.refused(let refusal, _) = error else {
             return "Nothing was changed: \(error.localizedDescription)"

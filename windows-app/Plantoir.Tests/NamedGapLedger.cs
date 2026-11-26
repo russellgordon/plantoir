@@ -709,8 +709,9 @@ internal static class NamedGapLedger
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with the folder and both pages in and the edit inside not: put back",
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with every change in but before redone: completed"),
         // ---- U3c (the mac's U3c for #899, 2026-11-20): its 4 trail events, 12
-        // stackCases and 10 recoveryCases were held here under Reason899W4c and
-        // went when Windows' W4c built them (2026-11-20, night). The kept-file
+        // stackCases and 10 recoveryCases were held here under the reason then
+        // named Reason899W4c (Reason899U4aContentGone since, which holds only
+        // U4a's rows) and went when Windows' W4c built them (2026-11-20, night). The kept-file
         // alert's four keys were held under Reason899W4cKeptAlert until
         // W7b2-9 built the alert (2026-11-25).
         Owed(MachineWordUsedIn, 921, V200, Reason921, "shared-rules.json:deployTokens.words.problemCouldNotSave"),
