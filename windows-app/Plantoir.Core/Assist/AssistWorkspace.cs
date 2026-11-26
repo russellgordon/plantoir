@@ -5078,12 +5078,13 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>A step for one daily action, made by this workspace's surface (#899 W7a): <c>madeBy</c> is <c>menu</c>, <c>builtInAssistant:&lt;id&gt;</c> or <c>outsideAssistant::&lt;id&gt;</c>.</summary>
-    internal UndoActionStep NewUndoStep(string actionKey, string courseCode, int section)
+    /// <param name="madeBy">Who makes it when that is not this workspace's surface: <c>sheet</c> for a sheet's own button (#899 W7b2-5, the start of the year's Go, as the mac's <c>UndoStepMaker.sheet</c>).</param>
+    internal UndoActionStep NewUndoStep(string actionKey, string courseCode, int section, string? madeBy = null)
     {
         UndoForThisProcess list = UndoList ?? UndoForThisProcess.Current;
         UndoDoor? door = UndoDoorOfATest
             ?? (UndoSeams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: UndoSeams, trail: list.Trail));
-        return new(new UndoStepMaker(UndoMadeBy, actionKey), _folder, courseCode, section, undo: list, door: door);
+        return new(new UndoStepMaker(madeBy ?? UndoMadeBy, actionKey), _folder, courseCode, section, undo: list, door: door);
     }
 
     /// <summary>
