@@ -345,4 +345,69 @@ public sealed class UndoCarryingMoveTests
         Assert.True(UndoSwap.TidyLeftovers(1, step.PathsToTidy, root, keepingOnlyCopies: true));
         Assert.False(File.Exists(kept));
     }
+
+    // W8-4's riding lows (review 1 of window 1, LOWs 1 to 3).
+
+    /// <summary>LOW 3: a folder made at a carried file's turn is followed when the swap is reversed: refused at that file's staging, the folder moved back holds no empty folder the swap made.</summary>
+    [Fact]
+    public void AFolderMadeForACarriedFileIsFollowedWhenTheSwapIsReversed()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        byte[] made = Encoding.UTF8.GetBytes("X\n");
+        JsonArray write = scribe.OpsFor(To + "/sub/x.md", null, made);
+        var seams = new UndoSeams { StagingWriteFailsAt = index => index == 2 };
+
+        UndoOutcome outcome = scribe.Door(seams).Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md"), write[0]!.DeepClone()), [made]));
+
+        Assert.Equal(UndoOutcomeKind.Refused, outcome.Kind);
+        Assert.False(outcome.LeftPartWay);
+        Assert.Equal(OldA, scribe.Page("A", From + "/a.md"));
+        Assert.False(Directory.Exists(scribe.FullPath("A", To)));
+        Assert.False(Directory.Exists(scribe.FullPath("A", From + "/sub")));
+        Assert.Equal(listing.Sha, UndoTreeReading.Read(scribe.FullPath("A", From)).ListingSha);
+        Assert.Empty(scribe.StagedLeftovers("A"));
+    }
+
+    /// <summary>LOW 2: a Redo whose carried page's staging fails after the folder has moved is reversed whole: the folder back at its from with its old a.md, nothing left part way, nothing staged left.</summary>
+    [Fact]
+    public void ARedoRefusedAfterItsCarryingMoveIsReversedWhole()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        Assert.Equal("undone", scribe.Undo().Name);
+
+        UndoOutcome redo = scribe.Door(new UndoSeams { StagingWriteFailsAt = index => index == 1 }).Redo();
+
+        Assert.Equal(UndoOutcomeKind.Refused, redo.Kind);
+        Assert.Equal(UndoRefusalKind.CouldNotWrite, redo.Refusal?.Kind);
+        Assert.False(redo.LeftPartWay);
+        Assert.Equal(OldA, scribe.Page("A", From + "/a.md"));
+        Assert.False(Directory.Exists(scribe.FullPath("A", To)));
+        Assert.Empty(scribe.StagedLeftovers("A"));
+    }
+
+    /// <summary>LOW 1: the folder's rename refused (a file inside it held open by another program) names the place it leaves, as the mac's moveHere names it, never a destination that does not exist yet.</summary>
+    [Fact]
+    public void AFolderRenameThatFailsNamesThePlaceItLeaves()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        Assert.Equal("undone", scribe.Undo().Name);
+        FileStream? held = null;
+        var seams = new UndoSeams
+        {
+            BeforeEachSwap = (index, _) =>
+            {
+                if (index == 0) held ??= new FileStream(scribe.FullPath("A", From + "/b.md"), FileMode.Open, FileAccess.Read, FileShare.None);
+            },
+        };
+        UndoOutcome redo;
+        try { redo = scribe.Door(seams).Redo(); }
+        finally { held?.Dispose(); }
+
+        Assert.Equal(UndoOutcomeKind.Refused, redo.Kind);
+        Assert.Equal(From, redo.Refusal?.Path);
+        Assert.Equal(OldA, scribe.Page("A", From + "/a.md"));
+        Assert.False(Directory.Exists(scribe.FullPath("A", To)));
+    }
 }

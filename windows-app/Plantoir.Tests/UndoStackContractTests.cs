@@ -27,6 +27,8 @@ public sealed class UndoStackContractTests
         "refusalNamed",
         // U4b's (W8-2)
         "movedFolder",
+        // U4b2-10's (W8-4)
+        "madeFolder", "foldersInside",
     };
 
     public static IEnumerable<object[]> Cases() =>
@@ -106,6 +108,10 @@ public sealed class UndoStackContractTests
             Assert.Equal(expectLast.GetString(), replay.Last);
         if (stackCase.TryGetProperty("movedFolder", out JsonElement movedFolder))
             Assert.Equal(movedFolder.GetString(), replay.MovedFolder());
+        if (stackCase.TryGetProperty("madeFolder", out JsonElement madeFolder))
+            Assert.Equal(madeFolder.GetString(), replay.MadeFolder());
+        if (stackCase.TryGetProperty("foldersInside", out JsonElement foldersInside))
+            Assert.Equal(foldersInside.GetString(), replay.FoldersInside());
         if (stackCase.TryGetProperty("refusalNamed", out JsonElement refusalNamed))
             Assert.Equal(refusalNamed.GetString(), replay.RefusalNamed);
         if (stackCase.TryGetProperty("cleared", out JsonElement cleared))
@@ -471,6 +477,23 @@ public sealed class UndoStackContractTests
                     Ops(new JsonArray(MoveTheMediaFolder(), EditInside(RenamedFolder + "/a.md")), []);
                     return;
                 }
+                // U4b2-10 (W8-4): a carried edit makes a folder inside the moved folder.
+                case "moveAFolderWithAFileMadeInANewFolderInside":
+                    MakeTheMediaFolder(withAnEmptySub: false);
+                    MoveCarrying(("sub/x.md", "X\n"));
+                    return;
+                case "addAFolderInsideTheMadeFolder": _scribe.WritePage("A", RenamedFolder + "/sub/mine/y.md", "Y\n"u8.ToArray()); return;
+                case "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt":
+                    MakeTheMediaFolder(withAnEmptySub: true);
+                    MoveCarrying(("sub/deeper/x.md", "X\n"));
+                    return;
+                case "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt":
+                    MakeTheMediaFolder(withAnEmptySub: true);
+                    MoveCarrying(("sub/x.md", "X\n"), ("new/y.md", "Y\n"));
+                    return;
+                case "finderRecordsAWindowInTheMadeFolder":
+                    File.WriteAllBytes(_scribe.FullPath("A", RenamedFolder + "/sub/" + UndoTreeListing.IgnoredName), "Finder"u8.ToArray());
+                    return;
                 case "addAFileInsideTheMovedFolder": _scribe.WritePage("A", RenamedFolder + "/c.md", "C\n"u8.ToArray()); return;
                 case "editThePageInsideByHand": _scribe.WritePage("A", RenamedFolder + "/a.md", "Hand.\n"u8.ToArray()); return;
                 // U4b, M1 (W8-3): the newest step's own kept original from an
@@ -547,6 +570,56 @@ public sealed class UndoStackContractTests
             ["kind"] = "replaceText", ["path"] = path, ["before"] = "old", ["after"] = "new",
             ["contextBefore"] = "Line one: ", ["contextAfter"] = ".\n",
         };
+
+        /// <summary>courses/TST1O/media as <c>moveAFolderWithAPageEditedInside</c> makes it (and an empty sub inside it), when neither it nor renamed is there.</summary>
+        private void MakeTheMediaFolder(bool withAnEmptySub)
+        {
+            if (Directory.Exists(_scribe.FullPath("A", MediaFolder)) || Directory.Exists(_scribe.FullPath("A", RenamedFolder))) return;
+            _scribe.WritePage("A", MediaFolder + "/a.md", "Intro.\nLine one: old.\nEnd.\n"u8.ToArray());
+            _scribe.WritePage("A", MediaFolder + "/b.md", "B\n"u8.ToArray());
+            if (withAnEmptySub) Directory.CreateDirectory(_scribe.FullPath("A", MediaFolder + "/sub"));
+        }
+
+        /// <summary>ONE step: the media folder's move, the edit of a.md, then a writeFile of each new file, inside the folder at its new place.</summary>
+        private void MoveCarrying(params (string Inside, string Text)[] made)
+        {
+            var ops = new JsonArray(MoveTheMediaFolder(), EditInside(RenamedFolder + "/a.md"));
+            var blobs = new List<byte[]>();
+            foreach ((string inside, string text) in made)
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(text);
+                ops.Add(_scribe.OpsFor(RenamedFolder + "/" + inside, null, bytes)[0]!.DeepClone());
+                blobs.Add(bytes);
+            }
+            Ops(ops, blobs);
+        }
+
+        /// <summary>Where the moved folder is now: renamed if it is there, else media.</summary>
+        private string MovedFolderNow() => Directory.Exists(_scribe.FullPath("A", RenamedFolder)) ? RenamedFolder : MediaFolder;
+
+        private static string InByteOrder(List<string> names)
+        {
+            names.Sort((first, second) => Encoding.UTF8.GetBytes(first).AsSpan().SequenceCompareTo(Encoding.UTF8.GetBytes(second)));
+            return string.Join(", ", names);
+        }
+
+        /// <summary><c>madeFolder</c>: what sub holds wherever the moved folder is now, every name counted, <c>empty</c>, or <c>none</c>.</summary>
+        internal string MadeFolder()
+        {
+            string sub = _scribe.FullPath("A", MovedFolderNow() + "/sub");
+            if (!Directory.Exists(sub)) return "none";
+            List<string> names = Directory.EnumerateFileSystemEntries(sub).Select(entry => Path.GetFileName(entry)).ToList();
+            return names.Count == 0 ? "empty" : InByteOrder(names);
+        }
+
+        /// <summary><c>foldersInside</c>: every folder below the moved folder wherever it is now, as paths inside it, or <c>none</c>.</summary>
+        internal string FoldersInside()
+        {
+            string folder = _scribe.FullPath("A", MovedFolderNow());
+            List<string> paths = Directory.EnumerateDirectories(folder, "*", SearchOption.AllDirectories)
+                .Select(entry => Path.GetRelativePath(folder, entry).Replace(Path.DirectorySeparatorChar, '/')).ToList();
+            return paths.Count == 0 ? "none" : InByteOrder(paths);
+        }
 
         /// <summary><c>movedFolder</c>: which place holds the folder (renamed, media, both or neither), then what its a.md holds (new, old, byHand, none).</summary>
         internal string MovedFolder()

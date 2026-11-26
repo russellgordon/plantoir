@@ -112,6 +112,9 @@ internal sealed class UndoSeams
     /// <summary>Called by <c>Perform(UndoOpsDraft)</c> once its ops are vetted and before its begin hold (a test prunes a blob there: W2b's review, LOW 5).</summary>
     internal Action? BeforeTheBegin { get; init; }
 
+    /// <summary>Called with each folder a move's last look left out, just before the tidy after every swap removes it if empty (U4b2-10; #899 W8-4): a test sees that a refused swap tidies none.</summary>
+    internal Action<string>? RemovingAFolderLeftOut { get; init; }
+
     internal bool Stops(string point, int index = -1) => StopsHere?.Invoke(point, index) == true;
 }
 
@@ -607,6 +610,9 @@ internal static class UndoSwap
                 return new UndoRefusal(UndoRefusalKind.NotReadable, target.RelativePath);
         }
     }
+
+    /// <summary>W8-4 stub: replaced by the tidy of a folder a move's last look left out.</summary>
+    internal static void RemoveAFolderLeftOut(string folder) { }
 
     /// <summary>
     /// The name a folder taken out is renamed to before it is deleted: its
