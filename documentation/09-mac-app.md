@@ -22817,6 +22817,38 @@ their traces. A regeneration now keeps each committed `recorded` and
 (`keepingTheCommittedMoments`), so only the steps whose recording changed
 change (review 1 of U4b2-6, L4).
 
+### U4b2: rename-traces-made
+
+The two recorded Rename folder steps now have their action traces (twelve,
+`action-151` to `action-162`), and the leave-out by name is gone. A trace
+lays each folder's listing at its `from` (never a carried page's before at its
+new place), and the step goes through `JournaledWrite.perform(ops:)`: one
+`move` per folder with its `listingSha` first, then the pages' ops (a carried
+page named at the new place), then the `editJSON` members. A folder is hashed
+by its listing's SHA-256 at both places in `afterUndoingAll` and `final`, and
+every page of the listing is hashed at both places too. The model holds a
+folder as its files, so it cannot hold one left empty. For that reason a
+rename trace never makes the `deletePage` that would take the last page out of
+a moved folder: the Mac would keep the empty folder there.
+
+The first replay found one disagreement, and the model was wrong. A refused
+Undo of a rename names the folder at its new name (`UndoOp.placeAsFound`,
+U4b), and the model named its old one. The model's `place_as_found` now
+follows the Mac's rule. Three lows from review 2 of piece 11 were fixed in the
+same branch:
+
+- **The tie-break.** `ClassPages.isInPathOrder` breaks a tie between two paths
+  that are alike once lowercased by comparing their UTF-8 bytes as spelled.
+  A file URL spells every path in one Unicode form, so on the Mac only a
+  case-only pair can tie.
+- **A link's own place.** A rename's page is ordered by its own place
+  (`UndoFolderPlaces.placeResolvingOnlyAbove`: the course folder canonical,
+  then the page's parts as written), never by a link's target.
+- **The order test.** The test no longer depends on the volume's own listing
+  order.
+
+No recorded step changed.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
