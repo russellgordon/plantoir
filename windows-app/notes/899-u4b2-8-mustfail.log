@@ -20,3 +20,10 @@ mf7 the delegate does not ask it first: RED (exit 65)
     UndoRenameFolderStepTests.swift:1160: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testASecondQuitRequestWhileAQuitGoesAheadAsksNothingAndRefusesNothing] : XCTAssertEqual failed: ("let closing: QuitConfirmation.ClosingReason = Qui
     UndoRenameFolderStepTests.swift:1164: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testASecondQuitRequestWhileAQuitGoesAheadAsksNothingAndRefusesNothing] : XCTAssertEqual failed: ("quitReasonCode: AppDelegate.quitReasonCode(),") i
 restored byte for byte (git diff of mac-app/QuartzTeachers empty)
+mf8 the page no longer halts as it goes away: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1120: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRealSettingsPageShrunkOrScrolledKeepsARenameAndLeavingItHalts] : XCTAssertEqual failed: ("XCTWaiterResult(rawValue: 2)") is not equal to ("X
+mf9 the per-section list is not handed the page run: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1120: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRealSettingsPageShrunkOrScrolledKeepsARenameAndLeavingItHalts] : XCTAssertEqual failed: ("XCTWaiterResult(rawValue: 2)") is not equal to ("X
+mf10 pageIsGoingAway halts only the shared list: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1120: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRealSettingsPageShrunkOrScrolledKeepsARenameAndLeavingItHalts] : XCTAssertEqual failed: ("XCTWaiterResult(rawValue: 2)") is not equal to ("X
+restored byte for byte (git diff of mac-app/QuartzTeachers empty)

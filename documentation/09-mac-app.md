@@ -22791,10 +22791,18 @@ still returns at Cancel without waiting, and a late result is still dropped.
 Riding lows from U4b2-7 review 2: the rename sheet is now hosted off screen
 and its own Rename and Cancel pressed through accessibility
 (`testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet`,
-`testTheRealSheetGoingAwayHaltsAHeldPlan`), which found that the sheet's
-`.onDisappear` is not called when the list that presents it leaves the
-window (the sheet closes, the plan went on): the list's own `.onDisappear`
-now halts a rename that is only planning too. And AppKit can ask again during
+`testTheRealSettingsPageShrunkOrScrolledKeepsARenameAndLeavingItHalts`),
+which found that the sheet's `.onDisappear` is not called when the list that
+presents it leaves the window (the sheet closes, the plan went on). The halt
+for that case is NOT on the list (review 1, M1): Course Settings draws its
+lists in a lazily drawn grouped `Form`, where a row leaving the visible area
+is not the teacher leaving the rename. The page owns its two renames
+(`CourseSettingsRenames`, one `FolderRenameRun` per folder list, handed to
+each list) and its own `.onDisappear` (Settings left for Planning, the course
+closed or switched, the window closed) halts those still planning through
+`haltIfStillPlanning`. The real page, grouped `Form` and all, is hosted: made
+220 points tall, and scrolled to its top and bottom, the row is out of view
+and the rename goes on; leaving the page halts it. And AppKit can ask again during
 a `.terminateLater` wait (Apple's `terminateLater` documentation: the run loop
 runs in `NSModalPanelRunLoopMode` until the reply, the mode in which a sheet
 takes input), so `applicationShouldTerminate` first asks
