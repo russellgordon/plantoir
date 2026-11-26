@@ -1619,8 +1619,10 @@ class CourseConfiguration {
     /// link (as many as the system follows, `MAXSYMLINKS`), or `url` itself
     /// when it is not a link. The last component only: the folders above
     /// it are named as the caller named them, so the place stays inside
-    /// the working folder when the link's target is.
-    static func fileALinkLeadsTo(_ url: URL) -> URL {
+    /// the working folder when the link's target is. Every daily action's
+    /// write follows a link the same way (`JournaledStep.placeALinkLeadsTo`,
+    /// U4b2-1), so this reads no state and runs off the main actor too.
+    nonisolated static func fileALinkLeadsTo(_ url: URL) -> URL {
         var place: URL = url
         var hops: Int = 0
         while hops < Int(MAXSYMLINKS) {

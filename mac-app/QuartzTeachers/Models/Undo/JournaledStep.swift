@@ -108,11 +108,18 @@ nonisolated enum JournaledStepError: Error, LocalizedError, Equatable {
 /// take the step (a busy list leaves one trail line), and nothing is ever
 /// offered back. A course that is not inside a working folder (no `courses`
 /// folder above it), a file outside its working folder through a link, or a
-/// target that is not a plain file (a link, a folder, a file that cannot be
-/// read) cannot be named in a step: in shadow those files are staged and
-/// swapped in together without the list (`writePlainly`), with one trail
-/// line; live, the step is refused before anything changes, because an
+/// target that is not a plain file (a folder, a file that cannot be read)
+/// cannot be named in a step: in shadow those files are staged and swapped
+/// in together without the list (`writePlainly`), with one trail line, and
+/// a target that is not a plain file is refused there before anything
+/// changes; live, the step is refused before anything changes, because an
 /// unrecorded change above the head would be passed over by the next Undo.
+///
+/// A page that is a LINK is planned at the file the link leads to
+/// (`placeALinkLeadsTo`, Russell's ruling on #899, 2026-11-25): its
+/// `before`, staging, swap and any kept file are all at that file, and the
+/// link stays a link, as U4a's Save of a linked settings file does. Before
+/// that ruling the Mac refused a linked page from U3 on.
 ///
 /// Each file's `before` is what it held when it was FIRST planned, never a
 /// second read at `make()`: a file another program changed in between
@@ -313,13 +320,16 @@ nonisolated final class JournaledStep {
     /// one that appeared after this was planned, refuses the step
     /// (`changedSince`), so it is never written over.
     func writeNew(_ data: Data, to url: URL) {
-        plan(data, at: url)
+        plan(data, at: url, throughALink: false)
         mustBeNew.insert(JournaledStep.key(of: url))
     }
 
-    /// Plans the file at `url` to be removed.
+    /// Plans the file at `url` to be removed. A link is never followed
+    /// here: removing what a link leads to would leave the teacher's link
+    /// pointing at nothing, so a link to remove is still refused as not a
+    /// plain file.
     func remove(_ url: URL) {
-        plan(nil, at: url)
+        plan(nil, at: url, throughALink: false)
     }
 
     /// Plans the file at `from` to be MOVED to `to` (one rename that never
@@ -364,10 +374,11 @@ nonisolated final class JournaledStep {
     /// changed after that read refuses the step instead of being written
     /// over.
     func write(_ data: Data, to url: URL, plannedFrom read: Data) {
-        let key: String = JournaledStep.key(of: url)
+        let place: URL = placeALinkLeadsTo(url)
+        let key: String = JournaledStep.key(of: place)
         if plannedURL[key] == nil {
             plannedOrder.append(key)
-            plannedURL[key] = url
+            plannedURL[key] = place
             plannedBefore[key] = .file(read)
         }
         plannedAfter[key] = data
@@ -447,13 +458,14 @@ nonisolated final class JournaledStep {
     func editJSON(
         at url: URL, read: Data, members: [(keyPath: [String], before: UndoJSON?, after: UndoJSON?)], leaving after: Data
     ) {
-        let key: String = JournaledStep.key(of: url)
+        let place: URL = placeALinkLeadsTo(url)
+        let key: String = JournaledStep.key(of: place)
         if plannedURL[key] != nil {
-            plan(after, at: url)
+            plan(after, at: place)
             return
         }
         plannedOrder.append(key)
-        plannedURL[key] = url
+        plannedURL[key] = place
         plannedBefore[key] = .file(read)
         plannedAfter[key] = after
         if !members.isEmpty {
@@ -495,7 +507,7 @@ nonisolated final class JournaledStep {
 
     /// The file's bytes as the step will leave them: planned, or on the disk.
     func readData(_ url: URL) -> Data? {
-        let key: String = JournaledStep.key(of: url)
+        let key: String = plannedKey(of: url)
         if let planned = plannedAfter[key] {
             return planned
         }
@@ -506,7 +518,7 @@ nonisolated final class JournaledStep {
     /// read a page (`String(contentsOf:encoding:)`, which drops a leading
     /// byte-order mark) when it is still the disk's.
     func readText(_ url: URL) -> String? {
-        let key: String = JournaledStep.key(of: url)
+        let key: String = plannedKey(of: url)
         if let planned = plannedAfter[key] {
             guard let data = planned else {
                 return nil
@@ -519,7 +531,7 @@ nonisolated final class JournaledStep {
     /// `readText`, throwing as `String(contentsOf:)` does when the disk's
     /// file cannot be read.
     func readTextOrThrow(_ url: URL) throws -> String {
-        let key: String = JournaledStep.key(of: url)
+        let key: String = plannedKey(of: url)
         if let planned = plannedAfter[key] {
             guard let data = planned, let text = String(data: data, encoding: .utf8) else {
                 throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: url.path])
@@ -531,7 +543,7 @@ nonisolated final class JournaledStep {
 
     /// Whether a file will be there once the step is made.
     func fileExists(_ url: URL) -> Bool {
-        let key: String = JournaledStep.key(of: url)
+        let key: String = plannedKey(of: url)
         if let planned = plannedAfter[key] {
             return planned != nil
         }
@@ -965,11 +977,12 @@ nonisolated final class JournaledStep {
     /// is staged beside its target and the files are swapped in together
     /// (`UndoSwap`, label `shadow`, its staged names noted for a tidy after a
     /// kill: `UndoShadowStaging`); each must still hold what it held when it
-    /// was planned, and one that was absent must still be absent. A target
-    /// that was a link, a folder or a file that could not be read when it was
-    /// planned is refused before anything is written, as a live step is: its
-    /// content cannot be checked, and writing over a link replaced the
-    /// teacher's link with a copy.
+    /// was planned, and one that was absent must still be absent. A page that
+    /// is a link was planned at the file it leads to (`placeALinkLeadsTo`),
+    /// so it is written there and the link stays a link. A target that was a
+    /// folder or a file that could not be read when it was planned (a link
+    /// to a folder included) is refused before anything is written, as a
+    /// live step is: its content cannot be checked.
     func writePlainly() throws {
         var targets: [UndoSwapTarget] = []
         for key in plannedOrder {
@@ -1011,14 +1024,44 @@ nonisolated final class JournaledStep {
 
     // MARK: - Functions: helpers
 
-    private func plan(_ data: Data?, at url: URL) {
-        let key: String = JournaledStep.key(of: url)
+    /// Plans one file. A page that is a link is planned at the file it
+    /// leads to (`throughALink`, the default), unless its own place is
+    /// already planned in this step.
+    private func plan(_ data: Data?, at url: URL, throughALink: Bool = true) {
+        var place: URL = url
+        if throughALink && plannedURL[JournaledStep.key(of: url)] == nil {
+            place = placeALinkLeadsTo(url)
+        }
+        let key: String = JournaledStep.key(of: place)
         if plannedURL[key] == nil {
             plannedOrder.append(key)
-            plannedURL[key] = url
-            plannedBefore[key] = UndoItem.read(at: placeOnDiskNow(url))
+            plannedURL[key] = place
+            plannedBefore[key] = UndoItem.read(at: placeOnDiskNow(place))
         }
         plannedAfter[key] = data
+    }
+
+    /// The place a daily action writes for `url` (Russell's ruling on #899,
+    /// 2026-11-25): the file a link leads to, followed link by link as
+    /// U4a's Save follows one (`CourseConfiguration.fileALinkLeadsTo`, the
+    /// folders above named as the caller named them), or `url` itself when
+    /// it is not a link. A place carried by a planned folder move is named
+    /// as the caller named it: the move decides where it is.
+    func placeALinkLeadsTo(_ url: URL) -> URL {
+        if placeOnDiskNow(url) != url {
+            return url
+        }
+        return CourseConfiguration.fileALinkLeadsTo(url)
+    }
+
+    /// The key a read finds a planned file by: `url`'s own when it is
+    /// planned, else the file a link at `url` leads to.
+    private func plannedKey(of url: URL) -> String {
+        let key: String = JournaledStep.key(of: url)
+        if plannedAfter[key] != nil {
+            return key
+        }
+        return JournaledStep.key(of: placeALinkLeadsTo(url))
     }
 
     /// One spelling per place, so a page planned twice is one file.
