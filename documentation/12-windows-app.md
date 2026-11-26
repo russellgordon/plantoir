@@ -17983,7 +17983,7 @@ The bullets above. Correction to W7a's "For W7b": the planners read through the 
   - When the file is gone, nothing is opened.
 - This copies the Mac's `FolderActions.showInFinder(files:)`: its plan and its order, alert first, then Finder.
 - The words read the contract. `keptTitle`, `kept` and `keptGone` are retyped as C# and pinned against `wording` by `TheSentencesAreTheContracts`, the house pattern. The app reads no contract at runtime. The two Windows words are new keys beside `wording`, not inside it:
-  - `keptOnWindows.hiddenItems`: "To see it, open View in File Explorer and turn on Hidden items." (true on Windows 10 and 11 alike; the director's wording, awaiting Russell's confirmation).
+  - `keptOnWindows.hiddenItems`: "To see it, open View in File Explorer and turn on Hidden items." (true on Windows 10 and 11 alike; the director's wording, which Russell confirmed on 2026-11-26).
   - `keptOnWindows.showKept`: "Open Folder". It is also pinned equal to `shared-rules.json` → `workingFolderPathBar`'s open action `windowsLabel`.
   - **Why beside `wording`:** the Mac's `TodaysClassOnTheFrontPageTests.testTheWordingIsTheContracts` compares the WHOLE `wording` dictionary with its own (`XCTAssertEqual(ours, wording)`). A Windows key inside it would turn the Mac red. The section's `fill` sentence said Windows' button "reads 'Show in File Explorer' … to be measured"; it now points at `keptOnWindows`.
   - "File Explorer" is the name of Windows' program and is listed in `plainWordsExceptions`; `NoKeptAlertSentenceSaysATechnicalWord` checks the filled sentences with that name taken out.
