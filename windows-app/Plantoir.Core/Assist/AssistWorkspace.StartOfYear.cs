@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -187,12 +188,24 @@ public sealed partial class AssistWorkspace
         var declined = new List<StartOfYearDraft>();
         using var recording = UndoHistory.Record(_undo,
             $"got {course.Code} Section {section} ready for the start of the year");
+        // ONE step through the door (#899 W7b2-5; the mac's
+        // StartOfYearPlanner.apply): every page put into draft together, all
+        // or none, each read through the step at plan time; the front page
+        // kept true by its rule after the step (recompute, sectionFrontPage),
+        // never written as a file of it. A failure now changes nothing, so
+        // there is nothing to put back: the act's own put-back is gone.
+        // The app's Go is the sheet's (the mac's UndoStepMaker.sheet); the
+        // assistant's is its conversation's.
+        var step = NewUndoStep("getReadyForTheStartOfTheYear", course.Code, section,
+            madeBy: from == StartOfYearAskedFrom.TheApp ? "sheet" : null);
+        string index = Path.GetFullPath(SectionIndex.PathFor(course, section));
+        string? frontBefore = null;
         try
         {
             foreach (var draft in plan.Drafts)
             {
                 string full = draft.Page.Id;
-                string before = File.ReadAllText(full);
+                string before = step.ReadText(full);
                 var (after, noRoom) = StartOfYearDraftEdit(course, section, full, before);
                 // Half a write that still leaves the page up is no write at
                 // all: nothing is saved, and the page is named.
@@ -202,36 +215,34 @@ public sealed partial class AssistWorkspace
                     continue;
                 }
                 if (after == before) continue;
-                Save(full, after);
+                step.Write(full, after);
                 written[full] = (before, after);
             }
-
-            // The front page catches up — after the hides, or it keeps
-            // embedding the class just put into draft.
-            var classes = ClassPages(course, section);
-            if (SectionIndex.MostRecentPublished(course, section, classes) is { } newest)
-            {
-                string index = SectionIndex.PathFor(course, section);
-                string before = File.ReadAllText(index);
-                string tail = SiblingTimeAndOffset(course, section, classes);
-                if (SectionIndex.PointedAndDated(before, PointerFor(course, section, newest),
-                        DateOf(course, section, newest) ?? default, tail) is { } after && after != before)
-                {
-                    Save(index, after);
-                    written[Path.GetFullPath(index)] = (before, after);
-                }
-            }
+            // The front page catches up AFTER the hides, by its rule, or it
+            // keeps embedding the class just put into draft.
+            step.KeepsTheFrontPageTrue(section, index);
+            try { if (File.Exists(index)) frontBefore = File.ReadAllText(index); } catch { }
+            MakeTheUndoStep(step);
         }
-        catch
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            recording.Done();
+            // All or none: "Nothing was changed" unless the door left a page
+            // holding its new content with its earlier content kept beside
+            // it, which is said as part way, naming each kept file.
+            if (error is not UndoStepLeftPartWayException)
+                return NotDone("writeFailed", NothingWasChanged(error));
             ActivityTrail.Note(ActivityTrail.Event.StartOfYearNotDone,
                 $"did not get ready for the start of the year {where} — the pages could not all be written (writeFailed); backup {Path.GetFileName(backup)}",
                 course.Code, section);
-            return new StartOfYearOutcome(written.Count > 0,
-                StartOfYearWording.Fill(StartOfYearWording.WriteFailed, ("backup", Path.GetFileName(backup))),
-                backup, written);
+            return new StartOfYearOutcome(false,
+                RefusalForAStepThatStopped(error, "the pages put into draft", section).Message,
+                backup, new Dictionary<string, (string, string)>());
         }
+        // The front page as the rule left it, for Undo Getting Ready.
+        string? frontAfter = null;
+        try { if (File.Exists(index)) frontAfter = File.ReadAllText(index); } catch { }
+        if (frontBefore is not null && frontAfter is not null && frontAfter != frontBefore)
+            written[index] = (frontBefore, frontAfter);
         recording.Done();
 
         // Counted from what was put into draft: a declined page is one of the
@@ -355,18 +366,14 @@ public sealed partial class AssistWorkspace
     public static (IReadOnlyList<string> PutBack, IReadOnlyList<string> LeftAsTheyAre) UndoStartOfYear(
         IReadOnlyDictionary<string, (string Before, string After)> written)
     {
-        var (toPutBack, left) = WhatAnUndoWouldDo(written);
-        var putBack = new List<string>();
-        var leftAsTheyAre = new List<string>(left);
-        foreach (string path in toPutBack)
-        {
-            try
-            {
-                File.WriteAllText(path, written[path].Before);
-                putBack.Add(path);
-            }
-            catch { leftAsTheyAre.Add(path); }
-        }
-        return (putBack, leftAsTheyAre);
+        // Through today's undo, as the mac's StartOfYearPreparation.undo
+        // records the held change on a fresh AssistChangeHistory and undoes
+        // it (#899 W7b2-5): the same verdict, and no writer of its own here.
+        var files = new Dictionary<string, UndoHistory.FileState>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (path, (before, after)) in written) files[path] = new UndoHistory.FileState(before, after);
+        var history = new UndoHistory();
+        history.Remember(new UndoHistory.Entry("got ready for the start of the year", DateTime.Now, files));
+        UndoResult result = history.Undo();
+        return (result.Restored, result.Skipped);
     }
 }
