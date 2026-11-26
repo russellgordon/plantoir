@@ -60,6 +60,12 @@ public class UndoWebsiteContractTests : IDisposable
 
     private static bool ChangesMore(JsonNode c) => c["changesMoreThanVisibility"]?.GetValue<bool>() ?? false;
 
+    /// <summary>
+    /// #1004-b: <c>recordListed: false</c> is a published-pages folder that is
+    /// there and could not be listed (its <c>record</c> is then []); absent, it was.
+    /// </summary>
+    private static bool RecordListed(JsonNode c) => c["recordListed"]?.GetValue<bool>() ?? true;
+
     // -------------------------------------------------------------------
     // The 18 cases.
     // -------------------------------------------------------------------
@@ -77,7 +83,7 @@ public class UndoWebsiteContractTests : IDisposable
         {
             string name = c!["name"]!.GetValue<string>();
             var expected = AnswerNamed(c["answer"]!.GetValue<string>());
-            var actual = UndoWebsite.Answer(Moves(c), ChangesMore(c), Record(c),
+            var actual = UndoWebsite.Answer(Moves(c), ChangesMore(c), RecordListed(c) ? Record(c) : null,
                 Strings(c["destinations"]), Strings(c["siteMarkers"]));
             walked++;
             if (actual != expected) red.Add($"RED: {name} (expected {expected}, got {actual})");
@@ -98,7 +104,12 @@ public class UndoWebsiteContractTests : IDisposable
             string name = c!["name"]!.GetValue<string>();
             var expected = AnswerNamed(c["answer"]!.GetValue<string>());
             var course = CourseFor(c, index++);
-            var inputs = UndoWebsite.Inputs(course, 1);
+            // #1004-b: a folder that refuses to be listed, through the listing
+            // seam (a deny ACE does not bite under an administrator's token;
+            // ARecordFolderThatDeniesListingCannotTell is the ACL half).
+            var inputs = RecordListed(c)
+                ? UndoWebsite.Inputs(course, 1)
+                : UndoWebsite.Inputs(course, 1, _ => throw new UnauthorizedAccessException("the case's record folder could not be listed"));
             var actual = UndoWebsite.Answer(Moves(c), ChangesMore(c), inputs.Record, inputs.Destinations, inputs.SiteMarkers);
             if (actual != expected) red.Add($"RED: {name} (expected {expected}, got {actual})");
             // The seam says what the case holds.

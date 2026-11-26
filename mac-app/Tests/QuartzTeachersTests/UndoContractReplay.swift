@@ -945,7 +945,12 @@ nonisolated enum UndoContractReplay {
             /// One flip of p1 written by another version of Plantoir: a begin
             /// line written raw, the page changed, then `applied`. The
             /// variant gives the begin a value this version does not write.
-            func stepFromAnotherVersion(_ variant: String) throws {
+            ///
+            /// #1004-b: `madeAtText` replaces the step's `madeAt` (one that
+            /// is not a moment); `segmentNamed` writes the two lines to a
+            /// file of that name in the list's folder instead, leaving p1
+            /// as it is, with no variant (`variant` empty).
+            func stepFromAnotherVersion(_ variant: String, madeAtText: String? = nil, segmentNamed: String? = nil) throws {
                 let change: [UndoFileChange] = flip(in: root, at: pagePath)
                 let made: UndoStepDraft = draft(changes: change, root: root, action: "publishPages")
                 var opObjects: [[String: Any]] = []
@@ -959,7 +964,7 @@ nonisolated enum UndoContractReplay {
                 let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: root)
                 var step: [String: Any] = [
                     "seq": next,
-                    "madeAt": moment,
+                    "madeAt": madeAtText ?? moment,
                     "action": ["key": "publishPages", "arguments": ["pageCount": "1"]],
                     "madeBy": "menu",
                     "workingFolder": ["id": folderID, "pathAtTheTime": root.path],
@@ -994,6 +999,8 @@ nonisolated enum UndoContractReplay {
                     if !opObjects.isEmpty {
                         opObjects[0]["onlyWhen"] = "aConditionNobodyKnows"
                     }
+                } else if variant.isEmpty {
+                    // No variant: the step as this version writes it.
                 } else {
                     failures.append("stackCases '\(name)': unknown variant \(variant)")
                 }
@@ -1001,16 +1008,29 @@ nonisolated enum UndoContractReplay {
                 let process: Any = try JSONSerialization.jsonObject(with: JSONEncoder().encode(UndoProcess.current()))
                 let begin: [String: Any] = ["v": 1, "seq": next, "event": "begin", "at": moment, "step": step, "process": process]
                 let beginData: Data = try JSONSerialization.data(withJSONObject: begin, options: [.sortedKeys])
+                let appliedLine: String = "{\"v\":1,\"seq\":\(next),\"event\":\"applied\",\"at\":\"\(moment)\"}"
+                if let segmentNamed {
+                    var lines: Data = beginData
+                    lines.append(Data("\n\(appliedLine)\n".utf8))
+                    try lines.write(to: place.journalFolder.appendingPathComponent(segmentNamed))
+                    return
+                }
                 try appendRaw(String(decoding: beginData, as: UTF8.self), to: journal())
                 if let first = change.first {
                     try (first.after ?? Data()).write(to: root.appendingPathComponent(first.relativePath))
                 }
-                try appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\",\"at\":\"\(moment)\"}", to: journal())
+                try appendRaw(appliedLine, to: journal())
             }
 
             for value in testCase["calls"] as? [String] ?? [] {
                 if value.hasPrefix("stepFromAnotherVersion:") {
                     try stepFromAnotherVersion(String(value.dropFirst("stepFromAnotherVersion:".count)))
+                } else if value == "aSegmentNamedWithOtherDigits" {
+                    // #1004-b: journal- and six ARABIC-INDIC digits (U+0660
+                    // five times, then U+0662) and .jsonl: not a segment.
+                    try stepFromAnotherVersion("", segmentNamed: "journal-\u{0660}\u{0660}\u{0660}\u{0660}\u{0660}\u{0662}.jsonl")
+                } else if value == "stepWithAMadeAtThatIsNotAMoment" {
+                    try stepFromAnotherVersion("", madeAtText: "yesterday")
                 } else if value == "step" {
                     oneStep(folderRoot: root, path: pagePath, daysAgo: 0)
                 } else if value == "stepOn:p2" {
@@ -1060,6 +1080,33 @@ nonisolated enum UndoContractReplay {
                     }
                     last = outcomeWord(journal().undoNewest(resolveRoot: resolve))
                     UndoKillPoints.hook = nil
+                } else if value == "newestSegmentGoesWhileRead" {
+                    // #1004-a: an undo whose reader lists the segments, then
+                    // finds the newest taken away before it opens it; the
+                    // segment comes back once the undo has answered, as a
+                    // sync service puts a file back.
+                    let listFolder: URL = place.journalFolder
+                    let numbers: [Int] = try journal().segmentNumbers()
+                    if let newest = numbers.last {
+                        let newestURL: URL = journal().segmentURL(number: newest)
+                        let awayURL: URL = listFolder.deletingLastPathComponent().appendingPathComponent("segment-away")
+                        var taken: Bool = false
+                        UndoKillPoints.afterTheSegmentsAreListed = { listed in
+                            if !taken && listed.standardizedFileURL == listFolder.standardizedFileURL {
+                                taken = true
+                                try? FileManager.default.moveItem(at: newestURL, to: awayURL)
+                            }
+                        }
+                        last = outcomeWord(journal().undoNewest(resolveRoot: resolve))
+                        UndoKillPoints.afterTheSegmentsAreListed = nil
+                        if taken {
+                            try FileManager.default.moveItem(at: awayURL, to: newestURL)
+                        } else {
+                            failures.append("stackCases '\(name)': the undo never listed the segments")
+                        }
+                    } else {
+                        failures.append("stackCases '\(name)': no segment to take away")
+                    }
                 } else if value == "deploy" {
                     // What a deploy leaves: a fragment of the section's
                     // published-pages record, and nothing in the list.
@@ -2210,7 +2257,7 @@ nonisolated enum UndoContractReplay {
     // MARK: - undo.deployedCases
 
     static let deployedKeys: Set<String> = [
-        "name", "moves", "changesMoreThanVisibility", "record", "destinations", "siteMarkers", "answer", "why",
+        "name", "moves", "changesMoreThanVisibility", "record", "recordListed", "destinations", "siteMarkers", "answer", "why",
     ]
 
     /// Ruling 19's question, as data: does a website show what the move
@@ -2230,9 +2277,14 @@ nonisolated enum UndoContractReplay {
                 }
                 moves.append(UndoWebsite.PageMove(place: place, visibleBeforeTheMove: before, visibleAfterTheMove: after))
             }
-            var record: [UndoWebsite.Fragment] = []
+            var listed: [UndoWebsite.Fragment] = []
             for fragment in testCase["record"] as? [[String: Any]] ?? [] {
-                record.append(UndoWebsite.Fragment(name: string(fragment["name"]) ?? "", places: fragment["places"] as? [String]))
+                listed.append(UndoWebsite.Fragment(name: string(fragment["name"]) ?? "", places: fragment["places"] as? [String]))
+            }
+            // #1004-b: a folder that is there and could not be listed.
+            var record: [UndoWebsite.Fragment]? = listed
+            if testCase["recordListed"] as? Bool == false {
+                record = nil
             }
             guard let destinations = testCase["destinations"] as? [String] else {
                 failures.append("deployedCases '\(name)': no destinations")

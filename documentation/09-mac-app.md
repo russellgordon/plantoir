@@ -23616,6 +23616,61 @@ folder, is refused "cannot tell now" before anything changes
 is unchanged. The door's rule for a place a move leaves is parked for the
 director.
 
+### #1004-a: the journal's own files are judged by what was read
+
+A file of the list is judged only by the bytes actually read from it. A
+`folder-id` or `computer-id` that holds no identifier is now known by the
+file number, size and time of the descriptor that read it
+(`UndoFileReads.readWholeWithStatus`, `fstat`), never by a second look at
+the name: before, a good file put at the name between the read and that
+look was the one moved aside, and a third file taking the name before the
+put-back stranded every step under the good identifier. macOS has no rename
+by descriptor (Windows renames through the handle it compared), so the name
+is compared just before the rename and the file moved just after; a file
+that is not the one read is put back. The window left is the instant
+between that last `lstat` and the rename. In `UndoFoldCache.read`, a
+segment gone between the listing and its open is passed over only when it
+is not the newest listed (pruning never deletes the segment that is newest when it prunes; one that was newest when a reader without the lock listed it can be pruned once a newer one has started, and that reader then refuses once), as Windows'
+`ReadSegments` does; the newest gone is an unreadable list, never a shorter
+fold that would reuse step numbers (stack row "#1004: the newest segment
+gone after the list was listed", call `newestSegmentGoesWhileRead`). And
+`segmentNumbers` lists with `opendir` and decides from its own `errno`: only
+`ENOENT` or `ENOTDIR` is no segments, anything else is `couldNotRead`.
+Neither of Foundation's answers can tell: `fileExists` answers false for a
+folder it may not look at, and, measured on macOS 26, `contentsOfDirectory`
+reports a folder whose parent may not be searched (`EACCES`) as Cocoa's
+`fileReadNoSuchFile` (260) over `fnfErr`, so reading "the underlying error"
+would have kept the bug. A race between a read and a rename has no fair contract row (no
+replay can place the swap at the same instant on both platforms): the
+folder-id rule is held by `undoJournal.identifierFiles.unreadable` and
+`UndoJournalCoreTests`.
+
+### #1004-b: what cannot be read is cannot tell
+
+`UndoWebsite.readRecord` now lists the section's published-pages folder with
+the same `UndoJournal.namesListed(in:)` and returns nil, never `[]`, for a
+folder that is there and cannot be listed; `UndoWebsite.answer` takes that
+nil as Windows' `Answer` takes a null record: cannot tell for a section that
+deploys anywhere now, whatever its site markers say, and no offer only when
+it deploys nowhere. Before, `try?` read such a folder as no fragments, and a
+section with no site marker (any folder destination) was told "never
+deployed". Only `ENOENT` or `ENOTDIR` is a folder that is not there. Three
+agreements are pinned too, each a row that passed on the base: a move whose
+path ends `.MD` names the same page as `.md` (`deployedCases`); a fragment
+whose moment, and a segment whose number, is written in digits that are not
+ASCII is not one (`deployedCases`, and `stackCases` call
+`aSegmentNamedWithOtherDigits`; Windows' fragment pattern already says
+`[0-9]`, its segment pattern's `\d` still matches any Unicode digit, held
+under `Reason1004JournalReading`); and a step whose `madeAt` is not a moment
+is a barrier that carries the step before's time, so it is never pruned as
+old on its own (`stackCases` call `stepWithAMadeAtThatIsNotAMoment`). An
+unreadable `madeAt` read as the oldest moment would carry the same time,
+since a step's time is the latest so far; the rule that matters is that it
+has no time of its own. `readRecord` has no caller yet: U6's offer to deploy
+is the first. `UndoWebsite.siteMarkers` still asks `fileExists`, so a marker
+that cannot be looked at reads as absent, on both platforms; that is left
+for the next piece.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
