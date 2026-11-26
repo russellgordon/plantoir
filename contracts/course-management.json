@@ -1719,7 +1719,7 @@
         "unlock a course kept for reference; throw away the built sites (kept sketch copies stay)",
         "make the moves; on any failure, the way back (faultCases), then every file written into the backup's items while they were in the course kept with the newcomers (keptFolders), last first: the course's own course_config.json, which moved out first, goes back only when every other move back succeeded, and a way back that cannot move the backup's course_config.json out again stops there, so a course that is a mix never has its settings (the implementation review's I1)",
         "write the record, phase done, flushed: the restore has happened",
-        "clear the rename records; lock again if kept for reference",
+        "clear the unit-word rename record, and keep a Rename folder record (documentation 09, step 7); lock again if kept for reference",
         "when the record says keepsWhatWasReplaced (no archive was made of a course folder that is there: a folder with no settings, left by a stop, is not a course the sidebar lists, so nothing archives it), move the set-aside copy to courses/_backups/<CODE>/<CODE> as it was before restoring again <stamp>; otherwise move out of it, to courses/_backups/<CODE>/<CODE> not in the archive <stamp>, at their paths inside the course, every file the archive's own listing does not hold as it is now (keptFolders.notInTheArchive); if any of those moves fails, stop here: nothing is removed, and the done record stays for the next reading (the fix review's I-a)",
         "remove the set-aside copy (clearing Locked and making folders writable on the way, never following a link) and the staging folder",
         "let go of the hold and the lease"

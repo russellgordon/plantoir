@@ -207,8 +207,8 @@ nonisolated enum RestoreSwap {
         let justBeforeTheSwap: () -> Void
 
         /// Run after the commit, and again by a settle that finds `done`:
-        /// clear the rename records, lock again if kept for reference. Must
-        /// be safe to run twice.
+        /// clear the unit-word rename record (a Rename folder record is
+        /// kept), lock again if kept for reference. Must be safe to run twice.
         let afterCommit: () -> Void
 
         /// Undo's seam (#899, U5): handed the set-aside copy before it is
