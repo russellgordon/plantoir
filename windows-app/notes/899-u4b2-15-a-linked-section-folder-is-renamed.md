@@ -50,7 +50,7 @@ What each new test proves: `testAPerSectionFolderThatIsALinkIsRenamedByMovingThe
 
 - **`undo.rule.shadow` changed.** "Removing a page that is a link, or renaming one away, still differs until the pieces that move a link (14 and 15) settle it:" is now "Removing a page that is a link, or renaming one away, still differs, and no piece yet settles it: the door moves a link as itself (U4b2-14) and Rename folder uses that for a folder that is itself a link (U4b2-15), but no writer of a page does:". The Windows test `UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15` reads only three substrings, all still present byte for byte: "never follows the link and is refused before anything changes", "saving a plain copy at the new name and deleting the link itself, the linked file left untouched", "held by name in UndoMakeRoomStepTests.<its name>". So the PC stays green with no Windows change. Its name and its `settle` message still say "U4b2-14 and 15"; renaming it would need the clause's "held by name" text changed in the same merge: if you rename the test to `…_WhereTheMacRefusesBeforeAnythingChanges`, the clause must then contain "held by name in UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges".
 - **Parked: which piece settles a linked PAGE renamed away or removed (Insert Class renaming a later class that is a link)?** Nothing in v2.0.0 names one (searched the milestone; the digest's rulings do not settle it). Options: (a, recommended) a small Mac piece, U4b3, after this merge: Insert Class renames a later class that is a link by moving the link (`JournaledStep.moveLink`, as Rename folder now does), and W8 does the same, replacing Windows' plain copy plus deleted link (which loses the teacher's link); (b) Windows' behaviour on both: a plain copy at the new name and the link deleted; (c) leave the Mac refusing until U7 decides. (a) keeps the teacher's link and its file exactly as they were, which is what Rename folder now does for a folder.
-- `contracts/` changed: both gates (taken with piece 14 anyway). No new row, no new key, no held row.
+- `contracts/` changed: both gates (taken with piece 14 anyway). First round: no new row or key. Review 1 added two `stackCases` rows and one call, both held.
 - HIG: nothing a teacher sees changed (a refused rename now goes ahead with the existing sentences; the part-way sentences are existing ones); no section read.
 
 ## Self-check
@@ -64,7 +64,7 @@ What each new test proves: `testAPerSectionFolderThatIsALinkIsRenamedByMovingThe
 7. `grep -n "DispatchQueue\|\.map {\|\.filter {\|\.reduce(\|\$0"` over the added Swift lines: empty; no new type authored (functions added to `JournaledStep`, `UndoTreeReading`, test helpers in their MARK sections; a new MARK section in the test class).
 8. Riding L3 fixed with two tests that failed first (S3, S4).
 9. The rename record is still written before the step and cleared after; `undoJournalIsLive` untouched (off).
-10. No new or changed contract row; nothing to hold.
+10. First round: no row. Review 1: two new `stackCases` rows, replayed on the Mac (`testStackCases`) and modelled in Python, held on Windows by exact name (2 rows, `Reason899W8U4b2LinkedFolder`).
 
 ## Review 1 (4 LOW), all fixed in this branch
 
