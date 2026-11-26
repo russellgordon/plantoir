@@ -1204,6 +1204,12 @@ class ContractCaseTests(unittest.TestCase):
                                 cleared.append(("changedSince", model.highest))
                             model.prune()
                         last = dry
+                    elif call == "newestSegmentGoesWhileRead":
+                        # #1004: the reader refuses a listed newest segment
+                        # that is gone when it opens it (pruning never takes
+                        # the newest): the list cannot be read, so the undo
+                        # changes nothing and clears nothing.
+                        last = ("listUnavailable",)
                     elif call == "deploy":
                         # Not on the list: the model is not told of it at all.
                         lines_written_by_the_deploy = 0

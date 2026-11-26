@@ -21,6 +21,10 @@ final class UndoJournalCoreTests: XCTestCase {
     }
 
     override func tearDown() {
+        // Given back even when a test failed before its own clean-up.
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: UndoCoreChecks.unlistableParent(under: scratchURL).path
+        )
         try? FileManager.default.removeItem(at: scratchURL)
     }
 
@@ -86,5 +90,28 @@ final class UndoJournalCoreTests: XCTestCase {
     /// The review of U2a: LOW 2.
     func testALaterOpOnAPathWithMissingContentIsNotJudgedStale() throws {
         XCTAssertEqual(try UndoCoreChecks.aLaterOpOnAPathWithMissingContentIsNotJudgedStale(under: scratchURL), [])
+    }
+
+    /// #1004-a, gap 1. MUST FAIL on 0e12bc8ac, which took the file number
+    /// by a second look at the name and moved the good file aside.
+    func testAFolderIDReplacedByAGoodOneIsNeverSetAside() throws {
+        XCTAssertEqual(try UndoCoreChecks.aFolderIDReplacedByAGoodOneIsNeverSetAside(under: scratchURL), [])
+    }
+
+    /// #1004-a, gap 1: the file moved is confirmed to be the file read.
+    func testAFileThatIsNotTheOneReadIsPutBack() throws {
+        XCTAssertEqual(try UndoCoreChecks.aFileThatIsNotTheOneReadIsPutBack(under: scratchURL), [])
+    }
+
+    /// #1004-a, gap 2. MUST FAIL on 0e12bc8ac, which passed over the newest
+    /// segment gone after the listing (the older half passes there).
+    func testTheNewestSegmentGoneAfterTheListingIsAnUnreadableList() throws {
+        XCTAssertEqual(try UndoCoreChecks.theNewestSegmentGoneAfterTheListingIsAnUnreadableList(under: scratchURL), [])
+    }
+
+    /// #1004-a, item 3. MUST FAIL on 0e12bc8ac, which asked fileExists and
+    /// read an unlistable folder as no segments.
+    func testAListFolderThatCannotBeListedIsUnreadable() throws {
+        XCTAssertEqual(try UndoCoreChecks.aListFolderThatCannotBeListedIsUnreadable(under: scratchURL), [])
     }
 }

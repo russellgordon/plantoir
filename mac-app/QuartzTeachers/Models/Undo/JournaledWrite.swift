@@ -1149,6 +1149,28 @@ nonisolated enum UndoKillPoints {
     /// Windows. Set only by tests.
     nonisolated(unsafe) static var putBackFailsAt: ((Int) -> Bool)?
 
+    /// Called with the list's folder once its segments are listed and
+    /// before any of them is opened: a test takes a segment away there, as
+    /// a sync service or a person could in that instant (#1004). Set only
+    /// by tests.
+    nonisolated(unsafe) static var afterTheSegmentsAreListed: ((URL) -> Void)?
+
+    /// Called with an identifier file's place once its bytes were read and
+    /// found to hold no identifier, before anything else looks at the name:
+    /// a test puts a good file there, as another process could in that
+    /// instant (#1004). Set only by tests.
+    nonisolated(unsafe) static var afterAnIdentifierFileIsRead: ((URL) -> Void)?
+
+    /// Called with an identifier file's place after the last look that it
+    /// is still the file read and before it is renamed aside (#1004). Set
+    /// only by tests.
+    nonisolated(unsafe) static var beforeAnIdentifierFileIsSetAside: ((URL) -> Void)?
+
+    /// Called with an identifier file's place just before a file set aside
+    /// from it is put back: a test takes the name there, as a third process
+    /// could (#1004). Set only by tests.
+    nonisolated(unsafe) static var beforeAnIdentifierFileIsPutBack: ((URL) -> Void)?
+
     // MARK: - Functions
 
     static func stopsHere(_ point: UndoKillPoint) -> Bool {

@@ -586,4 +586,258 @@ enum UndoCoreChecks {
         }
         return failures
     }
+
+    // MARK: - #1004-a: the journal's own files are judged by what was read
+
+    /// Writes bytes under a temporary name and renames them onto the name,
+    /// so the name holds a NEW file (a new file number), as a sync service
+    /// or another process replacing a file does.
+    static func replace(_ url: URL, with text: String) throws {
+        let temporaryURL: URL = url.deletingLastPathComponent().appendingPathComponent(".swap-" + UUID().uuidString)
+        try Data(text.utf8).write(to: temporaryURL)
+        let renamed: Int32 = temporaryURL.withUnsafeFileSystemRepresentation { from in
+            return url.withUnsafeFileSystemRepresentation { to in
+                guard let from, let to else {
+                    return -1
+                }
+                return rename(from, to)
+            }
+        }
+        if renamed != 0 {
+            throw UndoJournalError.couldNotRead
+        }
+    }
+
+    /// The identifiers the files set aside from an identifier file hold.
+    static func identifiersSetAside(from url: URL) -> [String] {
+        var found: [String] = []
+        let folder: URL = url.deletingLastPathComponent()
+        let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        for name in names where name.hasPrefix(url.lastPathComponent + ".unreadable-") {
+            if let identifier = UndoIdentifierFile.read(at: folder.appendingPathComponent(name)) {
+                found.append(identifier)
+            }
+        }
+        return found
+    }
+
+    /// A folder-id that holds no identifier, replaced by a good one between
+    /// the read and anything else looking at the name: the good file is
+    /// never set aside (never moved at all) and its identifier is the
+    /// answer; and with a third file taking the name the moment a file set
+    /// aside would be put back, the good identifier is still never
+    /// stranded under a set-aside name (#1004-a, gap 1). On the base the
+    /// file number was taken by a second look at the name, so the good file
+    /// was the one moved aside, and the third file stranded it.
+    static func aFolderIDReplacedByAGoodOneIsNeverSetAside(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        defer {
+            UndoKillPoints.afterAnIdentifierFileIsRead = nil
+            UndoKillPoints.beforeAnIdentifierFileIsPutBack = nil
+        }
+        for thirdTakesTheName in [false, true] {
+            let label: String = thirdTakesTheName ? "with a third file at the put-back" : "alone"
+            let folder: URL = parent.appendingPathComponent(thirdTakesTheName ? "replaced-id-third" : "replaced-id", isDirectory: true)
+            try? FileManager.default.removeItem(at: folder)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let url: URL = folder.appendingPathComponent("folder-id")
+            try Data("not an identifier, a sync conflict's leftovers\n".utf8).write(to: url)
+            let good: String = UUID().uuidString.lowercased()
+            let third: String = UUID().uuidString.lowercased()
+            var replaced: Bool = false
+            var putBackTried: Bool = false
+            UndoKillPoints.afterAnIdentifierFileIsRead = { place in
+                if place.standardizedFileURL == url.standardizedFileURL && !replaced {
+                    replaced = true
+                    try? replace(url, with: good + "\n")
+                }
+            }
+            UndoKillPoints.beforeAnIdentifierFileIsPutBack = { place in
+                if place.standardizedFileURL == url.standardizedFileURL {
+                    putBackTried = true
+                    if thirdTakesTheName {
+                        try? Data((third + "\n").utf8).write(to: url)
+                    }
+                }
+            }
+            let answer: String? = try? UndoIdentifierFile.readOrCreate(at: url)
+            UndoKillPoints.afterAnIdentifierFileIsRead = nil
+            UndoKillPoints.beforeAnIdentifierFileIsPutBack = nil
+            if !replaced {
+                failures.append("\(label): the seam between the read and the look never ran")
+            }
+            if putBackTried {
+                failures.append("\(label): the good folder-id was moved aside (a put-back was needed)")
+            }
+            if answer != good {
+                failures.append("\(label): the answer was \(answer ?? "none"), not the good identifier")
+            }
+            if UndoIdentifierFile.read(at: url) != good {
+                failures.append("\(label): the name holds \(UndoIdentifierFile.read(at: url) ?? "no identifier"), not the good identifier")
+            }
+            if identifiersSetAside(from: url).contains(good) {
+                failures.append("\(label): the good identifier is stranded under a set-aside name")
+            }
+        }
+        return failures
+    }
+
+    /// A file put at the name in the last moment before the rename (after
+    /// the last look that it is still the file read) is not the file read:
+    /// once moved it is found to be another file and put back, never left
+    /// aside (#1004-a, gap 1: the file moved is confirmed by its number).
+    static func aFileThatIsNotTheOneReadIsPutBack(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        defer {
+            UndoKillPoints.beforeAnIdentifierFileIsSetAside = nil
+        }
+        let folder: URL = parent.appendingPathComponent("swapped-at-the-rename", isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url: URL = folder.appendingPathComponent("folder-id")
+        try Data("not an identifier, the first leftovers\n".utf8).write(to: url)
+        let other: String = "not an identifier either, another process's leftovers\n"
+        var swapped: Bool = false
+        UndoKillPoints.beforeAnIdentifierFileIsSetAside = { place in
+            if place.standardizedFileURL == url.standardizedFileURL && !swapped {
+                swapped = true
+                try? replace(url, with: other)
+            }
+        }
+        _ = try? UndoIdentifierFile.readOrCreate(at: url)
+        UndoKillPoints.beforeAnIdentifierFileIsSetAside = nil
+        if !swapped {
+            failures.append("the seam before the rename never ran")
+        }
+        let held: String? = try? String(contentsOf: url, encoding: .utf8)
+        if held != other {
+            failures.append("the name holds \(held ?? "nothing"), not the file put there before the rename")
+        }
+        let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        for name in names where name.hasPrefix("folder-id.unreadable-") {
+            failures.append("a file that was not the one read was left aside as \(name)")
+        }
+        return failures
+    }
+
+    /// The newest segment taken away between the listing and its open is an
+    /// unreadable list, never a shorter fold, whether the fold is read on or
+    /// read whole; an older segment taken away the same way is still passed
+    /// over, as pruning from the oldest end by another process (#1004-a,
+    /// gap 2; the older half passes on the base too).
+    static func theNewestSegmentGoneAfterTheListingIsAnUnreadableList(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        defer {
+            UndoKillPoints.afterTheSegmentsAreListed = nil
+        }
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "newest-gone")
+        let page: String = "p.md"
+        try UndoContractReplay.write("---\npublish: false\n---\nBody.\n", to: page, in: place.root)
+        _ = UndoContractReplay.writeSteps(count: 2, onPage: page, root: place.root, journalFolder: place.journalFolder)
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        _ = try journal.read()
+        let newestURL: URL = journal.segmentURL(number: 1)
+        let awayURL: URL = place.journalFolder.deletingLastPathComponent().appendingPathComponent("segment-away")
+        for readingWhole in [false, true] {
+            let label: String = readingWhole ? "read whole" : "read on"
+            if readingWhole {
+                UndoFoldCache.forget(place.journalFolder)
+            }
+            var taken: Bool = false
+            UndoKillPoints.afterTheSegmentsAreListed = { folder in
+                if folder.standardizedFileURL == place.journalFolder.standardizedFileURL && !taken {
+                    taken = true
+                    try? FileManager.default.moveItem(at: newestURL, to: awayURL)
+                }
+            }
+            do {
+                let fold: UndoFold = try journal.read()
+                failures.append("\(label): the newest segment gone after the listing gave a fold of \(fold.highestSeq) steps, not an unreadable list")
+            } catch {
+                if error as? UndoJournalError != .couldNotRead {
+                    failures.append("\(label): threw \(error), not couldNotRead")
+                }
+            }
+            UndoKillPoints.afterTheSegmentsAreListed = nil
+            if !taken {
+                failures.append("\(label): the seam after the listing never ran")
+            }
+            try? FileManager.default.moveItem(at: awayURL, to: newestURL)
+        }
+        UndoFoldCache.forget(place.journalFolder)
+        let back: UndoFold = try journal.read()
+        if back.highestSeq != 2 {
+            failures.append("the list afterwards holds \(back.highestSeq) steps, not 2")
+        }
+
+        // An older segment: the steps move to segment 2, an empty segment 1
+        // below them is taken away after the listing.
+        UndoFoldCache.forget(place.journalFolder)
+        try FileManager.default.moveItem(at: newestURL, to: journal.segmentURL(number: 2))
+        try Data().write(to: newestURL)
+        var olderTaken: Bool = false
+        UndoKillPoints.afterTheSegmentsAreListed = { folder in
+            if folder.standardizedFileURL == place.journalFolder.standardizedFileURL && !olderTaken {
+                olderTaken = true
+                try? FileManager.default.removeItem(at: newestURL)
+            }
+        }
+        do {
+            let fold: UndoFold = try journal.read()
+            if fold.highestSeq != 2 {
+                failures.append("with an older segment gone the fold holds \(fold.highestSeq) steps, not 2")
+            }
+        } catch {
+            failures.append("an older segment gone after the listing threw \(error); it is passed over")
+        }
+        UndoKillPoints.afterTheSegmentsAreListed = nil
+        if !olderTaken {
+            failures.append("the seam after the listing never ran for the older segment")
+        }
+        return failures
+    }
+
+    /// The folder `aListFolderThatCannotBeListedIsUnreadable` makes unreadable
+    /// (no permissions on it), so the test can give them back in its
+    /// tear-down even when it fails.
+    static func unlistableParent(under parent: URL) -> URL {
+        return parent.appendingPathComponent("unlistable", isDirectory: true)
+    }
+
+    /// The list's folder there but not listable (its parent may not be
+    /// searched, so `fileExists` answers false for it) throws, never
+    /// answers no segments; a folder that is not there is still no
+    /// segments (#1004-a, item 3).
+    static func aListFolderThatCannotBeListedIsUnreadable(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let shut: URL = unlistableParent(under: parent)
+        try? FileManager.default.removeItem(at: shut)
+        let folder: URL = shut.appendingPathComponent("undo", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("{}\n".utf8).write(to: folder.appendingPathComponent("journal-000001.jsonl"))
+        let journal: UndoJournal = UndoJournal(folderURL: folder)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: shut.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shut.path)
+        }
+        do {
+            let numbers: [Int] = try journal.segmentNumbers()
+            failures.append("a list folder that cannot be listed answered \(numbers), not a throw")
+        } catch {
+            if error as? UndoJournalError != .couldNotRead {
+                failures.append("a list folder that cannot be listed threw \(error), not couldNotRead")
+            }
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shut.path)
+        let missing: UndoJournal = UndoJournal(folderURL: shut.appendingPathComponent("not-there", isDirectory: true))
+        do {
+            let numbers: [Int] = try missing.segmentNumbers()
+            if !numbers.isEmpty {
+                failures.append("a list folder that is not there answered \(numbers)")
+            }
+        } catch {
+            failures.append("a list folder that is not there threw \(error), not no segments")
+        }
+        return failures
+    }
 }

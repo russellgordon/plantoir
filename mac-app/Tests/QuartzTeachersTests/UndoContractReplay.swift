@@ -1060,6 +1060,33 @@ nonisolated enum UndoContractReplay {
                     }
                     last = outcomeWord(journal().undoNewest(resolveRoot: resolve))
                     UndoKillPoints.hook = nil
+                } else if value == "newestSegmentGoesWhileRead" {
+                    // #1004-a: an undo whose reader lists the segments, then
+                    // finds the newest taken away before it opens it; the
+                    // segment comes back once the undo has answered, as a
+                    // sync service puts a file back.
+                    let listFolder: URL = place.journalFolder
+                    let numbers: [Int] = try journal().segmentNumbers()
+                    if let newest = numbers.last {
+                        let newestURL: URL = journal().segmentURL(number: newest)
+                        let awayURL: URL = listFolder.deletingLastPathComponent().appendingPathComponent("segment-away")
+                        var taken: Bool = false
+                        UndoKillPoints.afterTheSegmentsAreListed = { listed in
+                            if !taken && listed.standardizedFileURL == listFolder.standardizedFileURL {
+                                taken = true
+                                try? FileManager.default.moveItem(at: newestURL, to: awayURL)
+                            }
+                        }
+                        last = outcomeWord(journal().undoNewest(resolveRoot: resolve))
+                        UndoKillPoints.afterTheSegmentsAreListed = nil
+                        if taken {
+                            try FileManager.default.moveItem(at: awayURL, to: newestURL)
+                        } else {
+                            failures.append("stackCases '\(name)': the undo never listed the segments")
+                        }
+                    } else {
+                        failures.append("stackCases '\(name)': no segment to take away")
+                    }
                 } else if value == "deploy" {
                     // What a deploy leaves: a fragment of the section's
                     // published-pages record, and nothing in the list.

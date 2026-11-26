@@ -360,6 +360,7 @@ nonisolated enum UndoFoldCache {
         guardLock.unlock()
 
         let numbers: [Int] = try journal.segmentNumbers()
+        UndoKillPoints.afterTheSegmentsAreListed?(journal.folderURL)
         var entry: Entry
         let readingOn: Bool
         if let cached, stillValid(cached, numbers: numbers, journal: journal) {
@@ -1007,6 +1008,7 @@ nonisolated enum UndoIdentifierFile {
         if let existing = try readStrictly(at: url) {
             return existing
         }
+        UndoKillPoints.afterAnIdentifierFileIsRead?(url)
         let folder: URL = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) {
@@ -1094,12 +1096,14 @@ nonisolated enum UndoIdentifierFile {
         }
         let asideURL: URL = url.deletingLastPathComponent()
             .appendingPathComponent(url.lastPathComponent + ".unreadable-" + UUID().uuidString.lowercased())
+        UndoKillPoints.beforeAnIdentifierFileIsSetAside?(url)
         if (try? FileManager.default.moveItem(at: url, to: asideURL)) == nil {
             return read(at: url)
         }
         guard let identifier = read(at: asideURL) else {
             return nil
         }
+        UndoKillPoints.beforeAnIdentifierFileIsPutBack?(url)
         let putBack: Int32 = asideURL.withUnsafeFileSystemRepresentation { from in
             return url.withUnsafeFileSystemRepresentation { to in
                 guard let from, let to else {
