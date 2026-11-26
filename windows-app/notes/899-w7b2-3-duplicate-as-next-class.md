@@ -1,28 +1,8 @@
 # #899 W7b2-3: the menu's Duplicate as Next Class is ONE step (Windows #949)
 
-Branch `issue/899-w7b2-3-duplicate-as-next-class`, from `origin/night25/integration-5` c50bc8112 (`dev` 24fcbc718 + W7b2-7, -8, -1, -2). Merges of `origin/dev`: at the start "Already up to date" (`origin/dev` was 24fcbc718, in the base); before hand-back: "Already up to date" again (`origin/dev` still 24fcbc718), so no merge commit was made either time.
+Branch `issue/899-w7b2-3-duplicate-as-next-class`, from `origin/night25/integration-5` c50bc8112 (`dev` 24fcbc718 + W7b2-7, -8, -1, -2). Merges of `origin/dev`: at the start "Already up to date" (`origin/dev` was 24fcbc718, in the base); before hand-back: "Already up to date" again (`origin/dev` still 24fcbc718), so no merge commit was made either time. (Merged on 2026-11-26 in `night25/integration-6`, 5b782bec9, with U4b2-7, -8, -9 and -10. "For PROGRESS" and "For documentation 12" are folded into `windows-app/PROGRESS.md` and documentation 12.)
 
 Commits: 194b40668 (tests first, with two stubs so they compile: `RefusalForAMenuCopyThatStopped` answering as the old path did, and `RefusalForAPressThatStopped(error, sheet, planning)` delegating to the old one), 5cb93ba7c (the product), cf11637e7 and aff3a9356 (test fixes from run `a`, below).
-
-## For PROGRESS
-
-- The Section menu's Duplicate as Next Class (Classes ▸ Add Class… as a copy, #927; `AssistWorkspace.ApplyMenuDuplicate`, key `duplicateAsTheNextClass`, `madeBy` `menu`) writes its one new page through ONE `UndoActionStep`. Ruling (c): the command and menu item are unchanged; only the step is new.
-- Windows' menu copy makes NO room (nothing else is renamed, re-dated or rewritten), so W7b2-2's room-and-copy pattern does not apply: the step holds one `writeFile` with no before and no recompute, exactly the mac's recorded step.
-- Nothing is written beforehand: the `Directory.CreateDirectory`, the `FileMode.CreateNew` stream and the `File.Delete` clean-up are gone; the class folder is made by the swap.
-- Never written over, as the exclusive create never wrote over a page: whether a page stands at the new name is read through the step as the write is planned (`step.Exists`, before the plan is made again so that "changed while saving a copy" is still said first when the page was there then), and the step's before (none) is read at plan time, so a page that appears after that is refused by the swap: its re-read of the target just before the rename, and, for a page written in the instant between that and the rename, its read of the kept original after it (L4), each `changedSince`, the swap reversed. Both answer today's `MenuTheNextPageIsAlreadyThere`, nothing written; so does a rename refused because the name is now taken.
-- Any other refusal says "Nothing was created: …" (the mac's `saidWhenTheStepStopped(nothing: "Nothing was created")`), as since #927. A step left part way says `wording.publishStoppedPartWay` with "the copy of the class" (the mac's `what` words), naming the kept file, with the menu's Restore-from-backup line. `RefusalForAMenuCopyThatStopped` holds the three answers.
-- No entry on today's in-memory undo, as before (night-3 ruling; `NamedGapLedger.MenuCopyUndoEntries` and `Reason899MenuCopy` still held: Edit ▸ Undo offering the step is W11b's). `NoteAChangeWithNoUndoEntry` still runs after a made copy.
-- The links checklist's refused press now says the mac's sentences (W7b2-8 review 1, L1): a page the plan cannot read, and a file the door could not read just now that really cannot be read, say the unreadable-page sentence naming the course ("“ICS3U” could not be read, so nothing was changed.", the mac's `AssistToolRefusal.unreadablePage(offer.course)`); a section page changed since it was checked says `linksChecklist.wording.pageChangedSince` with the sheet's name for the page; part way as before; anything else "Nothing was changed: …". No contract change.
-
-## For documentation 12
-
-- Duplicate as Next Class's step: one file, `Unit 2, Day 2.md`, new, one `writeFile`, no recompute: the mac's exactly. No difference to name.
-- The plan-time check (`step.Exists`) cannot be pinned alone by a test: the plan made again after the backup (#351) sees any page at the new name first (it plans the next day instead and the copy is refused as "changed while saving"), and nothing runs between the two. It stays as the guard the exclusive create was, for a page the planner does not count as a class. The door's two refusals are pinned (must-fail row 2).
-- A one-new-page step cannot be left part way by the door: a refusal of its only swap has nothing before it to put back. The part-way answer is pinned on `RefusalForAMenuCopyThatStopped` with a constructed `UndoStepLeftPartWayException`.
-- What each platform tells the teacher when a page cannot be read during a duplicate (W7b2-2 review 1, L3):
-  - Duplicate Class (the assistant's, W7b2-2): Windows refuses the whole duplicate, "Nothing was changed: …" with the reason (a permission in plain words, else the system's sentence), nothing moved. The mac's `ClassInsertionPlanner` carries the unreadable page past as not renamed (`JournaledStep.readText` gives nil), then the duplicate finds the copy's place still taken, makes the room alone and says `wording.thePlaceForTheCopyIsStillTaken`, naming the backup. `DuplicateClassTests.ALinkRewrittenInsideTheLessonCannotFoolTheGuard` built its skip with the mac's unreadable page until W7b2-2, and with a page of the teacher's own since.
-  - Duplicate as Next Class (the menu's, this piece): the source is read at plan time on both platforms; an unreadable source is `wording.noPageCalledFromTheMenu` on both. No other page is read.
-- The links checklist (W7b2-8 review 1, L3, a sentence only): Windows writes the answered record's `offered` and `leftUnticked` in the sheet's row order, where the mac's `LinksChecklistAnswered.write` sorts them; both readers read them as sets. Named in `WindowsOwnJson`.
 
 ## Changed tests and sentences
 
@@ -62,7 +42,7 @@ All on the PC (LENOVO 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200), under 
 
 ## Left for the next piece
 
-- W7b2-8 review 1, L2 (a contract key for "the pages you ticked", read from the Swift source today): waits for the next `contracts/` change that already brings back the Mac gate. Not changed.
+- W7b2-8 review 1, L2 (a contract key for "the pages you ticked", read from the Swift source today): waits for the next `contracts/` change that already brings back the Mac gate. Not changed. (Done since: U4b2-9 added `linksChecklist.wording.pagesYouTicked`, and Windows reads it there since 7edb554d2, `LinksChecklistWording.PagesYouTicked`; `AssistWorkspace.PagesThePressTicked` and the read of the Swift source are gone.)
 - The mapping of a door `cannotTellNow` on a really unreadable file to the unreadable-page sentence is pinned on `RefusalForAPressThatStopped` with a constructed refusal and a file held with no sharing, not through the door: the door reports a file held that way as `fileIsInUse` (error 32), and an access-denied read cannot be made in a test without changing the file's permissions.
 
 ## For the director

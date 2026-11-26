@@ -1,22 +1,6 @@
 # 899 U4b2-7: a rename that is only planning holds nothing (#899)
 
-Branch `issue/899-u4b2-7-planning-rename-holds-nothing`, from `origin/dev` 24fcbc718. `origin/dev` was fetched again before proving and before hand-back and had not moved (still 24fcbc718), so there was nothing to merge and no merge commit was made.
-
-## For PROGRESS
-
-- Mac, U4b2-7: Command-Q while a Rename folder is only planning no longer waits for it. The quit halts the rename the same way the sheet's Cancel does and gives the course back; it waits only for a rename whose check and swap have begun. Nothing is asked either way. The sheet's rename task and its halting rule moved into a small `@Observable` model, `FolderRenameRun`, so the chain from the sheet's Cancel to the plan is now tested (part eight's L1 and L3). After review 1: once a quit is going ahead, no rename may start and none may begin its swap (one latch, `FolderRenameRun.quitIsGoingAhead`), and every rename sheet's Rename is disabled while it waits.
-
-## For documentation 12
-
-What Windows must do (W8). Today `windows-app/` has no quit wait for a folder rename at all (a grep of `windows-app` for a close or exit path naming the rename finds none), so this is the rule to build when it gets one:
-
-- A Rename folder has two phases. **Planning** reads the course and writes nothing. **Swap** begins at the moment the rename is marked as begun (the same moment Cancel greys), and from then on it moves folders and rewrites pages and settings as one step.
-- When the app is closing and the close is going ahead (after any question about work under way has been answered "quit"), every rename that is still planning is halted the same way its dialog's Cancel halts it: its cancellation is signalled, its claim on the course ends, and nothing it planned is ever written. The close does not wait for it.
-- The close waits only for a rename whose swap has begun, until it ends. This wait asks nothing and shows nothing new; the rename's own dialog keeps its spinner.
-- A close that is called off (the teacher chooses to keep working) halts nothing: a planning rename carries on.
-- The safety that makes this race-free: the check "was this rename cancelled?" and the marking of the swap as begun happen together on the UI thread, with nothing awaited between them, so a halt lands either before the swap (the rename then writes nothing) or after it (the halt is refused, the close waits).
-- Once the close is going ahead (review 1, M1): from that moment no rename may start (the Rename button of every rename dialog is disabled, in the standard disabled state, with no new sentence), and a rename that reaches the point where its swap would begin is refused there, writing nothing. Use one flag, set on the UI thread in the same step as the close decides, and test it at that one point, together with the rename's own cancellation check. Without it, the windows stay live while the close waits, and a rename pressed then, or a plan the halt did not reach, could begin its swap after the close stopped counting it, and the process would end inside the swap. Nothing clears the flag: it is set only after the question is answered, and a close that has gone ahead is never called off.
-- No ledger row: no contract case changed.
+Branch `issue/899-u4b2-7-planning-rename-holds-nothing`, from `origin/dev` 24fcbc718. `origin/dev` was fetched again before proving and before hand-back and had not moved (still 24fcbc718), so there was nothing to merge and no merge commit was made. (Merged on 2026-11-26 in `night25/integration-6`, 5b782bec9, with U4b2-8, -9 and -10 and W7b2-3. "For PROGRESS" and "For documentation 12" are folded into `windows-app/PROGRESS.md` and documentation 12. U4b2-8 then found that the sheet's own `.onDisappear` is not called when the list that presents it leaves the window, and gave the halt for that case to the Course Settings page: its notes.)
 
 ## Must-fail lines
 
@@ -59,7 +43,7 @@ All through `xlock.sh` with the 900 s kill, derived data `.dd/` in the worktree.
 
 ## Left for the next piece
 
-- For piece 9 (director's riding low, piece 6 review L1): the sheet spinner's VoiceOver label "Renaming" (`StringListEditorView.swift`, the `ProgressView` in `renameSheet`, about line 514) is a sentence in Swift alone; it belongs in `contracts/`. Not changed here (no `contracts/` change in this piece).
+- For piece 9 (director's riding low, piece 6 review L1): the sheet spinner's VoiceOver label "Renaming" (`StringListEditorView.swift`, the `ProgressView` in `renameSheet`, about line 514) is a sentence in Swift alone; it belongs in `contracts/`. Not changed here (no `contracts/` change in this piece). (Done by U4b2-9: `undo.wording.renameFolderUnderWaySpinner`.)
 - Review 1 L3, unchanged from `dev`, noted only: a rename planned again after a `changedSince` refusal keeps its claim marked swapping from the first pass, so during that re-plan a quit waits for it and Cancel stays grey, although the refusal put everything back and the re-plan has written nothing; a re-plan stuck on a dead volume would hold the quit. Rare (a page or setting must change between plan and make). Once a quit is going ahead, the re-plan's next pass to the swap is refused (`FolderRenameRun.swapBegins`), so it ends with nothing written. Clearing `isSwapping` before the `continue` would make it a planning claim again; not done here (outside this brief's invariant as worded, and it changes when Cancel greys).
 - Nothing else owed from this brief.
 
