@@ -774,13 +774,19 @@ nonisolated enum UndoContractReplay {
 
     // MARK: - undo.stackCases
 
+    /// The two pages `wholeFileStepOnTwoPagesNamedIndex` writes (U4b2-4).
+    static let twoPagesNamedIndex: [String] = [
+        "courses/TST1O/Section 1/Classes/index.md",
+        "courses/TST1O/Section 2/Classes/index.md",
+    ]
+
     static let stackKeys: Set<String> = [
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
         "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
-        "movedFolder", "caseOnlyFolder", "refusalNamed",
+        "movedFolder", "caseOnlyFolder", "refusalNamed", "keptWhatItReplacedSays",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -851,16 +857,26 @@ nonisolated enum UndoContractReplay {
             var foreignBlob: String? = nil
             var foreignKept: (url: URL, bytes: Data)? = nil
             var contentFolderMadeReadOnly: URL? = nil
+            var foldersMadeReadOnly: [URL] = []
             var unreadableKeptOriginals: [URL] = []
             var keptWhatItReplacedLines: Int = 0
             let keptWhatItReplacedHookBefore = UndoTrailHook.keptWhatItReplacedLine
-            UndoTrailHook.keptWhatItReplacedLine = { _, _, _, _, _, _ in
+            var lastKeptWhatItReplacedLine: String? = nil
+            UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, putBackFromAKeptOriginal, pagesOfTheStep in
                 keptWhatItReplacedLines += 1
+                lastKeptWhatItReplacedLine = UndoTrail.keptWhatItReplacedLine(
+                    course: course, section: section, isUndo: isUndo, keptOriginals: keptOriginals,
+                    keptOfWhatItHoldsNow: keptOfWhatItHoldsNow, putBackFromAKeptOriginal: putBackFromAKeptOriginal,
+                    pagesOfTheStep: pagesOfTheStep
+                )
             }
             defer {
                 UndoTrailHook.keptWhatItReplacedLine = keptWhatItReplacedHookBefore
                 if let contentFolderMadeReadOnly {
                     try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: contentFolderMadeReadOnly.path)
+                }
+                for folder in foldersMadeReadOnly {
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
                 }
                 for keptURL in unreadableKeptOriginals {
                     try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: keptURL.path)
@@ -1201,6 +1217,51 @@ nonisolated enum UndoContractReplay {
                             try (data + Data("A line added to the kept original.\n".utf8)).write(to: keptURL)
                         }
                     }
+                } else if value == "wholeFileStepOnTwoPagesNamedIndex" {
+                    // Two pages with the same file name in two sections, both
+                    // written whole by one step (U4b2-4).
+                    var both: [UndoFileChange] = []
+                    for path in UndoContractReplay.twoPagesNamedIndex {
+                        let before: Data = Data("What \(path) held before the step.\n".utf8)
+                        try write(String(decoding: before, as: UTF8.self), to: path, in: root)
+                        both.append(UndoFileChange(relativePath: path, before: before, after: Data("What the step left in \(path).\n".utf8)))
+                    }
+                    let outcome: JournaledWriteOutcome = JournaledWrite.perform(
+                        draft(changes: both, root: root, action: "publishPages"), in: journal(), mode: .live
+                    )
+                    if case .applied = outcome {
+                        last = "applied"
+                    } else {
+                        last = "\(outcome)"
+                    }
+                } else if value == "firstIndexAfterContentGoneAndCannotBeStored" || value == "secondIndexBeforeContentGoneAndCannotBeStored" {
+                    // That page's content gone from the list, and the list's
+                    // folder for it taking no new file.
+                    let wantsTheFirst: Bool = value.hasPrefix("first")
+                    let path: String = UndoContractReplay.twoPagesNamedIndex[wantsTheFirst ? 0 : 1]
+                    let fold: UndoFold = try journal().read()
+                    var removedOne: Bool = false
+                    if let head = fold.offer(now: journal().now()).head {
+                        for op in head.step.ops where op.path == path && op.knownKind == .writeFile {
+                            if let sha = wantsTheFirst ? op.afterSha : op.beforeSha {
+                                let blobURL: URL = journal().blobURL(sha: sha)
+                                try FileManager.default.removeItem(at: blobURL)
+                                let prefixFolder: URL = blobURL.deletingLastPathComponent()
+                                try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: prefixFolder.path)
+                                foldersMadeReadOnly.append(prefixFolder)
+                                removedOne = true
+                            }
+                        }
+                    }
+                    if !removedOne {
+                        failures.append("stackCases '\(name)': no whole-file step on \(path) whose content to take away")
+                    }
+                } else if value == "keepTheOriginalOfTheSecondIndex" {
+                    // The newest step's kept original of the second page, as
+                    // a swap whose tidy could not remove it leaves it.
+                    let path: String = UndoContractReplay.twoPagesNamedIndex[1]
+                    let keptURL: URL = UndoSwap.besideURL(for: root.appendingPathComponent(path), label: "\(try journal().read().highestSeq)-apply", role: "orig")
+                    try Data("What \(path) held before the step.\n".utf8).write(to: keptURL)
                 } else if value == "begin:held" {
                     try beginHeld()
                 } else if value == "finish:held" {
@@ -1302,6 +1363,9 @@ nonisolated enum UndoContractReplay {
             }
             if let wanted = int(testCase["keptWhatItReplacedLines"]), keptWhatItReplacedLines != wanted {
                 failures.append("stackCases '\(name)': \(keptWhatItReplacedLines) 'undo kept what it replaced' lines, not \(wanted)")
+            }
+            if let wanted = string(testCase["keptWhatItReplacedSays"]), lastKeptWhatItReplacedLine != wanted {
+                failures.append("stackCases '\(name)': the last 'undo kept what it replaced' line is \(lastKeptWhatItReplacedLine ?? "none"), not \(wanted)")
             }
             if testCase["foreignKeptOriginalUntouched"] as? Bool == true {
                 if let foreignKept, UndoItem.read(at: foreignKept.url) != .file(foreignKept.bytes) {

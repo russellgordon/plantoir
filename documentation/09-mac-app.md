@@ -22618,6 +22618,31 @@ another is unfinished would be a new sentence and its own contract piece,
 and U7 drops the record. Chosen over removing `rename`, which five tests in
 `SpecialFolderRenamerTests` and one in `AssistCurriculumMentionsTests` call.
 
+### U4b2: kept-line-by-path
+
+The trail line `undo kept what it replaced` decides "from what was kept
+beside it" page by page, and since this piece a page is its place in the
+working folder, never its file name alone. `UndoCheck` passes each kept file
+by its path (the page's folder plus the hidden name), the pages a kept
+original put back by their paths, and every page the step changes;
+`UndoTrail.pageOfKept` gives a kept file's page and `UndoTrail.nameOnTheLine`
+names it. The words are unchanged when no other page of the step has the
+same file name. When one does (two sections' `index.md`, even if only one
+is named on the line), the page is named by its path inside the course
+(“Section 1/index.md”), in the opening clause and the hidden-file sentences
+alike; a page not under `courses/<course>/`, or in a step with no course,
+by its path in the working folder (“index.md” at its top). The hidden file
+is always its bare name, and names that differ only in capitals are
+different names. Before this, section 1's `index.md` put back from the list
+was said to come "from what was kept beside it" because section 2's
+`index.md` had, and two kept files with the same hidden name in two folders
+were named once (the part-two review of U4b, LOW 4; review 1 of this piece,
+LOW 1 to 3). The contract says so in the row's `carries` and in the stack
+case "U4b2-4: two pages named index.md in two sections…" (held for Windows'
+W4c in `NamedGapLedger.cs`). Tests: the U4b2-4 section of
+`UndoKeptCopiesTests` (Undo, Redo, the top of the working folder, no course,
+capitals).
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

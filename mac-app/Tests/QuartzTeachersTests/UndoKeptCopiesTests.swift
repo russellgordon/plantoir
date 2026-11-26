@@ -228,10 +228,11 @@ final class UndoKeptCopiesTests: XCTestCase {
         try removeBlob(UndoKeptCopiesTests.after, andTakesNoNewOne: true)
         var lines: [String] = []
         let hookBefore = UndoTrailHook.keptWhatItReplacedLine
-        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, putBackFromAKeptOriginal in
+        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, putBackFromAKeptOriginal, pagesOfTheStep in
             lines.append(UndoTrail.keptWhatItReplacedLine(
                 course: course, section: section, isUndo: isUndo, keptOriginals: keptOriginals,
-                keptOfWhatItHoldsNow: keptOfWhatItHoldsNow, putBackFromAKeptOriginal: putBackFromAKeptOriginal
+                keptOfWhatItHoldsNow: keptOfWhatItHoldsNow, putBackFromAKeptOriginal: putBackFromAKeptOriginal,
+                pagesOfTheStep: pagesOfTheStep
             ))
         }
         defer {
@@ -276,10 +277,11 @@ final class UndoKeptCopiesTests: XCTestCase {
         try secondBefore.write(to: second.deletingLastPathComponent().appendingPathComponent(".p2.md.plantoir-undo-1-apply-orig"))
         var lines: [String] = []
         let hookBefore = UndoTrailHook.keptWhatItReplacedLine
-        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, putBackFromAKeptOriginal in
+        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, putBackFromAKeptOriginal, pagesOfTheStep in
             lines.append(UndoTrail.keptWhatItReplacedLine(
                 course: course, section: section, isUndo: isUndo, keptOriginals: keptOriginals,
-                keptOfWhatItHoldsNow: keptOfWhatItHoldsNow, putBackFromAKeptOriginal: putBackFromAKeptOriginal
+                keptOfWhatItHoldsNow: keptOfWhatItHoldsNow, putBackFromAKeptOriginal: putBackFromAKeptOriginal,
+                pagesOfTheStep: pagesOfTheStep
             ))
         }
         defer {
@@ -304,5 +306,255 @@ final class UndoKeptCopiesTests: XCTestCase {
             putBackFromAKeptOriginal: ["B.md"]
         )
         XCTAssertTrue(line.contains("Undo put back “A.md”, and put back “B.md” from what was kept beside it, but the list"), line)
+    }
+
+    // MARK: - U4b2-4: two pages with the same name
+
+    static let firstIndex: String = "courses/TST1O/section1/index.md"
+
+    static let secondIndex: String = "courses/TST1O/section2/index.md"
+
+    /// Two pages, made in one step whose four contents are the same as
+    /// `testTheKeptLineIsDecidedPageByPage`'s. Returns what the second held
+    /// before.
+    func makeTheStepOnTwoPages(first firstPath: String, second secondPath: String) throws -> Data {
+        let secondBefore: Data = Data("What the second page held before, its own words.\n".utf8)
+        let secondAfter: Data = Data("What the step left in the second page.\n".utf8)
+        let first: URL = root.appendingPathComponent(firstPath)
+        let second: URL = root.appendingPathComponent(secondPath)
+        try FileManager.default.createDirectory(at: first.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: second.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try UndoKeptCopiesTests.before.write(to: first)
+        try secondBefore.write(to: second)
+        let changes: [UndoFileChange] = [
+            UndoFileChange(relativePath: firstPath, before: UndoKeptCopiesTests.before, after: UndoKeptCopiesTests.after),
+            UndoFileChange(relativePath: secondPath, before: secondBefore, after: secondAfter),
+        ]
+        let outcome: JournaledWriteOutcome = JournaledWrite.perform(
+            UndoContractReplay.draft(changes: changes, root: root, action: "publishPages"), in: journal(), mode: .live
+        )
+        XCTAssertEqual(outcome, .applied(seq: 1))
+        XCTAssertNotEqual(
+            journal().blobURL(sha: UndoHash.sha256(of: UndoKeptCopiesTests.after)).deletingLastPathComponent(),
+            journal().blobURL(sha: UndoHash.sha256(of: secondBefore)).deletingLastPathComponent()
+        )
+        return secondBefore
+    }
+
+    /// The first page's after content gone and the list taking no new file
+    /// there; the second's before content gone, its kept original beside it,
+    /// and with `secondTakesNoNewFile` the list taking no new file there
+    /// either, so that kept original stays once it is used.
+    func takeAwayTheContent(second secondPath: String, secondBefore: Data, secondTakesNoNewFile: Bool) throws {
+        try removeBlob(UndoKeptCopiesTests.after, andTakesNoNewOne: true)
+        try removeBlob(secondBefore, andTakesNoNewOne: secondTakesNoNewFile)
+        let second: URL = root.appendingPathComponent(secondPath)
+        try secondBefore.write(to: second.deletingLastPathComponent().appendingPathComponent(".index.md.plantoir-undo-1-apply-orig"))
+    }
+
+    /// Every 'undo kept what it replaced' line written while `body` runs.
+    func keptLines(during body: () -> Void) -> [String] {
+        var lines: [String] = []
+        let hookBefore = UndoTrailHook.keptWhatItReplacedLine
+        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, putBackFromAKeptOriginal, pagesOfTheStep in
+            lines.append(UndoTrail.keptWhatItReplacedLine(
+                course: course, section: section, isUndo: isUndo, keptOriginals: keptOriginals,
+                keptOfWhatItHoldsNow: keptOfWhatItHoldsNow, putBackFromAKeptOriginal: putBackFromAKeptOriginal,
+                pagesOfTheStep: pagesOfTheStep
+            ))
+        }
+        body()
+        UndoTrailHook.keptWhatItReplacedLine = hookBefore
+        return lines
+    }
+
+    /// The part-two review of U4b, LOW 4, through the real Undo: section1's
+    /// `index.md` put back from the list (its outgoing bytes refused and
+    /// kept), section2's `index.md` put back from its kept original (the
+    /// list took its bytes, so nothing of it is kept). The line never says
+    /// section1's page came "from what was kept beside it", and names it by
+    /// its path, since section2's page of the same step is `index.md` too
+    /// (review 1, LOW 1). MUST FAIL keyed by file name (section2's
+    /// `index.md` made both match), and with the shared name looked for
+    /// only among the pages named on the line (“index.md” alone).
+    func testTheKeptLineTellsTwoPagesWithTheSameNameApart() throws {
+        let secondBefore: Data = try makeTheStepOnTwoPages(first: UndoKeptCopiesTests.firstIndex, second: UndoKeptCopiesTests.secondIndex)
+        try takeAwayTheContent(second: UndoKeptCopiesTests.secondIndex, secondBefore: secondBefore, secondTakesNoNewFile: false)
+
+        var outcome: UndoOutcome? = nil
+        let lines: [String] = keptLines {
+            outcome = journal().undoNewest(resolveRoot: { _ in self.root })
+        }
+
+        XCTAssertEqual(outcome, .undone(seq: 1))
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(UndoKeptCopiesTests.secondIndex)), secondBefore, "section2's page was put back from its kept original")
+        XCTAssertEqual(lines.count, 1)
+        let line: String = lines.first ?? ""
+        XCTAssertFalse(line.contains("from what was kept beside it"), line)
+        XCTAssertTrue(line.contains("Undo put back “section1/index.md”, but the list could not keep a copy"), line)
+        XCTAssertTrue(line.contains("What “section1/index.md” held a moment before is kept beside it as the hidden file “.index.md.plantoir-undo-1-undo-orig”."), line)
+    }
+
+    /// The same two pages, both named on the line: section2's kept original
+    /// stays too, since the list would not take its bytes. Each is named by
+    /// its path inside the course, since both are `index.md`, and each the
+    /// way it came back. MUST FAIL keyed by file name (both said "from what
+    /// was kept beside it"), with `UndoCheck` passing the put-back pages by
+    /// file name, or the kept files by bare name.
+    func testTheKeptLineNamesTwoPagesWithTheSameNameByTheirPaths() throws {
+        let secondBefore: Data = try makeTheStepOnTwoPages(first: UndoKeptCopiesTests.firstIndex, second: UndoKeptCopiesTests.secondIndex)
+        try takeAwayTheContent(second: UndoKeptCopiesTests.secondIndex, secondBefore: secondBefore, secondTakesNoNewFile: true)
+
+        var outcome: UndoOutcome? = nil
+        let lines: [String] = keptLines {
+            outcome = journal().undoNewest(resolveRoot: { _ in self.root })
+        }
+
+        XCTAssertEqual(outcome, .undone(seq: 1))
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(UndoKeptCopiesTests.secondIndex)), secondBefore)
+        XCTAssertEqual(lines.count, 1)
+        let line: String = lines.first ?? ""
+        XCTAssertTrue(
+            line.contains("Undo put back “section1/index.md”, and put back “section2/index.md” from what was kept beside it, but the list"),
+            line
+        )
+        XCTAssertTrue(line.contains("What “section1/index.md” held a moment before is kept beside it as the hidden file “.index.md.plantoir-undo-1-undo-orig”."), line)
+        XCTAssertTrue(line.contains("What “section2/index.md” holds now is kept beside it as the hidden file “.index.md.plantoir-undo-1-apply-orig”."), line)
+    }
+
+    /// Review 1, LOW 2: the same through a Redo. The step undone with the
+    /// list whole; then section1's before content and section2's after
+    /// content gone, the list taking neither again, and section2's after
+    /// content kept beside it. The Redo puts section1 back from the list
+    /// (what it held, which the list will not take, kept) and section2 from
+    /// what was kept beside it (which stays). MUST FAIL keyed by file name
+    /// (both said "from what was kept beside it").
+    func testTheKeptLineOfARedoTellsTwoPagesWithTheSameNameApart() throws {
+        _ = try makeTheStepOnTwoPages(first: UndoKeptCopiesTests.firstIndex, second: UndoKeptCopiesTests.secondIndex)
+        let secondAfter: Data = Data("What the step left in the second page.\n".utf8)
+
+        var undone: UndoOutcome? = nil
+        var redone: UndoOutcome? = nil
+        var lines: [String] = keptLines {
+            undone = journal().undoNewest(resolveRoot: { _ in self.root })
+        }
+        XCTAssertEqual(undone, .undone(seq: 1))
+        XCTAssertEqual(lines, [], "the list was whole for the Undo")
+        try removeBlob(UndoKeptCopiesTests.before, andTakesNoNewOne: true)
+        try removeBlob(secondAfter, andTakesNoNewOne: true)
+        let second: URL = root.appendingPathComponent(UndoKeptCopiesTests.secondIndex)
+        try secondAfter.write(to: second.deletingLastPathComponent().appendingPathComponent(".index.md.plantoir-undo-1-undo-orig"))
+        lines = keptLines {
+            redone = journal().redoNewest(resolveRoot: { _ in self.root })
+        }
+
+        XCTAssertEqual(redone, .redone(seq: 1))
+        XCTAssertEqual(try Data(contentsOf: second), secondAfter)
+        XCTAssertEqual(lines.count, 1)
+        let line: String = lines.first ?? ""
+        XCTAssertTrue(
+            line.hasPrefix("TST1O/1 · Redo put back “section1/index.md”, and put back “section2/index.md” from what was kept beside it, but the list"),
+            line
+        )
+        XCTAssertTrue(line.contains("What “section1/index.md” held a moment before is kept beside it as the hidden file “.index.md.plantoir-undo-1-redo-orig”."), line)
+    }
+
+    /// Review 1, LOW 2 and LOW 3: a page at the top of the working folder,
+    /// outside every course, beside a course page of the same name. The top
+    /// page has no folder, so its kept file is its bare hidden name, and it
+    /// is named by its path in the working folder, “index.md”; the course
+    /// page by its path inside the course. MUST FAIL keyed by file name.
+    func testTheKeptLineNamesAPageAtTheTopOfTheWorkingFolderByItsPathThere() throws {
+        let top: String = "index.md"
+        let secondBefore: Data = try makeTheStepOnTwoPages(first: top, second: UndoKeptCopiesTests.secondIndex)
+        try takeAwayTheContent(second: UndoKeptCopiesTests.secondIndex, secondBefore: secondBefore, secondTakesNoNewFile: true)
+
+        var outcome: UndoOutcome? = nil
+        let lines: [String] = keptLines {
+            outcome = journal().undoNewest(resolveRoot: { _ in self.root })
+        }
+
+        XCTAssertEqual(outcome, .undone(seq: 1))
+        XCTAssertEqual(lines.count, 1)
+        let line: String = lines.first ?? ""
+        XCTAssertTrue(
+            line.contains("Undo put back “index.md”, and put back “section2/index.md” from what was kept beside it, but the list"),
+            line
+        )
+        XCTAssertTrue(line.contains("What “index.md” held a moment before is kept beside it as the hidden file “.index.md.plantoir-undo-1-undo-orig”."), line)
+    }
+
+    /// The line built from kept files given by their paths: two pages named
+    /// `index.md`, one each way, each named by its path inside the course.
+    /// MUST FAIL keyed by file name.
+    func testTheKeptLineKeysPagesByTheirPlaceInTheWorkingFolder() {
+        let line: String = UndoTrail.keptWhatItReplacedLine(
+            course: "ICS3U", section: 1, isUndo: true,
+            keptOriginals: ["courses/ICS3U/Section 1/.index.md.plantoir-undo-4-undo-orig"],
+            keptOfWhatItHoldsNow: ["courses/ICS3U/Section 2/.index.md.plantoir-undo-3-apply-orig"],
+            putBackFromAKeptOriginal: ["courses/ICS3U/Section 2/index.md"]
+        )
+        XCTAssertTrue(
+            line.hasPrefix("ICS3U/1 · Undo put back “Section 1/index.md”, and put back “Section 2/index.md” from what was kept beside it, but the list"),
+            line
+        )
+        XCTAssertTrue(line.contains("What “Section 1/index.md” held a moment before is kept beside it as the hidden file “.index.md.plantoir-undo-4-undo-orig”."), line)
+        XCTAssertTrue(line.contains("What “Section 2/index.md” holds now is kept beside it as the hidden file “.index.md.plantoir-undo-3-apply-orig”."), line)
+    }
+
+    /// Review 1, LOW 1: one page named, another page of the step with the
+    /// same file name not named: the named page is still told apart by its
+    /// path. A page of the step with another name changes nothing. MUST
+    /// FAIL with the shared name looked for only among the named pages.
+    func testTheKeptLineNamesAPageByItsPathWhenAnotherPageOfTheStepSharesItsName() {
+        let shared: String = UndoTrail.keptWhatItReplacedLine(
+            course: "ICS3U", section: 1, isUndo: true,
+            keptOriginals: ["courses/ICS3U/Section 1/.index.md.plantoir-undo-4-undo-orig"],
+            putBackFromAKeptOriginal: ["courses/ICS3U/Section 2/index.md"],
+            pagesOfTheStep: ["courses/ICS3U/Section 1/index.md", "courses/ICS3U/Section 2/index.md"]
+        )
+        XCTAssertTrue(shared.hasPrefix("ICS3U/1 · Undo put back “Section 1/index.md”, but the list"), shared)
+        XCTAssertTrue(shared.contains("What “Section 1/index.md” held a moment before"), shared)
+        let alone: String = UndoTrail.keptWhatItReplacedLine(
+            course: "ICS3U", section: 1, isUndo: true,
+            keptOriginals: ["courses/ICS3U/Section 1/.index.md.plantoir-undo-4-undo-orig"],
+            putBackFromAKeptOriginal: ["courses/ICS3U/Section 2/B.md"],
+            pagesOfTheStep: ["courses/ICS3U/Section 1/index.md", "courses/ICS3U/Section 2/B.md"]
+        )
+        XCTAssertTrue(alone.hasPrefix("ICS3U/1 · Undo put back “index.md”, but the list"), alone)
+    }
+
+    /// Review 1, LOW 3: with no course, or a page outside the step's course,
+    /// a page whose name another shares is named by its path in the working
+    /// folder; names that differ only in capitals are different names, each
+    /// named by its file name.
+    func testTheKeptLineNamesPagesOutsideTheCourseByTheirPathInTheWorkingFolder() {
+        let noCourse: String = UndoTrail.keptWhatItReplacedLine(
+            course: "", section: nil, isUndo: true,
+            keptOriginals: ["courses/ICS3U/Section 1/.index.md.plantoir-undo-4-undo-orig"],
+            keptOfWhatItHoldsNow: ["courses/ICS3U/Section 2/.index.md.plantoir-undo-3-apply-orig"],
+            putBackFromAKeptOriginal: ["courses/ICS3U/Section 2/index.md"]
+        )
+        XCTAssertTrue(
+            noCourse.hasPrefix("Undo put back “courses/ICS3U/Section 1/index.md”, and put back “courses/ICS3U/Section 2/index.md” from what was kept beside it"),
+            noCourse
+        )
+        let otherFolder: String = UndoTrail.keptWhatItReplacedLine(
+            course: "ICS3U", section: 1, isUndo: false,
+            keptOriginals: ["shared/.index.md.plantoir-undo-4-redo-orig"],
+            keptOfWhatItHoldsNow: ["courses/ICS3U/Section 2/.index.md.plantoir-undo-3-apply-orig"],
+            putBackFromAKeptOriginal: ["courses/ICS3U/Section 2/index.md"]
+        )
+        XCTAssertTrue(
+            otherFolder.hasPrefix("ICS3U/1 · Redo put back “shared/index.md”, and put back “Section 2/index.md” from what was kept beside it"),
+            otherFolder
+        )
+        let capitals: String = UndoTrail.keptWhatItReplacedLine(
+            course: "ICS3U", section: 1, isUndo: true,
+            keptOriginals: ["courses/ICS3U/Section 1/.Index.md.plantoir-undo-4-undo-orig"],
+            keptOfWhatItHoldsNow: ["courses/ICS3U/Section 2/.index.md.plantoir-undo-3-apply-orig"],
+            putBackFromAKeptOriginal: ["courses/ICS3U/Section 2/index.md"]
+        )
+        XCTAssertTrue(capitals.hasPrefix("ICS3U/1 · Undo put back “Index.md”, and put back “index.md” from what was kept beside it"), capitals)
     }
 }

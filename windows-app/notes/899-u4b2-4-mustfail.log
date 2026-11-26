@@ -1,0 +1,21 @@
+U4b2-4 must-fail log (#899), 2026-11-25
+
+Before the fix (head bf14823ac plus the three new tests), run-red, UndoKeptCopiesTests: 11 tests, 8 failures, the three new tests failing:
+- UndoKeptCopiesTests.swift:376 testTheKeptLineTellsTwoPagesWithTheSameNameApart: XCTAssertFalse failed - TST1O/1 · Undo put back “index.md” from what was kept beside it, ...
+- UndoKeptCopiesTests.swift:401 testTheKeptLineNamesTwoPagesWithTheSameNameByTheirPaths: XCTAssertTrue failed - TST1O/1 · Undo put back “index.md” from what was kept beside it, ... What “index.md” held a moment before ... What “index.md” holds now ...
+- UndoKeptCopiesTests.swift:419 testTheKeptLineKeysPagesByTheirPlaceInTheWorkingFolder: XCTAssertTrue failed - ICS3U/1 · Undo put back “courses/ICS3U/Section 1/.index.md.plantoir-undo-4-undo-orig”, ...
+
+Sabotage 1 (on 8f157262e): in UndoTrail.keptWhatItReplacedLine, a page matches putBackFromAKeptOriginal by its last path part on both sides (keyed by file name again). run-mustfail, UndoKeptCopiesTests: 11 tests, 4 failures (3 tests):
+- :376 testTheKeptLineTellsTwoPagesWithTheSameNameApart: XCTAssertFalse failed - TST1O/1 · Undo put back “index.md” from what was kept beside it, ...
+- :377 same test: XCTAssertTrue failed (no "Undo put back “index.md”, but the list")
+- :401 testTheKeptLineNamesTwoPagesWithTheSameNameByTheirPaths: XCTAssertTrue failed - TST1O/1 · Undo put back “section1/index.md”, “section2/index.md” from what was kept beside it, ...
+- :419 testTheKeptLineKeysPagesByTheirPlaceInTheWorkingFolder: XCTAssertTrue failed - ICS3U/1 · Undo put back “Section 1/index.md”, “Section 2/index.md” from what was kept beside it, ...
+Restored with git checkout of UndoAppSeams.swift; git status clean.
+RED 1 of 1.
+
+Review 1 round (on 5637f2933), each run UndoKeptCopiesTests + UndoJournalContractTests, each sabotage restored with git checkout (git status clean after each):
+- S2, LOW 1 off (pagesOfTheStep ignored in UndoTrail.keptWhatItReplacedLine; this is the state before the LOW 1 fix, so it is also the red-first run of the LOW 1 tests): 34 tests, 4 failures: UndoKeptCopiesTests.swift:516, :517 testTheKeptLineNamesAPageByItsPathWhenAnotherPageOfTheStepSharesItsName; :394, :395 testTheKeptLineTellsTwoPagesWithTheSameNameApart.
+- S3, the line matches pages by file name on both sides: 10 failures: UndoJournalContractTests.swift:118 testStackCases (the U4b2-4 case's keptWhatItReplacedSays); UndoKeptCopiesTests :497 testTheKeptLineKeysPagesByTheirPlaceInTheWorkingFolder, :480 testTheKeptLineNamesAPageAtTheTopOfTheWorkingFolderByItsPathThere, :516 testTheKeptLineNamesAPageByItsPathWhenAnotherPageOfTheStepSharesItsName, :538 and :548 testTheKeptLineNamesPagesOutsideTheCourseByTheirPathInTheWorkingFolder, :417 testTheKeptLineNamesTwoPagesWithTheSameNameByTheirPaths, :455 testTheKeptLineOfARedoTellsTwoPagesWithTheSameNameApart, :393 and :394 testTheKeptLineTellsTwoPagesWithTheSameNameApart.
+- S4, UndoCheck passes the put-back pages by their last path part: 4 failures: :118 testStackCases; :480 top-of-the-working-folder; :417 two pages by their paths; :455 the Redo.
+- S5, UndoCheck passes the kept files by bare hidden name: 9 failures: :118 testStackCases; :480; :417, :421, :422; :455, :459; :394, :395.
+RED 4 of 4 (5 of 5 with the first round's).

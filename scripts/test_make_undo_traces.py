@@ -668,7 +668,13 @@ class ContractCaseTests(unittest.TestCase):
                   "blobKept", "interrupted", "markers", "folderKept", "movedFolder", "caseOnlyFolder", "rederived", "nothingMovedOutside",
                   "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
                   "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
-                  "refusalNamed"}
+                  "refusalNamed",
+                  # U4b2-4: the whole of the line's words, which the model
+                  # does not write; the Swift replay checks it.
+                  "keptWhatItReplacedSays"}
+
+    # U4b2-4: the two pages wholeFileStepOnTwoPagesNamedIndex writes.
+    TWO_PAGES_NAMED_INDEX = ("courses/TST1O/Section 1/Classes/index.md", "courses/TST1O/Section 2/Classes/index.md")
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
     MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
@@ -1025,6 +1031,32 @@ class ContractCaseTests(unittest.TestCase):
                         model.pages[p1] = after
                         model.finish(seq)
                         last = ("applied", seq)
+                    elif call == "wholeFileStepOnTwoPagesNamedIndex":
+                        ops = []
+                        for path in self.TWO_PAGES_NAMED_INDEX:
+                            model.pages[path] = "What " + path + " held before the step.\n"
+                            ops += traces.ops_for_change(path, model.pages[path], "What the step left in " + path + ".\n")
+                        self.assertEqual([op["kind"] for op in ops], ["writeFile", "writeFile"])
+                        seq = model.begin(ops)
+                        for path in self.TWO_PAGES_NAMED_INDEX:
+                            model.pages[path] = "What the step left in " + path + ".\n"
+                        model.finish(seq)
+                        last = ("applied", seq)
+                    elif call in ("firstIndexAfterContentGoneAndCannotBeStored", "secondIndexBeforeContentGoneAndCannotBeStored"):
+                        first = call.startswith("first")
+                        path = self.TWO_PAGES_NAMED_INDEX[0 if first else 1]
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == path:
+                                text = op["afterText"] if first else op["beforeText"]
+                                model.removed_texts.add(text)
+                                model.unstorable_texts.add(text)
+                    elif call == "keepTheOriginalOfTheSecondIndex":
+                        path = self.TWO_PAGES_NAMED_INDEX[1]
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == path:
+                                model.kept.setdefault(path, []).append(op["beforeText"])
                     elif call == "removeContent":
                         model.content_removed = True
                     elif call == "contentCannotBeStored":

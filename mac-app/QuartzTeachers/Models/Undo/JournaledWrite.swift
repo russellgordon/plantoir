@@ -1225,8 +1225,14 @@ nonisolated enum UndoTrailHook {
     /// bytes the list would not take, which stays beside its page
     /// (`keptOfWhatItHoldsNow`, the second review's MEDIUM). The step stays
     /// on the list with both directions offered: the next Undo or Redo of it
-    /// uses those files (Russell's ruling of 2026-11-20, night).
-    nonisolated(unsafe) static var keptWhatItReplacedLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ keptOriginals: [String], _ keptOfWhatItHoldsNow: [String], _ putBackFromAKeptOriginal: [String]) -> Void)?
+    /// uses those files (Russell's ruling of 2026-11-20, night). Every kept
+    /// file is given by its path in the working folder (its page's folder
+    /// plus its hidden name), and `putBackFromAKeptOriginal` names pages by
+    /// their paths, so two pages with the same name in two folders are told
+    /// apart (the part-two review of U4b, LOW 4). `pagesOfTheStep` is every
+    /// page the step changes, by path, so a named page that shares its file
+    /// name with any of them is named by its path (U4b2-4 review 1, LOW 1).
+    nonisolated(unsafe) static var keptWhatItReplacedLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ keptOriginals: [String], _ keptOfWhatItHoldsNow: [String], _ putBackFromAKeptOriginal: [String], _ pagesOfTheStep: [String]) -> Void)?
 
     /// An Undo (`isUndo`) or a Redo was refused because the newest step is
     /// a gone process's that recovery has just tried and left: the course
