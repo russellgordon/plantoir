@@ -23605,8 +23605,12 @@ MOVING THE LINK ITSELF to the new name, its target as written, as one op of
 its one step (`JournaledStep.moveLink`, judged by `linkSha`, never followed),
 as Rename folder moves a linked folder (#899, 2026-11-26, Russell's ruling
 option (a); `undo.rule.shadow`). The file the link leads to is never moved,
-renamed or removed; the new title and the moved date are written into it,
-because a write planned at a link move's `to`, within the same folder, is
+renamed or removed, and never retitled ("Shared pages never have day 'x'
+titles in them", Russell, 2026-11-26): only the moved date is written into it,
+under the key the FILE's own place calls for (`created` inside this section's
+folder; `createdSection<N>` for this section only on a course-level page,
+every other date line left byte for byte; fix 4 of the review round), because
+a write planned at a link move's `to`, within the same folder, is
 planned at the file the link leads to (`JournaledStep.placeALinkLeadsTo`,
 this piece's first half), and the `[[link]]` rewrite reaches it the same way,
 once. The place the link leaves is filled in the same step by the class below
@@ -23614,9 +23618,13 @@ it or by the new class, a place handed over (the door pieces, next section),
 so two links in a row and a link below a plain class are one step too.
 `ClassInsertionPlanner.apply` decides "a link to a file" by `lstat` and the
 target's `stat` (`isALinkToAFile`); a link to a folder, or one whose target
-cannot be read, is not renamed, as before, and a dangling later-class link is
-skipped as before (`fileExists` follows it), the class below then written
-through it, which makes the file it names: left for a later piece. Before
+cannot be read, is not renamed, as before. A later class whose link leads,
+through any number of links, to another class page of the same section
+(judged by device and inode, `firstLinkThatCannotBeMoved`), or a dangling
+later-class link, is refused before anything changes with the refusal given
+before this piece ("cannot tell now", said as the file that could not be
+saved): never skipped, nothing written through it (the review round's fixes 2
+and 3). Before
 this piece the same Insert Class was refused "cannot tell now" before
 anything changed, because the rename was planned as "write the new name,
 remove the old one" and the door's `remove` never follows a link; that rule

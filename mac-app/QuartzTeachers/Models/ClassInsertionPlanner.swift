@@ -375,26 +375,28 @@ enum ClassInsertionPlanner {
                 notFinished.notRenamed.append(rename.from)
                 continue
             }
-            // The title inside the file follows the file name: a page whose
-            // name and title disagree is worse than either being wrong alone.
-            let retitled: String = PageFrontmatter.settingTitle(in: text, to: rename.to)
             if isALinkToAFile(rename.fromURL) {
                 // A later class that is a symbolic link to a file (#899
                 // U4b3, `undo.rule.shadow`): the LINK is moved as itself to
                 // the new name, judged by the target it holds, never
                 // followed, as Rename folder moves a linked folder. The
-                // file it leads to is never moved, renamed or removed; the
-                // new title is written INTO it through the link at its new
-                // name, as every write through a link is. The place the
-                // link leaves is handed over, in this same step, to the
-                // class below it or the new class.
+                // file it leads to is never moved, renamed or removed, and
+                // never retitled: "Shared pages never have day “x” titles
+                // in them" (Russell, 2026-11-26). Only the moved date is
+                // written into it (step 3). The place the link leaves is
+                // handed over, in this same step, to the class below it or
+                // the new class.
+                _ = text
                 guard let linkSha = UndoTreeReading.linkSha(at: rename.fromURL) else {
                     notFinished.notRenamed.append(rename.from)
                     continue
                 }
                 step.moveLink(rename.fromURL, to: rename.toURL, linkSha: linkSha)
-                step.write(retitled, to: rename.toURL)
             } else {
+                // The title inside the file follows the file name: a page
+                // whose name and title disagree is worse than either being
+                // wrong alone.
+                let retitled: String = PageFrontmatter.settingTitle(in: text, to: rename.to)
                 step.write(retitled, to: rename.toURL)
                 step.remove(rename.fromURL)
             }
@@ -429,7 +431,11 @@ enum ClassInsertionPlanner {
         }
 
         // 3. The dates.
-        let createdKey: String = PageFrontmatter.createdKey(forSection: plan.sectionNumber, isSectionLocal: true)
+        // An ordinary class page lives in the section's folder: `created`.
+        // A class that is a link takes the key its FILE's place calls for
+        // (Russell, 2026-11-26): `createdSection<N>` for a course-level
+        // page, every other section's line left as it is.
+        let sectionCreatedKey: String = PageFrontmatter.createdKey(forSection: plan.sectionNumber, isSectionLocal: true)
         var moved: Int = 0
         // Pages whose settings have no place a new date line can go (#186).
         // Named and carried on past: such a page had no date this app could
@@ -453,6 +459,13 @@ enum ClassInsertionPlanner {
             }
             guard step.fileExists(pageURL), let text = step.readText(pageURL) else {
                 continue
+            }
+            var createdKey: String = sectionCreatedKey
+            if let linkedFile = ClassInsertionPlanner.fileALinkLeadsTo(move.fileURL) {
+                let isSectionLocal: Bool = AssistPageVisibility.isSectionLocal(
+                    pageAt: linkedFile, forSection: plan.sectionNumber, in: course
+                )
+                createdKey = PageFrontmatter.createdKey(forSection: plan.sectionNumber, isSectionLocal: isSectionLocal)
             }
             let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                 in: text, key: createdKey, to: move.to, fallbackTail: tail
@@ -555,6 +568,31 @@ enum ClassInsertionPlanner {
             return stat(path, &targetStatus)
         }
         return targetResult == 0 && (targetStatus.st_mode & S_IFMT) == S_IFREG
+    }
+
+    /// The file a symbolic link at `url` leads to, followed link by link
+    /// (each target read as written, a relative one against its link's
+    /// folder), or nil when `url` is not a link or the chain does not end
+    /// at a file within 32 links. The folders above keep the spelling the
+    /// course uses, so the answer compares with the course's own paths.
+    static func fileALinkLeadsTo(_ url: URL) -> URL? {
+        if !ResolvedFile.isALink(url) {
+            return nil
+        }
+        var here: URL = url
+        var hops: Int = 0
+        while ResolvedFile.isALink(here) {
+            hops += 1
+            guard hops <= 32, let written = try? FileManager.default.destinationOfSymbolicLink(atPath: here.path) else {
+                return nil
+            }
+            if written.hasPrefix("/") {
+                here = URL(fileURLWithPath: written).standardizedFileURL
+            } else {
+                here = URL(fileURLWithPath: written, relativeTo: here.deletingLastPathComponent()).standardizedFileURL
+            }
+        }
+        return here
     }
 
     /// The first later class that is a symbolic link this piece cannot

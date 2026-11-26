@@ -874,8 +874,10 @@ nonisolated enum UndoContractKinds {
     /// U4b3 part 2's `linkedPage`: which place holds the link (`new`, Day
     /// 4; `old`, Day 3; `both`; `neither`), the target the link there holds
     /// (`notALink` when neither is a link), and what the file it leads to
-    /// holds: `retitledAndRedated` (Day 4's title and its meeting date, the
-    /// rest as laid), `asLaidDown`, `gone`, or `changed` (anything else).
+    /// holds: `redatedForThisSection` (as laid, its title kept, with
+    /// `createdSection1:` set to Day 4's meeting date at the top of its
+    /// settings: a course-level page takes this section's own key),
+    /// `asLaidDown`, `gone`, or `changed` (anything else).
     static func linkedPage(in root: URL) -> String {
         let atNew: Bool = UndoTreeReading.linkTarget(at: root.appendingPathComponent(linkedPageDay(4))) != nil
         let atOld: Bool = UndoTreeReading.linkTarget(at: root.appendingPathComponent(linkedPageDay(3))) != nil
@@ -896,13 +898,12 @@ nonisolated enum UndoContractKinds {
         var file: String = "changed"
         if let held = text(at: linkedPageFile, in: root) {
             let laid: String = linkedPageText(day: 3, date: linkedPageDates[2])
-            let retitled: String = laid
-                .replacingOccurrences(of: "title: Unit 1, Day 3\n", with: "title: Unit 1, Day 4\n")
-                .replacingOccurrences(of: "created: " + linkedPageDates[2], with: "created: " + linkedPageDates[3])
+            let redated: String = "---\ncreatedSection1: " + linkedPageDates[3] + "T07:00:00.000-0400\n"
+                + String(laid.dropFirst("---\n".count))
             if held == laid {
                 file = "asLaidDown"
-            } else if held == retitled {
-                file = "retitledAndRedated"
+            } else if held == redated {
+                file = "redatedForThisSection"
             }
         } else {
             file = "gone"

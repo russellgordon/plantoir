@@ -219,8 +219,8 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertTrue(try text("Unit 1, Day 2", in: made).contains("publish: false"), "the new blank class")
         let linked: String = try String(contentsOf: file, encoding: .utf8)
         XCTAssertTrue(linked.contains("Three."))
-        XCTAssertTrue(linked.contains("title: Unit 1, Day 4"), "the new title written into the file it leads to")
-        XCTAssertTrue(linked.contains("created: 2026-09-16T07:00:00.000-0400"), "the moved date written into it")
+        XCTAssertTrue(linked.contains("title: Unit 1, Day 3"), "never a title written into the file it leads to (Russell, 2026-11-26)")
+        XCTAssertTrue(linked.contains("createdSection1: 2026-09-16T07:00:00.000-0400"), "the moved date written into it")
         var copies: Int = 0
         for (_, content) in everything(under: made) where content.contains("Three.") {
             copies += 1
@@ -243,8 +243,8 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertTrue(try text("Unit 1, Day 3", in: made).contains("publish: false"), "the new class at the link's old place")
         XCTAssertTrue(try text("Unit 1, Day 2", in: made).contains("Two."), "Day 2 untouched")
         let linked: String = try String(contentsOf: file, encoding: .utf8)
-        XCTAssertTrue(linked.contains("title: Unit 1, Day 4"))
-        XCTAssertTrue(linked.contains("created: 2026-09-16T07:00:00.000-0400"))
+        XCTAssertTrue(linked.contains("title: Unit 1, Day 3"), "its own title kept")
+        XCTAssertTrue(linked.contains("createdSection1: 2026-09-16T07:00:00.000-0400"))
     }
 
     /// Day 2 a link and Day 3 plain; room at Day 2: the link moves into the
@@ -266,8 +266,8 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertTrue(try text("Unit 1, Day 2", in: made).contains("publish: false"))
         let linked: String = try String(contentsOf: file, encoding: .utf8)
         XCTAssertTrue(linked.contains("Two."))
-        XCTAssertTrue(linked.contains("title: Unit 1, Day 3"))
-        XCTAssertTrue(linked.contains("created: 2026-09-14T07:00:00.000-0400"))
+        XCTAssertTrue(linked.contains("title: Unit 1, Day 2"), "its own title kept")
+        XCTAssertTrue(linked.contains("createdSection1: 2026-09-14T07:00:00.000-0400"))
     }
 
     /// Day 2 and Day 3 both links, to two files; room at Day 2: two links
@@ -289,10 +289,10 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertTrue(try text("Unit 1, Day 2", in: made).contains("publish: false"))
         let linked2: String = try String(contentsOf: file2, encoding: .utf8)
         let linked3: String = try String(contentsOf: file3, encoding: .utf8)
-        XCTAssertTrue(linked2.contains("Two.") && linked2.contains("title: Unit 1, Day 3"), linked2)
-        XCTAssertTrue(linked3.contains("Three.") && linked3.contains("title: Unit 1, Day 4"), linked3)
-        XCTAssertTrue(linked2.contains("created: 2026-09-14T07:00:00.000-0400"))
-        XCTAssertTrue(linked3.contains("created: 2026-09-16T07:00:00.000-0400"))
+        XCTAssertTrue(linked2.contains("Two.") && linked2.contains("title: Unit 1, Day 2"), linked2)
+        XCTAssertTrue(linked3.contains("Three.") && linked3.contains("title: Unit 1, Day 3"), linked3)
+        XCTAssertTrue(linked2.contains("createdSection1: 2026-09-14T07:00:00.000-0400"))
+        XCTAssertTrue(linked3.contains("createdSection1: 2026-09-16T07:00:00.000-0400"))
     }
 
     /// The first arrangement with the link leading OUTSIDE the working
@@ -314,8 +314,8 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertTrue(try text("Unit 1, Day 3", in: made).contains("Two."))
         XCTAssertTrue(try text("Unit 1, Day 2", in: made).contains("publish: false"))
         let linked: String = try String(contentsOf: file, encoding: .utf8)
-        XCTAssertTrue(linked.contains("Three.") && linked.contains("title: Unit 1, Day 4"), linked)
-        XCTAssertTrue(linked.contains("created: 2026-09-16T07:00:00.000-0400"))
+        XCTAssertTrue(linked.contains("Three.") && linked.contains("title: Unit 1, Day 3"), linked)
+        XCTAssertTrue(linked.contains("createdSection1: 2026-09-16T07:00:00.000-0400"))
     }
 
     /// A linked file that names itself (`[[Unit 1, Day 3]]`) is rewritten
@@ -336,7 +336,87 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         let linked: String = try String(contentsOf: file, encoding: .utf8)
         XCTAssertEqual(linked.components(separatedBy: "[[Unit 1, Day 4]]").count, 2, linked)
         XCTAssertFalse(linked.contains("[[Unit 1, Day 3]]"), linked)
-        XCTAssertTrue(linked.contains("title: Unit 1, Day 4"))
+        XCTAssertTrue(linked.contains("title: Unit 1, Day 3"), "its own title kept")
+    }
+
+    /// Russell, 2026-11-26: "Shared pages never have day “x” titles in
+    /// them." A linked later class whose file has a title in its own words
+    /// keeps it byte for byte; only the moved date is written into it; Undo
+    /// and then Redo return the folder exactly. MUST FAIL with the title
+    /// written through the link.
+    func testALinkedClassKeepsItsOwnTitleAndTakesTheNewDate() throws {
+        try checkTheTitleIsKept("Loops and lists")
+    }
+
+    /// The same for a linked file whose title reads like a class's
+    /// ("Unit 1, Day 4"): never written through a link either.
+    func testALinkedClassWithADayStyleTitleKeepsItToo() throws {
+        try checkTheTitleIsKept("Unit 1, Day 4")
+    }
+
+    /// An ordinary (plain) class page is still retitled as it is renamed.
+    func testAPlainLaterClassIsStillRetitled() throws {
+        let made = try makeCourse()
+
+        _ = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertTrue(try text("Unit 1, Day 4", in: made).contains("title: Unit 1, Day 4"))
+        XCTAssertTrue(try text("Unit 1, Day 3", in: made).contains("title: Unit 1, Day 3"))
+    }
+
+    /// Russell, 2026-11-26: the date goes under the key the linked FILE's
+    /// own place calls for. A course-level page shared by two sections:
+    /// only `createdSection1:` moves; `createdSection2:` and the title are
+    /// left byte for byte. MUST FAIL with a plain `created:` added.
+    func testALinkToACourseLevelPageMovesOnlyThisSectionsDate() throws {
+        let laid: String = "---\ntitle: Shared lesson\npublish: true\ncreatedSection1: 2026-09-14T07:00:00.000-0400\n"
+            + "createdSection2: 2026-10-01T07:00:00.000-0400\n---\n\nShared.\n"
+        let expected: String = laid.replacingOccurrences(of: "createdSection1: 2026-09-14", with: "createdSection1: 2026-09-16")
+        try checkTheLinkedFile(target: "../../elsewhere/Shared.md", laid: laid, expected: expected)
+    }
+
+    /// A link to a page inside the section's own folder (not a class
+    /// page): its plain `created:` moves, its title kept.
+    func testALinkToAPageInTheSectionsFolderMovesItsCreatedLine() throws {
+        let laid: String = page(title: "Section notes", date: "2026-09-14", body: "Notes.")
+        let expected: String = laid.replacingOccurrences(of: "created: 2026-09-14", with: "created: 2026-09-16")
+        try checkTheLinkedFile(target: "../Section notes.md", laid: laid, expected: expected)
+    }
+
+    func checkTheTitleIsKept(_ ownTitle: String) throws {
+        // The file is a course-level page (`elsewhere/`): this section's
+        // own key is added at the top of its settings, `created:` kept.
+        let laid: String = page(title: ownTitle, date: "2026-09-14", body: "Three.")
+        let expected: String = "---\ncreatedSection1: 2026-09-16T07:00:00.000-0400\n" + String(laid.dropFirst("---\n".count))
+        try checkTheLinkedFile(target: "../../elsewhere/Unit 1, Day 3.md", laid: laid, expected: expected)
+    }
+
+    /// Day 3 a link holding `target` (from the class folder) to a file
+    /// laid as `laid`; room at Day 2: the file reads `expected`, the link
+    /// is at Day 4, and Undo then Redo return the folder exactly.
+    func checkTheLinkedFile(target: String, laid: String, expected: String) throws {
+        let made = try makeCourse()
+        let file: URL = try makeALink("Unit 1, Day 3", holding: target, in: made)
+        try laid.write(to: file, atomically: true, encoding: .utf8)
+        let before: [String: String] = everything(under: made)
+
+        _ = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), expected, "its title byte for byte, the new date")
+        XCTAssertEqual(linkTarget("Unit 1, Day 4", in: made), target)
+        let after: [String: String] = everything(under: made)
+        let journal: UndoJournal = try UndoJournalLocation.standardJournal()
+        let root: URL = made.root
+        let undone: UndoOutcome = journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+        guard case .undone = undone else {
+            return XCTFail("Undo came to \(undone)")
+        }
+        XCTAssertEqual(everything(under: made), before, "Undo puts the link's name and the file's date back")
+        let redone: UndoOutcome = journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+        guard case .redone = redone else {
+            return XCTFail("Redo came to \(redone)")
+        }
+        XCTAssertEqual(everything(under: made), after, "Redo makes them again")
     }
 
     // MARK: - Tests: what stays as it was
@@ -440,7 +520,7 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         let copy: String = try String(contentsOf: day2, encoding: .utf8)
         XCTAssertTrue(copy.contains("the words of Unit 1, Day 1"), copy)
         let linked: String = try String(contentsOf: elsewhere, encoding: .utf8)
-        XCTAssertTrue(linked.contains("the linked words") && linked.contains("title: Unit 1, Day 3"), linked)
+        XCTAssertTrue(linked.contains("the linked words") && linked.contains("title: Unit 1, Day 2"), linked)
     }
 
     // MARK: - Tests: recovery

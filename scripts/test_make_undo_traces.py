@@ -1050,7 +1050,8 @@ class ContractCaseTests(unittest.TestCase):
             # U4b3 part 2: Insert Class's plan of room for one class at Day 2
             # with Day 3 a link to a file elsewhere, as the step it must make
             # (stackCasesHow): the link moved as itself to Day 4, Day 4's
-            # title and date written into the file it leads to, Day 2's page
+            # date written into the file it leads to under this section's key
+            # (it is a course-level page), its title kept, Day 2's page
             # renamed into the place the link left, the new class at Day 2.
             # The plan itself is the Swift replay's to check.
             if pages.get(self.linked_day(3)) is None and pages.get(self.linked_day(4)) is None:
@@ -1062,7 +1063,7 @@ class ContractCaseTests(unittest.TestCase):
             return self.vetted_ops_step(model,
                 [{"kind": "move", "from": self.linked_day(3), "to": self.linked_day(4),
                   "linkSha": traces.sha(self.LINKED_TARGET)}]
-                + traces.ops_for_change(self.LINKED_FILE, pages[self.LINKED_FILE], self.linked_text(4, 4, body=3))
+                + traces.ops_for_change(self.LINKED_FILE, pages[self.LINKED_FILE], self.linked_redated())
                 + traces.ops_for_change(self.linked_day(3), None, self.linked_text(3, 3, body=2))
                 + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
         if call == "makeRoomWithALaterClassLinkedToAnEarlierClass":
@@ -1162,6 +1163,12 @@ class ContractCaseTests(unittest.TestCase):
         return ("---\ntitle: Unit 1, Day %d\npublish: true\ncreated: %sT07:00:00.000-0400\n---\n\nDay %d.\n"
                 % (number, self.LINKED_DATES[meeting - 1], body or number))
 
+    def linked_redated(self):
+        """The linked file after Insert Class: as laid, its title kept, with
+        createdSection1 set to Day 4's meeting date at the top of its
+        settings (a course-level page takes this section's key)."""
+        return ("---\ncreatedSection1: %sT07:00:00.000-0400\n" % self.LINKED_DATES[3]) + self.linked_text(3, 3)[len("---\n"):]
+
     def linked_page(self, model):
         """U4b3 part 2's linkedPage: which place holds the link, its target
         there, and what the file it leads to holds."""
@@ -1182,8 +1189,8 @@ class ContractCaseTests(unittest.TestCase):
             file = "gone"
         elif held == self.linked_text(3, 3):
             file = "asLaidDown"
-        elif held == self.linked_text(4, 4, body=3):
-            file = "retitledAndRedated"
+        elif held == self.linked_redated():
+            file = "redatedForThisSection"
         return place + ", " + target + ", " + file
 
     def handed_over(self, model):
