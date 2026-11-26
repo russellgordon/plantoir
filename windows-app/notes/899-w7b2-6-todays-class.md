@@ -20,7 +20,26 @@ Branch `issue/899-w7b2-6-todays-class`, from `origin/night25/integration-1` 53bb
 
 `vm-tools/guest/899-w7b2-6-mustfail.json`, run by `899-w7b2-6-go.ps1` (calling `899-w7b2-6-pc-run.ps1`, a copy of `899-w7b-pc-run.ps1`). Each row is reverted alone, its test run, then restored with `git checkout`.
 
-RUNS_PLACEHOLDER
+1. written outside the step (the front page by `File.WriteAllText`, as before): `UndoTodaysClassStepTests.ShowIsOneStepWithTheFrontPageAsItsContent`.
+2. the front page named as a recompute instead of the step's content: `ShowIsOneStepWithTheFrontPageAsItsContent`.
+3. a part-way stop answered as `CouldNotSave` (the part-way catch filtered out): `APartWayStopIsShownWithWhatItHeldKeptNeverCouldNotSave`.
+4. an `AlreadyShows` answer making a step: `AnAlreadyShowsAnswerMakesNoStep`.
+5. riding low, W7b2-5 review 1 L3 (a plan whose every page is declined answered with the done sentence): `UndoStartOfYearStepTests.APlanThatChangesNothingMakesNoStep`.
+6. riding low, W7b2-11 review 2 L2 (the straight apostrophe back in the held-timetable sentence): `ReDateTests.AReDateWhoseTimetableIsHeldSaysTheClassDatesAndNoHiddenPath`.
+
+Run d: 6 RED of 6, each a single failing test; RESTORED 510 of 510.
+
+## Runs
+
+All on the PC under `C:\vm-setup\wt-compare.lock` (the run script takes it, writes `owner.txt`, and removes it last; the lock was free after run d).
+
+- Run a (`899-w7b2-6-a`, 5bed94d09): both builds 0 errors. 479 of 480 passed. The one failure was the riding-low test L3: the declined sentence names pages in the PLAN's order (classes first: "“Unit 1, Day 2” and “Loops”"), not the recorded files' order. This was the test that failed first. Fixed in 51292ae33 (the test takes the names from the plan's drafts). Every other new test, the fixture row and the six traces passed on first run. Must-fail rows 1 to 4 RED.
+- Run b (`899-w7b2-6-b`, 51292ae33): 480 of 480. Must-fail 5 of 6 RED; row 6 NOT-FOUND (Windows PowerShell read the raw curly apostrophe in the JSON as ANSI). The file is now written with `\u2019` escapes.
+- Run c (`899-w7b2-6-c`, must-fail only): row 6 NOT-RED with no totals, because its test is in `ReDateTests`, not `TimetableTests`, so its filter matched nothing. That also meant runs a and b had not run `ReDateTests`, the class the apostrophe test is in.
+- Run d (`899-w7b2-6-d`, 51292ae33): both builds 0 errors (app x64 Debug: 37 warnings, none new). The classes: UndoTodaysClassStepTests, TodaysClassContractTests, UndoActionStepsOnWindowsTests, UndoActionTraceContractTests, NamedGapLedgerTests, UndoWriterScanTests, UndoStartOfYearStepTests, TimetableTests, ReDateTests, and the twenty source-scan classes that read `SectionDetailView.xaml.cs` (ClassesDatedLaterAtDeployTests, CourseBeingCopiedTests, DialogTitleScanTests, ObsidianOpenRouteTests, ObsidianRouteSourceTests, PreviewBrowserPrivacySourceTests, PreviewLeaseFolderKeyTests, PreviewNavigationSourceTests, PreviewStartRecordTests, PreviewWaitWakesOnTheRunTests, PublishingDestinationsContractTests, ReferenceInterfaceTests, ReferenceRefusalTests, ScheduledRunAnnouncementTests, SectionDeployRunSourceTests, SectionDetailTeardownSourceTests, SectionProblemsSourceTests, StopQuestionsContractTests, plus TodaysClassContractTests and UndoWriterScanTests above): 510 of 510. Must-fail 6 RED of 6. HEAD-AFTER the same, tree clean.
+- No UI class, no harness, no whole suite.
+
+On "tests first": the new tests use the new `Outcome` record types, so they cannot compile against the old enum. The old behaviour was proven red by sabotage instead. Row 1 puts back exactly the old write, and row 3 is the old `catch` answering `CouldNotSave`.
 
 ## Left for the next piece
 
@@ -36,4 +55,13 @@ RUNS_PLACEHOLDER
 
 ## Self-check
 
-SELFCHECK_PLACEHOLDER
+1. Broke each fix and watched its test fail: must-fail rows 1 to 6 RED (run d), each test named above.
+2. No timed waits: none in product or test. The PC waits were until-loops on the run's log.
+3. Every failure sentence is true. A refusal is `CouldNotSave` ("The front page could not be saved, so it still shows {shown}."), and the page is byte for byte as it was (tested). A part-way stop is `ShownWithWhatItHeldKept` with the kept name, and the page shows the new class (tested). Its trail line says what was kept. The view says nothing for it yet, which W7b2-9 owns, so the branch does not merge without piece 9. `AlreadyShows` and `NoLongerOffered` make no step and change nothing (tested). Grep for `Outcome.Written` and the other outcome names: every use has been moved to the record types.
+4. `dev` merged in before proving: `origin/dev` a03fecefd was already in the base 53bb1959f. It was fetched again before run b and before hand-back, both times "Already up to date", so there is no merge commit.
+5. No number tuned by trial.
+6. House style and contracts: the step is read from `undo-action-steps.json` by name, and the morning's pages are the mac's `morning()`, copied as written. Changes are in `windows-app/` only, plus `vm-tools/guest/`.
+7. The fixture row is green (UndoActionStepsOnWindowsTests and UndoActionTraceContractTests, run d). `showTodaysClassOnTheFrontPage` is out of the ledger row. `Reason899W7b2` now names W7b2-6 as converted and no longer lists Today's Class among the pending actions.
+8. The writer-scan count is true: `TodaysClassOnTheFrontPage.cs` is 2 (Not Today's folder and record), and the reason names W7b2-7.
+9. Riding lows: W7b2-5 L1 (notes corrected, plus the mac follow-up under "For the director"), L2 (`PlaceInTheFolder` removed, `Relative` kept), L3 (the answer checked, must-fail 5). W7b2-11 L1 (#1043 named four times) and L2 (curly apostrophe in the constant and its test, must-fail 6).
+10. The step keeps the action's file order (one file). Its before is read at plan time by `step.Write`, before `Make`.
