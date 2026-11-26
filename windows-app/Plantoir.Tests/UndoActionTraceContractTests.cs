@@ -20,8 +20,9 @@ namespace Plantoir.Tests;
 /// re-derived as the app does (<see cref="UndoSectionFrontPage"/>: a course
 /// with no settings is left alone). A recorded step with <c>members</c> is
 /// made as its recorded <c>editJSON</c> ops (#899 W8-11); one with
-/// <c>moves</c>, <c>folderMoves</c> or <c>trees</c> is held by name in the
-/// ledger.
+/// <c>trees</c> is made by its Windows action, each folder hashed by its
+/// listing (#899 W8-13); one with <c>moves</c> or <c>folderMoves</c> is held
+/// by name in the ledger.
 /// </summary>
 public sealed class UndoActionTraceContractTests
 {
@@ -72,7 +73,9 @@ public sealed class UndoActionTraceContractTests
         // W8-11). Rename folder's steps hold members AND folderMoves: the
         // guard names folderMoves, so they still stop here rather than run
         // with no folder move made.
-        foreach (string unmade in new[] { "moves", "folderMoves", "trees" })
+        // A step with trees (Add folder) is made by its Windows action since
+        // W8-13, each folder hashed by its listing.
+        foreach (string unmade in new[] { "moves", "folderMoves" })
         {
             if (recorded.TryGetProperty(unmade, out _))
                 Assert.Fail($"{name}: a step this replay does not make yet ({unmade})");
@@ -86,6 +89,12 @@ public sealed class UndoActionTraceContractTests
             string path = file.GetProperty("path").GetString()!;
             paths.Add(path);
             scribe.WritePage("A", path, Bytes(file.GetProperty("before")));
+        }
+        // Each folder a step makes is judged by its path, hashed by its
+        // listing, and absent before the action (#899 W8-13).
+        if (recorded.TryGetProperty("trees", out JsonElement trees))
+        {
+            foreach (JsonElement tree in trees.EnumerateArray()) paths.Add(tree.GetProperty("path").GetString()!);
         }
         // A converted step's action is the REAL Windows action on the mac's
         // fixture (#899 W7b1), so each trace judges what Windows wrote; the
@@ -156,6 +165,10 @@ public sealed class UndoActionTraceContractTests
                         recordedOrder.Add(file.GetProperty("path").GetString()!);
                     }
                     if (measured.OwnFile is { } ownPath) recordedOrder.Add(ownPath.Path);
+                    if (recorded.TryGetProperty("trees", out JsonElement madeTrees))
+                    {
+                        foreach (JsonElement tree in madeTrees.EnumerateArray()) recordedOrder.Add(tree.GetProperty("path").GetString()!);
+                    }
                     Assert.True(recordedOrder.SequenceEqual(LastBeginsFilePaths(scribe)),
                                 $"{where}: files in the order {string.Join(" | ", LastBeginsFilePaths(scribe))}");
                     break;
@@ -180,6 +193,12 @@ public sealed class UndoActionTraceContractTests
                 {
                     string path = call.GetProperty("path").GetString()!;
                     string kind = call.GetProperty("kind").GetString()!;
+                    if (kind == "deletePage" && Directory.Exists(scribe.FullPath("A", path)))
+                    {
+                        // A folder the step made, removed by hand (#899 W8-13).
+                        Directory.Delete(scribe.FullPath("A", path), recursive: true);
+                        break;
+                    }
                     if (scribe.Page("A", path) is null) break;
                     if (kind == "deletePage")
                     {
@@ -361,6 +380,12 @@ public sealed class UndoActionTraceContractTests
         var hashes = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (string path in paths)
         {
+            // A folder is hashed by its listing (undo-traces.json, U4b2-12).
+            if (Directory.Exists(scribe.FullPath("A", path)))
+            {
+                hashes[path] = UndoTreeReading.Read(scribe.FullPath("A", path)).ListingSha;
+                continue;
+            }
             byte[]? bytes = scribe.Page("A", path);
             hashes[path] = bytes is null ? null : UndoCheck.Sha(bytes);
         }

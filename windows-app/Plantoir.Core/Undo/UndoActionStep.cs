@@ -115,6 +115,8 @@ internal sealed class UndoActionStep
     private readonly HashSet<string> _removedOnce = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>A JSON file planned member by member (<see cref="EditJson"/>): its members, by the file's full path.</summary>
     private readonly Dictionary<string, IReadOnlyList<UndoMemberChange>> _members = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Each folder the step makes whole (<see cref="MakeTree"/>), in the order planned.</summary>
+    private readonly List<(string FullPath, UndoTreeListing Listing, Dictionary<string, byte[]> Contents)> _trees = [];
 
     // ---- Initializer ---------------------------------------------------------------
 
@@ -155,6 +157,7 @@ internal sealed class UndoActionStep
     {
         get
         {
+            if (_trees.Count > 0) return true;
             foreach (string path in _order)
             {
                 if (!Same(_before[path], _after[path])) return true;
@@ -228,6 +231,50 @@ internal sealed class UndoActionStep
     /// (#899 W7b2-1, Make Room for Classes).
     /// </summary>
     internal void Remove(string fullPath) => Plan(fullPath, null);
+
+    /// <summary>
+    /// Plans a folder made whole at <paramref name="fullPath"/>, where nothing
+    /// is yet, as ONE <c>createTree</c> (#899 W8-13; the mac's
+    /// <c>JournaledStep.makeTree</c>, U4a): <paramref name="folders"/> the
+    /// folders inside it and <paramref name="files"/> every file inside it by
+    /// its path in the folder (<c>/</c>-separated), with its bytes. Made, the
+    /// door is given the listing and every listed file's content as blobs, so
+    /// the folder can always be made again.
+    /// </summary>
+    internal void MakeTree(string fullPath, IReadOnlyList<string> folders, IReadOnlyDictionary<string, byte[]> files)
+    {
+        var paths = new List<string>();
+        foreach (string path in files.Keys) paths.Add(path);
+        paths.Sort((first, second) => Encoding.UTF8.GetBytes(first).AsSpan().SequenceCompareTo(Encoding.UTF8.GetBytes(second)));
+        var listed = new List<(string Path, string Sha)>();
+        var contents = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (string path in paths)
+        {
+            listed.Add((path, UndoCheck.Sha(files[path])));
+            contents[path] = files[path];
+        }
+        _trees.Add((Path.GetFullPath(fullPath), new UndoTreeListing(new List<string>(folders), listed), contents));
+    }
+
+    /// <summary>Each planned folder's <c>createTree</c> op and the blobs it needs (its listing, then every listed file's bytes), or null when one cannot be named in a step.</summary>
+    private List<(JsonObject Op, List<byte[]> Blobs)>? RecordableTrees()
+    {
+        var result = new List<(JsonObject, List<byte[]>)>();
+        foreach ((string full, UndoTreeListing listing, Dictionary<string, byte[]> contents) in _trees)
+        {
+            if (RelativeOf(full) is not { } relative || !UndoPlaces.StaysInside(_root!, relative)) return null;
+            var names = new JsonArray(listing.Sha);
+            var blobs = new List<byte[]> { listing.Bytes };
+            var seen = new HashSet<string>(StringComparer.Ordinal) { listing.Sha };
+            foreach ((string path, string sha) in listing.Files)
+            {
+                if (seen.Add(sha)) names.Add(sha);
+                blobs.Add(contents[path]);
+            }
+            result.Add((new JsonObject { ["kind"] = UndoOp.CreateTree, ["path"] = relative, ["listingSha"] = listing.Sha, ["blobs"] = names }, blobs));
+        }
+        return result;
+    }
 
     /// <summary>Every planned file the step leaves with content, as its full path, in the order first planned.</summary>
     internal IReadOnlyList<string> PlannedWithContent
@@ -311,7 +358,7 @@ internal sealed class UndoActionStep
             RederiveTheFrontPages();
             return;
         }
-        if (RecordableChanges() is not { } changes)
+        if (RecordableChanges() is not { } changes || (_trees.Count > 0 && RecordableTrees() is null))
         {
             if (_mode == UndoMode.Live)
             {
@@ -331,7 +378,7 @@ internal sealed class UndoActionStep
                 ["path"] = RelativeOf(full)!, ["section"] = section,
             });
         }
-        if (_members.Count > 0)
+        if (_members.Count > 0 || _trees.Count > 0)
         {
             MakeAsOps(changes, recomputes);
             return;
@@ -397,11 +444,18 @@ internal sealed class UndoActionStep
                 if (change.After is { } after) blobs.Add(after);
             }
         }
+        // Each folder made whole after the files, as the mac's makeAsOps
+        // orders them, counted in pageCount as the mac counts it (W8-13).
+        foreach ((JsonObject treeOp, List<byte[]> treeBlobs) in RecordableTrees()!)
+        {
+            ops.Add(treeOp);
+            blobs.AddRange(treeBlobs);
+        }
         foreach (JsonObject recompute in recomputes) ops.Add(recompute);
         var draft = new UndoOpsDraft
         {
             ActionKey = _maker.ActionKey,
-            ActionArguments = new Dictionary<string, string>(StringComparer.Ordinal) { ["pageCount"] = changes.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+            ActionArguments = new Dictionary<string, string>(StringComparer.Ordinal) { ["pageCount"] = (changes.Count + _trees.Count).ToString(System.Globalization.CultureInfo.InvariantCulture) },
             MadeBy = _maker.MadeBy,
             WorkingFolder = _root!,
             Course = _course,
@@ -508,6 +562,8 @@ internal sealed class UndoActionStep
             // inside, and the refusal's sentence checks the page it names.
             targets.Add(new UndoSwapTarget(place, place, _before[path], _after[path]));
         }
+        foreach ((string full, UndoTreeListing listing, Dictionary<string, byte[]> contents) in _trees)
+            targets.Add(new UndoSwapTarget(full, full, null, null) { Change = new UndoSwapChange.MakeTree(listing, contents) });
         HashSet<string> keptBefore = KeptOriginalsNow();
         switch (UndoSwap.Swap(targets, UndoSwap.PlainLabel(), null, _plainSeams))
         {

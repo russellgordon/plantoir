@@ -210,13 +210,13 @@ public sealed partial class CourseSettingsView : UserControl
     {
         // #580: the folder arrives with its index page and a page to duplicate.
         // The curriculum folder is the PRIMARY one the course resolves to
-        // (#345's rule, the mac's #128), read from the disk AFTER the folders
-        // are made, in the mac's order.
+        // (#345's rule, the mac's #128), read from the disk before the step
+        // that makes the folders, in the mac's order (U4a). The folders and
+        // their pages are ONE step on the list (#899 W8-13).
         var outcome = SpecialFolderRenamer.CreateFoldersOnDisk(
             name, scope, _course.DirectoryPath, Config.SectionNumbers,
             template: FolderScaffold.ReadTemplate(BundledToolchain.SupportPath(Path.Combine(FolderScaffold.TemplatePathInSupport))),
-            curriculumPageNames: () => FolderScaffold.TopLevelFileNames(_course.DirectoryPath,
-                CurriculumFolderRule.ForCourse(Config, _course.DirectoryPath).Resolved.FirstOrDefault()));
+            curriculumPageNames: () => FolderScaffold.CurriculumPageNames(Config, _course.DirectoryPath));
         if (outcome.FoldersCreated == 0) return;
         ActivityTrail.Note(ActivityTrail.Event.FolderCreated,
             FolderScaffold.FolderCreatedTrailLine(name, _course.Code, scope, outcome));

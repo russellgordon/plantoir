@@ -36,6 +36,7 @@ internal static class WindowsActionsOnTheMacFixture
         "reDateClasses", "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear",
         "showTodaysClassOnTheFrontPage", "notTodayOnTheFrontPage", "keepClassesDatedLater", "answerTheLinksChecklist",
         "makeRoomForClasses", "duplicateClass", "duplicateAsTheNextClass", "setSchoolYear", "saveCourseSettings",
+        "addFolder",
     ];
 
     /// <summary>
@@ -292,6 +293,20 @@ internal static class WindowsActionsOnTheMacFixture
         // Save of Course Settings is the sheet's Save, given the edits the
         // mac's recording made (the first Marks tick, Tests, and the sidebar
         // hiding Media alone), on the workspace's list and door (#899 W8-12).
+        // Add folder is the sheet's add, given the name, scope and moment the
+        // mac's createFoldersOnDisk(named: "Labs", scope: .shared, created:)
+        // was given, the bundled template and the course's curriculum pages,
+        // on the workspace's list and door (#899 W8-13).
+        if (stepName == "addFolder")
+        {
+            string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);
+            var configuration = CourseConfiguration.Load(Path.Combine(courseDirectory, "course_config.json"));
+            string templatePath = Path.Combine(ContractLoader.RepositoryRoot, "support", Path.Combine(FolderScaffold.TemplatePathInSupport));
+            var outcome = SpecialFolderRenamer.CreateFoldersOnDisk("Labs", FolderScope.Shared, courseDirectory, configuration.SectionNumbers,
+                FolderScaffold.ReadTemplate(templatePath), () => FolderScaffold.CurriculumPageNames(configuration, courseDirectory),
+                "2026-09-08T07:00:00.000-0400", workspace.UndoList, workspace.UndoDoorOfATest);
+            return "folders created " + outcome.FoldersCreated;
+        }
         if (stepName == "saveCourseSettings")
         {
             string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);
@@ -651,6 +666,12 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
         var recordedPaths = new List<string>();
         foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray()) recordedPaths.Add(file.GetProperty("path").GetString()!);
         if (holdsOneMore) recordedPaths.Add(ownFile.Path);
+        // A step with trees: each folder made, after the files, as the mac
+        // orders its createTree ops (#899 W8-13).
+        if (recorded.TryGetProperty("trees", out JsonElement recordedTrees))
+        {
+            foreach (JsonElement tree in recordedTrees.EnumerateArray()) recordedPaths.Add(tree.GetProperty("path").GetString()!);
+        }
         Assert.True(recordedPaths.SequenceEqual(paths), $"{name}: files {string.Join(" | ", paths)}");
         var recordedKinds = recorded.GetProperty("ops").EnumerateArray().Select(op => op.GetString()!).ToList();
         if (holdsOneMore)
@@ -708,6 +729,28 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             }
             Assert.True(want is null ? have is null : have is not null && want.AsSpan().SequenceEqual(have),
                         $"{name}: {path} after is not the recorded after:\n{(have is null ? "(absent)" : Encoding.UTF8.GetString(have))}");
+        }
+        // Each tree made is the recorded one: its folders, and every file's
+        // bytes by its path inside it (#899 W8-13).
+        if (recorded.TryGetProperty("trees", out JsonElement madeTrees))
+        {
+            foreach (JsonElement tree in madeTrees.EnumerateArray())
+            {
+                string path = tree.GetProperty("path").GetString()!;
+                var reading = UndoTreeReading.Read(UndoDoor.FullPath(Folder, path), keepingContents: true);
+                Assert.True(reading is UndoTreeReading.Tree, $"{name}: {path} is not a folder made: {reading}");
+                var made = (UndoTreeReading.Tree)reading;
+                var folders = tree.GetProperty("folders").EnumerateArray().Select(folder => folder.GetString()!).ToList();
+                Assert.True(folders.Order(StringComparer.Ordinal).SequenceEqual(made.Listing.Folders.Order(StringComparer.Ordinal)), $"{name}: {path}'s folders");
+                var files = tree.GetProperty("files").EnumerateObject().ToList();
+                Assert.True(files.Count == made.Contents.Count, $"{name}: {path} holds {made.Contents.Count} files");
+                foreach (JsonProperty file in files)
+                {
+                    Assert.True(made.Contents.TryGetValue(file.Name, out byte[]? bytes), $"{name}: {path}/{file.Name} was not made");
+                    Assert.True(new UTF8Encoding(false).GetBytes(file.Value.GetString()!).AsSpan().SequenceEqual(bytes),
+                                $"{name}: {path}/{file.Name} is not the recorded file:\n{Encoding.UTF8.GetString(bytes!)}");
+                }
+            }
         }
         if (holdsOneMore)
         {

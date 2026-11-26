@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Plantoir.Core.Models;
@@ -320,43 +321,88 @@ public static class FolderScaffold
         return "---\n" + string.Join("\n", lines) + rest;
     }
 
-    // ---- Writing them -----------------------------------------------------------
+    // ---- Planning them as one step ----------------------------------------------
 
     /// <summary>
-    /// Writes the pages — only into the folders in <paramref name="newFolders"/>,
-    /// the ones this click has just made, and never over a file
-    /// (<see cref="FileMode.CreateNew"/>, so even a page that appeared in between
-    /// stays). UTF-8 without a byte-order mark, LF, as the mac writes. A page
-    /// that cannot be written leaves the folder as it was before #580.
+    /// Plans every new folder, with its pages, into <paramref name="step"/> as
+    /// ONE <c>createTree</c> per tree (#899 W8-13; the mac's
+    /// <c>FolderScaffold.planPages</c>, U4a): each tree made at the highest
+    /// folder of the new one's path that is not there yet, holding the folders
+    /// below it down to the new one and the new one's pages. Pages go only
+    /// into the folders in <paramref name="newFolders"/>, the ones this click
+    /// makes; the step makes them all or none. UTF-8 without a byte-order
+    /// mark, LF, as the mac writes.
     /// </summary>
-    public static Outcome WritePages(IReadOnlyList<Page> pages, IReadOnlyCollection<string> newFolders, string courseDirectory)
+    internal static Outcome PlanPages(IReadOnlyList<Page> pages, IReadOnlyList<string> newFolders, string courseDirectory,
+                                      Plantoir.Core.Undo.UndoActionStep step)
     {
-        var newFolderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (string folder in newFolders) newFolderPaths.Add(Normalized(folder));
+        string course = Path.GetFullPath(courseDirectory);
+        var treeOrder = new List<string>();
+        var treeFolders = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var treeFiles = new Dictionary<string, Dictionary<string, byte[]>>(StringComparer.OrdinalIgnoreCase);
+        var placeOfNewFolder = new Dictionary<string, (string Root, string Inside)>(StringComparer.OrdinalIgnoreCase);
+        foreach (string folder in newFolders)
+        {
+            string folderPath = RelativeInside(course, folder);
+            // The tree's root: the first folder of the path, walking down from
+            // the course, that is not there yet.
+            string[] parts = folderPath.Split('/');
+            string root = parts[0];
+            for (int count = 1; count <= parts.Length; count++)
+            {
+                root = string.Join("/", parts, 0, count);
+                if (!Directory.Exists(FullPathOf(course, root))) break;
+            }
+            if (!treeFolders.ContainsKey(root))
+            {
+                treeOrder.Add(root);
+                treeFolders[root] = new List<string>();
+                treeFiles[root] = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            }
+            string inside = Plantoir.Core.Undo.UndoOp.PartInside(root, folderPath) ?? "";
+            if (inside != "")
+            {
+                string walked = "";
+                foreach (string part in inside.Split('/'))
+                {
+                    walked = walked == "" ? part : walked + "/" + part;
+                    if (!treeFolders[root].Contains(walked)) treeFolders[root].Add(walked);
+                }
+            }
+            placeOfNewFolder[folderPath] = (root, inside);
+        }
         int indexPages = 0, templates = 0;
         foreach (var page in pages)
         {
-            string pagePath = Path.Combine(courseDirectory, page.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-            string? folder = Path.GetDirectoryName(pagePath);
-            if (folder is null || !newFolderPaths.Contains(Normalized(folder))) continue;
-            try
-            {
-                using var stream = new FileStream(pagePath, FileMode.CreateNew, FileAccess.Write);
-                byte[] bytes = Utf8NoBom.GetBytes(page.Text);
-                stream.Write(bytes, 0, bytes.Length);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
-            {
-                continue;
-            }
-            if (string.Equals(Path.GetFileName(pagePath), TemplateFileName, StringComparison.Ordinal)) templates++;
+            int slash = page.RelativePath.LastIndexOf('/');
+            string pageFolder = slash < 0 ? "" : page.RelativePath[..slash];
+            string name = page.RelativePath[(slash + 1)..];
+            if (!placeOfNewFolder.TryGetValue(pageFolder, out var place)) continue;
+            string pathInTree = place.Inside == "" ? name : place.Inside + "/" + name;
+            treeFiles[place.Root][pathInTree] = Utf8NoBom.GetBytes(page.Text);
+            if (string.Equals(name, TemplateFileName, StringComparison.Ordinal)) templates++;
             else indexPages++;
         }
+        foreach (string root in treeOrder)
+            step.MakeTree(FullPathOf(course, root), treeFolders[root], treeFiles[root]);
         return new Outcome(newFolders.Count, indexPages, templates);
     }
 
-    private static string Normalized(string path) =>
-        Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+    /// <summary>A folder's path inside the course, <c>/</c>-separated, spelled as given.</summary>
+    private static string RelativeInside(string courseDirectory, string folder) =>
+        Path.GetRelativePath(courseDirectory, Path.GetFullPath(folder)).Replace('\\', '/');
+
+    private static string FullPathOf(string courseDirectory, string relative) =>
+        Path.Combine(courseDirectory, relative.Replace('/', Path.DirectorySeparatorChar));
+
+    /// <summary>
+    /// The file names at the top of the course's PRIMARY curriculum folder, the
+    /// first one <see cref="CurriculumFolderRule"/> resolves (#345, the mac's
+    /// #128 and its <c>curriculumPageNames(for:)</c>), or null when it has none
+    /// or it is not on disk.
+    /// </summary>
+    public static List<string>? CurriculumPageNames(CourseConfiguration configuration, string courseDirectory) =>
+        TopLevelFileNames(courseDirectory, CurriculumFolderRule.ForCourse(configuration, courseDirectory).Resolved.FirstOrDefault());
 
     /// <summary>
     /// The file names at the top of <paramref name="folderName"/> inside the
