@@ -107,16 +107,19 @@ public sealed class UndoDuplicateClassStepTests : IDisposable
         var plan = workspace.PlanDuplicateClass("ICS3U", 1, "Unit 1, Day 1");
         const string teachers = "---\ntitle: Unit 1, Day 4\npublish: false\n---\nMy own page.\n";
         File.WriteAllText(Page("Unit 1, Day 4"), teachers);
-        string lesson = File.ReadAllText(Page("Unit 1, Day 2"));
 
         var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyDuplicateClass(plan));
 
         Assert.Equal(ClassChangeWording.ThePlaceForTheCopyIsStillTaken("Unit 1, Day 2", workspace.ConversationBackupPath), refused.Message);
-        Assert.Equal(lesson, File.ReadAllText(Page("Unit 1, Day 2")));
+        // Day 2 keeps its own lesson (re-dated under its old name, as Make
+        // Room dates a class whose rename did not happen), never the copy.
+        string standing = File.ReadAllText(Page("Unit 1, Day 2"));
+        Assert.Contains("title: Unit 1, Day 2", standing, StringComparison.Ordinal);
+        Assert.EndsWith("\n\nTwo.", standing, StringComparison.Ordinal);
+        Assert.DoesNotContain("One.", standing, StringComparison.Ordinal);
         Assert.Equal(teachers, File.ReadAllText(Page("Unit 1, Day 4")));
         JsonObject begin = Assert.Single(WindowsActionsOnTheMacFixture.AppliedBegins(ListFolder));
         Assert.Equal(StepName, (string?)begin["step"]!["action"]!["key"]);
-        Assert.DoesNotContain("courses/ICS3U/section1/All Classes/Unit 1, Day 2.md", OpPaths(begin));
         Assert.Single(WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
         Assert.Empty(_history.Entries);
         Assert.True(workspace.TakeWhetherTheCallChangedAnything(workspace.TopOfTheUndoList), "the room was made");
