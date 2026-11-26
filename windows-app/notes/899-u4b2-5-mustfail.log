@@ -1,0 +1,15 @@
+#899 U4b2-5 part-way-line-true, must-fail log, 2026-11-26 (main Mac, through xlock.sh)
+
+Red before the fix (run-red, base 58afe8a21's parent with only the new test added):
+  UndoRenameFolderStepTests.testAFinishStoppedPartWaySaysTheFolderIsAtItsNewName FAILED
+  :1083 XCTAssertTrue failed - "“Concepts” was not renamed, and Plantoir could not put everything back as it was: ..."
+  :1088 XCTAssertTrue failed - trail held "did not rename the folder Concepts to Ideas in ICS3U, and could not put everything back (shared_folders, 1 file kept beside its page)"
+  :1089 XCTAssertFalse failed - same line
+
+Sabotage 1: in CourseSettingsView.renameFolder, the folders taken from this run's planned moves again
+  (`planned.moves.isEmpty ? [] : SpecialFolderRenamer.foldersAtTheirNewName(...)`), built, run-mustfail:
+  UndoRenameFolderStepTests: Executed 35 tests, with 3 failures; all three in
+  testAFinishStoppedPartWaySaysTheFolderIsAtItsNewName at :1083, :1088, :1089 (the same three asserts).
+  The 34 other tests, the start-run part-way tests included, passed.
+  Restored with `git checkout --` the file; `git diff` clean.
+RED 1 of 1.
