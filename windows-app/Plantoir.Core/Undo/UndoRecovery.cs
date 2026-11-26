@@ -934,9 +934,7 @@ internal static class UndoRecovery
                             keepingTheOriginalsOf = notTaken.OutgoingOf;
                             keptNotTaken = notTaken.KeptOriginalsHolding;
                         }
-                        var putBackTargets = ready.InOrder.Select(change => new UndoSwapTarget(UndoDoor.FullPath(root, change.Path), change.Path,
-                                                                                                change.Expected, change.Replacement)).ToList();
-                        putBackTargets.AddRange(ready.Whole);
+                        List<UndoSwapTarget> putBackTargets = UndoDoor.TargetsOf(ready, root);
                         UndoSeams? recoverySeams = seams is null ? null : new UndoSeams
                         {
                             StopsHere = (point, index) => seams.Stops(point == "beforeSwap" ? "recoveryBeforeSwap" : point, index),

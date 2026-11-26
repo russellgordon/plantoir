@@ -59,6 +59,23 @@ internal static class UndoPlaces
     }
 
     /// <summary>
+    /// The first of <paramref name="op"/>'s places (<see cref="UndoOp.PathsNamed"/>:
+    /// path, from, to) that no longer stays inside the working folder, links
+    /// resolved (<see cref="StaysInside"/>), or null when every one does: the
+    /// one place a leaves-the-folder refusal names, at the plan and again just
+    /// before each change, never the other side of a move (the mac's
+    /// <c>UndoCheck.placeLeavingTheFolder</c>, U4b2-2; #899 W8-1).
+    /// </summary>
+    internal static string? FirstPlaceLeadingOut(string root, UndoOp op)
+    {
+        foreach (string place in op.PathsNamed)
+        {
+            if (!StaysInside(root, place)) return place;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// The file system of the volume <paramref name="folder"/> (or its deepest
     /// existing parent) is REALLY on, after junctions and mount points (W2a's
     /// review, LOW 6: the drive letter's file system is not the folder's when a

@@ -208,15 +208,19 @@ internal static class UndoCheck
     /// are. <paramref name="cannotRead"/> is a test's seam (a full path that
     /// cannot be read just now).
     /// </summary>
-    internal static UndoOpState WholeStateOf(UndoOp op, string root, IUndoExternalPlaces places, Func<string, bool>? cannotRead = null)
+    /// <param name="overridingTo">For a move that carries edits, going back: each carried file, relative to its <c>to</c>, as the step's own edit leaves it once taken back (the listing override; the mac's <c>overridingTo</c>, U4b; #899 W8-2), and the step's own staged and kept files inside it as absent (W8-3).</param>
+    /// <param name="overridingFrom">For a move that carries edits: the step's own staged and kept files inside its <c>from</c>, as absent (the mac's <c>overridingFrom</c>, U4b's M1; #899 W8-3).</param>
+    internal static UndoOpState WholeStateOf(UndoOp op, string root, IUndoExternalPlaces places, Func<string, bool>? cannotRead = null,
+                                             IReadOnlyDictionary<string, UndoCurrent>? overridingTo = null,
+                                             IReadOnlyDictionary<string, UndoCurrent>? overridingFrom = null)
     {
         if (!op.Readable) return UndoOpState.NotReadable;
         switch (op.Kind)
         {
             case UndoOp.Move:
             {
-                UndoMoveSide atFrom = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead);
-                UndoMoveSide atTo = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead);
+                UndoMoveSide atFrom = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom);
+                UndoMoveSide atTo = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo);
                 if (atFrom == UndoMoveSide.CannotRead || atTo == UndoMoveSide.CannotRead) return UndoOpState.CannotTell;
                 if (atFrom == UndoMoveSide.Free && atTo == UndoMoveSide.HoldsTheContent) return UndoOpState.After;
                 if (atFrom == UndoMoveSide.HoldsTheContent && atTo == UndoMoveSide.Free) return UndoOpState.Before;
@@ -281,6 +285,16 @@ internal static class UndoCheck
         /// <summary>Every op can be moved: the new content of each file it touches (null: no file).</summary>
         internal sealed record Ready(IReadOnlyDictionary<string, byte[]?> Changes) : PlanResult
         {
+            /// <summary>
+            /// Going forward, each move that carries edits, swapped in BEFORE
+            /// every file (<c>opKinds.wholeOps</c>' order: the edit is made after
+            /// the move; the mac's <c>leadingTargets</c>, U4b; #899 W8-2).
+            /// </summary>
+            internal IReadOnlyList<UndoSwapTarget> Leading { get; init; } = [];
+
+            /// <summary>The carried files (relative paths) staged only at their turn, once the move has made their folder (staging first would make the folder at <c>to</c>, and the move would be refused).</summary>
+            internal IReadOnlySet<string> StagedAtItsTurn { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
             /// <summary>The whole ops' changes (a move, a tree made or taken out, an external target set), in the order the check met them, after every file's (<c>opKinds.external</c>: "after every file's content has been swapped in").</summary>
             internal IReadOnlyList<UndoSwapTarget> Whole { get; init; } = [];
 
@@ -344,10 +358,14 @@ internal static class UndoCheck
     /// that page whose bytes hash to exactly the sha wanted (page path and sha in), or null when none matches (the mac's U3c,
     /// Russell's ruling of 2026-11-20, 15:20; <see cref="UndoRecovery.KeptOriginal"/>).</param>
     /// <param name="keptOriginalUsed">Told of each page put back from a kept original, with what the page holds at that op.</param>
+    /// <param name="ownSeq">The step's number for an Undo or a Redo (null while a step is made): a move that carries edits is
+    /// judged without the step's own staged and kept files inside its folder, from any of its swaps, on either side (the mac's
+    /// <c>ownSeq</c>, U4b's M1; #899 W8-3).</param>
     internal static PlanResult Plan(IReadOnlyList<UndoOp> ops, bool backward,
                                     Func<string, UndoCurrent> read, Func<string, byte[]?> blob,
                                     Func<bool>? folderIsReachable = null, UndoWholeReads? whole = null,
-                                    Func<string, string, byte[]?>? keptOriginal = null, Action<UndoKeptOriginalUse>? keptOriginalUsed = null)
+                                    Func<string, string, byte[]?>? keptOriginal = null, Action<UndoKeptOriginalUse>? keptOriginalUsed = null,
+                                    long? ownSeq = null)
     {
         foreach (UndoOp op in ops)
         {
@@ -364,6 +382,18 @@ internal static class UndoCheck
         string? cannotTell = null;
 
         var wholeChanges = new List<UndoSwapTarget>();
+        // U4b (opKinds.wholeOps' order; #899 W8-2): each edit named inside a
+        // move's new place, after the move in the step, is carried by it.
+        // Going forward it is judged where its file is before the move and
+        // made after it; going back it is taken back first, and the move is
+        // judged as if it were (the mac's UndoCheck.plan).
+        Dictionary<string, UndoOp> carriers = Carriers(ops);
+        var movingNow = new HashSet<string>(StringComparer.Ordinal);
+        var stagedAtItsTurn = new HashSet<string>(StringComparer.Ordinal);
+        // Where each file was read: a carried file whose move goes in now is
+        // where it is before the move, and its kept original beside it there.
+        var readAt = new Dictionary<string, string>(StringComparer.Ordinal);
+        var leading = new List<UndoSwapTarget>();
         foreach (UndoOp op in ordered)
         {
             if (op.Kind == UndoOp.Recompute) continue;   // re-derived after, never checked
@@ -372,31 +402,73 @@ internal static class UndoCheck
             // since the step was made is a change since, judged before
             // anything is read through it (the mac's second hard review of
             // U2b, MEDIUM 2).
-            if (whole is { Root.Length: > 0 } && op.PathsNamed.Any(place => !UndoPlaces.StaysInside(whole.Root, place)))
+            // The place named is the first that leads out, never the other
+            // side of a move (U4b2-2; #899 W8-1).
+            if (whole is { Root.Length: > 0 } && UndoPlaces.FirstPlaceLeadingOut(whole.Root, op) is { } leadingOut)
             {
-                if (!inTheWay.Contains(op.PlaceName, StringComparer.Ordinal)) inTheWay.Add(op.PlaceName);
+                if (!inTheWay.Contains(leadingOut, StringComparer.Ordinal)) inTheWay.Add(leadingOut);
                 continue;
             }
             if (op.IsWhole)
             {
                 if (whole is null) return new PlanResult.NotReadable();
-                UndoOpState wholeState = WholeStateOf(op, whole.Root, whole.Places, whole.CannotRead);
+                bool carriesEdits = false;
+                Dictionary<string, UndoCurrent>? overridingTo = null;
+                foreach ((string carried, UndoOp carrier) in carriers)
+                {
+                    if (!ReferenceEquals(carrier, op)) continue;
+                    carriesEdits = true;
+                    // Going back, the move is judged with each carried file as
+                    // the edit's other side, taken back already (the listing
+                    // override), matched by the one comparison.
+                    if (backward && working.TryGetValue(carried, out UndoCurrent? takenBack) && UndoOp.PartInside(op.To!, carried) is { } inside)
+                        (overridingTo ??= new Dictionary<string, UndoCurrent>(StringComparer.Ordinal))[inside] = takenBack;
+                }
+                // The step's own staged and kept files inside the folder, from
+                // any of its swaps, on either side, are never its content (U4b,
+                // M1); a carried file's override above wins over its own.
+                Dictionary<string, UndoCurrent>? overridingFrom = null;
+                if (carriesEdits && ownSeq is { } seq)
+                {
+                    overridingFrom = UndoSwap.StepsOwnFilesInside(UndoTreeReading.Under(whole.Root, op.From!), seq);
+                    foreach ((string inside, UndoCurrent absent) in UndoSwap.StepsOwnFilesInside(UndoTreeReading.Under(whole.Root, op.To!), seq))
+                        (overridingTo ??= new Dictionary<string, UndoCurrent>(StringComparer.Ordinal)).TryAdd(inside, absent);
+                }
+                UndoOpState wholeState = WholeStateOf(op, whole.Root, whole.Places, whole.CannotRead, overridingTo, overridingFrom);
                 UndoVerdict verdict = backward ? UndoVerdictOf(wholeState) : RedoVerdictOf(wholeState);
                 if (verdict is UndoVerdict.AlreadyBack or UndoVerdict.AlreadyRedone) continue;
-                if (verdict == UndoVerdict.CannotTell) { cannotTell ??= op.PlaceName; continue; }
+                // A moved item is named where a teacher finds it now: its to
+                // before an Undo, its from before a Redo (placeAsFound).
+                if (verdict == UndoVerdict.CannotTell) { cannotTell ??= op.PlaceAsFound(backward); continue; }
                 if (verdict == UndoVerdict.ChangedSince)
                 {
-                    if (!inTheWay.Contains(op.PlaceName, StringComparer.Ordinal)) inTheWay.Add(op.PlaceName);
+                    string found = op.PlaceAsFound(backward);
+                    if (!inTheWay.Contains(found, StringComparer.Ordinal)) inTheWay.Add(found);
                     continue;
                 }
                 if (WholeTarget(op, backward, whole.Root, blob) is not { } target) { missing ??= op.PlaceName; continue; }
+                if (carriesEdits && !backward)
+                {
+                    movingNow.Add(op.To!);
+                    leading.Add(target);
+                    continue;
+                }
                 wholeChanges.Add(target);
                 continue;
             }
             string path = op.Path!;
             if (!original.ContainsKey(path))
             {
-                original[path] = read(path);
+                // A carried file whose move goes in now is read where it is
+                // before the move, and staged only at its turn.
+                string readPath = path;
+                if (carriers.TryGetValue(path, out UndoOp? carrying) && movingNow.Contains(carrying.To!))
+                {
+                    readPath = UndoOp.PlaceBeforeTheMove(path, carrying.From!, carrying.To!);
+                    stagedAtItsTurn.Add(path);
+                }
+                readAt[path] = readPath;
+                original[path] = read(readPath);
                 working[path] = original[path];
                 met.Add(path);
             }
@@ -420,7 +492,7 @@ internal static class UndoCheck
                 {
                     // A blob the list no longer holds: put back from the kept
                     // original beside the page when its hash is the one wanted.
-                    if (keptOriginal?.Invoke(path, targetSha) is { } kept)
+                    if (keptOriginal?.Invoke(readAt[path], targetSha) is { } kept)
                     {
                         keptOriginalUsed?.Invoke(new UndoKeptOriginalUse(path, kept, backward ? op.AfterSha : op.BeforeSha, working[path]));
                         working[path] = new UndoCurrent.Bytes(kept);
@@ -496,7 +568,21 @@ internal static class UndoCheck
             changes[path] = replacement;
             inOrder.Add((path, was is UndoCurrent.Bytes before ? before.Content : null, replacement));
         }
-        return new PlanResult.Ready(changes) { InOrder = inOrder, Whole = wholeChanges };
+        return new PlanResult.Ready(changes) { InOrder = inOrder, Whole = wholeChanges, Leading = leading, StagedAtItsTurn = stagedAtItsTurn };
+    }
+
+    /// <summary>Each edit's path a move of the step carries (<see cref="UndoOp.MoveCarries"/>, the edit after the move), with that move (the mac's <c>UndoCheck.carriers</c>).</summary>
+    internal static Dictionary<string, UndoOp> Carriers(IReadOnlyList<UndoOp> ops)
+    {
+        var found = new Dictionary<string, UndoOp>(StringComparer.Ordinal);
+        for (int index = 0; index < ops.Count; index++)
+        {
+            for (int later = index + 1; later < ops.Count; later++)
+            {
+                if (ops[later].Path is { } path && UndoOp.MoveCarries(ops[index], ops[later])) found[path] = ops[index];
+            }
+        }
+        return found;
     }
 
     private static bool SameContent(UndoCurrent a, UndoCurrent b) => (a, b) switch

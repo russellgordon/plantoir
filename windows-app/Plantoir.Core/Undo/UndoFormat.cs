@@ -145,12 +145,66 @@ internal sealed record UndoOp
     /// them, is a step this version cannot read. That is also why a move that
     /// changes only case is never made as two renames here.
     /// </summary>
-    internal static bool PlacesOverlap(string first, string second)
+    internal static bool PlacesOverlap(string first, string second) =>
+        PartInside(first, second) is not null || PartInside(second, first) is not null;
+
+    /// <summary>
+    /// Whether <paramref name="edit"/> is an edit (a <c>writeFile</c>, an
+    /// <c>editLine</c>, a <c>replaceText</c> or an <c>editJSON</c>) of the item
+    /// a <c>move</c> moved, or of a file inside the folder it moved, named at
+    /// the NEW place and naming nothing inside the old one (the mac's
+    /// <c>UndoOp.moveCarries</c>, U4b; <c>opKinds.wholeOps</c>' one exception;
+    /// #899 W8-2). Such an edit is made, and redone, after the move and taken
+    /// back before it, and the move is judged as if it were taken back.
+    /// Whether it comes AFTER the move in the step is the caller's to check.
+    /// "At or inside" is <see cref="PartInside"/>, the one comparison. A
+    /// capitalisation-only move (piece 5) and a link's move (piece 6) carry
+    /// nothing here yet: the first fails the last test (its two places
+    /// overlap), and the second is not readable on Windows.
+    /// </summary>
+    internal static bool MoveCarries(UndoOp move, UndoOp edit)
     {
-        string one = first.ToLowerInvariant();
-        string other = second.ToLowerInvariant();
-        if (one == other) return true;
-        return one.StartsWith(other + "/", StringComparison.Ordinal) || other.StartsWith(one + "/", StringComparison.Ordinal);
+        if (move.Kind != Move || !move.Readable || move.From is not { } from || move.To is not { } to || edit.Path is not { } path) return false;
+        if (edit.Kind is not (WriteFile or EditLine or ReplaceText or EditJson)) return false;
+        if (edit.From is not null || edit.To is not null || edit.Target is not null) return false;
+        if (PartInside(to, path) is null) return false;
+        return !PlacesOverlap(from, path);
+    }
+
+    /// <summary>The place <paramref name="path"/>, named inside a move's <paramref name="to"/>, had before the move: the same path under its <paramref name="from"/> (the mac's <c>placeBeforeTheMove</c>).</summary>
+    internal static string PlaceBeforeTheMove(string path, string from, string to) =>
+        PartInside(to, path) is not { } inside ? path : inside.Length == 0 ? from : from + "/" + inside;
+
+    /// <summary>
+    /// Where a teacher finds the item this op names now, going this way: a
+    /// <c>move</c>'s <c>to</c> before it is undone and its <c>from</c> before
+    /// it is redone (the mac's <c>placeAsFound</c>, U4b); <see cref="PlaceName"/>
+    /// for every other op.
+    /// </summary>
+    internal string PlaceAsFound(bool backward) =>
+        Kind == Move && From is { } from && To is { } to ? (backward ? to : from) : PlaceName;
+
+    /// <summary>
+    /// The part of <paramref name="path"/> inside <paramref name="place"/>,
+    /// spelled as <paramref name="path"/> spells it: "" when it is the place
+    /// itself, null when it is neither the place nor inside it (the mac's
+    /// <c>UndoOp.partInside</c>, U4b2-9; #899 W8-2). Compared part by part
+    /// (split on <c>/</c>), each part WITHOUT regard to case, as NTFS takes
+    /// them: <c>Renamed/a.md</c> is inside <c>renamed</c>, and
+    /// <c>Mediahouse/a.md</c> is not inside <c>Media</c>. The ONE comparison
+    /// for "at or inside" (W8 COMMON, lesson 6): <see cref="PlacesOverlap"/>,
+    /// whether a move carries an edit, and every later use.
+    /// </summary>
+    internal static string? PartInside(string place, string path)
+    {
+        string[] placeParts = place.Split('/');
+        string[] pathParts = path.Split('/');
+        if (pathParts.Length < placeParts.Length) return null;
+        for (int index = 0; index < placeParts.Length; index++)
+        {
+            if (!string.Equals(placeParts[index].ToLowerInvariant(), pathParts[index].ToLowerInvariant(), StringComparison.Ordinal)) return null;
+        }
+        return string.Join('/', pathParts, placeParts.Length, pathParts.Length - placeParts.Length);
     }
 }
 
@@ -201,10 +255,36 @@ internal sealed record UndoStep
     }
 
     /// <summary>
+    /// Every path the tidy of its staged files looks beside: <see cref="Paths"/>,
+    /// and each edit a move carries also where it is before the move
+    /// (<see cref="UndoOp.PlaceBeforeTheMove"/>), so the step's own files
+    /// inside a moved folder are found wherever the folder is now (U4b, M1;
+    /// #899 W8-3).
+    /// </summary>
+    internal IEnumerable<string> PathsToTidy
+    {
+        get
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string path in Paths)
+            {
+                if (seen.Add(path)) yield return path;
+            }
+            foreach ((string carried, UndoOp move) in UndoCheck.Carriers(Ops))
+            {
+                string before = UndoOp.PlaceBeforeTheMove(carried, move.From!, move.To!);
+                if (seen.Add(before)) yield return before;
+            }
+        }
+    }
+
+    /// <summary>
     /// <c>opKinds.wholeOps</c>: no other op of the step names a whole op's
     /// places (a move's two, a tree's folder or anything inside it) or its
     /// target. A step that breaks it is one this version cannot read: a
-    /// barrier, never undone in a guessed order.
+    /// barrier, never undone in a guessed order. The one exception: an edit a
+    /// move carries (<see cref="UndoOp.MoveCarries"/>), after the move; one
+    /// inside the move's <c>from</c>, or before it, is still a barrier.
     /// </summary>
     internal static bool WholeOpsStandAlone(IReadOnlyList<UndoOp> ops)
     {
@@ -217,6 +297,10 @@ internal sealed record UndoStep
                 if (other == index) continue;
                 UndoOp second = ops[other];
                 if (op.Target is { } target && string.Equals(second.Target, target, StringComparison.Ordinal)) return false;
+                // An edit inside what a move moved, named at its new place
+                // and written after it, is the one op that may share a
+                // move's place (opKinds.wholeOps' order; #899 W8-2).
+                if (other > index && UndoOp.MoveCarries(op, second)) continue;
                 foreach (string mine in op.PathsNamed)
                 {
                     foreach (string theirs in second.PathsNamed)
@@ -621,7 +705,12 @@ internal static class UndoFormat
                 if (!okMaintainer || !okSection || !string.Equals(maintainer, UndoOp.SectionFrontPage, StringComparison.Ordinal)) readable = false;
                 break;
         }
-        if (listingSha is not null) blobs.Add(listingSha);
+        // A tree's listing is one of its blobs, so the folder can be made
+        // again. A folder move's is not: "The moved content is never a blob:
+        // the item itself is what moves" (opKinds.move). Named as one, the
+        // door's vetting refused every folder move as not readable, as the
+        // mac's JournaledWrite.vet did until U4b (#899 W8-2).
+        if (listingSha is not null && kind != UndoOp.Move) blobs.Add(listingSha);
 
         var op = new UndoOp
         {
