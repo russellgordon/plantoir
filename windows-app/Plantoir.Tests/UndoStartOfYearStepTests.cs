@@ -215,16 +215,17 @@ public sealed class UndoStartOfYearStepTests : IDisposable
         }
         var before = PagesNow();
         AssistWorkspace workspace = Open();
-        Assert.NotEmpty(workspace.PlanStartOfYear(Course, 1).Plan.Drafts);
+        var drafts = workspace.PlanStartOfYear(Course, 1).Plan.Drafts;
+        Assert.NotEmpty(drafts);
+        // In the plan's order, as the sheet names them (measured: classes first).
+        var declined = new List<string>();
+        foreach (var draft in drafts) declined.Add(draft.Page.Name);
 
         StartOfYearOutcome outcome = Go(workspace);
 
         Assert.False(outcome.Changed, outcome.Message);
         // The answer names the declined pages (review 1, L3): never the done
         // sentence, never "Nothing was changed".
-        var declined = new List<string>();
-        foreach (JsonElement file in _recorded.GetProperty("files").EnumerateArray())
-            declined.Add(Path.GetFileNameWithoutExtension(file.GetProperty("path").GetString()!));
         Assert.Equal(AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined), outcome.Message);
         Assert.Empty(WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
         AssertSamePages(before, PagesNow());
