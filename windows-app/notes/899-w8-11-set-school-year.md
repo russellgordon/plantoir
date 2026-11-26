@@ -20,7 +20,9 @@ See "Runs".
 
 ## Runs
 
-(filled in below as the PC answered)
+- `w8-11-a`, the PC, bfb94e4bd (before the merge), both builds and the 15 classes of `899-w8-11-go.ps1`: 550 of 550 passed. That includes action-133 to 138 and 145 to 150, and the fixture row `setSchoolYear`.
+- Merge of origin/dev 96a3d2b73 (W8 pieces 7 and 8): 48a25006c. In `NamedGapLedger.cs`, dev's `Reason899W8U4b` was kept and its "hold members" clause changed to folderMoves.
+- `w8-11-b`, the PC, 48a25006c, classes and the 4 must-fail rows: running at hand-back (`C:\vm-setup\w8-11-b\run.log`).
 
 ## Left for the next piece
 
@@ -34,4 +36,4 @@ See "Runs".
 
 ## Self-check
 
-(below)
+Items 7 and 8 green on `w8-11-a`. Item 9: no riding lows. Item 10: one file, its before read at plan time (must-fail row 2). Item 11: rows cleared, reasons rewritten, including U4b's. Item 12: no key added to a replay's `KeysChecked`. Item 13: the member rule is `UndoJsonMember.Moved`. Item 14: `w8-11-b` was still running at hand-back, and its lock is released by the run itself.
