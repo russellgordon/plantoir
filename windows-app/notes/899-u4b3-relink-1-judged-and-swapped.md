@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # U4b3 relink-1 (#899): a relinking move judged by each side's own text, swapped as make, rename in, remove
 
 Brief `vm-tools/briefs/2026-11-26-899-u4b3-relink-1-judged-and-swapped.md`, from ea0ad5cac on `issue/899-u4b3-linked-class-page-moves-its-link`. `origin/dev` is still 06e067fbe (already merged in, dc161321d); checked before proving and before handing back, no merge needed. `contracts/` not touched.

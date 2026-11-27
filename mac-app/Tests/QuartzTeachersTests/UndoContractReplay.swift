@@ -484,16 +484,9 @@ nonisolated enum UndoContractReplay {
             }
         }
         if current["cannotBeRead"] as? Bool == true {
-            // Unreadable just now: no permission (`cannotBeRead`). A link
-            // is read with lstat and readlink, which never ask the link's
-            // own permissions (and chmod would follow it), so its folder's
-            // are taken away instead (U4b3 relink-2).
-            var unreadable: URL = url
-            if string(current["link"]) != nil {
-                unreadable = url.deletingLastPathComponent()
-            }
-            _ = chmod(unreadable.path, 0)
-            madeUnreadable.append(unreadable)
+            // Unreadable just now: no permission (`cannotBeRead`).
+            _ = chmod(url.path, 0)
+            madeUnreadable.append(url)
         }
     }
 
@@ -609,22 +602,6 @@ nonisolated enum UndoContractReplay {
                 // U4b2-14: a link's move, judged by the bytes it holds.
                 given["linkSha"] = UndoHash.sha256(of: Data(target.utf8))
                 given["linkTarget"] = nil
-            }
-            // U4b3 relink: a link's move that changes its text, each text
-            // given; both hashes in `blobs` unless the case gives its own.
-            var relinkNames: [String] = []
-            if let target = string(given["linkTargetBefore"]) {
-                given["linkShaBefore"] = UndoHash.sha256(of: Data(target.utf8))
-                relinkNames.append(UndoHash.sha256(of: Data(target.utf8)))
-                given["linkTargetBefore"] = nil
-            }
-            if let target = string(given["linkTargetAfter"]) {
-                given["linkShaAfter"] = UndoHash.sha256(of: Data(target.utf8))
-                relinkNames.append(UndoHash.sha256(of: Data(target.utf8)))
-                given["linkTargetAfter"] = nil
-            }
-            if !relinkNames.isEmpty && given["blobs"] == nil {
-                given["blobs"] = relinkNames
             }
             if let tree = given["listing"] as? [String: Any] {
                 let made: UndoTreeListing = listing(from: tree)
@@ -1649,7 +1626,7 @@ nonisolated enum UndoContractReplay {
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
         "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored", "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
-        "withAHandedOverPlace", "handedOver", "withARelink",
+        "withAHandedOverPlace", "handedOver",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1746,49 +1723,22 @@ nonisolated enum UndoContractReplay {
                 "afterALinksMove": "handAPlaceOverAfterALinksMove",
                 "beforeALinksMove": "handAPlaceOverBeforeALinksMove",
             ]
-            // U4b3 relink-3: the same, a step holding a relinking move,
-            // its class pages read on Day 3 to Day 5.
-            let relinkCalls: [String: String] = [
-                "alone": "relinkALink",
-                "leavingAHandedOverPlace": "relinkALinkLeavingAHandedOverPlace",
-                "chained": "relinkTwoChainedLinks",
-                "chainedThree": "relinkThreeChainedLinks",
-                "thenAMove": "relinkThenMoveALinkIntoItsPlace",
-            ]
             var handedOverCall: String? = nil
             var handedOverBefore: String = ""
             var handedOverAfter: String = ""
-            var classDays: [Int] = UndoContractKinds.handedOverDays
-            var shapeCall: String? = nil
             if let shape = string(testCase["withAHandedOverPlace"]) {
                 guard let call = handedOverCalls[shape] else {
                     failures.append("recoveryCases '\(name)': withAHandedOverPlace '\(shape)' is not a value this replay knows")
                     continue
                 }
-                shapeCall = call
-            }
-            if let shape = string(testCase["withARelink"]) {
-                guard let call = relinkCalls[shape] else {
-                    failures.append("recoveryCases '\(name)': withARelink '\(shape)' is not a value this replay knows")
-                    continue
-                }
-                shapeCall = call
-                classDays = UndoContractKinds.relinkedDays
-                if shape == "chained" || shape == "thenAMove" {
-                    classDays = UndoContractKinds.chainedRelinkDays
-                } else if shape == "chainedThree" {
-                    classDays = UndoContractKinds.threeChainedRelinkDays
-                }
-            }
-            if let call = shapeCall {
                 handedOverCall = call
                 let twin: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "recovery-\(number)-twin")
                 let twinJournal: UndoJournal = UndoJournal(folderURL: twin.journalFolder)
                 let twinPlaces: UndoMemoryPlaces = UndoMemoryPlaces()
                 let made: String? = try UndoContractKinds.call(call, root: twin.root, journal: twinJournal, places: twinPlaces)
-                handedOverAfter = UndoContractKinds.handedOver(in: twin.root, days: classDays)
+                handedOverAfter = UndoContractKinds.handedOver(in: twin.root)
                 let undone: UndoOutcome = twinJournal.undoNewest(resolveRoot: { _ in twin.root }, places: twinPlaces)
-                handedOverBefore = UndoContractKinds.handedOver(in: twin.root, days: classDays)
+                handedOverBefore = UndoContractKinds.handedOver(in: twin.root)
                 if made != "applied" || outcomeWord(undone) != "undone" || handedOverBefore == handedOverAfter {
                     failures.append("recoveryCases '\(name)': the twin of \(call) came to \(made ?? "nil") and \(outcomeWord(undone))")
                 }
@@ -2251,7 +2201,7 @@ nonisolated enum UndoContractReplay {
                 if stillAside != wanted {
                     failures.append("recoveryCases '\(name)': a folder kept aside is \(stillAside) (\(leftovers))")
                 }
-            } else if (withATree || handedOverCall != nil) && !leftovers.isEmpty {
+            } else if withATree && !leftovers.isEmpty {
                 failures.append("recoveryCases '\(name)': staged items left: \(leftovers)")
             }
             if let heldChange {
@@ -2265,7 +2215,7 @@ nonisolated enum UndoContractReplay {
             if handedOverCall != nil {
                 // files: section 1's class pages and the library, exactly as
                 // before or after the step (the two pages are not in it).
-                let nowHandedOver: String = UndoContractKinds.handedOver(in: root, days: classDays)
+                let nowHandedOver: String = UndoContractKinds.handedOver(in: root)
                 switch string(testCase["files"]) ?? "" {
                 case "before":
                     if nowHandedOver != handedOverBefore {
@@ -2387,12 +2337,6 @@ nonisolated enum UndoContractReplay {
     static func killPoint(named name: String) -> UndoKillPoint {
         if name.hasPrefix("beforeSwap:") {
             return .beforeSwap(Int(name.dropFirst("beforeSwap:".count)) ?? 0)
-        }
-        if name.hasPrefix("relinkStaged:") {
-            return .relinkStaged(Int(name.dropFirst("relinkStaged:".count)) ?? 0)
-        }
-        if name.hasPrefix("relinkRenamedIn:") {
-            return .relinkRenamedIn(Int(name.dropFirst("relinkRenamedIn:".count)) ?? 0)
         }
         switch name {
         case "afterBegin":

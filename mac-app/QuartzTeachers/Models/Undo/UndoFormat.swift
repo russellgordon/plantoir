@@ -616,15 +616,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     /// itself is what moves; what it leads to is never read or touched.
     var linkSha: String?
 
-    /// `move` of a symbolic link that changes the text it holds (a
-    /// RELINKING move, U4b3 relink-1): the SHA-256 of the text at `from`
-    /// before and of the text at `to` after, both blobs. Never beside
-    /// `linkSha`: a reader that knows `linkSha` but not these finds none of
-    /// `sha`, `listingSha` and `linkSha`, so it cannot read the op rather
-    /// than Redo it with the old text.
-    var linkShaBefore: String?
-    var linkShaAfter: String?
-
     /// `external`: what outside the working folder it changed.
     var target: String?
 
@@ -666,8 +657,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         case sha
         case listingSha
         case linkSha
-        case linkShaBefore
-        case linkShaAfter
         case target
         // Read only to say the op cannot be read: a later piece's meaning.
         case element
@@ -718,8 +707,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         sha = UndoLenient.string(container, .sha, &readable)
         listingSha = UndoLenient.string(container, .listingSha, &readable)
         linkSha = UndoLenient.string(container, .linkSha, &readable)
-        linkShaBefore = UndoLenient.string(container, .linkShaBefore, &readable)
-        linkShaAfter = UndoLenient.string(container, .linkShaAfter, &readable)
         target = UndoLenient.string(container, .target, &readable)
         // `element` (editJSON) and `heldBy` (removeTree) are the reserved
         // shapes' keys for meanings a later piece settles: an op carrying
@@ -764,8 +751,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         try container.encodeIfPresent(sha, forKey: .sha)
         try container.encodeIfPresent(listingSha, forKey: .listingSha)
         try container.encodeIfPresent(linkSha, forKey: .linkSha)
-        try container.encodeIfPresent(linkShaBefore, forKey: .linkShaBefore)
-        try container.encodeIfPresent(linkShaAfter, forKey: .linkShaAfter)
         try container.encodeIfPresent(target, forKey: .target)
     }
 
@@ -776,34 +761,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             return nil
         }
         return UndoOpKind(rawValue: kind)
-    }
-
-    /// Whether the op is a symbolic link's move: a plain one (`linkSha`,
-    /// the same text on both sides) or a relinking one (`linkShaBefore`
-    /// and `linkShaAfter`, U4b3 relink-1). Every rule that reads "a link's
-    /// move" asks this, never `linkSha` alone, or a relinking move would
-    /// be read through, judged leading out, or carry edits.
-    var isALinksMove: Bool {
-        return linkSha != nil || linkShaBefore != nil
-    }
-
-    /// Whether the op is a relinking move (U4b3 relink-1): a link's move
-    /// that changes the text the link holds.
-    var isARelink: Bool {
-        return linkShaBefore != nil
-    }
-
-    /// The SHA-256 of the text a link's move holds at `from` (`isAtFrom`)
-    /// or at `to`: `linkSha` on both sides of a plain one, each side's own
-    /// for a relinking one. Nil for any other op.
-    func linkText(isAtFrom: Bool) -> String? {
-        if let linkSha {
-            return linkSha
-        }
-        if isAtFrom {
-            return linkShaBefore
-        }
-        return linkShaAfter
     }
 
     /// Every blob the op names, from `blobs`, its two hashes and its
@@ -1008,22 +965,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         return op
     }
 
-    /// A symbolic link moved and given a new text in one op (U4b3
-    /// relink-1): judged at `from` by `linkShaBefore` and at `to` by
-    /// `linkShaAfter`, both texts kept as blobs (a Redo needs the new, an
-    /// Undo the old). Swapped as: make the new link beside `to`, rename it
-    /// in exclusively, remove the old one. Unreadable from the journal
-    /// until `shapeIsKnown` knows it.
-    static func relinkLink(from: String, to: String, linkShaBefore: String, linkShaAfter: String) -> UndoOp {
-        var op: UndoOp = UndoOp(kind: UndoOpKind.move.rawValue, path: nil)
-        op.from = from
-        op.to = to
-        op.linkShaBefore = linkShaBefore
-        op.linkShaAfter = linkShaAfter
-        op.blobs = [linkShaBefore, linkShaAfter]
-        return op
-    }
-
     /// `createTree` or `removeTree`: blobs are the listing's and every
     /// file's content, so the tree can be made again.
     static func tree(_ kind: UndoOpKind, path: String, listing: UndoTreeListing) -> UndoOp {
@@ -1063,16 +1004,10 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         switch kind {
         case .move, .moveApart, .setAside:
             // No `path`: `from` and `to` follow path's rules, differ, and
-            // neither holds the other. Exactly one content form: a file's
-            // `sha`, a folder's `listingSha`, a link's `linkSha` (U4b2-14),
-            // or a relinking link's pair `linkShaBefore` and `linkShaAfter`
-            // (U4b3 relink-2). A reader that knows no `linkSha` finds none
-            // of the others, so it cannot read the op rather than misread
-            // it. The relink's pair is never spelled `linkSha` plus one new
-            // key for the same reason: a reader that knows `linkSha` but not
-            // the new key would read a plain link's move and Redo it with
-            // the OLD text; finding none of `sha`, `listingSha` and
-            // `linkSha`, it cannot read the op instead.
+            // neither holds the other. Exactly one of a file's `sha`, a
+            // folder's `listingSha` and a link's `linkSha` (U4b2-14): a
+            // reader that knows no `linkSha` finds neither of the other two,
+            // so it cannot read the op rather than misread it.
             guard op.path == nil, let from = op.from, let to = op.to else {
                 return false
             }
@@ -1086,12 +1021,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             }
             var contents: Int = 0
             for given in [op.sha, op.listingSha, op.linkSha] where given != nil {
-                contents += 1
-            }
-            if op.linkShaBefore != nil || op.linkShaAfter != nil {
-                if !UndoOp.relinkShapeIsKnown(op, kind: kind) {
-                    return false
-                }
                 contents += 1
             }
             return contents == 1
@@ -1153,28 +1082,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         }
     }
 
-    /// The shape of a relinking move (U4b3 relink-2, opKinds.move): a
-    /// `move`, never a `moveApart` or `setAside` and never a
-    /// capitalisation-only rename, carrying BOTH `linkShaBefore` and
-    /// `linkShaAfter`, each a blob name, the two different (a link whose
-    /// text did not change is a plain link's move), and `blobs` holding
-    /// exactly those two, so an Undo has the old text and a Redo the new.
-    static func relinkShapeIsKnown(_ op: UndoOp, kind: UndoOpKind) -> Bool {
-        if kind != .move || op.isCaseOnlyMove {
-            return false
-        }
-        guard let before = op.linkShaBefore, let after = op.linkShaAfter else {
-            return false
-        }
-        if !UndoOp.isBlobName(before) || !UndoOp.isBlobName(after) || before == after {
-            return false
-        }
-        guard let blobs = op.blobs, blobs.count == 2 else {
-            return false
-        }
-        return blobs.contains(before) && blobs.contains(after)
-    }
-
     /// Whether `edit` is an edit (a `writeFile`, an `editLine`, a
     /// `replaceText` or an `editJSON`) of the file a `move` moved, or of a
     /// file inside the folder it moved, named at the NEW place and naming
@@ -1191,7 +1098,7 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         // A link's move carries nothing (U4b2-14, review 1, MEDIUM 1): a
         // link is neither a file nor a folder the move moved, so an edit
         // under its `to` breaks opKinds.wholeOps and the step is unreadable.
-        if move.isALinksMove {
+        if move.linkSha != nil {
             return false
         }
         switch edit.knownKind {

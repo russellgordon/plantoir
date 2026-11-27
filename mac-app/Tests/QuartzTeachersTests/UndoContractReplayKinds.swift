@@ -44,7 +44,6 @@ nonisolated enum UndoContractKinds {
         "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
         "moveALinkToAFolder", "stepEditingInsideALinksMove",
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
-        "relinkALink", "relinkALinkLeavingAHandedOverPlace", "relinkTwoChainedLinks", "relinkThreeChainedLinks", "relinkThenMoveALinkIntoItsPlace",
         "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
     ]
 
@@ -76,16 +75,6 @@ nonisolated enum UndoContractKinds {
     /// `handAPlaceOverBeforeALinksMove` hand over, by day, and the library
     /// their links lead to (relative targets).
     static let handedOverDays: [Int] = [2, 3, 4]
-
-    /// U4b3 relink-3: the class pages `relinkALink` and
-    /// `relinkALinkLeavingAHandedOverPlace` change, by day.
-    static let relinkedDays: [Int] = [3, 4, 5]
-
-    /// Review D of U4b3: the class pages `relinkTwoChainedLinks` changes.
-    static let chainedRelinkDays: [Int] = [4, 5, 6]
-
-    /// Review F of U4b3: the class pages `relinkThreeChainedLinks` changes.
-    static let threeChainedRelinkDays: [Int] = [4, 5, 6, 7]
 
     static func classPage(_ day: Int) -> String {
         return "courses/TST1O/section1/Unit 1, Day \(day).md"
@@ -528,86 +517,6 @@ nonisolated enum UndoContractKinds {
                 UndoOp.writeFile(path: classPage(2), beforeSha: nil, afterSha: UndoHash.sha256(of: new)),
             ]
             return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [three, new], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
-        case "relinkALink", "relinkALinkLeavingAHandedOverPlace":
-            // U4b3 relink-3: Day 3 a page, Day 4 a link holding `Unit 1,
-            // Day 3.md`; ONE step: the link moved to Day 5 holding `Unit 1,
-            // Day 4.md` (a relinking move); leaving a handed-over place, as
-            // Insert Class makes it, Day 3's page then moved into Day 4 and
-            // `New.` written at Day 3.
-            let oldText: Data = Data("Unit 1, Day 3.md".utf8)
-            let newText: Data = Data("Unit 1, Day 4.md".utf8)
-            if !somethingIsAt(classPage(3), in: root) && !somethingIsAt(classPage(4), in: root) {
-                try UndoContractReplay.write("Three.\n", to: classPage(3), in: root)
-                try layALink(classPage(4), leadingTo: "Unit 1, Day 3.md", root: root)
-            }
-            var ops: [UndoOp] = [
-                UndoOp.relinkLink(from: classPage(4), to: classPage(5), linkShaBefore: UndoHash.sha256(of: oldText), linkShaAfter: UndoHash.sha256(of: newText)),
-            ]
-            var blobs: [Data] = [oldText, newText]
-            if value == "relinkALinkLeavingAHandedOverPlace" {
-                let three: Data = Data("Three.\n".utf8)
-                let new: Data = Data("New.\n".utf8)
-                ops.append(UndoOp.moveFile(from: classPage(3), to: classPage(4), sha: UndoHash.sha256(of: three)))
-                ops.append(UndoOp.writeFile(path: classPage(3), beforeSha: nil, afterSha: UndoHash.sha256(of: new)))
-                blobs.append(new)
-            }
-            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: blobs, root: root, action: "insertClass"), in: journal, mode: .live, places: places))
-        case "relinkTwoChainedLinks":
-            // Review D of U4b3, MEDIUM: Day 4 a link holding `Unit 1, Day
-            // 1.md`, Day 5 one holding `Unit 1, Day 2.md`; ONE step, as
-            // Insert Class makes it, highest first: Day 5's link moved to
-            // Day 6 holding `Unit 1, Day 3.md`, then Day 4's moved to Day 5
-            // holding `Unit 1, Day 2.md` (the first move's old text).
-            let one: Data = Data("Unit 1, Day 1.md".utf8)
-            let two: Data = Data("Unit 1, Day 2.md".utf8)
-            let three: Data = Data("Unit 1, Day 3.md".utf8)
-            if !somethingIsAt(classPage(4), in: root) && !somethingIsAt(classPage(5), in: root) && !somethingIsAt(classPage(6), in: root) {
-                try layALink(classPage(4), leadingTo: "Unit 1, Day 1.md", root: root)
-                try layALink(classPage(5), leadingTo: "Unit 1, Day 2.md", root: root)
-            }
-            let ops: [UndoOp] = [
-                UndoOp.relinkLink(from: classPage(5), to: classPage(6), linkShaBefore: UndoHash.sha256(of: two), linkShaAfter: UndoHash.sha256(of: three)),
-                UndoOp.relinkLink(from: classPage(4), to: classPage(5), linkShaBefore: UndoHash.sha256(of: one), linkShaAfter: UndoHash.sha256(of: two)),
-            ]
-            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [one, two, three], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
-        case "relinkThreeChainedLinks":
-            // Review F of U4b3, MEDIUM: Day 4, Day 5 and Day 6 links holding
-            // `Unit 1, Day 1.md`, `Unit 1, Day 2.md` and `Unit 1, Day
-            // 3.md`; ONE step, highest first: Day 6's link moved to Day 7
-            // holding `Unit 1, Day 4.md`, then Day 5's to Day 6, then Day
-            // 4's to Day 5, each holding the next one's old text.
-            var texts: [Data] = []
-            var day: Int = 1
-            while day <= 4 {
-                texts.append(Data("Unit 1, Day \(day).md".utf8))
-                day += 1
-            }
-            if !somethingIsAt(classPage(4), in: root) && !somethingIsAt(classPage(5), in: root) && !somethingIsAt(classPage(6), in: root) && !somethingIsAt(classPage(7), in: root) {
-                try layALink(classPage(4), leadingTo: "Unit 1, Day 1.md", root: root)
-                try layALink(classPage(5), leadingTo: "Unit 1, Day 2.md", root: root)
-                try layALink(classPage(6), leadingTo: "Unit 1, Day 3.md", root: root)
-            }
-            let ops: [UndoOp] = [
-                UndoOp.relinkLink(from: classPage(6), to: classPage(7), linkShaBefore: UndoHash.sha256(of: texts[2]), linkShaAfter: UndoHash.sha256(of: texts[3])),
-                UndoOp.relinkLink(from: classPage(5), to: classPage(6), linkShaBefore: UndoHash.sha256(of: texts[1]), linkShaAfter: UndoHash.sha256(of: texts[2])),
-                UndoOp.relinkLink(from: classPage(4), to: classPage(5), linkShaBefore: UndoHash.sha256(of: texts[0]), linkShaAfter: UndoHash.sha256(of: texts[1])),
-            ]
-            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: texts, root: root, action: "insertClass"), in: journal, mode: .live, places: places))
-        case "relinkThenMoveALinkIntoItsPlace":
-            // Review F of U4b3: Day 4 and Day 5 links both holding `Unit 1,
-            // Day 2.md`; ONE step: Day 5's link relinked to Day 6 holding
-            // `Unit 1, Day 3.md`, then Day 4's moved plainly into Day 5.
-            let two: Data = Data("Unit 1, Day 2.md".utf8)
-            let three: Data = Data("Unit 1, Day 3.md".utf8)
-            if !somethingIsAt(classPage(4), in: root) && !somethingIsAt(classPage(5), in: root) && !somethingIsAt(classPage(6), in: root) {
-                try layALink(classPage(4), leadingTo: "Unit 1, Day 2.md", root: root)
-                try layALink(classPage(5), leadingTo: "Unit 1, Day 2.md", root: root)
-            }
-            let ops: [UndoOp] = [
-                UndoOp.relinkLink(from: classPage(5), to: classPage(6), linkShaBefore: UndoHash.sha256(of: two), linkShaAfter: UndoHash.sha256(of: three)),
-                UndoOp.moveLink(from: classPage(4), to: classPage(5), linkSha: UndoHash.sha256(of: two)),
-            ]
-            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [two, three], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
         case "editTheHandedOverPageByHand":
             try? FileManager.default.removeItem(at: root.appendingPathComponent(classPage(3)))
             try UndoContractReplay.write("Hand.\n", to: classPage(3), in: root)
@@ -778,10 +687,9 @@ nonisolated enum UndoContractKinds {
     /// `Day <n>: link <target>` or `Day <n>: nothing`, then `library:
     /// untouched` when every page the links lead to holds what the call laid
     /// (else `changed`), joined by `; `.
-    /// U4b3 relink-3 reads `relinkedDays` instead (Day 3 to Day 5).
-    static func handedOver(in root: URL, days: [Int] = handedOverDays) -> String {
+    static func handedOver(in root: URL) -> String {
         var parts: [String] = []
-        for day in days {
+        for day in handedOverDays {
             let url: URL = root.appendingPathComponent(classPage(day))
             var what: String = "nothing"
             if let bytes = UndoTreeReading.linkTarget(at: url), let target = UndoText.decode(bytes) {

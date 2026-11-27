@@ -1135,12 +1135,6 @@ nonisolated enum UndoKillPoint: Equatable, Sendable {
     /// clearing takes a step in flight (`undo.rule.clearing`).
     case afterTheCheck
     case beforeSwap(Int)
-    /// U4b3 relink-3: inside a relinking move's swap at target N, the new
-    /// link made under its staged name and not yet renamed in.
-    case relinkStaged(Int)
-    /// U4b3 relink-3: inside the same swap, the new link renamed in and the
-    /// old one not yet removed: both links stand.
-    case relinkRenamedIn(Int)
     case beforeApplied
     case afterUndoing
     case beforeUndone
@@ -1208,11 +1202,6 @@ nonisolated enum UndoKillPoints {
     /// swap is being reversed, as a file another program holds does on
     /// Windows. Set only by tests.
     nonisolated(unsafe) static var putBackFailsAt: ((Int) -> Bool)?
-
-    /// Answers true to make renaming a relinking move's new link in fail at
-    /// this place (U4b3 relink-1), as a place taken in that instant would.
-    /// Set only by tests.
-    nonisolated(unsafe) static var relinkRenameInFails: ((URL) -> Bool)?
 
     /// Called with the list's folder once its segments are listed and
     /// before any of them is opened: a test takes a segment away there, as

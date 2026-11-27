@@ -965,298 +965,36 @@ final class JournaledStepTests: XCTestCase {
         XCTAssertEqual(stagedNames(under: made.course), [])
     }
 
-    // MARK: - Recorded by JournaledStep (relink-4)
-
-    /// Where a relinked link's two texts lead.
-    enum RelinkLeads: CaseIterable {
-        /// To two pages of the course, by relative text.
-        case inside
-        /// To two files outside the working folder, by absolute text.
-        case outToAFile
-        /// To nothing, outside the working folder.
-        case outToNothing
+    /// #1055 M3 keeps the rename that changes both case and Unicode
+    /// normalisation in the last part: a capitalisation-only move, judged
+    /// as the step left it each way, as today. (Moved here unchanged from
+    /// `UndoRelinkTests` by #1055 M4, its scratch folder made here.)
+    func testACapitalisationAndNormalisationRenameIsStillACapitalisationOnlyMove() throws {
+        let parent: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("journaled-step-\(UUID().uuidString)", isDirectory: true)
+        folders.append(parent)
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "m3-case-and-normalisation")
+        let content: String = "{\"site_id\": \"aaa-111\"}\n"
+        let to: String = "courses/TST1O/m/\u{00C9}cole.json"
+        try UndoContractReplay.write(content, to: to, in: place.root)
+        let given: [String: Any] = [
+            "kind": "move",
+            "from": "courses/TST1O/m/e\u{0301}cole.json",
+            "to": to,
+            "sha": UndoHash.sha256(of: Data(content.utf8))
+        ]
+        let op: UndoOp = try JSONDecoder().decode(UndoOp.self, from: JSONSerialization.data(withJSONObject: given))
+        XCTAssertTrue(op.isReadable)
+        let state: UndoOpState = UndoCheck.wholeState(of: op, root: place.root, places: UndoMemoryPlaces())
+        XCTAssertEqual(UndoCheck.verdict(for: state, direction: .backward), .canUndo)
+        XCTAssertEqual(UndoCheck.verdict(for: state, direction: .forward), .alreadyRedone)
     }
 
-    /// A relink alone, its texts leading inside, out to a file and out to
-    /// nothing: one step, one op with both shas, both texts in the list
-    /// byte for byte, the link at its new name holding exactly the new
-    /// text and nothing at the old; Undo puts the old name and old text
-    /// back, Redo the new; nothing outside written or made. MUST FAIL
-    /// with the relink recorded as a plain link's move (the old text at the
-    /// new name) or with either text left out of the list.
-    func testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone() throws {
-        for leads in RelinkLeads.allCases {
-            let made = try course(inAWorkingFolder: true)
-            let texts: (old: String, new: String) = try relinkTexts(leads, in: made)
-            let outside: URL? = outsideFolderOf(texts.old, leads: leads)
-            let outsideBefore: [String: String] = try timesUnder(outside)
-            let classes: URL = made.day1.deletingLastPathComponent()
-            let day4: URL = try linkedPage(named: "Unit 1, Day 4.md", in: made, leadingTo: texts.old)
-            let day5: URL = classes.appendingPathComponent("Unit 1, Day 5.md")
-            let before: [String: String] = try everythingUnder(made.course)
-            JournaledStep.modeOverride = .live
-            let step: JournaledStep = step(for: made.course)
-            XCTAssertTrue(step.relinkLink(day4, to: day5, textAfter: Data(texts.new.utf8)), "\(leads)")
-            try step.make()
-
-            let ops: [UndoOp] = try newestOps()
-            XCTAssertEqual(ops.count, 1, "\(leads)")
-            let op: UndoOp = try XCTUnwrap(ops.first)
-            XCTAssertTrue(op.isARelink, "\(leads)")
-            XCTAssertNil(op.linkSha, "\(leads)")
-            let journal: UndoJournal = UndoJournalLocation.standardJournal()
-            XCTAssertEqual(journal.readBlob(sha: try XCTUnwrap(op.linkShaBefore)), Data(texts.old.utf8), "\(leads)")
-            XCTAssertEqual(journal.readBlob(sha: try XCTUnwrap(op.linkShaAfter)), Data(texts.new.utf8), "\(leads)")
-            XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day5.path), texts.new, "\(leads)")
-            XCTAssertFalse(standsAnything(day4), "\(leads)")
-            let after: [String: String] = try everythingUnder(made.course)
-
-            let root: URL = workingFolder(of: made)
-            XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .undone(seq: 1), "\(leads)")
-            XCTAssertEqual(try everythingUnder(made.course), before, "\(leads)")
-            XCTAssertEqual(journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .redone(seq: 1), "\(leads)")
-            XCTAssertEqual(try everythingUnder(made.course), after, "\(leads)")
-            XCTAssertEqual(stagedNames(under: made.course), [], "\(leads)")
-            XCTAssertEqual(try timesUnder(outside), outsideBefore, "\(leads): something outside was written or made")
-            JournaledStep.modeOverride = nil
-        }
-    }
-
-    /// Insert Class's shape: the link at Day 4 is relinked to Day 5 (its
-    /// text `Unit 1, Day 3.md` becoming `Unit 1, Day 4.md`), the page at
-    /// Day 3 is written, retitled, at Day 4 (the place the link leaves, a
-    /// new file there, never through the leaving link) and removed, and a
-    /// new page is made at Day 3. One step in the handing-over order; Undo
-    /// and Redo exact. MUST FAIL with the old place read as taken (door-6's
-    /// reading skipped for a relink).
-    func testARelinkWhoseOldPlaceIsFilledInTheSameStepIsOneStep() throws {
-        let made = try course(inAWorkingFolder: true)
-        let classes: URL = made.day1.deletingLastPathComponent()
-        let day3: URL = classes.appendingPathComponent("Unit 1, Day 3.md")
-        let day5: URL = classes.appendingPathComponent("Unit 1, Day 5.md")
-        try "---\ntitle: Unit 1, Day 3\n---\nThree.\n".write(to: day3, atomically: true, encoding: .utf8)
-        let day4: URL = try linkedPage(named: "Unit 1, Day 4.md", in: made, leadingTo: "Unit 1, Day 3.md")
-        let before: [String: String] = try everythingUnder(made.course)
-        JournaledStep.modeOverride = .live
-        let step: JournaledStep = step(for: made.course)
-        XCTAssertTrue(step.relinkLink(day4, to: day5, textAfter: Data("Unit 1, Day 4.md".utf8)))
-        XCTAssertFalse(step.fileExists(day4), "the place the relink leaves reads as taken")
-        step.write("---\ntitle: Unit 1, Day 4\n---\nThree.\n", to: day4)
-        step.remove(day3)
-        step.write("New.\n", to: day3)
-        try step.make()
-
-        let ops: [UndoOp] = try newestOps()
-        XCTAssertEqual(UndoCheck.handovers(in: ops).count, 1)
-        XCTAssertTrue(UndoStep.wholeOpsStandAlone(ops))
-        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day5.path), "Unit 1, Day 4.md")
-        XCTAssertFalse(isALink(day4))
-        XCTAssertEqual(try String(contentsOf: day4, encoding: .utf8), "---\ntitle: Unit 1, Day 4\n---\nThree.\n")
-        XCTAssertEqual(try String(contentsOf: day3, encoding: .utf8), "New.\n")
-        let after: [String: String] = try everythingUnder(made.course)
-
-        let root: URL = workingFolder(of: made)
-        let journal: UndoJournal = UndoJournalLocation.standardJournal()
-        XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .undone(seq: 1))
-        XCTAssertEqual(try everythingUnder(made.course), before)
-        XCTAssertEqual(journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .redone(seq: 1))
-        XCTAssertEqual(try everythingUnder(made.course), after)
-        XCTAssertEqual(stagedNames(under: made.course), [])
-    }
-
-    /// Two relinks in a row, the second filling the place the first
-    /// leaves (Day 4 to Day 5, Day 3 to Day 4, each with its own new
-    /// text), planned lowest first so the order must change: one step,
-    /// exact both ways.
-    func testTwoRelinksInARowAreOneStep() throws {
-        let made = try course(inAWorkingFolder: true)
-        let classes: URL = made.day1.deletingLastPathComponent()
-        let day3: URL = try linkedPage(named: "Unit 1, Day 3.md", in: made, leadingTo: "../../elsewhere/three.md")
-        let day4: URL = try linkedPage(named: "Unit 1, Day 4.md", in: made, leadingTo: "../../elsewhere/four.md")
-        let day5: URL = classes.appendingPathComponent("Unit 1, Day 5.md")
-        let before: [String: String] = try everythingUnder(made.course)
-        JournaledStep.modeOverride = .live
-        let step: JournaledStep = step(for: made.course)
-        XCTAssertTrue(step.relinkLink(day3, to: day4, textAfter: Data("../../elsewhere/four.md".utf8)))
-        XCTAssertTrue(step.relinkLink(day4, to: day5, textAfter: Data("../../elsewhere/five.md".utf8)))
-        try step.make()
-
-        let ops: [UndoOp] = try newestOps()
-        XCTAssertEqual(ops.count, 2)
-        XCTAssertEqual(UndoCheck.handovers(in: ops).count, 1)
-        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day5.path), "../../elsewhere/five.md")
-        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day4.path), "../../elsewhere/four.md")
-        XCTAssertFalse(standsAnything(day3))
-        let after: [String: String] = try everythingUnder(made.course)
-
-        let root: URL = workingFolder(of: made)
-        let journal: UndoJournal = UndoJournalLocation.standardJournal()
-        XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .undone(seq: 1))
-        XCTAssertEqual(try everythingUnder(made.course), before)
-        XCTAssertEqual(journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .redone(seq: 1))
-        XCTAssertEqual(try everythingUnder(made.course), after)
-    }
-
-    /// A write planned at a relink's new name, by either way of planning
-    /// one, would be a write through a link whose text the step changes:
-    /// the step is refused before anything changes, nothing on the list,
-    /// the link and what it leads to untouched. MUST FAIL with the refusal
-    /// taken out (the write goes through the link).
-    func testAWriteAtARelinksNewNameIsRefusedBeforeAnythingChanges() throws {
-        for byReadBytes in [false, true] {
-            let made = try course(inAWorkingFolder: true)
-            let target: URL = try linkedFile(named: "Unit 1, Day 3.md", in: made)
-            let classes: URL = made.day1.deletingLastPathComponent()
-            let day4: URL = try linkedPage(named: "Unit 1, Day 4.md", in: made, leadingTo: "../../elsewhere/Unit 1, Day 3.md")
-            let day5: URL = classes.appendingPathComponent("Unit 1, Day 5.md")
-            let before: [String: String] = try everythingUnder(made.course)
-            let step: JournaledStep = step(for: made.course)
-            XCTAssertTrue(step.relinkLink(day4, to: day5, textAfter: Data("../../elsewhere/Unit 1, Day 4.md".utf8)))
-            if byReadBytes {
-                step.write(Data("Through.\n".utf8), to: day5, plannedFrom: try Data(contentsOf: target))
-            } else {
-                step.write("Through.\n", to: day5)
-            }
-            XCTAssertThrowsError(try step.make(), "\(byReadBytes)") { error in
-                guard case JournaledStepError.refused(.cannotTellNow, _) = error else {
-                    return XCTFail("not refused as cannot tell now: \(error)")
-                }
-            }
-            XCTAssertEqual(try everythingUnder(made.course), before, "\(byReadBytes)")
-            XCTAssertEqual(try UndoJournalLocation.standardJournal().read().records.count, 0, "\(byReadBytes)")
-        }
-    }
-
-    /// The list refusing the relink's SECOND text (its blob folder locked)
-    /// with the switch off: one trail line saying the action went ahead,
-    /// nothing on the list, and the relink made as the door would have
-    /// made it, the link at its new name holding the new text.
-    func testARelinkWhoseNewTextTheListRefusesGoesAheadUnrecorded() throws {
-        let made = try course(inAWorkingFolder: true)
-        let classes: URL = made.day1.deletingLastPathComponent()
-        let oldText: String = "../../elsewhere/old.md"
-        let newText: String = "../../elsewhere/new.md"
-        let day4: URL = try linkedPage(named: "Unit 1, Day 4.md", in: made, leadingTo: oldText)
-        let day5: URL = classes.appendingPathComponent("Unit 1, Day 5.md")
-        let journal: UndoJournal = UndoJournalLocation.standardJournal()
-        let oldFolder: URL = journal.blobURL(sha: UndoHash.sha256(of: Data(oldText.utf8))).deletingLastPathComponent()
-        let newFolder: URL = journal.blobURL(sha: UndoHash.sha256(of: Data(newText.utf8))).deletingLastPathComponent()
-        XCTAssertNotEqual(oldFolder.path, newFolder.path, "the two texts' blobs share a folder: choose other texts")
-        try FileManager.default.createDirectory(at: newFolder, withIntermediateDirectories: true)
-        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: newFolder.path)
-        lockedFolders.append(newFolder)
-        let step: JournaledStep = step(for: made.course)
-        XCTAssertTrue(step.relinkLink(day4, to: day5, textAfter: Data(newText.utf8)))
-
-        let lines: [UndoUnrecordedChange] = try couldNotRecordLines {
-            try step.make()
-        }
-        XCTAssertEqual(lines, [.wentAhead])
-        XCTAssertEqual(try journal.read().records.count, 0)
-        XCTAssertNil(journal.readBlob(sha: UndoHash.sha256(of: Data(newText.utf8))))
-        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day5.path), newText)
-        XCTAssertFalse(standsAnything(day4))
-        XCTAssertEqual(stagedNames(under: made.course), [])
-    }
-
-    /// The handed-over place left by a relink leading OUT of the working
-    /// folder, filled in Insert Class's way (the page below written there,
-    /// retitled, and removed from its own place; relink-3's parked case
-    /// met through a write, not a page's move): the link is moved as a
-    /// link, never followed, so the step is recorded and made, Undo and
-    /// Redo exact, nothing outside touched.
-    func testAPageWrittenIntoThePlaceALinkLeadingOutLeavesIsOneStep() throws {
-        let made = try course(inAWorkingFolder: true)
-        let texts: (old: String, new: String) = try relinkTexts(.outToAFile, in: made)
-        let outside: URL? = outsideFolderOf(texts.old, leads: .outToAFile)
-        let outsideBefore: [String: String] = try timesUnder(outside)
-        let classes: URL = made.day1.deletingLastPathComponent()
-        let day3: URL = classes.appendingPathComponent("Unit 1, Day 3.md")
-        let day5: URL = classes.appendingPathComponent("Unit 1, Day 5.md")
-        try "---\ntitle: Unit 1, Day 3\n---\nThree.\n".write(to: day3, atomically: true, encoding: .utf8)
-        let day4: URL = try linkedPage(named: "Unit 1, Day 4.md", in: made, leadingTo: texts.old)
-        let before: [String: String] = try everythingUnder(made.course)
-        JournaledStep.modeOverride = .live
-        let step: JournaledStep = step(for: made.course)
-        XCTAssertTrue(step.relinkLink(day4, to: day5, textAfter: Data(texts.new.utf8)))
-        step.write("---\ntitle: Unit 1, Day 4\n---\nThree.\n", to: day4)
-        step.remove(day3)
-        try step.make()
-
-        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: day5.path), texts.new)
-        XCTAssertEqual(try String(contentsOf: day4, encoding: .utf8), "---\ntitle: Unit 1, Day 4\n---\nThree.\n")
-        XCTAssertFalse(isALink(day4))
-        XCTAssertFalse(standsAnything(day3))
-        let after: [String: String] = try everythingUnder(made.course)
-        let root: URL = workingFolder(of: made)
-        let journal: UndoJournal = UndoJournalLocation.standardJournal()
-        XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .undone(seq: 1))
-        XCTAssertEqual(try everythingUnder(made.course), before)
-        XCTAssertEqual(journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .redone(seq: 1))
-        XCTAssertEqual(try everythingUnder(made.course), after)
-        XCTAssertEqual(try timesUnder(outside), outsideBefore)
-    }
-
-    // MARK: - Helpers (relink-4)
-
-    /// A relink's old and new texts: two pages of the course by relative
-    /// text, two files laid outside the working folder by absolute text,
-    /// or two absolute places outside naming nothing.
-    func relinkTexts(_ leads: RelinkLeads, in made: (course: URL, day1: URL, day2: URL, list: URL)) throws -> (old: String, new: String) {
-        switch leads {
-        case .inside:
-            _ = try linkedFile(named: "old.md", in: made)
-            _ = try linkedFile(named: "new.md", in: made)
-            return (old: "../../elsewhere/old.md", new: "../../elsewhere/new.md")
-        case .outToAFile:
-            let old: URL = try linkedFile(named: "old.md", in: made, outside: true)
-            let new: URL = old.deletingLastPathComponent().appendingPathComponent("new.md")
-            try "---\ntitle: New\n---\nNew.\n".write(to: new, atomically: true, encoding: .utf8)
-            return (old: old.path, new: new.path)
-        case .outToNothing:
-            let folder: URL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("journaled-step-outside-\(UUID().uuidString)", isDirectory: true)
-            folders.append(folder)
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            return (old: folder.appendingPathComponent("gone old.md").path, new: folder.appendingPathComponent("gone new.md").path)
-        }
-    }
-
-    /// The folder outside the working folder a text leads into, or nil.
-    func outsideFolderOf(_ text: String, leads: RelinkLeads) -> URL? {
-        if leads == .inside {
-            return nil
-        }
-        return URL(fileURLWithPath: text).deletingLastPathComponent()
-    }
-
-    /// Every item in a folder by name with its modification time, size and
-    /// the SHA-256 of its bytes: nothing made there or written there. Never
-    /// its access time (#1054): a scanner moves it on another Mac.
-    func timesUnder(_ folder: URL?) throws -> [String: String] {
-        var found: [String: String] = [:]
-        guard let folder else {
-            return found
-        }
-        for name in try FileManager.default.contentsOfDirectory(atPath: folder.path) {
-            var information: stat = stat()
-            XCTAssertEqual(lstat(folder.appendingPathComponent(name).path, &information), 0)
-            found[name] = "\(information.st_mtimespec.tv_sec).\(information.st_mtimespec.tv_nsec) \(information.st_size) "
-                + (UndoHash.sha256(ofOptional: try? Data(contentsOf: folder.appendingPathComponent(name))) ?? "unreadable")
-        }
-        return found
-    }
+    // MARK: - Helpers (#1055 M4)
 
     /// The working folder holding the course's `courses` folder.
     func workingFolder(of made: (course: URL, day1: URL, day2: URL, list: URL)) -> URL {
         return made.course.deletingLastPathComponent().deletingLastPathComponent()
-    }
-
-    /// Whether anything at all stands at the place, a link leading nowhere
-    /// included (`lstat`).
-    func standsAnything(_ url: URL) -> Bool {
-        var information: stat = stat()
-        return lstat(url.path, &information) == 0
     }
 
     /// Everything under the folder by relative path: a link by its text, a
