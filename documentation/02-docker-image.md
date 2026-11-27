@@ -282,6 +282,26 @@ The image is layered as follows (in order):
    skipping the seven by name on a Mac, which a Windows run would inherit;
    and a list of the seven kept by hand, which a new file would miss until
    somebody added it (the first version of this change kept one).
+
+   **`verify.sh` discovers every `scripts/test_*.py` (#1052).** Step 0.5 no longer
+   trusts a written list. Every named run hands its file to `python3` through
+   `ran_by_name`, which appends the name to `/tmp/verify_ran_by_name.list` and
+   prints it; at the end of step 0.5 the discovery runs every `scripts/test_*.py`
+   that list does not hold, and each must pass (a file needing python-frontmatter
+   exits 77 on a Mac without it and fails there on purpose, since it belongs in
+   the image runs). The list, not the script's text, is the record, so a name in
+   a message or comment can neither hide a file nor run it twice. Files run by
+   name only after step 0.5 (the image runs, two `--site` runs) are written in
+   `tests_run_by_name_later`, and a check at the end of the run fails if that list
+   and what those steps name differ either way. At the start of step 0.5
+   `verify.sh` reads itself and fails on any non-comment, non-message line that
+   hands `python3` a `test_*.py` without `ran_by_name`. It prints "N run by name in
+   this script, M found and run by the discovery" and, for a discovered unittest
+   file that skipped cases, the number skipped (not a failure). `not_run_on_this_mac`,
+   the named skip list with a reason beside each entry, is empty. The two readers
+   above (`test_image_only_tests_say_so.py`, `test_image_runs_find_their_modules.py`)
+   read `"$(ran_by_name test_x.py)"` as well as the bare forms. Windows discovers
+   the files already and does not read `verify.sh`.
 10. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to

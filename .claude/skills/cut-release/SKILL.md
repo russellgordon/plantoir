@@ -233,6 +233,11 @@ Style rules, in order of importance:
   Many commits produce NO line — that is correct behaviour.
 - Merge related commits into one line (three commits fixing the same
   sidebar bug are one bullet).
+- **v2.0.0: the release notes, on both platforms, say nothing about symbolic
+  links (or "linked" pages or folders).** Russell, 2026-11-27: symbolic links
+  in a course's working folder are not supported; the handling built and then
+  removed during the sprint (#899, #1055) is never described. Before showing a
+  draft, search it for "symbolic link", "symlink" and "linked page".
 - **Keep the app's two words apart** (#443, v1.4.4): DEPLOY is putting a
   site online — Netlify, Cloudflare or a folder; PUBLISH is only marking a
   page so that the next deploy includes it, and nothing leaves the

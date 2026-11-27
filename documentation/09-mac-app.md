@@ -9789,6 +9789,21 @@ didCommit / didFinish / didFail / didFailProvisional — no policy method, so
 every navigation is allowed exactly as with no delegate). An address change
 in between is not the teacher's.
 
+**What the tests count, not wait for (#1046).** `WebPreviewController` counts
+the loads it asks for (`appLoadsAskedFor`, beside `ledger.appLoadBegan()`; Reload's
+`reloadFromOrigin` branch counts too) and the loads it hands to WebKit
+(`appLoadsHandedToWebKit`, only where `webView.load` or `reloadFromOrigin`
+returns a navigation, in the completion after the caches are emptied), both
+`@ObservationIgnored`; each hand-off calls `whenALoadIsHandedToWebKit`. Whether
+to load is the controller's decision alone, made synchronously, so
+`WebPreviewControllerTests` asserts the asked-for count after each call (1, still
+1 for a repeated address, 2 after `showFreshBuild`, still 2 after the mounting
+view's `loadIfNeeded`) and the hand-off count's ORDER (still 0 before the
+caches are emptied, 1 after `showFreshBuild`), and waits for each hand-off only on
+an `XCTestExpectation` with a 60 s bound that ends a hung test and never judges
+speed. No poll and no GCD remain; WebKit's own speed (another build on the
+same Mac) can no longer fail the test.
+
 **Why commit, not only finish** (implementation review, 1, measured):
 didFinish waits for the window's `load` event, and every built page pulls
 KaTeX and fonts from CDNs in its head. With one such resource answering after
@@ -19249,7 +19264,15 @@ broader gate would hide them, so a test pins all eight combinations.
 
 **It chains with the sheet host.** `SheetsHungOffScreenStayThere` (#621)
 replaces `constrainFrameRect(_:to:)` again for sheets hung from a test's own
-`OffScreenWindow`. It is installed later, from the first `SheetHost`, so the
+`OffScreenWindow`. (`SheetHost.init` waits for the sheet itself, not for a fixed
+0.6 s turn of the run loop (#1050): it registers an `XCTNSNotificationExpectation`
+for `NSWindow.willBeginSheetNotification` on its window before `isShown = true`
+and, if `attachedSheet` is still nil, waits on it with `XCTWaiter` (a 30 s bound
+that only ends a sheet that never opens); the notification is posted from inside
+AppKit's attach, so the waiter cannot return before the sheet is attached. KVO on
+`attachedSheet` never fires, so it is not used. If a sizing test that reads
+`sheet.frame` right after `SheetHost.init` is ever reported flaky, look here
+first.) It is installed later, from the first `SheetHost`, so the
 answer it falls back to is this one, not AppKit's. Tests therefore never call
 the installer: a second install would cut that chain. The off-screen formula
 has one copy, and `TableHost.offScreenOrigin(for:)` asks it.
