@@ -39,6 +39,13 @@ class WebPreviewController {
     @ObservationIgnored private var ledger: PreviewNavigationLedger = PreviewNavigationLedger()
     @ObservationIgnored private var appNavigation: WKNavigation?
 
+    /// How many loads the app has asked for (a first load, a fresh build,
+    /// Reload), counted as each is asked, before the caches are emptied
+    /// and the load reaches WebKit. Read by the tests, which judge this
+    /// controller's own decision to load rather than how quickly WebKit's
+    /// processes answer (#1046).
+    @ObservationIgnored private(set) var appLoadsAskedFor: Int = 0
+
     /// Tells this controller when a navigation ends (#504).
     let navigationWatcher: PreviewNavigationWatcher
 
@@ -160,6 +167,7 @@ class WebPreviewController {
         // ending in between must not end this one.
         ledger.appLoadBegan()
         appNavigation = nil
+        appLoadsAskedFor += 1
         let caches: Set<String> = [
             WKWebsiteDataTypeDiskCache,
             WKWebsiteDataTypeMemoryCache,

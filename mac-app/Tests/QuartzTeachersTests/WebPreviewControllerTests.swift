@@ -31,7 +31,16 @@ final class WebPreviewControllerTests: XCTestCase {
     /// fresh build, arriving at the SAME address because a section keeps its
     /// port, then looked "already loaded" to `loadIfNeeded`, which skipped.
     /// The teacher kept the page from before their change with no reload
-    /// coming. `showFreshBuild` must start a navigation anyway.
+    /// coming. `showFreshBuild` must start a load anyway.
+    ///
+    /// Judged by the loads the controller ASKS for, counted as each is
+    /// asked (#1046). The test used to wait, on a fixed six seconds, for
+    /// WebKit to begin each navigation; a load reaches WebKit only after the
+    /// website data store has emptied its caches in WebKit's own process,
+    /// and with another build running on the same Mac that round trip once
+    /// took longer than the six seconds, so the test failed with nothing
+    /// wrong in the preview. Whether to load is this controller's decision
+    /// alone, and the count says it the moment it is made.
     @MainActor
     func testShowFreshBuildLoadsEvenWhenTheAddressWasAlreadyRequested() {
         let controller: WebPreviewController = WebPreviewController()
@@ -39,67 +48,16 @@ final class WebPreviewControllerTests: XCTestCase {
 
         // The phantom load that re-arms the last-requested address.
         controller.loadIfNeeded(url)
-
-        // Let that first navigation actually begin, so a navigation seen
-        // below can only belong to showFreshBuild.
-        let firstLoadBegan: XCTestExpectation = expectation(description: "first navigation begins")
-        pollUntil(deadline: Date().addingTimeInterval(5), expectation: firstLoadBegan) {
-            return controller.webView.url != nil
-        }
-        wait(for: [firstLoadBegan], timeout: 6)
-
-        let recorder: NavigationStartRecorder = NavigationStartRecorder()
-        controller.webView.navigationDelegate = recorder
-        let freshNavigationBegan: XCTestExpectation = expectation(description: "showFreshBuild begins a navigation")
-        recorder.onStart = {
-            freshNavigationBegan.fulfill()
-        }
+        XCTAssertEqual(controller.appLoadsAskedFor, 1, "the first request for an address did not load it")
+        controller.loadIfNeeded(url)
+        XCTAssertEqual(controller.appLoadsAskedFor, 1, "a repeated request for the same address loaded it again")
 
         controller.showFreshBuild(url)
-        wait(for: [freshNavigationBegan], timeout: 6)
+        XCTAssertEqual(controller.appLoadsAskedFor, 2, "showFreshBuild did not load an address that was already requested")
 
         // And the mounting view's own loadIfNeeded is then the no-op, so
         // this stays a single load per rebuild.
-        recorder.onStart = {
-            XCTFail("loadIfNeeded after showFreshBuild must not start another navigation")
-        }
         controller.loadIfNeeded(url)
-    }
-
-    /// Checks the condition on a timer until it holds or the deadline
-    /// passes, fulfilling the expectation when it holds.
-    @MainActor
-    private func pollUntil(
-        deadline: Date, expectation: XCTestExpectation, condition: @escaping () -> Bool
-    ) {
-        if condition() {
-            expectation.fulfill()
-            return
-        }
-        if Date() > deadline {
-            return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            guard let self else {
-                return
-            }
-            Task { @MainActor in
-                self.pollUntil(deadline: deadline, expectation: expectation, condition: condition)
-            }
-        }
-    }
-}
-
-/// Reports when the web view begins a provisional navigation.
-private final class NavigationStartRecorder: NSObject, WKNavigationDelegate {
-
-    // MARK: - Stored properties
-
-    var onStart: () -> Void = {}
-
-    // MARK: - Functions
-
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        onStart()
+        XCTAssertEqual(controller.appLoadsAskedFor, 2, "loadIfNeeded after showFreshBuild must not start another load")
     }
 }
