@@ -1218,6 +1218,11 @@ nonisolated enum UndoKillPoints {
     /// Set only by tests.
     nonisolated(unsafe) static var relinkRenameInFails: ((URL) -> Bool)?
 
+    /// mac-1's fix round: a relink where the link stands whose exchange
+    /// BACK (the place found changed under the swap) is refused, as on a
+    /// volume that stopped taking it. Set only by tests.
+    nonisolated(unsafe) static var relinkExchangeBackFails: ((URL) -> Bool)?
+
     /// Called with the list's folder once its segments are listed and
     /// before any of them is opened: a test takes a segment away there, as
     /// a sync service or a person could in that instant (#1004). Set only

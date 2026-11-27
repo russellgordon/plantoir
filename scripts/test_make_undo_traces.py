@@ -1862,7 +1862,7 @@ class ContractCaseTests(unittest.TestCase):
         link staged (relinkStaged) or just after its one swap
         (relinkSwapped), settles on the text the place holds."""
         cases = [case for case in shared_undo()["recoveryCases"] if case.get("withARelink")]
-        self.assertEqual(len(cases), 17)
+        self.assertEqual(len(cases), 21)
         phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
                   ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done"}
         old, new = "Unit 1, Day 3.md", "Unit 1, Day 4.md"

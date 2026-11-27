@@ -50899,6 +50899,27 @@
         "why": "mac-1: exactly one content form, as for any move; a plain link's move (linkSha) whose from and to are one place is not readable either."
       },
       {
+        "name": "mac-1, a relink where the link stands: the same place spelled with another Unicode normalisation: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Caf\u00e9.md",
+          "to": "courses/TST1O/section1/Cafe\u0301.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 5.md"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable",
+        "why": "Review 1 of mac-1, MEDIUM 1: from spells the place with a composed \u00e9 (U+00E9) and to with e and a combining acute (U+0301). They are not one path byte for byte, so the op is not a relink where the link stands; on a volume that folds Unicode normalisation (APFS) the two spellings are one item, so its places overlap, and a move whose places overlap is a shape this version cannot read. Compared as UTF-8 bytes, never Unicode equivalence, as replaceText's windows are."
+      },
+      {
         "name": "editJSON: a whole number beyond 2^53 in the file cannot be compared exactly: cannot tell, never a guess",
         "op": {
           "kind": "editJSON",
@@ -55084,6 +55105,7 @@
       },
       {
         "name": "mac-1, a relink where the link stands: the same step dies just after its one swap, the old link under the staged name and not yet removed: the staged link removed by the text it holds, the new text at Day 4, done",
+        "platform": "mac",
         "work": "step",
         "withARelink": "inPlace",
         "stopAt": "relinkSwapped:0",
@@ -55103,9 +55125,51 @@
       },
       {
         "name": "mac-1, a relink where the link stands: the same undo dies just after its one swap, the new link under the staged name and not yet removed: the staged link removed by the text it holds, the old text at Day 4, undone",
+        "platform": "mac",
         "work": "undo",
         "withARelink": "inPlace",
         "stopAt": "relinkSwapped:0",
+        "files": "before",
+        "phase": "undone",
+        "head": null
+      },
+      {
+        "name": "mac-1, a relink where the link stands, on Windows: a step that re-points Day 4's link where it stands dies with the old link renamed aside and the place empty: the old link renamed back, the staged new link removed by the text it holds, the old text at Day 4, failed",
+        "platform": "windows",
+        "work": "step",
+        "withARelink": "inPlace",
+        "stopAt": "relinkSetAside:0",
+        "files": "before",
+        "phase": "failed",
+        "head": null,
+        "why": "NTFS has no exchange, so Windows' swap renames the standing item aside exclusively (relinkSetAside), then the staged new link in exclusively (relinkRenamedIn); killed between the two, the place is empty and two staged items stand: the item set aside goes back to the place."
+      },
+      {
+        "name": "mac-1, a relink where the link stands, on Windows: the same step dies with the new link renamed in and the old one still set aside: the old link removed by the text it holds, the new text at Day 4, done",
+        "platform": "windows",
+        "work": "step",
+        "withARelink": "inPlace",
+        "stopAt": "relinkRenamedIn:0",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "mac-1, a relink where the link stands, on Windows: the undo of that step dies with the new link renamed aside and the place empty: the new link renamed back, the staged old link removed by the text it holds, the new text at Day 4, the step done",
+        "platform": "windows",
+        "work": "undo",
+        "withARelink": "inPlace",
+        "stopAt": "relinkSetAside:0",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "mac-1, a relink where the link stands, on Windows: the same undo dies with the old link renamed in and the new one still set aside: the new link removed by the text it holds, the old text at Day 4, undone",
+        "platform": "windows",
+        "work": "undo",
+        "withARelink": "inPlace",
+        "stopAt": "relinkRenamedIn:0",
         "files": "before",
         "phase": "undone",
         "head": null

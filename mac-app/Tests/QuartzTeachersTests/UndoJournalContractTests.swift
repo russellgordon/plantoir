@@ -138,7 +138,7 @@ final class UndoJournalContractTests: XCTestCase {
     /// the same points with SIGKILL.)
     func testRecoveryCases() async throws {
         let result: (cases: Int, failures: [String]) = try await UndoContractReplay.runRecoveryCases(under: scratchURL)
-        XCTAssertEqual(result.cases, 89)
+        XCTAssertEqual(result.cases, 89, "the rows run on the Mac: every row but the four marked platform windows")
         XCTAssertEqual(result.failures, [])
     }
 
