@@ -37,7 +37,7 @@ RED 3 of 3 (run `w8b-21a3-a`, 2026-11-27 04:41 to 04:45 on the PC; restored byte
   - Red first on 4aa4e4fef: `UndoHandedOverPlaceTests` failed 12 of 36, every new test (8 theory rows, the name and put-back test, the kept-original test, the two `JudgedTogether` tests), each `Assert.Equal()` collections differ or `Assert.True()` (the kept original).
   - On a0d1f0e6d: both builds exit 0 (37 warnings, none new); 381 of 382, the one failure shape B's "a link with another target at P": the removal judged `CannotTell`, not neither. The test's link was laid mac-style (`../library/Another day.md`), which NTFS does not follow, so reading the page through it is `CannotReadNow` (21a1's note). The test now lays that link with Windows' separator (58b1beec9) so the row tests the table; the mac-style case is under "For the director".
 - `w8b-21a3-b`, `-Mode classes` on 58b1beec9 (launcher `899-w8b-21a3-launch-b.ps1`): lock 04:46:40 to `RUN_DONE` 04:48:32, `LOCK-RELEASED`. Both builds exit 0; **382 of 382 passed, 0 skipped**: `UndoHandedOverPlaceTests` 36, `UndoRecoveryContractTests`, `UndoRecoveryTests`, `NamedGapLedgerTests`, and the three scan classes `UndoWriterScanTests`, `UndoOpKindsContractTests`, `UndoStackContractTests`. The PC has Developer Mode on, so every `SymbolicLink` test ran.
-- `origin/dev` (8046ca2e8) was already an ancestor at the start and before hand-back: "Already up to date" both times, no merge commit.
+- `origin/dev` 8046ca2e8 was an ancestor at the start. Before hand-back `dev` had moved (W8b 17 to 18b, the day27-7 gate fixes, `UndoOpKinds.cs` among them): merged cleanly in e2597eb03, then proved again, `w8b-21a3-c` (`899-w8b-21a3-launch-c.ps1`, `RUN_DONE` 04:59:23, `LOCK-RELEASED`): both builds exit 0, **382 of 382**, the same classes.
 
 ## Left for the next piece
 
@@ -53,7 +53,7 @@ Nothing for Russell. One fact for 21a4 and 21a6: recovery reads a file op's page
 1. Broke each fix and watched it fail: must-fail 1 to 3 above.
 2. No timed waits in product or test.
 3. Failure paths: no new sentence; the states are the existing ones.
-4. Merges: `origin/dev` 8046ca2e8 already an ancestor at the start and before hand-back.
+4. Merges: `origin/dev` 8046ca2e8 already an ancestor at the start; the moved `dev` merged in e2597eb03 before hand-back and proved there (382 of 382).
 5. No number tuned by trial (the round limit is the mac's `ops.Count`).
 6. House style: the C# around it.
 7. (W7b2 7) No fixture row moves; `NamedGapLedgerTests` green.
