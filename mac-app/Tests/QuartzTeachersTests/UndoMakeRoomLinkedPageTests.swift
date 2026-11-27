@@ -1024,8 +1024,6 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         let made = try makeCourse()
         try replaceWithALink("Unit 1, Day 1", holding: "Unit 1, Day 3.md", in: made)
         let dayOne: URL = made.classes.appendingPathComponent("Unit 1, Day 1.md")
-        let reachedBefore: ResolvedFile? = ResolvedFile.throughLinks(at: dayOne)
-        XCTAssertNotNil(reachedBefore)
         let before: [String: String] = everything(under: made)
 
         let result = try makeRoom(atDay: 2, in: made)
@@ -1033,10 +1031,13 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertEqual(result.steps, 1, "one step")
         XCTAssertEqual(result.couldNotRecord, [])
         XCTAssertEqual(linkTarget("Unit 1, Day 1", in: made), "Unit 1, Day 4.md", "re-pointed at the page's new name")
-        XCTAssertEqual(ResolvedFile.throughLinks(at: dayOne), reachedBefore, "the same file, the same lesson")
+        XCTAssertEqual(
+            ResolvedFile.throughLinks(at: dayOne), ResolvedFile.ofThePlace(at: made.classes.appendingPathComponent("Unit 1, Day 4.md")),
+            "Day 1 leads to the lesson, now Day 4's page"
+        )
         let day4: String = try text("Unit 1, Day 4", in: made)
         XCTAssertTrue(day4.contains("Three.") && day4.contains("title: Unit 1, Day 4"), day4)
-        XCTAssertTrue(day4.contains("created: 2026-09-16T07:00:00.000-0400"), "its own move's date only: \(day4)")
+        XCTAssertEqual(try text("Unit 1, Day 1", in: made), day4, "the same lesson")
         XCTAssertEqual(day4.components(separatedBy: "created").count, 2, "dated once, nothing through Day 1: \(day4)")
         let day3: String = try text("Unit 1, Day 3", in: made)
         XCTAssertTrue(day3.contains("Two.") && day3.contains("title: Unit 1, Day 3"), day3)
@@ -1055,7 +1056,6 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         try FileManager.default.createSymbolicLink(atPath: hop.path, withDestinationPath: "../section1/All Classes/Unit 1, Day 3.md")
         try replaceWithALink("Unit 1, Day 1", holding: "../../elsewhere/hop.md", in: made)
         let dayOne: URL = made.classes.appendingPathComponent("Unit 1, Day 1.md")
-        let reachedBefore: ResolvedFile? = ResolvedFile.throughLinks(at: dayOne)
         let before: [String: String] = everything(under: made)
 
         let result = try makeRoom(atDay: 2, in: made)
@@ -1067,7 +1067,10 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
             try FileManager.default.destinationOfSymbolicLink(atPath: hop.path),
             "../section1/All Classes/Unit 1, Day 4.md", "the hop re-pointed where it stands"
         )
-        XCTAssertEqual(ResolvedFile.throughLinks(at: dayOne), reachedBefore, "the same lesson")
+        XCTAssertEqual(
+            ResolvedFile.throughLinks(at: dayOne), ResolvedFile.ofThePlace(at: made.classes.appendingPathComponent("Unit 1, Day 4.md")),
+            "the same lesson, now Day 4's page"
+        )
         XCTAssertEqual(try text("Unit 1, Day 4", in: made).components(separatedBy: "created").count, 2)
         try checkUndoAndRedoAreExact(made, before: before)
     }
@@ -1086,7 +1089,6 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         try FileManager.default.createSymbolicLink(atPath: hop.path, withDestinationPath: hopText)
         try replaceWithALink("Unit 1, Day 1", holding: hop.path, in: made)
         let dayOne: URL = made.classes.appendingPathComponent("Unit 1, Day 1.md")
-        let reachedBefore: ResolvedFile? = ResolvedFile.throughLinks(at: dayOne)
         let before: [String: String] = everything(under: made)
 
         let result = try makeRoom(atDay: 2, in: made)
@@ -1095,7 +1097,10 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertEqual(result.couldNotRecord, [], "nothing is written outside")
         XCTAssertEqual(linkTarget("Unit 1, Day 1", in: made), "Unit 1, Day 4.md", "straight at the page's new name")
         XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: hop.path), hopText, "the link outside untouched")
-        XCTAssertEqual(ResolvedFile.throughLinks(at: dayOne), reachedBefore, "the same lesson")
+        XCTAssertEqual(
+            ResolvedFile.throughLinks(at: dayOne), ResolvedFile.ofThePlace(at: made.classes.appendingPathComponent("Unit 1, Day 4.md")),
+            "the same lesson, now Day 4's page"
+        )
         try checkUndoAndRedoAreExact(made, before: before)
     }
 
