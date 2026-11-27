@@ -46,6 +46,10 @@ final class SheetHost {
     /// and was ordered out.
     private(set) var reachedAScreen: Bool = false
 
+    /// How long a sheet asked for may take to open before the host stops
+    /// waiting for it: a failure bound, never a settling time.
+    static let longestWaitForTheSheet: TimeInterval = 30
+
     // MARK: - Computed properties
 
     /// The presented sheet's window.
@@ -71,10 +75,30 @@ final class SheetHost {
         window.orderFrontRegardless()
         pump()
         presentation.isShown = true
+        waitForTheSheetToOpen()
         pump(0.6)
     }
 
     // MARK: - Functions
+
+    /// Turns the run loop until the sheet asked for is hung from the window
+    /// (#1050). SwiftUI presents a sheet on a later turn of the run loop,
+    /// and how much later depends on how busy the Mac is: the fixed 0.6
+    /// seconds this host used to give it alone was once too short on a Mac
+    /// running another build beside the suite, and the verb sheet's test
+    /// found no sheet. The wait ends when the sheet is there; the bound only
+    /// keeps a sheet that never opens from holding the suite, and the
+    /// caller's `XCTUnwrap(host.sheet)` then says so.
+    private func waitForTheSheetToOpen() {
+        let asked: Date = Date()
+        let bound: Date = asked.addingTimeInterval(SheetHost.longestWaitForTheSheet)
+        while window.attachedSheet == nil && Date() < bound {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        }
+        let waited: TimeInterval = Date().timeIntervalSince(asked)
+        print("SheetHost: the sheet was hung from its window \(String(format: "%.3f", waited)) s after it was asked for (opened: \(window.attachedSheet != nil))")
+        keepOffTheScreens()
+    }
 
     /// Lets SwiftUI and AppKit settle, then checks nothing reached a display.
     func pump(_ seconds: Double = 0.3) {
