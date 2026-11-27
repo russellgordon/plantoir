@@ -685,6 +685,27 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
     }
 
     /// <summary>
+    /// A file's move from Day 4 to Day 5, then a link's move from Day 3 into
+    /// Day 4, the link leading out of the working folder, killed after both
+    /// swaps (review 1 of window D, LOW 1): the file's move is After, as on
+    /// the mac. Its <c>from</c> is handed over, so it is judged free and never
+    /// resolved through the link leading out that fills it now; only the
+    /// folders above it are asked whether they stay inside.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void RecoveryJudgesAFilesMoveWhoseHandedOverPlaceALinkLeadingOutNowFillsAfter()
+    {
+        WritePage(Day(4), "Four.\n");
+        LayLink(Day(3), "Day 3.md", leadingOut: true);
+        List<UndoOp> ops = [FileMove(Day(4), Day(5), "Four.\n"), LinkMove(Day(3), Day(4))];
+        File.Move(Full(Day(4)), Full(Day(5)));
+        File.Move(Full(Day(3)), Full(Day(4)));
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(Full(Day(4))));
+
+        Assert.Equal([MoveNamed(Day(4), Day(5)) + "=After", MoveNamed(Day(3), Day(4)) + "=After"], Judged(ops));
+    }
+
+    /// <summary>
     /// A file's move from Day 3 to Day 4, then a new page at Day 3, both made:
     /// recovery judges the move as "Day 3 → Day 4" and the new page as Day 3,
     /// each after, and puts back the ops by that same name, each alone.
