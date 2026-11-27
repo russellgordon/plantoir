@@ -135,6 +135,111 @@ final class UndoRestoreSetAsideRestoreTests: XCTestCase {
         XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), asTheSaveLeftIt, "recovery wrote over the course")
     }
 
+    // MARK: - The lock across the swap (review 2)
+
+    /// While the swap moves files the list's lock is held, so no recovery
+    /// can judge and no step can begin between the swap and the set-aside:
+    /// a try for the lock from inside a move is refused (review 2, L1).
+    func testTheListsLockIsHeldWhileTheSwapMoves() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        try killASave(of: fixture.courseURL, code: "ICS3U")
+        let journal: UndoJournal = UndoJournal(folderURL: listFolder)
+        var triesRefused: Int = 0
+        var tries: Int = 0
+        let hooks: RestoreSwap.Hooks = RestoreSwap.Hooks(
+            step: { (_: String) throws in },
+            move: { (source: URL, destination: URL) throws in
+                tries += 1
+                do {
+                    try journal.withLock(waitingAtMost: 0) { (_: UndoJournalWriter) in }
+                } catch UndoJournalError.lockBusy {
+                    triesRefused += 1
+                }
+                try FileManager.default.moveItem(at: source, to: destination)
+            },
+            moveBack: { (source: URL, destination: URL) throws in
+                try FileManager.default.moveItem(at: source, to: destination)
+            },
+            flushes: false
+        )
+        try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, hooks: hooks)
+        XCTAssertGreaterThan(tries, 0)
+        XCTAssertEqual(triesRefused, tries, "the list's lock was free while the swap moved files")
+    }
+
+    /// A list whose lock cannot be had: the restore does not start (no
+    /// move, the course as it was, the step still in flight), rather than
+    /// swap with no set-aside (review 2, L3).
+    func testARestoreThatCannotHaveTheListDoesNotStart() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        try killASave(of: fixture.courseURL, code: "ICS3U")
+        let seq: Int = try XCTUnwrap(try inFlight().first?.step.seq)
+        let asTheSaveLeftIt: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        let journal: UndoJournal = UndoJournal(folderURL: listFolder)
+        let held: UndoLock = try UndoLock.take(at: journal.lockFileURL, waitingAtMost: 0)
+        defer { held.release() }
+
+        XCTAssertThrowsError(try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL))
+        held.release()
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), asTheSaveLeftIt, "the restore went ahead without the list")
+        XCTAssertEqual(try UndoJournal(folderURL: listFolder).read().records[seq]?.phase, .begun)
+    }
+
+    /// A restore that died after its commit and before the set-aside line:
+    /// the settle that finishes it at the next reading sets the step aside,
+    /// so recovery never judges the restored course (review 2, L2).
+    func testASettleThatFinishesARestoreSetsTheStepAside() async throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        try killASave(of: fixture.courseURL, code: "ICS3U")
+        let seq: Int = try XCTUnwrap(try inFlight().first?.step.seq)
+        // As a kill after `done` leaves it: every move made, nothing set aside.
+        _ = try StagedRestore.make(fixture, phase: .done, movesMade: Int.max, archived: true)
+        XCTAssertEqual(try UndoJournal(folderURL: listFolder).read().records[seq]?.phase, .begun)
+
+        WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
+        XCTAssertEqual(
+            try UndoJournal(folderURL: listFolder).read().records[seq]?.phase, .interrupted,
+            "the settle finished the restore and left the step in flight"
+        )
+        let restored: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        await recoverAsAtALaunch(fixture.rootURL)
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), restored, "recovery wrote over the restored course")
+    }
+
+    /// A one-section restore writes the section's per-section keys into
+    /// the shared pages inside the same lock (review 2, L4).
+    func testAOneSectionRestoreWritesItsKeysInsideTheLock() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let id: String = try FolderIdentityFile.identifier(forWorkingFolder: fixture.rootURL)
+        _ = try beginAStep(writing: ["courses/ICS3U/section1/a.md"], in: UndoWorkingFolder(id: id, pathAtTheTime: fixture.rootURL.path))
+        let journal: UndoJournal = UndoJournal(folderURL: listFolder)
+        var keysReached: Bool = false
+        var refusedThere: Bool = false
+        let hooks: CourseRestorer.SectionSwapHooks = CourseRestorer.SectionSwapHooks(
+            move: { (source: URL, destination: URL) throws in
+                try FileManager.default.moveItem(at: source, to: destination)
+            },
+            reached: { (point: CourseRestorer.SwapPoint) throws in
+                if point != .perSectionKeysPutBack {
+                    return
+                }
+                keysReached = true
+                do {
+                    try journal.withLock(waitingAtMost: 0) { (_: UndoJournalWriter) in }
+                } catch UndoJournalError.lockBusy {
+                    refusedThere = true
+                }
+            }
+        )
+        try CourseRestorer.restoreSection(1, from: try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, hooks: hooks)
+        XCTAssertTrue(keysReached)
+        XCTAssertTrue(refusedThere, "the per-section keys were written outside the list's lock")
+    }
+
     // MARK: - A one-section restore
 
     /// Each file a one-section restore replaces is set aside: a step wholly
