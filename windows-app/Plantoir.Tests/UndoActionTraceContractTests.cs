@@ -57,6 +57,56 @@ public sealed class UndoActionTraceContractTests
         ReplayTheActionTrace(name);
     }
 
+    /// <summary>
+    /// The part of a recorded step this replay stops at by name, before any
+    /// door is asked, or null. Rename folder's steps hold members AND
+    /// folderMoves: the guard names folderMoves first, so they stop here
+    /// rather than run with no folder move made.
+    /// </summary>
+    internal static string? WhatThisReplayDoesNotMake(JsonElement recorded, bool byTheWindowsAction)
+    {
+        foreach (string unmade in new[] { "moves", "folderMoves" })
+        {
+            if (recorded.TryGetProperty(unmade, out _)) return unmade;
+        }
+        // A step with members or trees is made only by its Windows action
+        // (#899 W8-11 to 13; W8-11 to 13 review 1, LOW 4): the recorded-step
+        // draft writes whole files and makes no folder, so a step of either
+        // that is not converted stops here by name, never at the final hashes.
+        foreach (string onlyByTheAction in new[] { "members", "trees" })
+        {
+            if (!byTheWindowsAction && recorded.TryGetProperty(onlyByTheAction, out _)) return onlyByTheAction;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// A recorded step with folderMoves is made only by its Windows action
+    /// (#899 W8b-16): the recorded-step draft cannot move a folder, so such a
+    /// step that no Windows action makes stops by name at folderMoves, never
+    /// later at members or at the final hashes; one the Windows action makes
+    /// goes through. The rollover's moves stop it either way (W7c).
+    /// </summary>
+    [Fact]
+    public void AStepWithFolderMovesStopsByNameUnlessItsWindowsActionMakesIt()
+    {
+        int withFolderMoves = 0;
+        foreach (JsonElement recorded in StepsDocument.Value.RootElement.GetProperty("steps").EnumerateArray())
+        {
+            string stepName = recorded.GetProperty("name").GetString()!;
+            if (recorded.TryGetProperty("moves", out _))
+            {
+                Assert.Equal("moves", WhatThisReplayDoesNotMake(recorded, byTheWindowsAction: true));
+                continue;
+            }
+            if (!recorded.TryGetProperty("folderMoves", out _)) continue;
+            withFolderMoves++;
+            Assert.True(WhatThisReplayDoesNotMake(recorded, byTheWindowsAction: false) == "folderMoves", $"{stepName}: not stopped by folderMoves");
+            Assert.True(WhatThisReplayDoesNotMake(recorded, byTheWindowsAction: true) is null, $"{stepName}: stopped although its Windows action makes it");
+        }
+        Assert.True(withFolderMoves >= 2, $"{withFolderMoves} recorded steps hold folderMoves");
+    }
+
     private static JsonElement RecordedStep(string stepName) =>
         StepsDocument.Value.RootElement.GetProperty("steps").EnumerateArray()
             .Single(candidate => candidate.GetProperty("name").GetString() == stepName);
@@ -69,26 +119,10 @@ public sealed class UndoActionTraceContractTests
         JsonElement trace = UndoContract.Traces.RootElement.GetProperty("actionTraces").EnumerateArray()
             .Single(candidate => candidate.GetProperty("name").GetString() == name);
         JsonElement recorded = RecordedStep(trace.GetProperty("step").GetString()!);
-        // Rename folder's steps hold members AND folderMoves: the guard names
-        // folderMoves first, so they stop here rather than run with no folder
-        // move made.
         string stepName = recorded.GetProperty("name").GetString()!;
         bool byTheWindowsAction = WindowsActionsOnTheMacFixture.Converted.Contains(stepName);
-        foreach (string unmade in new[] { "moves", "folderMoves" })
-        {
-            if (recorded.TryGetProperty(unmade, out _))
-                Assert.Fail($"{name}: a step this replay does not make yet ({unmade})");
-        }
-        // A step with members or trees is made only by its Windows action
-        // (#899 W8-11 to 13; W8-11 to 13 review 1, LOW 4): the recorded-step
-        // draft below writes whole files and makes no folder, so a step of
-        // either that is not converted stops here by name, never at the
-        // final hashes.
-        foreach (string onlyByTheAction in new[] { "members", "trees" })
-        {
-            if (!byTheWindowsAction && recorded.TryGetProperty(onlyByTheAction, out _))
-                Assert.Fail($"{name}: a step this replay does not make yet ({onlyByTheAction})");
-        }
+        if (WhatThisReplayDoesNotMake(recorded, byTheWindowsAction) is { } unmade)
+            Assert.Fail($"{name}: a step this replay does not make yet ({unmade})");
 
         using var scribe = new UndoScribe();
         var files = recorded.GetProperty("files").EnumerateArray().ToList();
