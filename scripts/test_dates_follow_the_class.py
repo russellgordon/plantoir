@@ -633,6 +633,145 @@ class DatesFollowTheClassTests(unittest.TestCase):
         self.assertEqual(again["rewritten"], [], "a second build rewrote pages")
         self.assertEqual({path: path.read_bytes() for path in course.rglob("*.md")}, settled)
 
+    def test_a_file_a_numbered_class_owns_keeps_that_classs_date(self):
+        # #1048b: the cases are class-planning.json →
+        # datingPagesAClassBrings.frontmatterKey.firstClassKeepsASharedLessonCases,
+        # each built for every section it has classes in, then built again.
+        cases = _load("datingPagesAClassBrings", "frontmatterKey", "firstClassKeepsASharedLessonCases")
+        self.assertGreater(len(cases), 0)
+        for index, case in enumerate(cases):
+            with self.subTest(case=case["name"]):
+                self.run_a_first_class_case(case, index)
+
+    def run_a_first_class_case(self, case: dict, index: int) -> None:
+        course = self.temporary / f"first-class-{index}" / "courses" / "TEST"
+        for place, keys in case["files"].items():
+            file = course / place
+            file.parent.mkdir(parents=True, exist_ok=True)
+            lines = ["---", f"title: {file.stem}"]
+            for key, value in keys.items():
+                lines.append(f"{key}: {value}")
+            lines.extend(["---", "The lesson.", ""])
+            file.write_text("\n".join(lines), encoding="utf-8")
+        sections: list = []
+        for page in case["classes"]:
+            place = course / page["page"]
+            place.parent.mkdir(parents=True, exist_ok=True)
+            section = int(page["page"].split("/")[0][len("section"):])
+            if section not in sections:
+                sections.append(section)
+            if page.get("linkHolds") is not None:
+                _link_or_skip(self, place, Path(page["linkHolds"]))
+                continue
+            place.write_text(
+                f"---\ntitle: {place.stem}\npublish: true\ncreated: {page['created']}\n---\n"
+                f"{page.get('says', '')}\n", encoding="utf-8")
+
+        def build(section: int) -> dict:
+            content = self.temporary / f"first-class-{index}" / f"content{section}"
+            if content.exists():
+                shutil.rmtree(content)
+            content.mkdir()
+            build_site.forget_vault_sources(course)
+            for root, _dirs, files in os.walk(course / "Shared"):
+                relative = Path(root).relative_to(course)
+                (content / relative).mkdir(parents=True, exist_ok=True)
+                for file in files:
+                    shutil.copy2(Path(root) / file, content / relative / file)
+                    build_site.remember_vault_source(content / relative / file, Path(root) / file, False)
+                    build_site.process_frontmatter(content / relative / file, section)
+            # Every folder of the section, as a course with Handouts beside
+            # its classes copies them (#1048b review 1, LOW 3).
+            folders_of_the_section: list = []
+            for entry in sorted((course / f"section{section}").iterdir()):
+                if entry.is_dir() and not entry.is_symlink():
+                    folders_of_the_section.append(entry.name)
+            build_site.copy_the_per_section_folders(course / f"section{section}", content,
+                                                    folders_of_the_section, section)
+            first = build_site._find_first_class_created(content)
+            if first is not None:
+                build_site._sync_non_class_pages_created(content, first)
+            return build_site._date_pages_from_their_classes(content, section)
+
+        def every_file() -> dict:
+            files: dict = {}
+            for path in sorted(course.rglob("*.md")):
+                if not path.is_symlink():
+                    files[path] = path.read_bytes()
+            return files
+
+        for section in sections:
+            build(section)
+        for place, expected in case["expect"].items():
+            metadata = frontmatter.load(course / place).metadata
+            for key, value in expected.items():
+                self.assertEqual(str(metadata.get(key)), value, f"{place}: {key}")
+            for key in metadata:
+                if key.startswith("created"):
+                    self.assertIn(key, expected, f"{place}: a key the case does not expect, {key}")
+        settled = every_file()
+        for section in sections:
+            again = build(section)
+            self.assertEqual(again["rewritten"], [], "a second build rewrote pages")
+        self.assertEqual(every_file(), settled, "a second build changed the teacher's files")
+        self.assert_the_owner_is_the_contracts(case, course, sections)
+
+    def assert_the_owner_is_the_contracts(self, case: dict, course: Path, sections: list) -> None:
+        """The RULE on the case, not only the build outcome (#1048b review 1,
+        LOW 4): for each section, whether a numbered class owns each file, and
+        which class page owns it, by the build's one rule."""
+        class_pages_of = getattr(build_site, "_class_pages_of_the_section", None)
+        owners_of = getattr(build_site, "_owners_of_the_files_the_numbered_classes_own", None)
+        self.assertIsNotNone(class_pages_of, "the build has no list of a section's class pages")
+        self.assertIsNotNone(owners_of, "the build names no owner of a file")
+        for section in sections:
+            build_site.forget_vault_sources(course)
+            build_site.set_class_folders(["All Classes"])
+            owners = owners_of(class_pages_of(section))
+            for place in case["files"]:
+                identity = build_site._identity_of_the_file(course / place)
+                owner = owners.get(identity)
+                self.assertEqual(owner is not None, case["ownedByANumberedClass"],
+                                 f"section {section}: {place} owned")
+                expected = case["owningClass"].get(f"section{section}")
+                named = Path(owner).relative_to(course).as_posix() if owner is not None else None
+                self.assertEqual(named, expected, f"section {section}: the class that owns {place}")
+
+    def test_the_class_pages_are_the_section_class_folders_pages_as_the_mac_lists_them(self):
+        # #1048b review 1, LOWs 1 to 3: every page under section<N>/<class
+        # folder>/, its settings readable or not; never a hidden file or
+        # folder, a folder's index.md, or a folder of the same name deeper in.
+        class_pages_of = getattr(build_site, "_class_pages_of_the_section", None)
+        self.assertIsNotNone(class_pages_of, "the build has no list of a section's class pages")
+        course = self.temporary / "list" / "courses" / "TEST"
+        classes = course / "section1" / "All Classes"
+        pages = {
+            "section1/All Classes/Unit 1, Day 1.md": "---\ntitle: Unit 1, Day 1\n---\nDay.\n",
+            "section1/All Classes/Unit 1, Day 2.md": "---\ntitle: [unclosed\n---\nSettings no reader accepts.\n",
+            "section1/All Classes/Unit 2/Unit 2, Day 1.md": "Day.\n",
+            "section1/All Classes/Overview.MD": "Overview.\n",
+            "section1/All Classes/index.md": "Index.\n",
+            "section1/All Classes/.drafts/Unit 1, Day 3.md": "Hidden folder.\n",
+            "section1/All Classes/.Unit 1, Day 4.md": "Hidden file.\n",
+            "section1/Handouts/All Classes/Unit 1, Day 5.md": "Same name, deeper.\n",
+            "section2/All Classes/Unit 1, Day 6.md": "Another section.\n",
+        }
+        for place, text in pages.items():
+            (course / place).parent.mkdir(parents=True, exist_ok=True)
+            (course / place).write_text(text, encoding="utf-8")
+        build_site.forget_vault_sources(course)
+        build_site.set_class_folders(["All Classes"])
+        listed = []
+        for page in class_pages_of(1):
+            listed.append(Path(page).relative_to(course).as_posix())
+        self.assertEqual(sorted(listed), sorted([
+            "section1/All Classes/Unit 1, Day 1.md",
+            "section1/All Classes/Unit 1, Day 2.md",
+            "section1/All Classes/Unit 2/Unit 2, Day 1.md",
+            "section1/All Classes/Overview.MD",
+        ]))
+        self.assertTrue(classes.is_dir())
+
     # MARK: - Assertions
 
     def copy_of(self, content: Path, title: str) -> Path:

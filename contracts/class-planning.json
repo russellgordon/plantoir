@@ -18,7 +18,21 @@
         {"name": "a link to a page outside the working folder", "classFolder": "section1/All Classes", "linkHolds": "../../../../../Outside.md", "files": ["../../../Outside.md"], "expectKey": "createdSection1"},
         {"name": "a link into a folder of the section that is itself a link to a course-level folder", "classFolder": "section1/All Classes", "linkHolds": "../Lessons/Lesson.md", "links": {"section1/Lessons": "../Shared"}, "files": ["Shared/Lesson.md"], "expectKey": "createdSection1"}
       ],
-      "linkedClassPageCasesLayout": "Every path in linkedClassPageCases (files, links' places, classFolder) is relative to the course folder, which is <working folder>/courses/<CODE>; the working folder has a parent of its own, so '../../../Outside.md' is a file outside the working folder. linkHolds is the text the class page's link holds, read against classFolder. The place is decided from the file the page really is, every link resolved, a linked folder included. A date is written into a file outside the working folder when a class page leads there, under createdSection<N>."
+      "linkedClassPageCasesLayout": "Every path in linkedClassPageCases (files, links' places, classFolder) is relative to the course folder, which is <working folder>/courses/<CODE>; the working folder has a parent of its own, so '../../../Outside.md' is a file outside the working folder. linkHolds is the text the class page's link holds, read against classFolder. The place is decided from the file the page really is, every link resolved, a linked folder included. A date is written into a file outside the working folder when a class page leads there, under createdSection<N>.",
+      "firstClassKeepsASharedLessonCases": [
+        {"name": "two classes link to the lesson; an earlier class only says [[Lesson]]", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "../../Shared/Lesson.md"}, {"page": "section1/All Classes/Unit 1, Day 4.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md"}},
+        {"name": "three classes link to the lesson; an earlier class and a later one only say [[Lesson]]", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "../../Shared/Lesson.md"}, {"page": "section1/All Classes/Unit 1, Day 3.md", "linkHolds": "../../Shared/Lesson.md"}, {"page": "section1/All Classes/Unit 1, Day 4.md", "linkHolds": "../../Shared/Lesson.md"}, {"page": "section1/All Classes/Unit 1, Day 6.md", "created": "2026-09-11T07:00:00.000+0000", "says": "[[Lesson]]"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md"}},
+        {"name": "a later class only says [[Lesson]]; no earlier class does", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "../../Shared/Lesson.md"}, {"page": "section1/All Classes/Unit 1, Day 5.md", "created": "2026-09-15T07:00:00.000+0000", "says": "[[Lesson]]"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md"}},
+        {"name": "a chain: Day 2 is a link to Day 5, which is a link to the lesson", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "Unit 1, Day 5.md"}, {"page": "section1/All Classes/Unit 1, Day 5.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 5.md"}},
+        {"name": "only an unnumbered page of the class folder links to the lesson", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-01T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Overview.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-08T07:00:00.000+0000"}}, "ownedByANumberedClass": false, "owningClass": {}},
+        {"name": "a numbered class's link passes through an unnumbered page of the class folder", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-01T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "Overview.md"}, {"page": "section1/All Classes/Overview.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-08T07:00:00.000+0000"}}, "ownedByANumberedClass": false, "owningClass": {}},
+        {"name": "two sections each own the lesson", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000", "createdSection2": "2026-09-12T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "../../Shared/Lesson.md"}, {"page": "section2/All Classes/Unit 1, Day 1.md", "created": "2026-09-09T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section2/All Classes/Unit 1, Day 3.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000", "createdSection2": "2026-09-12T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md", "section2": "section2/All Classes/Unit 1, Day 3.md"}},
+        {"name": "a class's link passes through a hidden folder inside the class folder", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/.drafts/Overview.md", "linkHolds": "../../../Shared/Lesson.md"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": ".drafts/Overview.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md"}},
+        {"name": "the lesson is hidden, so the class that is a link to it is hidden too; an earlier visible class says [[Lesson]]", "files": {"Shared/Lesson.md": {"publish": "false", "createdSection1": "2026-09-10T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md"}},
+        {"name": "the class that owns the lesson is visible but undated; an earlier class says [[Lesson]]", "files": {"Shared/Lesson.md": {}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md"}},
+        {"name": "a folder named like the class folder elsewhere in the section holds no class", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-15T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/Handouts/All Classes/Unit 1, Day 3.md", "linkHolds": "../../../Shared/Lesson.md"}, {"page": "section1/All Classes/Unit 1, Day 5.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-15T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 5.md"}}
+      ],
+      "firstClassKeepsASharedLessonCasesLayout": "What the site build does with firstClassKeepsASharedLesson, run by scripts/test_dates_follow_the_class.py. Paths are relative to the course folder; files are course-level pages with the keys they start with; classes are the pages of each section's class folder, either a page of its own (created, and says: its body) or a link (linkHolds, read against the page's folder) whose date is the one the file it leads to holds. Each section that has classes is built, and built again; expect is every key of each file after both builds, and the second build changes no file. A file a numbered class owns keeps the date it holds; a file no numbered class owns is dated by the first visible class that says its name, as any other page. ownedByANumberedClass says, for every section the case has classes in, whether a numbered class of that section owns the file by firstClassKeepsASharedLesson, and owningClass names that class page for each section that owns it ({} when none does), so each app runs the RULE on the case, not only the build outcome. The section's class pages are every page under section<N>/<class folder>/ (a folder of that name directly inside the section folder, nowhere deeper), read from the teacher's folder whether or not their settings can be read, a hidden file or folder (a name starting with a dot) never among them, and never a folder's index.md, as the Mac's ClassPages.list reads them. Every reader of a page's class takes the owner's answer: the build never writes the file's date, the links checklist offers it as datedByTheBuild with no date and claimedBy naming the owning class, and My Progress groups it under the owning class when that class is visible and dated (under the first visible class that says its name otherwise)."
     },
     "movesWhen": [
       "the page is reached by following links from a class page being published",
@@ -135,7 +149,7 @@
       "howTheCasesRun": "The shape reachStopsAtAClassPage.cases uses, plus `publishedBefore`: the titles of pages the section's published-pages record lists. Run by the mac harness through the assistant's publish (AssistToolRunnerTests); owed by Windows."
     },
     "fromTheLinksChecklist": {
-      "rule": "When a teacher publishes pages from the links checklist (shared-rules.json -> linksChecklist), each page takes a date worked out by the BUILD and written into the offer (file-formats.json -> linksChecklistOffer). From every VISIBLE, DATED class page of the section, links are followed up to TWO steps - by the #333 finding's reader, path first then name, a name several pages share landing on a hidden one only when EVERY one is hidden. A link that lands on a class page is not entered (followingLinks.stopsAtAClassPage), a hidden class is not walked from (visibleClassesOnly), and the walk does not go THROUGH a folder's index or Key Links. (1) A hidden page reached at step 1 or 2 is 'used by a class' (group fromAClass), claimed by the earliest visible class that reaches it (date, then title - whenSeveralClassesShareAPage). (2) EXCEPT a page a visible, dated class links DIRECTLY in the way the build's own date pass reads links: the build has already given it the earliest direct linker's date (atBuildTime) and would rewrite any other on the next build, so the checklist writes no date for it (why datedByTheBuild). (3) Every other hidden page that a visible page, or an offered page, links to - closed transitively, stopping at class pages - is 'linked from other pages' (group notReachedByAClass) and takes the date of the first class of the year (datingNonClassPages.dateInherited). (4) A hidden class such a link lands on is offered as a class (group class): never walked through, never dated. (5) A page in the section's published-pages record keeps the date it has (publishedBeforeIsRecorded); a folder's index or Key Links is never given a date. (6) A page no page students can see links, reached only through OTHER offered pages, names those pages in `dependsOn` (file-formats.json -> linksChecklistOffer.rowKeys.dependsOn): the offered, non-class rows linking it, nearest to a page students can see first (fewest offered pages between), then by place. It is published only with one of them (shared-rules.json -> linksChecklist.followingARow). A class row never depends on a row and is never one a row depends on (#385).",
+      "rule": "When a teacher publishes pages from the links checklist (shared-rules.json -> linksChecklist), each page takes a date worked out by the BUILD and written into the offer (file-formats.json -> linksChecklistOffer). From every VISIBLE, DATED class page of the section, links are followed up to TWO steps - by the #333 finding's reader, path first then name, a name several pages share landing on a hidden one only when EVERY one is hidden. A link that lands on a class page is not entered (followingLinks.stopsAtAClassPage), a hidden class is not walked from (visibleClassesOnly), and the walk does not go THROUGH a folder's index or Key Links. (1) A hidden page reached at step 1 or 2 is 'used by a class' (group fromAClass), claimed by the earliest visible class that reaches it (date, then title - whenSeveralClassesShareAPage). (2) EXCEPT a page a visible, dated class links DIRECTLY in the way the build's own date pass reads links: the build has already given it the earliest direct linker's date (atBuildTime) and would rewrite any other on the next build, so the checklist writes no date for it (why datedByTheBuild). So does a page whose file a numbered class of the section owns (frontmatterKey.firstClassKeepsASharedLesson), however it is reached: its date is the owning class's, never another class's, so it is offered as datedByTheBuild with no date, claimedBy naming the owning class (#1048b). (3) Every other hidden page that a visible page, or an offered page, links to - closed transitively, stopping at class pages - is 'linked from other pages' (group notReachedByAClass) and takes the date of the first class of the year (datingNonClassPages.dateInherited). (4) A hidden class such a link lands on is offered as a class (group class): never walked through, never dated. (5) A page in the section's published-pages record keeps the date it has (publishedBeforeIsRecorded); a folder's index or Key Links is never given a date. (6) A page no page students can see links, reached only through OTHER offered pages, names those pages in `dependsOn` (file-formats.json -> linksChecklistOffer.rowKeys.dependsOn): the offered, non-class rows linking it, nearest to a page students can see first (fewest offered pages between), then by place. It is published only with one of them (shared-rules.json -> linksChecklist.followingARow). A class row never depends on a row and is never one a row depends on (#385).",
       "reach": "two steps",
       "appliesWhen": "a page is published from the links checklist",
       "datesAreDays": "The offer carries a calendar day (YYYY-MM-DD, the day the class's own value names as written, never converted to another time zone), because that is what the apps write - the same CalendarDay the assistant's date moves carry. A page's date is therefore KEPT as that day, not copied character for character (director's ruling N9).",
@@ -143,7 +157,7 @@
       "ticking": "Every row in the two page groups starts TICKED, except a page that a HIDDEN class links directly while NO visible class does: that page is a later class's material, starts UNTICKED, and says which hidden class uses it first (firstUsedIn - the earliest by date, then title). Class rows always start unticked. Russell's decision 1 (2026-09-29) and the director's ruling on the plan's Q1 as narrowed by plan-review finding 5: measured over the 39 payloads, a default-ticked sheet straight after Get Ready (#96) would offer a median of 56 pages (16-82), e.g. SNC1W's Final Examination dated Unit 1, Day 1 through How Marks Work - one press would undo Get Ready and misdate the year. A page a VISIBLE class links directly stays ticked even when a hidden class links it too: it is material of a class students can already open. A row's tick is its OWN: a row with `dependsOn` keeps the tick this rule gives it, and is published only when one of those rows is (shared-rules.json -> linksChecklist.followingARow) - the build never copies a row's tick into the rows under it (#385).",
       "tickedAnyway": "A row that started unticked and is ticked by the teacher takes the date its group gives it (step 2: the claiming visible class's; the other group: the first class of the year) - the row shows that date, so the teacher sees what ticking it means.",
       "firstClassException": "Recorded so nobody 'fixes' it (plan-review N8): a page a visible class links DIRECTLY takes that class's date from the BUILD on every build, hidden or not, even when the page was published before and hidden again - so for those pages the build's rule (atBuildTime) wins over publishedBeforeIsRecorded. Decision 4 governs step-2 and other-group pages.",
-      "howTheCasesRun": "Each case lays out pages by their place in the course folder, the way test_links_into_hidden_pages.py does (a page in section1/ lands at the top of the merged content; every page is remembered against its source). A page is a class when its name is a class page's (section1/All Classes/Unit x, Day y). `visible` false writes `publish: false`; `created` is written as the page's date; `links` are [[...]] lines; `published` true puts the page in the section's published-pages record. `expect` maps a page's place to the row the offer must carry for it - only the keys given are compared (null means null); `expectAbsent` lists places that must not be offered at all; `expectNoOffer` true means the offer is empty and no file is written. `dependsOn` in `expect` is compared as an ordered list, and every case since #385 names `dependsOn` for every row it expects. Run by the build (scripts/test_links_checklist.py) in the image under verify.sh and on Windows by PythonToolchainTests.",
+      "howTheCasesRun": "Each case lays out pages by their place in the course folder, the way test_links_into_hidden_pages.py does (a page in section1/ lands at the top of the merged content; every page is remembered against its source). A page is a class when its name is a class page's (section1/All Classes/Unit x, Day y). `visible` false writes `publish: false`; `created` is written as the page's date; `links` are [[...]] lines; `published` true puts the page in the section's published-pages record. `linkHolds` makes the teacher's file a symbolic link holding that text (read against the link's folder), and its copy in the merged content holds the file it leads to. `expect` maps a page's place to the row the offer must carry for it - only the keys given are compared (null means null); `expectAbsent` lists places that must not be offered at all; `expectNoOffer` true means the offer is empty and no file is written. `dependsOn` in `expect` is compared as an ordered list, and every case since #385 names `dependsOn` for every row it expects. Run by the build (scripts/test_links_checklist.py) in the image under verify.sh and on Windows by PythonToolchainTests.",
       "cases": [
         {
           "name": "a. two steps away takes the class's date",
@@ -1154,6 +1168,127 @@
               "dependsOn": [
                 "Assessments/Final Examination"
               ]
+            }
+          }
+        },
+        {
+          "name": "r. a shared lesson a numbered class owns is never dated from another class (#1048b)",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Lesson"
+              ]
+            },
+            {
+              "path": "Shared/Lesson",
+              "visible": false,
+              "created": "2026-09-10T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 2",
+              "linkHolds": "../../Shared/Lesson.md"
+            }
+          ],
+          "expect": {
+            "Shared/Lesson": {
+              "group": "fromAClass",
+              "ticked": true,
+              "step": 1,
+              "claimedBy": "section1/All Classes/Unit 1, Day 2",
+              "date": null,
+              "why": "datedByTheBuild",
+              "dependsOn": []
+            }
+          }
+        },
+        {
+          "name": "s. a shared lesson a numbered class owns, reached at step 2, is never dated from another class (#1048b)",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "path": "Concepts/Hub",
+              "visible": true,
+              "links": [
+                "Lesson"
+              ]
+            },
+            {
+              "path": "Shared/Lesson",
+              "visible": false,
+              "created": "2026-09-10T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 2",
+              "linkHolds": "../../Shared/Lesson.md"
+            }
+          ],
+          "expect": {
+            "Shared/Lesson": {
+              "group": "fromAClass",
+              "ticked": true,
+              "step": 2,
+              "claimedBy": "section1/All Classes/Unit 1, Day 2",
+              "date": null,
+              "why": "datedByTheBuild",
+              "dependsOn": []
+            }
+          }
+        },
+        {
+          "name": "t. a shared lesson a numbered class owns, linked from other pages beyond two steps, names its owner (#1048b)",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "path": "Concepts/Hub",
+              "visible": true,
+              "links": [
+                "Mid"
+              ]
+            },
+            {
+              "path": "Concepts/Mid",
+              "visible": true,
+              "links": [
+                "Lesson"
+              ]
+            },
+            {
+              "path": "Shared/Lesson",
+              "visible": false,
+              "created": "2026-09-10T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 2",
+              "linkHolds": "../../Shared/Lesson.md"
+            }
+          ],
+          "expect": {
+            "Shared/Lesson": {
+              "group": "notReachedByAClass",
+              "claimedBy": "section1/All Classes/Unit 1, Day 2",
+              "date": null,
+              "why": "datedByTheBuild",
+              "dependsOn": []
             }
           }
         }
