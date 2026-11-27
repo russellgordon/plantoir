@@ -817,6 +817,21 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
     }
 
     /// <summary>
+    /// A move that hands a place over is judged under its two places
+    /// ("from → to"), but shown under its own place, as every other move is
+    /// named (the mac's <c>placesShown</c>, U4b3 door-5); a step with no
+    /// handover shows nothing other than its places.
+    /// </summary>
+    [Fact]
+    public void AMoveThatHandsAPlaceOverIsShownByItsOwnPlace()
+    {
+        IReadOnlyDictionary<string, string> shown = UndoRecovery.PlacesShown(StepOf(ShapeAInMemory()));
+        Assert.Equal(Day(3), Assert.Single(shown, entry => entry.Key == Day(3) + " → " + Day(4)).Value);
+        Assert.Single(shown);
+        Assert.Empty(UndoRecovery.PlacesShown(StepOf([NewFile(Day(3), "New.\n"), NewFile(Day(4), "New.\n")])));
+    }
+
+    /// <summary>
     /// Shape A killed with the link moved and the new page not written, then
     /// someone's page written at Day 3: both of the pair are in the way, and
     /// the settle counts Day 3 once, as the trail and a teacher are shown it,

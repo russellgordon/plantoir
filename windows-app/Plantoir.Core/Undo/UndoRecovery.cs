@@ -999,6 +999,24 @@ internal static class UndoRecovery
         movesHandingOver.Contains(index) && op.From is { } from && op.To is { } to ? from + " → " + to : op.PlaceName;
 
     /// <summary>
+    /// For each move that hands a place over, the plain path its judged name
+    /// ("from → to", <see cref="PlaceJudged"/>) is shown as on the trail and
+    /// to a teacher: its own place (<see cref="UndoOp.PlaceName"/>), as every
+    /// other move is named (the mac's <c>placesShown</c>, U4b3 door-5).
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> PlacesShown(UndoStep step)
+    {
+        HashSet<int> moving = MovesHandingOver(UndoOp.Handovers(step.Ops), step.Ops);
+        var shown = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (int index in moving)
+        {
+            UndoOp op = step.Ops[index];
+            shown[PlaceJudged(op, index, moving)] = op.PlaceName;
+        }
+        return shown;
+    }
+
+    /// <summary>
     /// Each op of a step judged by <paramref name="judge"/>, then each
     /// handed-over pair judged together (#899 W8b-21a3, the mac's U4b3
     /// door-3; the pairs are <see cref="UndoOp.Handovers"/>, the one finder
@@ -1251,15 +1269,33 @@ internal static class UndoRecovery
         {
             if (op.Kind == UndoOp.External && op.Target is { } target) targets.Add(target);
         }
-        List<string> PathsOnly(IEnumerable<string> places) => places.Where(place => !targets.Contains(place)).ToList();
+        // A move that hands a place over is judged under its two places
+        // ("from → to"), but the trail and a teacher are shown a plain path:
+        // its own place, as every other move is named, each path once (the
+        // mac's placesShown, U4b3 door-5; W8b-21a5).
+        IReadOnlyDictionary<string, string> shownAs = PlacesShown(step);
+        string Shown(string place) => shownAs.TryGetValue(place, out string? plain) ? plain : place;
+        List<string> PathsOnly(IEnumerable<string> places)
+        {
+            var named = new List<string>();
+            foreach (string place in places)
+            {
+                if (targets.Contains(place)) continue;
+                string plain = Shown(place);
+                if (!named.Contains(plain, StringComparer.Ordinal)) named.Add(plain);
+            }
+            return named;
+        }
+        // How many places a count on the trail names: each shown path once.
+        int CountShown(IEnumerable<string> places) => places.Select(Shown).Distinct(StringComparer.Ordinal).Count();
         // A file that could not be read now is never judged changed by hand:
         // tried again on the schedule, as for a file in use (ruling 4).
         foreach ((string path, UndoOpState state) in files)
         {
             if (state is UndoOpState.InUse)
-                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.FileIsInUse, path));
+                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.FileIsInUse, Shown(path)));
             if (state is UndoOpState.CannotTell or UndoOpState.NotReadable)
-                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow, path));
+                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow, Shown(path)));
         }
 
         int atStart = 0, atEnd = 0;
@@ -1386,8 +1422,8 @@ internal static class UndoRecovery
                         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
                         List<string> keptLeft = KeptOriginalsLeft(step, root);
                         trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoCouldNotPutBack, course, section,
-                                                        UndoTrail.CouldNotPutBackWords(phase, leftPartWay.Count, keptLeft), keptLeft));
-                        return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, UndoRecoveryOutcome.Interrupted, step, root, 0, leftPartWay.Count), false, false);
+                                                        UndoTrail.CouldNotPutBackWords(phase, CountShown(leftPartWay), keptLeft), keptLeft));
+                        return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, UndoRecoveryOutcome.Interrupted, step, root, 0, CountShown(leftPartWay)), false, false);
                     }
                 }
             }
@@ -1412,7 +1448,7 @@ internal static class UndoRecovery
                 // In shadow nothing was put back and nothing offered was
                 // cleared: the journal holds the outcome, the trail does not.
                 if (live)
-                    line = new UndoTrailLine(ActivityTrail.Event.UndoRolledBack, course, section, UndoTrail.InterruptedWords(phase, putBack, inTheWay.Count));
+                    line = new UndoTrailLine(ActivityTrail.Event.UndoRolledBack, course, section, UndoTrail.InterruptedWords(phase, putBack, CountShown(inTheWay)));
             }
         }
         if (seams?.Stops("recoveryBeforeWriting") == true) return SettleAnswer.Halted;
@@ -1458,7 +1494,7 @@ internal static class UndoRecovery
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
         }
-        return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, outcome, step, root, putBack, inTheWay.Count), false, false);
+        return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, outcome, step, root, putBack, CountShown(inTheWay)), false, false);
     }
 
     private static JsonObject Interrupted(long seq, string phase, string reason, IReadOnlyList<string> paths)

@@ -57,6 +57,9 @@ internal static class Program
                 "w8-carrying-move-kill" => W8Runs.CarryingMoveKill(folder),
                 "child-w8-carry" => W8Runs.ChildCarry(folder, args[2], args[3], args[4]),
                 "child-w8-recover" => W8Runs.ChildRecover(folder, args[2]),
+                "w8b-handover-kill" => W8bRuns.HandoverKill(folder),
+                "child-w8b-handover" => W8bRuns.ChildHandover(folder, args[2], args[3], args[4]),
+                "child-w8b-handover-recover" => W8bRuns.ChildRecover(folder),
                 _ => Unknown(mode),
             };
         }

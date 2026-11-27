@@ -311,10 +311,23 @@ internal sealed class UndoDoor
                 return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: new UndoRefusal(UndoRefusalKind.NotReadable));
         }
         // 2. Every path inside the working folder, its links resolved (a
-        // link's move by the folders above the link alone, U4b2-14; W8-6).
-        foreach (UndoOp op in step.Ops)
+        // link's move by the folders above the link alone, U4b2-14; W8-6). A
+        // file op at a place a link's move hands over is judged on the folders
+        // above it only, as the plan judges it: the link standing there is
+        // moved, never written through, wherever it leads (the mac's U4b3
+        // door-5, a link leading out of the working folder; W8b-21a5).
+        var judgedAbove = new HashSet<int>();
+        foreach (UndoHandover handover in UndoOp.Handovers(step.Ops))
         {
-            if (op.PathsNamed.Any() && (draft.WorkingFolder is null || UndoPlaces.FirstPlaceLeadingOut(draft.WorkingFolder, op) is not null))
+            if (!handover.ALinkMoves) continue;
+            judgedAbove.Add(handover.LeaverIndex);
+            judgedAbove.Add(handover.FillerIndex);
+        }
+        for (int index = 0; index < step.Ops.Count; index++)
+        {
+            UndoOp op = step.Ops[index];
+            bool aboveOnly = judgedAbove.Contains(index) && !op.IsWhole;
+            if (op.PathsNamed.Any() && (draft.WorkingFolder is null || UndoPlaces.FirstPlaceLeadingOut(draft.WorkingFolder, op, judgedOnTheFoldersAbove: aboveOnly) is not null))
                 return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: new UndoRefusal(UndoRefusalKind.NotReadable));
         }
         // 3. Every blob it names, given or already held, hashing to its name.
@@ -526,10 +539,12 @@ internal sealed class UndoDoor
             UndoRefusal refusal = RefusalOf(plan);
             return new UndoOutcome(UndoOutcomeKind.Refused, seq, refusal, AnswerARefusal(refusal, seq, backward));
         }
-        // Every place inside the working folder, links resolved, at the plan.
+        // Every place inside the working folder, links resolved, at the plan;
+        // a file at a place a link's move hands over on the folders above it
+        // only, as the plan judged it (W8b-21a5, the mac's U4b3 door-5).
         foreach ((string path, _, _) in ready.InOrder)
         {
-            if (root.Length > 0 && !UndoPlaces.StaysInside(root, path))
+            if (root.Length > 0 && !(ready.HandedOver.Contains(path) ? UndoPlaces.StaysInsideAbove(root, path) : UndoPlaces.StaysInside(root, path)))
             {
                 var outside = new UndoRefusal(UndoRefusalKind.ChangedSince, path);
                 return new UndoOutcome(UndoOutcomeKind.Refused, seq, outside, AnswerARefusal(outside, seq, backward));
