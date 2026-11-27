@@ -106,7 +106,6 @@ public static class HowITeachSettingsRow
         return changed.Count == 1 && changed[0].BeforeBytes is null;
     }
 
-    /// <summary>The folder holding <c>courses\</c> above a course's folder, or null when the course is not inside one.</summary>
     /// <summary>The working folder above a course folder (the folder holding <c>courses\</c>), or null when the course is not inside one.</summary>
     internal static string? WorkingFolderOf(string courseDirectory)
     {

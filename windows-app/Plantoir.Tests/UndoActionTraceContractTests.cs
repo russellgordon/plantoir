@@ -69,16 +69,25 @@ public sealed class UndoActionTraceContractTests
         JsonElement trace = UndoContract.Traces.RootElement.GetProperty("actionTraces").EnumerateArray()
             .Single(candidate => candidate.GetProperty("name").GetString() == name);
         JsonElement recorded = RecordedStep(trace.GetProperty("step").GetString()!);
-        // A step with members is made as its recorded editJSON ops (#899
-        // W8-11). Rename folder's steps hold members AND folderMoves: the
-        // guard names folderMoves, so they still stop here rather than run
-        // with no folder move made.
-        // A step with trees (Add folder) is made by its Windows action since
-        // W8-13, each folder hashed by its listing.
+        // Rename folder's steps hold members AND folderMoves: the guard names
+        // folderMoves first, so they stop here rather than run with no folder
+        // move made.
+        string stepName = recorded.GetProperty("name").GetString()!;
+        bool byTheWindowsAction = WindowsActionsOnTheMacFixture.Converted.Contains(stepName);
         foreach (string unmade in new[] { "moves", "folderMoves" })
         {
             if (recorded.TryGetProperty(unmade, out _))
                 Assert.Fail($"{name}: a step this replay does not make yet ({unmade})");
+        }
+        // A step with members or trees is made only by its Windows action
+        // (#899 W8-11 to 13; W8-11 to 13 review 1, LOW 4): the recorded-step
+        // draft below writes whole files and makes no folder, so a step of
+        // either that is not converted stops here by name, never at the
+        // final hashes.
+        foreach (string onlyByTheAction in new[] { "members", "trees" })
+        {
+            if (!byTheWindowsAction && recorded.TryGetProperty(onlyByTheAction, out _))
+                Assert.Fail($"{name}: a step this replay does not make yet ({onlyByTheAction})");
         }
 
         using var scribe = new UndoScribe();
@@ -99,8 +108,6 @@ public sealed class UndoActionTraceContractTests
         // A converted step's action is the REAL Windows action on the mac's
         // fixture (#899 W7b1), so each trace judges what Windows wrote; the
         // rest still make the recorded step's draft through the door.
-        string stepName = recorded.GetProperty("name").GetString()!;
-        bool byTheWindowsAction = WindowsActionsOnTheMacFixture.Converted.Contains(stepName);
         if (byTheWindowsAction) WindowsActionsOnTheMacFixture.Lay(scribe.FullPath("A", ""), recorded);
         // A step whose bytes are Windows' own, measured (#899 W7b2-10, review 1
         // L2), keyed by the dictionaries so that every entry a later piece adds
@@ -139,9 +146,7 @@ public sealed class UndoActionTraceContractTests
                     }
                     else
                     {
-                        UndoOutcome outcome = recorded.TryGetProperty("members", out _)
-                            ? Door().Perform(MembersDraft(scribe, recorded))
-                            : Door().Perform(Draft(scribe, recorded));
+                        UndoOutcome outcome = Door().Perform(Draft(scribe, recorded));
                         made = (outcome.Word, outcome.Seq);
                     }
                     Assert.True(call.GetProperty("expect").GetString() == made.Word, $"{where}: came to {made.Word}");
@@ -266,55 +271,6 @@ public sealed class UndoActionTraceContractTests
             Holds = "section",
             Changes = changes,
             Recomputes = recomputes,
-        };
-    }
-
-    /// <summary>
-    /// A recorded step with <c>members</c> as its action hands it to the door
-    /// (#899 W8-11; the mac's <c>JournaledStep.makeAsOps</c>): each member as
-    /// the recorded <c>editJSON</c> op, its key path, before and after (no
-    /// before or after where the member was absent), in the recorded order,
-    /// then its recompute ops, through the door that takes every kind. Never
-    /// the file worked out by the door's line rule.
-    /// </summary>
-    private static UndoOpsDraft MembersDraft(UndoScribe scribe, JsonElement recorded)
-    {
-        var ops = new JsonArray();
-        foreach (JsonElement member in recorded.GetProperty("members").EnumerateArray())
-        {
-            var op = new JsonObject
-            {
-                ["kind"] = UndoOp.EditJson,
-                ["path"] = member.GetProperty("path").GetString(),
-                ["keyPath"] = JsonNode.Parse(member.GetProperty("keyPath").GetRawText()),
-            };
-            if (member.TryGetProperty("before", out JsonElement before)) op["before"] = JsonNode.Parse(before.GetRawText());
-            if (member.TryGetProperty("after", out JsonElement after)) op["after"] = JsonNode.Parse(after.GetRawText());
-            ops.Add(op);
-        }
-        foreach (JsonElement recompute in recorded.GetProperty("recomputes").EnumerateArray())
-        {
-            ops.Add(new JsonObject
-            {
-                ["kind"] = UndoOp.Recompute,
-                ["maintainer"] = recompute.GetProperty("maintainer").GetString(),
-                ["path"] = recompute.GetProperty("path").GetString(),
-                ["section"] = recompute.GetProperty("section").GetInt64(),
-            });
-        }
-        return new UndoOpsDraft
-        {
-            ActionKey = recorded.GetProperty("action").GetString()!,
-            ActionArguments = new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["pageCount"] = recorded.GetProperty("files").GetArrayLength().ToString(System.Globalization.CultureInfo.InvariantCulture),
-            },
-            MadeBy = recorded.GetProperty("madeBy").GetString()!,
-            WorkingFolder = scribe.FullPath("A", ""),
-            Course = "ICS3U",
-            Class = "A",
-            Holds = "course",
-            Ops = ops,
         };
     }
 

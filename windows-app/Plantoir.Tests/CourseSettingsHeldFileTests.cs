@@ -218,6 +218,44 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
         Assert.Empty(Temporaries());
     }
 
+    /// <summary>
+    /// W8-11 to 13 review 1, LOW 3: the Save Course Settings makes since
+    /// W8-12 (<see cref="CourseConfiguration.SaveCourseSettings(Course)"/>, one
+    /// step through the door), with the file held by a reader that lets it be
+    /// read but not replaced: the door's rename is refused as in use, said
+    /// with its in-use words naming the file, the file is as it was, nothing
+    /// staged is left beside it, no step is applied and the window keeps its
+    /// edit unsaved.
+    /// </summary>
+    [Fact]
+    public void HeldByAReaderTheWindowsSaveIsRefusedAsInUseAndChangesNothing()
+    {
+        File.WriteAllText(Path.Combine(_workspace, Workspace.MarkerLauncher), "");
+        string listFolder = Directory.CreateTempSubdirectory("held-settings-list-").FullName;
+        try
+        {
+            var window = CourseConfiguration.Load(ConfigPath);
+            window.Values["show_reading_time"] = true;
+            byte[] before = File.ReadAllBytes(ConfigPath);
+            var list = new Plantoir.Core.Undo.UndoForThisProcess(listFolder, Plantoir.Core.Undo.UndoMode.Shadow, null);
+            var door = new Plantoir.Core.Undo.UndoDoor(list.Journal, list.Mode, list.Maintainers, trail: list.Trail);
+
+            Plantoir.Core.Undo.UndoStepRefusedException refused;
+            using (new SecondProcessHold(ConfigPath, FileShare.Read))
+                refused = Assert.Throws<Plantoir.Core.Undo.UndoStepRefusedException>(
+                    () => CourseConfiguration.SaveCourseSettings(new Course("ICS3U", CourseDir, window), list, door));
+
+            Assert.Equal(Plantoir.Core.Undo.UndoRefusalKind.FileIsInUse, refused.Refusal.Kind);
+            Assert.Contains("course_config.json", refused.Message, StringComparison.Ordinal);
+            Assert.Contains("is in use by another program", refused.Message, StringComparison.Ordinal);
+            Assert.Equal(before, File.ReadAllBytes(ConfigPath));
+            Assert.Empty(Directory.GetFiles(CourseDir, "*" + Plantoir.Core.Undo.UndoSwap.StagedMarker + "*"));
+            Assert.Empty(WindowsActionsOnTheMacFixture.AppliedBegins(listFolder));
+            Assert.True(window.HasUnsavedChanges);
+        }
+        finally { try { Directory.Delete(listFolder, true); } catch { } }
+    }
+
     [Fact]
     public void AReaderThatLetsGoOnTheFirstPauseLetsTheMergedSaveLand()
     {

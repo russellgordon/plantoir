@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 using Plantoir.Core.Models;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Tests;
 
@@ -46,9 +47,21 @@ public sealed class CourseSettingsSaveTests : IDisposable
         var set = JObject.Parse(Placeholders(c["set"]?.ToJsonString() ?? "{}"));
         foreach (var property in set.Properties()) shape[property.Name] = property.Value;
         foreach (var key in c["remove"]?.AsArray() ?? new JsonArray()) shape.Remove(key!.ToString());
-        string path = Path.Combine(_folder, "course_config.json");
-        File.WriteAllText(path, shape.ToString(Newtonsoft.Json.Formatting.Indented), new UTF8Encoding(false));
-        return CourseConfiguration.Load(path);
+        Directory.CreateDirectory(CourseFolder);
+        File.WriteAllText(Path.Combine(_folder, "wf", Workspace.MarkerLauncher), "");
+        File.WriteAllText(ConfigPath, shape.ToString(Newtonsoft.Json.Formatting.Indented), new UTF8Encoding(false));
+        return CourseConfiguration.Load(ConfigPath);
+    }
+
+    private string CourseFolder => Path.Combine(_folder, "wf", "courses", "ICS3U");
+    private string ConfigPath => Path.Combine(CourseFolder, "course_config.json");
+
+    /// <summary>The window's Save, as Course Settings makes it since #899 W8-12 (one step), on this test's own list.</summary>
+    private void Save(CourseConfiguration config)
+    {
+        var list = new UndoForThisProcess(Path.Combine(_folder, "state", "undo"), UndoMode.Shadow, null);
+        var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, trail: list.Trail);
+        CourseConfiguration.SaveCourseSettings(new Course("ICS3U", CourseFolder, config), list, door);
     }
 
     /// <summary>One change, through the setter the dialog's control calls.</summary>
@@ -128,8 +141,8 @@ public sealed class CourseSettingsSaveTests : IDisposable
             var state = SettingsSaveState.Decide(config, "");
             Assert.True(state.SaveEnabled && state.RevertEnabled, $"{name}: Save/Revert not enabled");
 
-            config.Write(Path.Combine(_folder, "course_config.json"));
-            var written = JObject.Parse(File.ReadAllText(Path.Combine(_folder, "course_config.json")));
+            Save(config);
+            var written = JObject.Parse(File.ReadAllText(ConfigPath));
             foreach (var expect in c["written"]!.AsArray().Concat(c["unchanged"]!.AsArray()))
             {
                 JToken? at = written;

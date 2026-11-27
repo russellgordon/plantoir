@@ -118,12 +118,16 @@ public sealed class CourseConfiguration
     public sealed record SaveReport(IReadOnlyList<string> KeptFromElsewhere, IReadOnlyList<string> ReplacedChangesFromElsewhere);
 
     /// <summary>
-    /// Every writer of course_config.json saves through here (Course Settings,
-    /// Add Section, archive, restore, rename), so the rule lives in ONE place
-    /// (#272 / mac #265, <c>shared-rules.json → savingSettings</c>): a Save
-    /// writes only the TOP-LEVEL keys this copy changed since it last read or
-    /// wrote the file, and keeps the file's value — including being gone — for
-    /// every other key.
+    /// Every writer of course_config.json that is not yet one step on the
+    /// undo list writes through here (Add Section, archive, restore, rename,
+    /// Rename folder's settings write); Course Settings' Save
+    /// (<see cref="SaveCourseSettings(Course)"/>) and Set School Year
+    /// (<see cref="WriteMemberAsOneStep"/>) plan the same merge
+    /// (<see cref="WholeOver"/>) into one step instead (#899 W8-11, W8-12).
+    /// The rule lives in ONE place (#272 / mac #265,
+    /// <c>shared-rules.json → savingSettings</c>): a write keeps only the
+    /// TOP-LEVEL keys this copy changed since it last read or wrote the file,
+    /// and keeps the file's value — including being gone — for every other key.
     ///
     /// <para>MEASURED here before it was written (2026-09-30): a WinUI window
     /// DOES hold its own copy. Ctrl+N opens a second window on the same
@@ -131,13 +135,13 @@ public sealed class CourseConfiguration
     /// <c>WorkspaceViewModel</c> loads its own <see cref="Course"/> list, and
     /// each course its own <see cref="CourseConfiguration"/>; the old Write
     /// serialised the whole object, so window B's Save put back the hides
-    /// window A had just saved — the mac's reported failure, reproduced by
-    /// <c>TwoWindowSettingsTests.TheOldWholeFileWriteLostTheOtherWindowsHides</c>.</para>
-    /// </summary>
+    /// window A had just saved — the mac's reported failure, now pinned on the
+    /// window's Save by
+    /// <c>TwoWindowSettingsTests.TheOtherWindowsHidesSurviveAStaleWindowsSave</c>.</para>
     ///
     /// <para><b>A held file (#874).</b> A merge read that could not be made
-    /// just now REFUSES the Save — nothing written, <see cref="FileInUseException"/>,
-    /// whose message is the sentence the status line shows — rather than
+    /// just now refuses the write — nothing written, <see cref="FileInUseException"/>,
+    /// whose message is the sentence the caller shows — rather than
     /// writing this whole copy over what a build may just have written. The
     /// write goes through a hidden temporary of its own beside the file and
     /// one rename, asked again while the file is held; still refused, the
