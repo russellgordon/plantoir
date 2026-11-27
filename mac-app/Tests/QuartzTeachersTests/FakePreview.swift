@@ -28,6 +28,12 @@ final class FakePreview {
     private var watchedURL: URL?
     private var textWhenWatched: String?
 
+    /// The preview lease a running preview holds, as a real window's does
+    /// (#899): only when `holdingALease` is asked for, so the whole-course
+    /// restore sees this preview as the course being busy.
+    private var heldLease: PreviewLeases.Lease?
+    private var leaseKey: (folderPath: String, courseCode: String, sectionNumber: Int)?
+
     // MARK: - Functions
 
     /// Pretend a section window is open.
@@ -43,8 +49,14 @@ final class FakePreview {
                   showing: SectionWindowControllers.PreviewState? = nil,
                   refusingToDeploy refusal: String? = nil,
                   answeringLaterClasses laterClassesAnswer: LaterClassesAnswer = .nothingToAsk,
-                  pressingObsidian obsidianPress: OpenInObsidianPress = .noWindow) {
+                  pressingObsidian obsidianPress: OpenInObsidianPress = .noWindow,
+                  holdingALease: Bool = false) {
         events = []
+        releaseTheLease()
+        leaseKey = nil
+        if holdingALease {
+            leaseKey = (folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber)
+        }
         // `running` is kept for the callers that only care whether there is
         // something to stop; `showing` is for the tests that care WHICH of the
         // two running states it is in.
@@ -52,6 +64,9 @@ final class FakePreview {
         deployRefusal = refusal
         watchedURL = nil
         textWhenWatched = nil
+        if state != .notRunning {
+            takeTheLease()
+        }
         SectionWindowControllers.shared.register(
             folderPath: folderPath,
             courseCode: courseCode,
@@ -61,6 +76,7 @@ final class FakePreview {
                 startPreview: { [weak self] in
                     self?.noteWriteIfItHappened()
                     self?.state = .showing
+                    self?.takeTheLease()
                     self?.events.append("start")
                 },
                 stopPreview: { [weak self] in
@@ -74,6 +90,7 @@ final class FakePreview {
                     self?.events.append("stop-begins")
                     try? await Task.sleep(for: .milliseconds(60))
                     self?.state = .notRunning
+                    self?.releaseTheLease()
                     self?.noteWriteIfItHappened()
                     self?.events.append("stop-ends")
                 },
@@ -124,6 +141,8 @@ final class FakePreview {
     }
 
     func forget() {
+        releaseTheLease()
+        leaseKey = nil
         SectionWindowControllers.shared.forgetAll()
         events = []
         watchedURL = nil
@@ -131,6 +150,22 @@ final class FakePreview {
     }
 
     // MARK: - Private
+
+    private func takeTheLease() {
+        guard let key = leaseKey, heldLease == nil else {
+            return
+        }
+        heldLease = try? PreviewLeases.lease(
+            folderPath: key.folderPath, courseCode: key.courseCode, sectionNumber: key.sectionNumber
+        )
+    }
+
+    private func releaseTheLease() {
+        if let lease = heldLease {
+            PreviewLeases.release(lease)
+        }
+        heldLease = nil
+    }
 
     private func noteWriteIfItHappened() {
         guard let watchedURL, events.last != "write" else {

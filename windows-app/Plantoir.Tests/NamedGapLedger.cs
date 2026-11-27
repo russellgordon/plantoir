@@ -162,6 +162,9 @@ internal static class NamedGapLedger
     /// <summary><c>shared-rules.json</c> → <c>referenceCourses.importing.wording</c>, by key: missing here or said differently (<c>ReferenceImportTests.EverySentenceIsTheContracts</c>).</summary>
     internal const string ImportWording = "shared-rules.json → referenceCourses.importing.wording";
 
+    /// <summary><c>shared-rules.json</c> → <c>startOfYear.wording</c>, by key: a sentence the Get Ready sheet does not say yet (#899's restore offer).</summary>
+    internal const string StartOfYearSheetWording = "shared-rules.json → startOfYear.wording";
+
     /// <summary><c>shared-rules.json</c> → <c>subjectMenus.items</c>, by item name (both facts of <c>SubjectMenusContractTests</c>).</summary>
     internal const string SubjectMenuItems = "shared-rules.json → subjectMenus.items";
 
@@ -443,6 +446,7 @@ internal static class NamedGapLedger
     private const string Reason826 = "replacing a reference course is #826's piece of v2.0.0, not built here yet";
     private const string Reason827 = "the groups a teacher makes on the reference shelf are #827's piece of v2.0.0, not built here yet";
     private const string Reason899SettingsFinishesItself = "the mac's #899 (2026-11-27): a one-file settings step stopped part way is judged at once by content, and one that cannot be finished offers Put It Back; Windows does not judge at once or offer it yet";
+    private const string Reason899GetReadyRestoreOffer = "the mac's #899 (2026-11-27): Get Ready for the Start of the Year stopped part way offers, in the same sheet, to restore the whole course from the backup made at Go (Leave As It Is with Escape, Restore Course with Return, no second confirmation), and a stop that changed nothing stays writeFailed; Windows does not tell the two stops apart or offer the restore yet";
     private const string Reason884 = "GitHub Copilot as a third outside assistant (the mac's #783) is #884's piece of v2.0.0; Windows has no Copilot door yet";
 
     // #884's first part (2026-11-13): the mac's #783 and #850 merged into dev.
@@ -553,6 +557,8 @@ internal static class NamedGapLedger
         Owed(ShelfWording, 827, V200, Reason827, "codeAlreadyInThatGroup"),
         Owed(ShelfWording, 899, V200, Reason899SettingsFinishesItself,
              "settingCouldNotBeChanged", "settingCanBePutBack", "settingsCanBePutBack", "settingCouldNotBeChangedButtons"),
+        Owed(StartOfYearSheetWording, 899, V200, Reason899GetReadyRestoreOffer,
+             "stoppedPartWay", "restoreOffer", "leaveAsItIsButton", "restoreCourseButton"),
         Owed(SubjectMenuItems, 827, V200, Reason827, "moveToGroup"),
         Owed(ImportWording, 823, V200, Reason823,
              "explanation", "zipCouldNotBeOpened", "zipIsNotSafeToOpen", "zipHoldsNoCourse", "zipHoldsSeveralCourses",

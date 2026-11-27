@@ -1,0 +1,28 @@
+# #899 Get Ready restore offer, must-fail log, 2026-11-27 (each break on its own, then reverted; classes StartOfYearRestoreOfferTests + StartOfYearTests/testTheWordingIsTheContractsWording)
+GREEN: StartOfYearRestoreOfferTests, StartOfYearTests, SheetConventionScanTests: Executed 41 tests, with 0 failures
+BREAK 1 part-way caught as its own outcome: exit 65; ['Executed 5 tests, with 2 failures (0 unexpected) in 0.618 (0.620) seconds']; failing: ['QuartzTeachersTests.StartOfYearRestoreOfferTests testStoppedPartWayCasesAsTheContractSays]']
+BREAK 2 button keys: exit 65; ['Executed 5 tests, with 1 failure (0 unexpected) in 0.614 (0.616) seconds']; failing: ['QuartzTeachersTests.StartOfYearRestoreOfferTests testTheTwoButtonsTheirRolesAndTheirOrder]']
+BREAK 3 Restore Course runs the restore: exit 65; ['Executed 5 tests, with 3 failures (0 unexpected) in 0.305 (0.307) seconds']; failing: ['QuartzTeachersTests.StartOfYearRestoreOfferTests testStoppedPartWayCasesAsTheContractSays]']
+BREAK 4 the sidebar passes the one restore: exit 65; ['Executed 5 tests, with 1 failure (0 unexpected) in 0.266 (0.269) seconds']; failing: ['QuartzTeachersTests.StartOfYearRestoreOfferTests testTheSidebarHandsTheSheetTheOneRestore]']
+BREAK 5 the sentence is the contract's: exit 65; ['Executed 5 tests, with 3 failures (0 unexpected) in 0.296 (0.298) seconds']; failing: ['QuartzTeachersTests.StartOfYearRestoreOfferTests testStoppedPartWayCasesAsTheContractSays]', 'QuartzTeachersTests.StartOfYearTests testTheWordingIsTheContractsWording]']
+BASE (tests commit on the base's sources): build-for-testing exit 65:
+binary operator '~=' cannot be applied to two 'StartOfYearSheetModel.Stage' operands
+extra argument 'restoreWholeCourse' in call
+reference to member 'stoppedPartWay' cannot be resolved without a contextual type
+type 'StartOfYearSheetModel' has no member 'stoppedPartWaySentences'
+type 'StartOfYearWording' has no member 'leaveAsItIsButton'
+type 'StartOfYearWording' has no member 'restoreCourseButton'
+type 'StartOfYearWording' has no member 'restoreOffer'
+type 'StartOfYearWording' has no member 'stoppedPartWay'
+value of type 'StartOfYearSheetModel' has no member 'restoreCourse'
+
+# Fix round one, 2026-11-27 (each break on its own, then reverted; class StartOfYearRestoreOfferTests)
+BASE aa991d513 with the new tests: exit 65, 2 tests, 6 failures: the preview started again before the offer; "ICS3U is previewing or deploying right now. Stop that first, then restore." (both tests); pages still in draft; another section's preview not stopped.
+GREEN: StartOfYearRestoreOfferTests, StartOfYearTests, SheetConventionScanTests, WholeCourseRestoreDoorTests: Executed 54 tests, with 0 failures
+BREAK B1 part-way branch restarts the preview before the offer: brk: exit 65; Executed 9 tests, with 6 failures (0 unexpected) in 3.256 (3.259) seconds; failing: ['StartOfYearRestoreOfferTests testADeployHoldsRestoreCourseBackAndTheOfferStillWorksAfter', 'StartOfYearRestoreOfferTests testLeaveAsItIsStartsThePreviewAgainOnceAndChangesNothing', 'StartOfYearRestoreOfferTests testRestoreCourseRestoresWhileThisSectionWasPreviewing']
+BREAK B2 Restore Course does not stop the course's previews: brk: exit 65; Executed 9 tests, with 3 failures (0 unexpected) in 3.225 (3.233) seconds; failing: ['StartOfYearRestoreOfferTests testRestoreCourseStopsAndRestartsAnotherSectionsPreview']
+BREAK B3 nothing started again after the restore: brk: exit 65; Executed 9 tests, with 4 failures (0 unexpected) in 3.109 (3.116) seconds; failing: ['StartOfYearRestoreOfferTests testADeployHoldsRestoreCourseBackAndTheOfferStillWorksAfter', 'StartOfYearRestoreOfferTests testRestoreCourseRestoresWhileThisSectionWasPreviewing', 'StartOfYearRestoreOfferTests testRestoreCourseStopsAndRestartsAnotherSectionsPreview']
+BREAK B4 a deploy does not hold the restore back: brk: exit 65; Executed 9 tests, with 5 failures (0 unexpected) in 2.979 (2.985) seconds; failing: ['StartOfYearRestoreOfferTests testADeployHoldsRestoreCourseBackAndTheOfferStillWorksAfter']
+BREAK B5 the offer can be answered twice: brk: exit 65; Executed 9 tests, with 2 failures (0 unexpected) in 3.288 (3.294) seconds; failing: ['StartOfYearRestoreOfferTests testLeaveAsItIsStartsThePreviewAgainOnceAndChangesNothing']
+BREAK B6 the trail line's old count: brk: exit 65; Executed 9 tests, with 1 failure (0 unexpected) in 3.053 (3.061) seconds; failing: ['StartOfYearRestoreOfferTests testTheStoppedPartWayLineCountsWhatWasKept']
+BREAK B7 Leave As It Is does not start the preview again: brk: exit 65; Executed 9 tests, with 1 failure (0 unexpected) in 3.039 (3.047) seconds; failing: ['StartOfYearRestoreOfferTests testTheTwoButtonsTheirRolesAndTheirOrder']

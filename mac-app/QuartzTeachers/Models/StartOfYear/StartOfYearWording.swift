@@ -195,6 +195,27 @@ nonisolated enum StartOfYearWording {
              + "the course as it was before you pressed the button."
     }
 
+    // MARK: - The sheet, after a part-way stop (#899)
+
+    /// Said when the write stopped part way: some pages went into draft and
+    /// some are as they were. Russell's ruling of 2026-11-26, word for word.
+    static func stoppedPartWay(course: String, section: String) -> String {
+        return "Plantoir stopped part way through putting the pages into draft, so Section \(section) of "
+             + "\(course) now has some pages in draft and some as they were."
+    }
+
+    /// The offer under it. Names `restoreCourseButton` and `goButton` as
+    /// they are titled (`StartOfYearRestoreOfferTests` holds them together).
+    static func restoreOffer(course: String, backup: String) -> String {
+        return "Restore Course puts \(course) back as it was before you pressed Put These into Draft, "
+             + "from the backup “\(backup)”. The course as it is now moves to Archived, at the bottom of "
+             + "the sidebar, so nothing is lost."
+    }
+
+    static let leaveAsItIsButton: String = "Leave As It Is"
+
+    static let restoreCourseButton: String = "Restore Course"
+
     static func noFirstClass(course: String, section: String, noun: String) -> String {
         return "\(course) Section \(section) has no numbered \(noun) yet, so there is no first \(noun) "
              + "to keep. Nothing was changed."

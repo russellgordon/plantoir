@@ -246,9 +246,15 @@ public class StartOfYearTests : IDisposable
     public void EverySentenceIsTheContracts()
     {
         var wording = StartOfYearRule["wording"]!.AsObject();
-        Assert.Equal(wording.Select(p => p.Key).OrderBy(k => k), StartOfYearWording.ByKey.Keys.OrderBy(k => k));
+        var keys = wording.Select(p => p.Key).ToList();
+        // A key Windows owes and has not built yet (#899's restore offer) is
+        // held open by name in the ledger, as ContractTests does for the
+        // trail's events; every other key is still compared exactly.
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.StartOfYearSheetWording, keys, StartOfYearWording.ByKey.Keys);
+        Assert.Equal(keys.Except(deferred).OrderBy(k => k), StartOfYearWording.ByKey.Keys.OrderBy(k => k));
         foreach (var (key, value) in wording)
-            Assert.True(StartOfYearWording.ByKey[key] == value!.ToString(), $"startOfYear.wording.{key} differs");
+            if (!deferred.Contains(key))
+                Assert.True(StartOfYearWording.ByKey[key] == value!.ToString(), $"startOfYear.wording.{key} differs");
     }
 
     /// <summary>An undo puts back what the write wrote and leaves a file changed since, and says so on the trail.</summary>

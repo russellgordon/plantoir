@@ -186,6 +186,20 @@ final class SectionWindowControllers {
         ]
     }
 
+    /// The sections of a course whose windows are open, in order: Restore
+    /// Course after a part-way Get Ready stops their previews (#899).
+    func sectionsShowing(folderPath: String, courseCode: String) -> [Int] {
+        let wanted: Key = Key(folderPath: folderPath, courseCode: courseCode, sectionNumber: 0)
+        var sections: [Int] = []
+        for key in controllers.keys {
+            if key.folderPath == wanted.folderPath && key.courseCode == wanted.courseCode {
+                sections.append(key.sectionNumber)
+            }
+        }
+        sections.sort()
+        return sections
+    }
+
     /// Forget everything. Tests only — the app's windows manage their own.
     func forgetAll() {
         controllers.removeAll()
