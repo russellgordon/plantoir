@@ -39,6 +39,12 @@ public static class SchoolYear
         return $"{startingYear}–{((endsIn % 100) + 100) % 100:D2}";
     }
 
+    /// <summary>The Set School Year picker's item for no year (Windows' own: there are no shelf groups here yet, #827).</summary>
+    public const string NoYearPickerLabel = "No school year";
+
+    /// <summary>A year as the Set School Year picker labels it: "2026–27", or <see cref="NoYearPickerLabel"/> (#899 W8c-1b: the Put It Back alert says the old year this way).</summary>
+    public static string PickerLabel(int? startingYear) => startingYear is int year ? Label(year) : NoYearPickerLabel;
+
     /// <summary>"2025–26", or "no school year" — how a trail line and a sentence name a year.</summary>
     public static string Name(int? startingYear, string none = "no school year") =>
         startingYear is int year ? Label(year) : none;

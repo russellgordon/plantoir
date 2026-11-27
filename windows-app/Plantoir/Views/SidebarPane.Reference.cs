@@ -266,8 +266,8 @@ public sealed partial class SidebarPane
     {
         var picker = new ComboBox { Header = "School year", MinWidth = 220 };
         foreach (int year in SchoolYear.Offered(Today))
-            picker.Items.Add(new ComboBoxItem { Content = SchoolYear.Label(year), Tag = year });
-        picker.Items.Add(new ComboBoxItem { Content = "No school year", Tag = null });
+            picker.Items.Add(new ComboBoxItem { Content = SchoolYear.PickerLabel(year), Tag = year });
+        picker.Items.Add(new ComboBoxItem { Content = SchoolYear.PickerLabel(null), Tag = null });
         picker.SelectedIndex = selected is int wanted && SchoolYear.Offered(Today).Contains(wanted)
             ? SchoolYear.Offered(Today).ToList().IndexOf(wanted)
             : picker.Items.Count - 1;
@@ -303,10 +303,18 @@ public sealed partial class SidebarPane
         Validate();
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
-        if (ReferenceCourseUpkeep.SetSchoolYear(course, ChosenYear(picker), Workspace.Courses, Today) is { } problem)
+        switch (ReferenceCourseUpkeep.SetSchoolYearJudged(course, ChosenYear(picker), Workspace.Courses, Today))
         {
-            await ShowError("The school year was not changed", problem);
-            return;
+            case SettingWriteResult.Refused refused:
+                await ShowError("The school year was not changed", refused.Sentence);
+                return;
+            case SettingWriteResult.CouldNotFinish couldNotFinish:
+                // Stopped part way and not finished (#899 W8c-1b): the one
+                // alert, once the year dialog above has closed.
+                SettingPutBackAnswer answer = await SettingPutBackAlert.AskAsync(couldNotFinish.Offer, ShowDialogSafelyAsync);
+                if (SettingPutBack.AnswerForTheSchoolYear(answer, couldNotFinish.Offer, course) is { } stillNot)
+                    await ShowError("The school year was not changed", stillNot);
+                break;
         }
         Workspace.Reload();
         _window.ApplyState();

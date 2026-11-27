@@ -406,6 +406,8 @@ public sealed partial class CourseSettingsView : UserControl
             XamlRoot = XamlRoot,
         };
         AutomationProperties.SetAutomationId(dialog, "renameFolderDialog");
+        // A rename that stopped part way and could not be finished: its offer, shown once the sheet has closed.
+        SettingPutBackOffer? renameOffer = null;
 
         bool Finishing() => interruptedTarget is not null
             && interruptedTarget.Equals(field.Text.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -427,12 +429,22 @@ public sealed partial class CourseSettingsView : UserControl
             try
             {
                 string newName = field.Text.Trim();
-                string? failure = await RenameFolderAsync(oldName, newName, scope, Finishing());
-                if (failure is not null)
+                try
                 {
-                    problem.Text = failure;
-                    problem.Visibility = Visibility.Visible;
-                    args.Cancel = true;
+                    string? failure = await RenameFolderAsync(oldName, newName, scope, Finishing());
+                    if (failure is not null)
+                    {
+                        problem.Text = failure;
+                        problem.Visibility = Visibility.Visible;
+                        args.Cancel = true;
+                    }
+                }
+                catch (SettingCouldNotFinishException couldNotFinish)
+                {
+                    // A ContentDialog cannot stand over this sheet (one open
+                    // per window), so the sheet closes and the alert follows
+                    // it, in place of the sheet's problem line (#899 W8c-1b).
+                    renameOffer = couldNotFinish.Offer;
                 }
             }
             finally { deferral.Complete(); }
@@ -440,6 +452,18 @@ public sealed partial class CourseSettingsView : UserControl
 
         try { await dialog.ShowAsync(); }
         catch (Exception ex) { App.LogDiagnostic($"rename dialog: {ex.Message}"); }
+
+        if (renameOffer is { } offer)
+        {
+            SettingPutBackAnswer answer = await SettingPutBackAlert.AskAsync(offer, ShowAlertSafelyAsync);
+            string? stillNot = SettingPutBack.AnswerForARename(answer, offer, _course);
+            if (answer == SettingPutBackAnswer.PutItBack)
+            {
+                BuildForm();
+                RefreshDirtyState();
+            }
+            if (stillNot is not null) ShowFolderNotice(stillNot);
+        }
     }
 
     /// <summary>
@@ -1372,6 +1396,24 @@ public sealed partial class CourseSettingsView : UserControl
             await Task.Delay(3000);
             SaveStatus.Text = "";
         }
+        catch (SettingCouldNotFinishException couldNotFinish)
+        {
+            // Stopped part way and not finished at once (#899 W8c-1b): the one
+            // alert (its offer line is already on the trail), the edits left
+            // unsaved; a failed Put It Back says Save's line, naming no file.
+            SettingPutBackAnswer answer = await SettingPutBackAlert.AskAsync(couldNotFinish.Offer, ShowAlertSafelyAsync);
+            string? stillNot = SettingPutBack.AnswerForASave(answer, couldNotFinish.Offer, _course);
+            if (answer == SettingPutBackAnswer.PutItBack)
+            {
+                BuildForm();
+                RefreshDirtyState();
+            }
+            if (stillNot is not null)
+            {
+                SaveStatus.Text = stillNot;
+                SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+            }
+        }
         catch (Exception error)
         {
             // The exception's message can carry a path under the teacher's
@@ -1379,11 +1421,25 @@ public sealed partial class CourseSettingsView : UserControl
             // (windowsHomeFolder, pinned by problemReportRedaction case 2).
             // Its one known limit is pre-existing and shared with every other
             // line: an account name with a space in it loses only its first
-            // word.
+            // word. The teacher's line names no file for a refused step
+            // (#899 W8c-1b, the mac's LOW A2); the trail keeps it all.
             ActivityTrail.Note(ActivityTrail.Event.SettingsCouldNotBeSaved,
                 "could not save the settings for " + _course.Code + " — " + error.Message);
-            SaveStatus.Text = $"Could not save: {error.Message}";
+            SaveStatus.Text = CourseConfiguration.SaveFailureLine(error);
             SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+        }
+    }
+
+    /// <summary>The Put It Back alert's show (#899 W8c-1b): on this view's root, an exception logged and answered as no answer (Not Now).</summary>
+    private async Task<ContentDialogResult?> ShowAlertSafelyAsync(ContentDialog dialog)
+    {
+        if (XamlRoot is null) return null;
+        dialog.XamlRoot = XamlRoot;
+        try { return await dialog.ShowAsync(); }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"setting put-back alert: {ex.Message}");
+            return null;
         }
     }
 
