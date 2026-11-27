@@ -53,6 +53,8 @@ internal abstract record UndoCurrent
 
     internal sealed record Absent : UndoCurrent;
     internal sealed record Folder : UndoCurrent;
+    /// <summary>A symbolic link or junction at the path (<see cref="UndoLinks.Look(string)"/>): not a file, never read through (the mac's <c>UndoItem.notAFile</c>, lstat).</summary>
+    internal sealed record NotAFile : UndoCurrent;
     internal sealed record Bytes(byte[] Content) : UndoCurrent;
     internal sealed record CannotReadNow(int ErrorCode) : UndoCurrent;
 

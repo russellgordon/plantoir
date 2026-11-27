@@ -37,7 +37,8 @@ public sealed class UndoRecoveryContractTests
         "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
         // U4b3 door-5's (W8b-21a5)
         "withAHandedOverPlace", "handedOver",
-        // U4b3 kept-original-named's (W8b-21c): keptPageLines is held with its two rows (NamedGapLedger).
+        // U4b3 kept-original-named's (W8b-21c, W8b-21c2)
+        "keptPageLines",
     };
 
     private const string First = "courses/TST1O/Section 1/Classes/first.md";
