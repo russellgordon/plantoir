@@ -330,13 +330,22 @@ enum ClassPages {
         return true
     }
 
-    /// Every file the section's class pages are, through their links: no
-    /// other write in a change that dates classes may date one of them (a
-    /// page a class brings, a year-round page, publishing a later class),
+    /// Every file a NUMBERED class of the section owns (by
+    /// `isTheFirstClassLeadingToItsFile`, among every class page in
+    /// `classPages`), through its links: the files a change that dates
+    /// classes dates as classes. No other write in it may date one of them
+    /// (a page a class brings, a year-round page, publishing a later class),
     /// so a shared lesson keeps its first class's date (review 1, MEDIUM 2).
-    static func filesTheClassesAre(_ classes: [ClassPageSummary]) -> [ResolvedFile] {
+    /// A file only an unnumbered page of the class folder leads to is not
+    /// among them: no class dates it, so a class that brings it still does
+    /// (review 2, MEDIUM 1).
+    static func filesTheNumberedClassesOwn(among classPages: [ClassPageSummary]) -> [ResolvedFile] {
+        let numbered: [ClassPageSummary] = ClassInsertionPlanner.numberedClasses(among: classPages)
         var files: [ResolvedFile] = []
-        for summary in classes {
+        for summary in numbered {
+            if !isTheFirstClassLeadingToItsFile(summary.fileURL, among: classPages) {
+                continue
+            }
             if let file = ResolvedFile.throughLinks(at: summary.fileURL) {
                 files.append(file)
             }

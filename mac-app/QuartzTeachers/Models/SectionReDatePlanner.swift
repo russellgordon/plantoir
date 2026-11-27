@@ -155,10 +155,11 @@ enum SectionReDatePlanner {
 
         var moves: [ReDatedPage] = []
         var spokenFor: Set<String> = []
-        // The files the classes ARE, through their links (review 1, MEDIUM
-        // 2): claimed by step 1 by file, not by title, so neither a page a
+        // The files the numbered classes OWN, through their links (review
+        // 1, MEDIUM 2; review 2, MEDIUM 1): claimed by step 1 by file, not
+        // by title, so neither a page a
         // class brings nor a year-round page dates a shared lesson again.
-        let filesTheClassesAre: [ResolvedFile] = ClassPages.filesTheClassesAre(everyClass)
+        let filesTheNumberedClassesOwn: [ResolvedFile] = ClassPages.filesTheNumberedClassesOwn(among: everyClass)
         // Classes past the last date that are actually put on it as drafts
         // (review 1, MEDIUM 3): a later class linked to the same file as an
         // earlier one is neither moved nor hidden, so it is not counted.
@@ -205,7 +206,7 @@ enum SectionReDatePlanner {
         for page in graph.pages {
             guard yearRound.contains(page.lowercasedTitle),
                   !spokenFor.contains(page.lowercasedTitle),
-                  !ClassPages.isOneOf(filesTheClassesAre, pageAt: page.fileURL),
+                  !ClassPages.isOneOf(filesTheNumberedClassesOwn, pageAt: page.fileURL),
                   !page.isFolderIndex,
                   !AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course) else {
                 continue
@@ -248,7 +249,7 @@ enum SectionReDatePlanner {
                 }
                 // The file a class page of the section IS keeps the date
                 // step 1 gave it, its first class's (review 1, MEDIUM 2).
-                if ClassPages.isOneOf(filesTheClassesAre, pageAt: page.fileURL) {
+                if ClassPages.isOneOf(filesTheNumberedClassesOwn, pageAt: page.fileURL) {
                     continue
                 }
                 if AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course) {

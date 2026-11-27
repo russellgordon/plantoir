@@ -1568,11 +1568,11 @@ enum AssistPublishPlanner {
 
         var claimed: Set<String> = []
         var moves: [AssistPublishDateMove] = []
-        // The files the section's class pages ARE, through their links
+        // The files the section's numbered classes own, through their links
         // (review 1, MEDIUM 2): publishing Day 3, which brings the shared
         // lesson Day 2 is a link to, must not date it to Day 3's day. A
         // shared lesson keeps its first class's date (Russell on #899).
-        let filesTheClassesAre: [ResolvedFile] = ClassPages.filesTheClassesAre(classPages)
+        let filesTheNumberedClassesOwn: [ResolvedFile] = ClassPages.filesTheNumberedClassesOwn(among: classPages)
         for entry in named {
             // The same reach publishing uses, so the two halves of one publish
             // cannot disagree about how far it went. It stops at a class, so a
@@ -1603,7 +1603,7 @@ enum AssistPublishPlanner {
                 if page.isClassPage {
                     continue
                 }
-                if ClassPages.isOneOf(filesTheClassesAre, pageAt: page.fileURL) {
+                if ClassPages.isOneOf(filesTheNumberedClassesOwn, pageAt: page.fileURL) {
                     continue
                 }
                 claimed.insert(page.lowercasedTitle)

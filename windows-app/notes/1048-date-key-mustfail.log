@@ -48,3 +48,11 @@ Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheKeyIsDecid
 /Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:496: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingDatesALinkedPageItBringsUnderTheSectionsLine] : XCTAssertTrue failed - thi
 /Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:497: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingDatesALinkedPageItBringsUnderTheSectionsLine] : XCTAssertFalse failed - no
 Restored: 19 of 19 green in the run below.
+
+## Fix round two: the new tests on 00b52ec19 code (tests commit 7e88914a1), DateKeyByTheTargetsPlaceTests
+	 Executed 24 tests, with 3 failures (0 unexpected) in 1.048 (1.052) seconds
+	 Executed 24 tests, with 3 failures (0 unexpected) in 1.048 (1.053) seconds
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:583: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateStillDatesALessonOnlyAnUnnumberedLinkLeadsTo] : XCTAssertTrue failed - Day 3's
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:600: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateStillDatesAYearRoundPageKeptInTheClassFolder] : XCTAssertTrue failed - the fir
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:625: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingStillDatesALessonOnlyAnUnnumberedLinkLeadsTo] : XCTAssertTrue failed
+(the two chain tests are green here by design: they pin the two halves of the owner rule, proven by revert below)
