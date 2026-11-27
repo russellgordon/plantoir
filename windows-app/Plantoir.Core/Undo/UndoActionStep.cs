@@ -202,6 +202,18 @@ internal sealed class UndoActionStep
     internal void WriteBytes(string fullPath, byte[] bytes) => Plan(fullPath, bytes);
 
     /// <summary>
+    /// Plans <paramref name="bytes"/> as the file's content, from
+    /// <paramref name="plannedFrom"/>: the bytes the caller's plan was built
+    /// from, read by the caller, which are the step's before for the file,
+    /// never a second read of the disk (the mac's <c>write(_:to:plannedFrom:)</c>;
+    /// window A fixes, review 1 M1). A file another program changes or
+    /// removes after that read refuses the step (<c>changedSince</c>) instead
+    /// of being written over or brought back. A file already planned in this
+    /// step keeps the before it was first planned with.
+    /// </summary>
+    internal void WriteBytes(string fullPath, byte[] bytes, byte[] plannedFrom) => PlanFrom(fullPath, plannedFrom, bytes);
+
+    /// <summary>
     /// Plans a JSON file's change as one <c>editJSON</c> per member (#899 W8-11;
     /// the mac's <c>JournaledStep.editJSON</c>, U4a): <paramref name="read"/>
     /// is the bytes the caller's plan was built from, read when planned and
@@ -215,6 +227,19 @@ internal sealed class UndoActionStep
     /// </summary>
     internal void EditJson(string fullPath, byte[] read, IReadOnlyList<UndoMemberChange> members, byte[] after)
     {
+        bool plannedBefore = _before.ContainsKey(Path.GetFullPath(fullPath));
+        PlanFrom(fullPath, read, after);
+        if (!plannedBefore && members.Count > 0) _members[Path.GetFullPath(fullPath)] = members;
+    }
+
+    /// <summary>
+    /// Plans <paramref name="after"/> for a file whose before is
+    /// <paramref name="read"/>, the caller's own read (<see cref="EditJson"/>,
+    /// <see cref="WriteBytes(string, byte[], byte[])"/>); a file already
+    /// planned is planned whole, its first before kept.
+    /// </summary>
+    private void PlanFrom(string fullPath, byte[] read, byte[] after)
+    {
         string key = Path.GetFullPath(fullPath);
         if (_before.ContainsKey(key))
         {
@@ -226,7 +251,6 @@ internal sealed class UndoActionStep
         _order.Add(key);
         _shownAs[key] = fullPath;
         _after[key] = after;
-        if (members.Count > 0) _members[key] = members;
     }
 
     /// <summary>
@@ -631,10 +655,11 @@ internal sealed class UndoActionStep
 
     /// <summary>
     /// Each changed file with its change. In the order first planned; in a
-    /// step that moves a folder (W8b-15a), the files planned whole in the one
+    /// step that moves a folder (W8b-15a), the pages planned whole in the one
     /// page order (<see cref="ComparePageOrder"/>, never the directory's or
-    /// the plan's), then the files planned member by member in the order
-    /// planned.
+    /// the plan's), then every other file (one planned member by member, or
+    /// a settings file planned whole) in the order planned, as the mac keeps
+    /// it (window A fixes, review 1 L4).
     /// </summary>
     private List<(string Path, UndoFileChange Change)> InTheStepsOrder(List<UndoFileChange> changes)
     {
@@ -647,16 +672,19 @@ internal sealed class UndoActionStep
         }
         if (_folderMoves.Count == 0) return planned;
         var pages = new List<(string Path, UndoFileChange Change)>();
-        var memberFiles = new List<(string Path, UndoFileChange Change)>();
+        var otherFiles = new List<(string Path, UndoFileChange Change)>();
         foreach ((string path, UndoFileChange change) in planned)
         {
-            if (_members.ContainsKey(path)) memberFiles.Add((path, change));
-            else pages.Add((path, change));
+            if (IsAPage(path) && !_members.ContainsKey(path)) pages.Add((path, change));
+            else otherFiles.Add((path, change));
         }
         pages.Sort((first, second) => ComparePageOrder(first.Change.RelativePath, second.Change.RelativePath));
-        pages.AddRange(memberFiles);
+        pages.AddRange(otherFiles);
         return pages;
     }
+
+    /// <summary>A page, by its name: a Markdown file (<c>.md</c>), as the page walk names one.</summary>
+    private static bool IsAPage(string fullPath) => fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>What the door's outcome means for the action: nothing more to do, or the refusal it throws.</summary>
     private void Answer(UndoOutcome outcome, HashSet<string> keptBefore)

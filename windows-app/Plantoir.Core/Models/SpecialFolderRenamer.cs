@@ -43,16 +43,17 @@ public sealed record RenameOutcome(
 /// <list type="number">
 /// <item><description><b>It commits to disk immediately, not at Save.</b>
 /// Settings holds its edits in memory and reverts them on Cancel — but a
-/// folder that has really moved cannot be un-moved, so a rename that waited
-/// for Save would let Cancel appear to undo something it cannot. The
-/// configuration is written to a FRESH read of the file, so the teacher's
-/// other unsaved edits stay unsaved.</description></item>
-/// <item><description><b>Nothing moves until every destination has been
-/// checked.</b> A per-section rename is several moves, and one that got half
-/// way through four sections would leave a course nobody could reason about.
-/// This matters more on Windows than on the mac: <see cref="Directory.Move"/>
-/// refuses a folder with an open handle, and both OneDrive and Obsidian hold
-/// them.</description></item>
+/// rename moves folders on disk, which Cancel does not take back, so it is
+/// made at once as its own step on the list, and Undo takes it back. The
+/// configuration's members are moved in a FRESH read of the file, so the
+/// teacher's other unsaved edits stay unsaved.</description></item>
+/// <item><description><b>Nothing is planned until every destination has been
+/// checked, and the rename is ONE step, all or none.</b> A per-section rename
+/// is several moves, and one that got half way through four sections would
+/// leave a course nobody could reason about. Every move, relinked page and
+/// setting goes through the door together: a folder held open by OneDrive or
+/// Obsidian refuses the swap's <c>MoveFileEx</c>, whatever had moved is put
+/// back, and the course is left as it was.</description></item>
 /// <item><description><b>The class folder need NOT keep the word "class" in
 /// its new name.</b> A refusal to that effect shipped on the mac for a few
 /// hours and was reversed the same day: it was Plantoir's vocabulary imposed
@@ -62,8 +63,7 @@ public sealed record RenameOutcome(
 /// fix.</description></item>
 /// </list>
 ///
-/// <para><b>Renaming a folder is far safer than renaming a page</b>, which is
-/// why this ships without an undo. Obsidian resolves <c>[[Quiz 1]]</c> by
+/// <para><b>Renaming a folder is far safer than renaming a page.</b> Obsidian resolves <c>[[Quiz 1]]</c> by
 /// searching the vault, so a bare link survives the folder moving; only
 /// QUALIFIED links break, and <see cref="FolderPathRewriter"/> handles
 /// those.</para>
@@ -374,7 +374,7 @@ public static class SpecialFolderRenamer
                                           IReadOnlyList<(string From, string To, int? Section)> moves)
     {
         var strict = new UTF8Encoding(false, throwOnInvalidBytes: true);
-        var planned = new List<(string Place, byte[] Rewritten)>();
+        var planned = new List<(string Place, byte[] Read, byte[] Rewritten)>();
         foreach (string page in PagePaths.MarkdownPages(courseDirectory, descendsIntoLinks: false))
         {
             string text;
@@ -385,10 +385,13 @@ public static class SpecialFolderRenamer
             if (FolderPathRewriter.Count(text, oldName) == 0) continue;
             string rewritten = FolderPathRewriter.Rewritten(text, oldName, newName);
             if (rewritten == text) continue;
-            planned.Add((PlaceAfter(moves, page), strict.GetBytes(rewritten)));
+            planned.Add((PlaceAfter(moves, page), read, strict.GetBytes(rewritten)));
         }
         planned.Sort((first, second) => UndoActionStep.ComparePageOrder(Slashed(first.Place), Slashed(second.Place)));
-        foreach (var (place, rewritten) in planned) step.WriteBytes(place, rewritten);
+        // Each page judged by the bytes its rewrite came from, never read
+        // again: a page edited or removed after this read is a change the
+        // door refuses, and the rename is planned again (review 1 M1).
+        foreach (var (place, read, rewritten) in planned) step.WriteBytes(place, rewritten, plannedFrom: read);
         return planned.Count;
     }
 
@@ -714,17 +717,20 @@ public static class SpecialFolderRenamer
     /// <summary>
     /// Why the moves cannot all be made, or null when they can.
     ///
-    /// <para>Every destination checked BEFORE any of them is moved. On Windows
-    /// this is not belt-and-braces: <see cref="Directory.Move"/> refuses a
-    /// folder with an open handle, and a teacher's folder is very often open in
-    /// Obsidian or being copied by OneDrive.</para>
+    /// <para>Every destination checked BEFORE anything is planned, by
+    /// <see cref="UndoLinks.Look"/>, so a link already there counts as taken
+    /// wherever it leads. The moves themselves are one step through the door,
+    /// all or none: a folder held open (Obsidian, OneDrive) refuses the
+    /// swap's <c>MoveFileEx</c>, and whatever had moved is put back.</para>
     /// </summary>
     public static string? WhyTheMovesCannotBeMade(
         IReadOnlyList<(string From, string To, int? Section)> moves)
     {
         foreach (var move in moves)
         {
-            if (Directory.Exists(move.To) || File.Exists(move.To))
+            // Anything at all there, a link leading nowhere included, read
+            // without following it (review 1 L2).
+            if (UndoLinks.Look(move.To) != UndoLinks.What.Nothing)
                 return SpecialNames.RenameProblemDestinationExists
                     .Replace("{name}", Path.GetFileName(move.To));
         }

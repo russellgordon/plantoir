@@ -214,12 +214,14 @@ public static class PagePaths
     /// <summary>
     /// Whether the page walk goes into a folder entry, by what
     /// <see cref="Plantoir.Core.Undo.UndoLinks.Look"/> reads it as: always
-    /// when the walk follows links; otherwise never into a link.
+    /// when the walk follows links; otherwise never into a link, and never
+    /// into an entry it cannot look at, which is skipped as the mac's walk
+    /// skips what it cannot read (window A fixes, review 1 L3).
     /// </summary>
     internal static bool WalksInto(Plantoir.Core.Undo.UndoLinks.What what, bool descendsIntoLinks)
     {
         if (descendsIntoLinks) return true;
-        return what != Plantoir.Core.Undo.UndoLinks.What.Link;
+        return what != Plantoir.Core.Undo.UndoLinks.What.Link && what != Plantoir.Core.Undo.UndoLinks.What.CannotLook;
     }
 
     private static StringComparison PathComparison =>
