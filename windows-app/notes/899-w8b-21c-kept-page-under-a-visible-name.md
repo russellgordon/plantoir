@@ -49,3 +49,42 @@ A seventh row (recovery never keeping a page) was dropped: the contract rows it 
 ## Self-check
 
 1. Each new test broken by its must-fail row (see Runs). 2. No timed waits. 3. The trail line is the contract's line (the mac's `keptAPageLine`); the couldNotPutBack line, said after, names only what is still hidden (it reads the disk). 4. `dev` 6dc36fcea in before proving. 5. No number tuned. 6. Contract rows read from JSON; no `contracts/` change. 11. The event row out of the ledger; the two recovery rows held again with a true sentence (not cleared). 12. `keptPageLines` checked against every held recovery row. 13. One function per rule: `VisibleName` and `RenameToAVisibleName` for a folder and a page; the place's "is it a copy" is `UndoSwap.IsACopyOfItsPlace`. 14. The PC script releases only its own lock.
+
+## 21c2
+
+Brief `vm-tools/briefs/2026-11-27-899-w8b-21c2-kept-page-rows-replay.md`. Same branch; `git merge origin/dev` (6dc36fcea) already up to date before proving and before handing back.
+
+### The cause (diagnostic replay, PC runs w8b-21c2-diag and -diag2, scratch commits e19b3458d and e3265d77b on `scratch/899-w8b-21c2-diag`, deleted after)
+
+The first suspect was wrong: nothing deleted Day 3's hidden original, and no page was lost. Listing section 1 at each recovery point showed `.Unit 1, Day 3.md.plantoir-undo-1-apply-orig` (holding `Three.`) present after the stop, after the hand edit, after the first tidy and after recovery, and the journal holding only the step's begin line: recovery never settled the step at all. The judged states were Day 4 After, Day 3 Neither, the link's move "Day 2 → Day 3" Neither, and **Day 2's writeFile CannotTell**, so `Settle` returned `cannotTellNow` (Day 2) and left the step `begun`, which `TidyClosedSteps` (interrupted only) never meets, so `KeepPagesWhosePlaceIsTaken` never ran. Day 2 holds the link still (the step stopped before the link's move), and its write (New. at the place the link leaves) is judged against what is at Day 2; with the move Neither (Day 3 taken by someone's page) the pair rule does not judge it as absent, so `UndoCurrent.Read` read Day 2 THROUGH the link, and a link the mac writes (`../library/Day 2.md`, forward slashes) does not open on Windows: cannot tell, for good. The mac reads the place by `lstat` (`UndoItem.read`): a link is `notAFile`, so the write is neither, the step closes changedByHand and the tidy keeps the page under its visible name.
+
+### The fix
+
+`UndoCurrent.ReadWithoutFollowingALink` (UndoCheck.cs): a link at the place (`UndoLinks.Look`, the one test of a link) is the new `UndoCurrent.NotAFile`, never read through; `StateOf` judges a writeFile on it neither, as on a folder (every other op already judges a non-`Bytes` neither). Only `UndoRecovery.FileStates` reads with it. A first try (8259287c8) put the rule in `UndoCurrent.Read` itself, for every reader, as the mac's lstat is; run w8b-21c2-a showed it changes the switch-off step on a linked later class (`UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacMovesTheLink_UntilW8bPiece22`, "Nothing was changed" where it wrote plainly), because the door's plan and the swap's re-read read that page through its link. So the door and the swap still follow a link until W8b piece 22 moves the link itself; piece 22 should then ask whether `Read` can stop following links everywhere, as the mac's does.
+
+### Tests (tests first, a82e2e783, inert stub `NotAFile` never returned; seen RED in run w8b-21c2-a: 4 of 103)
+
+- `UndoKeptPageUnderAVisibleNameTests.APagesPlaceHoldingALinkIsNotAFileAndIsNeverReadThroughIt` (two cases: the mac's link `../library/Day 2.md`, and a Windows one with backslashes whose target holds the op's after): RED at `Assert.IsType<UndoCurrent.NotAFile>` on both.
+- The two contract rows, out of the ledger with `keptPageLines` in `KeysChecked`: RED at the `keptVisibleAs` bytes (`UndoRecoveryContractTests.cs` about 404).
+- `ThePageKeptUnderAVisibleNameIsSaidBeforeTheCouldNotPutBackLine` (the test 21c did not write): a step laid by hand that died with Day 3 removed and Day 5 changed, the list's content gone and Day 5's kept original changed, someone's page at Day 3; recovery closes it couldNotPutBack, Day 3 is kept as `Unit 1, Day 3 (kept by Undo).md`, its line comes before the couldNotPutBack line, which names only Day 5's kept original. Green at the tests-first commit (the order was right by construction); must-fail row 3 turns it RED.
+
+### Ledger
+
+- `Reason899W8HandedOverPlace` is gone (it held only these two rows), with the two `UndoRecoveryCases` rows; `keptPageLines` is back in `KeysChecked` (only these two rows carry it). A stale comment naming 21c above the restore's `ActivityTrailEvents` row is gone too.
+
+### Must-fail (`vm-tools/guest/899-w8b-21c2-mustfail.json`)
+
+1. recovery reads a link at a page op's place through it: RED, `APagesPlaceHoldingALinkIsNotAFileAndIsNeverReadThroughIt` and the two contract rows.
+2. a writeFile judges a link at its place as nothing there (`NotAFile` not neither): RED, the same test.
+3. the page kept under a visible name after the couldNotPutBack line: RED, `ThePageKeptUnderAVisibleNameIsSaidBeforeTheCouldNotPutBackLine`.
+
+### Runs
+
+- w8b-21c2-diag, w8b-21c2-diag2 (PC, scratch refs): the diagnostic above; only `UndoRecoveryContractTests`.
+- w8b-21c2-a (PC, ref 8259287c8, red ref a82e2e783): red 4 of 103 as above; both builds 0 errors; 1461 of 1464 (`~Plantoir.Tests.Undo`, NamedGapLedgerTests, ActivityTrailWiringTests, ContractTests.SharedRules_ActivityTrailEvents_Exist; 1 skipped), the two failures the make-room test above; must-fail RED 3 of 3 (rows 1 and 2 as then written, on `Read`).
+- w8b-21c2-b (PC, ref 2e7794107): both builds 0 errors; **1463 of 1464 passed** (1 skipped, the same classes as -a); must-fail RED 3 of 3; restored 1463 of 1464; lock released. The make-room test passes again.
+
+### For the director
+
+- Nothing parked; no `contracts/` or `mac-app/` change.
+- For W8b piece 22: the door's plan and the swap still read a page through a link (above).
