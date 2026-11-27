@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # #1048b: the site build keeps the first class's date on a shared lesson (shared script, both platforms)
 
 Branch `issue/1048b-site-build-keeps-the-first-class-date`, from `origin/day27/integration-3` (d32d22bda). Fixes the day27-3 sweep's MEDIUM 1. Its LOW 1 (documentation names the build nowhere) is documentation, not the script or its tests: the sentence for it is below. LOWs 2 and 3 are Windows documentation and `PROGRESS.md`, not this piece.
