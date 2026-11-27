@@ -698,26 +698,37 @@ final class JournaledStepTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: classes.appendingPathComponent("Unit 1, Day 5.md").path), "Unit 1, Day 4.md")
     }
 
-    /// #1055 M4 leaves a plain link's move (`linkSha`, the same text at
-    /// both places) judged as today (M6 removes it): the link at its new
-    /// place and the old place free is as the step left it.
-    func testAPlainLinksMoveIsStillJudgedAsToday() throws {
+    /// #1055 M6: the door never moves a symbolic link as itself, so a
+    /// journal line whose move carries `linkSha` (the op of the check row
+    /// once named "move of a link: judged by the target it names: holds the
+    /// content") is a shape this version cannot read: with the link at its
+    /// new place and the old place free, as such a step would leave it,
+    /// neither Undo nor Redo reads it, the step is a barrier, nothing on
+    /// disk changes and nothing is cleared.
+    func testALineCarryingALinksMoveIsAShapeThisVersionCannotRead() throws {
         let made = try course(inAWorkingFolder: true)
         let root: URL = workingFolder(of: made)
-        let linked = try linkedDay3(in: made, target: "../../elsewhere/Unit 1, Day 3.md")
-        let sha: String = try XCTUnwrap(UndoTreeReading.linkSha(at: linked.link))
-        try FileManager.default.moveItem(at: linked.link, to: linked.newName)
+        let journal: UndoJournal = UndoJournalLocation.standardJournal()
+        let section: URL = made.course.appendingPathComponent("section1", isDirectory: true)
+        let renamed: URL = section.appendingPathComponent("renamed")
+        try FileManager.default.createSymbolicLink(atPath: renamed.path, withDestinationPath: "../library")
         let given: [String: Any] = [
             "kind": "move",
-            "from": classPlace(3),
-            "to": classPlace(4),
-            "linkSha": sha
+            "from": "courses/ICS3U/section1/media",
+            "to": "courses/ICS3U/section1/renamed",
+            "linkSha": UndoHash.sha256(of: Data("../library".utf8))
         ]
-        let op: UndoOp = try JSONDecoder().decode(UndoOp.self, from: JSONSerialization.data(withJSONObject: given))
-        XCTAssertTrue(op.isReadable)
-        let state: UndoOpState = UndoCheck.wholeState(of: op, root: root, places: UndoMemoryPlaces())
-        XCTAssertEqual(UndoCheck.verdict(for: state, direction: .backward), .canUndo)
-        XCTAssertEqual(UndoCheck.verdict(for: state, direction: .forward), .alreadyRedone)
+        let data: Data = try JSONSerialization.data(withJSONObject: given, options: [.sortedKeys])
+        let line: String = String(decoding: data, as: UTF8.self)
+        let op: UndoOp = try JSONDecoder().decode(UndoOp.self, from: data)
+        XCTAssertFalse(op.isReadable, "a link's move is read")
+        try UndoContractKinds.appendAStepChangingNothing(ops: "[" + line + "]", root: root, journal: journal)
+        let written: [String: String] = try everythingUnder(made.course)
+        XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .notAvailable)
+        XCTAssertEqual(journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .notAvailable)
+        XCTAssertEqual(try everythingUnder(made.course), written)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: renamed.path), "../library")
+        XCTAssertEqual(try journal.read().records.count, 1, "nothing is cleared")
     }
 
     /// #1055 M3 keeps the rename that changes both case and Unicode
