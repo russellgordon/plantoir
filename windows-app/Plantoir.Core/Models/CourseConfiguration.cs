@@ -242,8 +242,23 @@ public sealed class CourseConfiguration
             step.EditJson(path, read.Data!, [moved.Change], moved.Bytes);
             return true;
         }
-        step.WriteBytes(path, WholeOver(read).Data);
+        PlanWhole(step, path, read, WholeOver(read).Data);
         return true;
+    }
+
+    /// <summary>
+    /// Plans <paramref name="whole"/> as the file's whole bytes, one
+    /// <c>writeFile</c>, its before the bytes the plan was built from
+    /// (<paramref name="read"/>), never a second read of the disk (W8-11 to 13
+    /// review 1, LOW 1; the mac's <c>editJSON(at:read:members:[] leaving:
+    /// whole)</c>). Bytes another program writes after the plan's read are a
+    /// change since the plan, refused at the make. A file the plan found not
+    /// there is planned as new, as the mac's <c>write(_:to:)</c> plans it.
+    /// </summary>
+    internal static void PlanWhole(UndoActionStep step, string path, HeldFiles.FileBytes read, byte[] whole)
+    {
+        if (read.Outcome == HeldFiles.ReadOutcome.Read) step.EditJson(path, read.Data!, [], whole);
+        else step.WriteBytes(path, whole);
     }
 
     /// <summary>
@@ -318,7 +333,7 @@ public sealed class CourseConfiguration
             step.EditJson(place, read.Data!, moved.Changes, moved.Bytes);
             return new PlannedSave(report, written, moved.Bytes);
         }
-        step.WriteBytes(place, whole);
+        PlanWhole(step, place, read, whole);
         return new PlannedSave(report, written, whole);
     }
 

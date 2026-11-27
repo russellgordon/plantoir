@@ -87,6 +87,11 @@ public static class ReferenceCourseUpkeep
     /// write that did not go in answers
     /// <see cref="ReferenceCourse.CouldNotSetSchoolYear"/>, this copy then
     /// following the file.
+    /// <para>Only the year is written: any other unsaved edit of this copy
+    /// (Course Settings open on the same course) stays unsaved. The mac's
+    /// sheet calls <c>writeAsOneStep</c>, which writes every change its copy
+    /// holds, though its comment says one <c>editJSON</c>; which is right is
+    /// parked for a ruling (#899 W8-14 notes, "For the director").</para>
     /// </summary>
     /// <param name="undo">The list, mode and trail: this process's by default, a test's own in a test.</param>
     /// <param name="door">A test's door over <paramref name="undo"/>; the list's own by default.</param>
