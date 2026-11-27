@@ -26,11 +26,21 @@ Branch `issue/899-w8b-15b-rename-folder-is-one-step`, built on 15a's `origin/iss
 
 ## Must-fail lines
 
-(filled in from the runs)
+`vm-tools/guest/899-w8b-15b-mustfail.json`, run in `w8b-15b-mf` on 8e7843064, restored at 501 of 501:
+
+1. The members written by a second save after the step (`RecordOnDisk` after `FinishRecord`): RED in `UndoRenameFolderStepTests.APerSectionRenameIsOneStepOfItsMovesThenItsPagesThenItsMembersAndNoSecondWrite`. The whole re-spelled write loses `"num_sections" :   2,`.
+2. The walk descending into a link (the `UndoLinks.Look` skip removed): RED in `ALinkInsideTheCourseIsNotWalked`. The page behind the link is planned, so the step cannot be named and is written plainly, and the outside page is changed.
+3. The walk skipping by `FileAttributes.ReparsePoint`: RED in `AOneDriveStylePlaceholderFolderIsWalkedAsTheFolderItIs`. The placeholder folder is skipped and its page is not relinked. This test RAN on the PC: a Cloud Files API placeholder (tag `IO_REPARSE_TAG_CLOUD`, not a name surrogate) under a sync root of the test's own can be made and listed. That is what 15a could not do with a bare `0x80000013` tag.
+4. The pages in directory order (the renamer's `ComparePageOrder` sort removed): RED in `TheFinishingRunIsOneStepOfItsPagesInTheOnePageOrderThenItsMembersAndNoMove`. With no folder move, the step keeps planned order, and `MarkdownPages`' case-blind sort puts `index.md` before `_Intro.md`.
+5. `Directory.Move` put back before the make: NOT RED in `w8b-15b-mf`, where the row named `APerSectionRename…`. The step judges each move by content. With `from` gone and `to` holding the planned listing, the move reads as already made, so the step goes ahead and the test passes. The row's filter named the wrong class. The test that catches a writing call coming back is `UndoWriterScanTests` (`SpecialFolderRenamer.cs` allowed 3; the sabotage makes 4). The row now names that class, and `w8b-15b-mf5` ran it alone (result under "Runs").
 
 ## Runs
 
-(filled in from the runs)
+- `w8b-15b-a` (0251619e5): both builds 0 errors. 499 of 501 passed, 0 skipped. `renameFolder` and `renameFolderPerSection` failed because the fixture wrote the marker before making the working folder. Fixed in 164e5726a.
+- `w8b-15b-b` (8e7843064): both builds 0 errors. **501 passed of 501**, 0 skipped. The run covered `UndoRenameFolderStepTests` (6, the symbolic-link and placeholder tests run), `SpecialFolderRenamerTests`, `FolderRenameApplyTests`, `UndoActionStepsOnWindowsTests`, `UndoActionStepFolderMoveTests`, `NamedGapLedgerTests`, `UndoActionTraceContractTests` and the three scan classes `UndoWriterScanTests`, `UndoOpKindsContractTests` and `UndoStackContractTests`.
+- `w8b-15b-mf` (8e7843064): must-fail 4 RED of 5, row 5 NOT RED (above). Restored at 501 of 501.
+- `w8b-15b-mf5`: row 5 alone against `UndoWriterScanTests`.
+- Locks: every run's own script took and released the lock. Runs b and mf waited behind the director's `day27-4-two` runs. I removed no lock that was not mine.
 
 ## Left for the next piece
 
@@ -39,4 +49,12 @@ Branch `issue/899-w8b-15b-rename-folder-is-one-step`, built on 15a's `origin/iss
 
 ## For the director
 
-(filled in)
+- Tests first: 22d976478 (the tests, including the fixture rows and the ledger) comes before 0251619e5 (the product). The tests do not compile on the product without `RenamingTheSettings` and the new `Rename` overload, so their red is the must-fail rows, as in W8-12 and 15a.
+- Parked: nothing for Russell. A refusal now shows the door's own sentence through `RenameException`. The contract's `renameFolderNothingWasChanged` and the part-way sentences are 18b's. `HalfFailureMessage` is no longer reached (all or none); 18b decides it.
+- Found by row 5, for 16 and 21 to know: a folder moved by hand to the new name between the plan and the make reads to the step as the move already made (judged by content). The step goes ahead, and the move op is recorded. That is the `opKinds.move` rule as built in W8-2 and W8-5, not a fault of this piece. I did not test whether the mac does the same.
+- `FinishRecord` runs on the `Task.Run` thread, where today's `RecordOnDisk` ran on the UI thread after it. The sheet is awaiting, so nothing reads `Config` meanwhile. 20a moves the planning anyway.
+- Self-check:
+  - 11: both rows are out of the ledger, `Reason899W8U4b` names only the twelve traces, and `Reason899W8U4b2LinkedFolder` is rewritten (it described `Directory.Move` and the old walk).
+  - 12: no `KeysChecked` key was added. `MakeAndMatch` now compares `move` ops with `folderMoves`.
+  - 13: link is `UndoLinks.Look`, at-or-inside is `UndoOp.PartInside`, page order is `ComparePageOrder`, members go through `MembersMoved`.
+  - 14: no run is going, no lock is held, and I removed none that was not mine.
