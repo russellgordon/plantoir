@@ -159,15 +159,34 @@ public static class SpecialFolderRenamer
     /// record carries the TARGET, and the clash check is relaxed only when the
     /// record and the disk agree.
     /// </summary>
-    /// <remarks>Only <see cref="RenameRecordClaim"/> calls it in the app (#899 W8b-17).</remarks>
-    internal static void RecordRenameStarting(string oldName, string newName, FolderScope scope, string courseDirectory)
+    /// <remarks>
+    /// Only <see cref="RenameRecordClaim"/> calls it in the app (#899 W8b-17).
+    /// Its shape is <c>file-formats.json</c> → <c>folderRenameRecord</c>
+    /// (W8b-18a; the mac's <c>recordRenameStarting</c>): <paramref name="moved"/>
+    /// is every place, inside the course, with forward slashes and spelled
+    /// with the new name, that this rename moves or an earlier run of it
+    /// moved; <paramref name="mayHaveMoved"/> is the places an earlier run
+    /// whose record did not say may have moved. Each is an array of strings,
+    /// left out when empty, as the mac leaves it out.
+    /// </remarks>
+    internal static void RecordRenameStarting(string oldName, string newName, FolderScope scope, string courseDirectory,
+                                              IReadOnlyList<string>? moved = null, IReadOnlyList<string>? mayHaveMoved = null)
     {
         try
         {
             var note = new JObject { ["from"] = oldName, ["to"] = newName, ["scope"] = ScopeKey(scope) };
+            if (moved is { Count: > 0 }) note["moved"] = ArrayOf(moved);
+            if (mayHaveMoved is { Count: > 0 }) note["mayHaveMoved"] = ArrayOf(mayHaveMoved);
             WriteRenameRecord(courseDirectory, Encoding.UTF8.GetBytes(note.ToString(Newtonsoft.Json.Formatting.Indented) + "\n"));
         }
         catch (Exception) { /* best-effort: a missing record costs a refusal later, never a folder */ }
+    }
+
+    private static JArray ArrayOf(IReadOnlyList<string> places)
+    {
+        var array = new JArray();
+        foreach (string place in places) array.Add(place);
+        return array;
     }
 
     /// <summary>
@@ -206,35 +225,72 @@ public static class SpecialFolderRenamer
         catch (Exception) { return null; }
     }
 
-    /// <summary>A rename record as read (W8b-18a tests first: not yet read by shape).</summary>
+    /// <summary>
+    /// A rename record as read (<c>file-formats.json</c> → <c>folderRenameRecord</c>;
+    /// the mac's <c>RenameRecordNote</c>). <see cref="Moved"/> is null when the
+    /// record does not say what it moved (what a released Windows build
+    /// writes, or an older mac).
+    /// </summary>
     internal sealed record RenameRecordNote(string From, string To, string Scope, IReadOnlyList<string>? Moved, IReadOnlyList<string> MayHaveMoved);
 
-    /// <summary>Tests first (W8b-18a): the record read as today, each key by its text, no other key.</summary>
+    /// <summary>
+    /// The record's bytes as a note, or null when they are not a record (#899
+    /// W8b-18a; the mac's <c>readRenameRecord</c>): not UTF-8, not JSON, not
+    /// an object, or <c>from</c>, <c>to</c> or <c>scope</c> not a string (a
+    /// number there is not read as its text, night25-4 sweep LOW 3). Every
+    /// other key is read only as an array of strings and is otherwise taken
+    /// as not said, so a key this build does not know, or one in another
+    /// shape, never makes the whole record unreadable.
+    /// </summary>
     internal static RenameRecordNote? ReadRenameRecord(byte[]? bytes)
     {
-        var note = RenameRecordObject(bytes);
-        if (note is null || note["from"] is null || note["to"] is null || note["scope"] is null) return null;
-        return new RenameRecordNote(note["from"]!.ToString(), note["to"]!.ToString(), note["scope"]!.ToString(), null, new List<string>());
+        if (bytes is null) return null;
+        JObject? note;
+        try
+        {
+            string text = new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes);
+            if (text.Length > 0 && text[0] == '\uFEFF') text = text.Substring(1);
+            // Strings stay strings: Newtonsoft would otherwise read a value
+            // that looks like a date as a date.
+            using var reader = new Newtonsoft.Json.JsonTextReader(new StringReader(text)) { DateParseHandling = Newtonsoft.Json.DateParseHandling.None };
+            note = JToken.ReadFrom(reader) as JObject;
+            if (reader.Read()) return null;
+        }
+        catch (Exception) { return null; }
+        if (note is null) return null;
+        if (TextIn(note["from"]) is not { } from) return null;
+        if (TextIn(note["to"]) is not { } to) return null;
+        if (TextIn(note["scope"]) is not { } scope) return null;
+        return new RenameRecordNote(from, to, scope, StringsIn(note["moved"]), StringsIn(note["mayHaveMoved"]) ?? new List<string>());
     }
 
-    /// <summary>The record's note from its bytes, or null when they are not a record (not JSON, or not an object).</summary>
-    internal static JObject? RenameRecordObject(byte[]? bytes)
+    /// <summary>A JSON value as its string, or null when it is not a string.</summary>
+    private static string? TextIn(JToken? value) =>
+        value is JValue { Type: JTokenType.String } text ? text.Value as string : null;
+
+    /// <summary>A JSON value as an array of strings, or null when it is not one (the mac's <c>stringsIn</c>).</summary>
+    private static IReadOnlyList<string>? StringsIn(JToken? value)
     {
-        if (bytes is null) return null;
-        try { return JToken.Parse(Encoding.UTF8.GetString(bytes)) as JObject; }
-        catch (Exception) { return null; }
+        if (value is not JArray items) return null;
+        var strings = new List<string>();
+        foreach (JToken item in items)
+        {
+            if (TextIn(item) is not { } text) return null;
+            strings.Add(text);
+        }
+        return strings;
     }
 
     /// <summary>Whether a record names a rename OF this folder, to any name: the same folder (capitals aside), the same scope (the mac's <c>recordNamesTheFolder</c>).</summary>
-    internal static bool RecordNamesTheFolder(JObject? note, string oldName, FolderScope scope) =>
+    internal static bool RecordNamesTheFolder(RenameRecordNote? note, string oldName, FolderScope scope) =>
         note is not null
-        && string.Equals(note["from"]?.ToString(), oldName, StringComparison.OrdinalIgnoreCase)
-        && note["scope"]?.ToString() == ScopeKey(scope);
+        && string.Equals(note.From, oldName, StringComparison.OrdinalIgnoreCase)
+        && note.Scope == ScopeKey(scope);
 
     /// <summary>Whether a record names this rename: the same folder, the same target (capitals aside), the same scope (the mac's <c>recordNames</c>).</summary>
-    internal static bool RecordNames(JObject? note, string oldName, string newName, FolderScope scope) =>
+    internal static bool RecordNames(RenameRecordNote? note, string oldName, string newName, FolderScope scope) =>
         RecordNamesTheFolder(note, oldName, scope)
-        && string.Equals(note!["to"]?.ToString(), newName, StringComparison.OrdinalIgnoreCase);
+        && string.Equals(note!.To, newName, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The <c>folder renamed</c> trail line when the record could not be
@@ -252,15 +308,8 @@ public static class SpecialFolderRenamer
         return whatHappened + " could not tidy the note kept while a folder rename is unfinished (" + said + ")";
     }
 
-    private static JObject? ReadRenameRecord(string courseDirectory)
-    {
-        try
-        {
-            string path = RenameRecordPath(courseDirectory);
-            return File.Exists(path) ? JObject.Parse(File.ReadAllText(path)) : null;
-        }
-        catch (Exception) { return null; }
-    }
+    private static RenameRecordNote? RenameRecordOnDisk(string courseDirectory) =>
+        ReadRenameRecord(ReadRenameRecordBytes(courseDirectory));
 
     /// <summary>
     /// The name a rename of this folder was heading for when it stopped, or
@@ -270,8 +319,8 @@ public static class SpecialFolderRenamer
     public static string? InterruptedRenameTarget(
         string oldName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers)
     {
-        var note = ReadRenameRecord(courseDirectory);
-        if (note?["to"]?.ToString() is not { } target) return null;
+        var note = RenameRecordOnDisk(courseDirectory);
+        if (note?.To is not { } target) return null;
         return LooksLikeAnInterruptedRename(oldName, target, scope, courseDirectory, sectionNumbers) ? target : null;
     }
 
@@ -284,11 +333,7 @@ public static class SpecialFolderRenamer
     public static bool LooksLikeAnInterruptedRename(
         string oldName, string newName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers)
     {
-        var note = ReadRenameRecord(courseDirectory);
-        if (note is null) return false;
-        if (!string.Equals(note["from"]?.ToString(), oldName, StringComparison.OrdinalIgnoreCase)) return false;
-        if (!string.Equals(note["to"]?.ToString(), newName, StringComparison.OrdinalIgnoreCase)) return false;
-        if (note["scope"]?.ToString() != ScopeKey(scope)) return false;
+        if (!RecordNames(RenameRecordOnDisk(courseDirectory), oldName, newName, scope)) return false;
         foreach (var (place, _) in FolderLocations(oldName, scope, courseDirectory, sectionNumbers))
             if (Directory.Exists(place) || File.Exists(place)) return false;
         foreach (var (place, _) in FolderLocations(newName, scope, courseDirectory, sectionNumbers))
@@ -503,6 +548,93 @@ public static class SpecialFolderRenamer
     }
 
     private static string Slashed(string fullPath) => fullPath.Replace('\\', '/');
+
+    // ---- The places a rename record names (#899 W8b-18a) -------------------------
+
+    /// <summary>
+    /// A place inside the course, with forward slashes, as the record and the
+    /// trail name it (the mac's <c>placeInside</c>): the path after the
+    /// course's, by the one comparison (<see cref="UndoOp.PartInside"/>), kept
+    /// as the path spells it; the last part when it is not inside.
+    /// </summary>
+    internal static string PlaceInside(string place, string courseDirectory)
+    {
+        string course = Slashed(Path.TrimEndingDirectorySeparator(Path.GetFullPath(courseDirectory)));
+        string full = Slashed(Path.GetFullPath(place));
+        if (UndoOp.PartInside(course, full) is { Length: > 0 } inside) return inside;
+        return Path.GetFileName(Path.TrimEndingDirectorySeparator(place));
+    }
+
+    /// <summary>Whether <paramref name="places"/> holds <paramref name="place"/>: the same place by the one comparison (<see cref="UndoOp.PartInside"/>, at and not below).</summary>
+    internal static bool HoldsThePlace(IReadOnlyList<string> places, string place)
+    {
+        foreach (string held in places)
+            if (UndoOp.PartInside(held, place) is { Length: 0 }) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// The places a record of this same rename says it moved (its
+    /// <c>moved</c>), or null when the record is not this rename's or does not
+    /// say (the mac's <c>placesMoved(byTheRecord:)</c>).
+    /// </summary>
+    internal static IReadOnlyList<string>? PlacesMoved(RenameRecordNote? record, string oldName, string newName, FolderScope scope) =>
+        RecordNames(record, oldName, newName, scope) ? record!.Moved : null;
+
+    /// <summary>
+    /// The places an earlier run of this same rename may have moved without
+    /// its record saying so (the mac's <c>placesAnEarlierRunMayHaveMoved</c>):
+    /// those its record carries as <c>mayHaveMoved</c> and, when the record
+    /// says nothing of what it moved, each folder or link now at the new name
+    /// whose old name beside it is absent or cannot be read. Nothing here is
+    /// known to be this rename's: a folder made by hand at the new name reads
+    /// the same. Read from the disk as it is when asked.
+    /// </summary>
+    internal static List<string> PlacesAnEarlierRunMayHaveMoved(RenameRecordNote? record, string oldName, string newName, FolderScope scope,
+                                                                string courseDirectory, IReadOnlyList<int> sectionNumbers)
+    {
+        var places = new List<string>();
+        if (!RecordNames(record, oldName, newName, scope)) return places;
+        foreach (string place in record!.MayHaveMoved) places.Add(place);
+        if (record.Moved is not null) return places;
+        bool onlyCapitalisation = oldName.Equals(newName, StringComparison.OrdinalIgnoreCase);
+        foreach (var (place, _) in FolderLocations(newName, scope, courseDirectory, sectionNumbers))
+        {
+            string inside = PlaceInside(place, courseDirectory);
+            if (HoldsThePlace(places, inside)) continue;
+            string oldPlace = Path.Combine(Path.GetDirectoryName(place)!, oldName);
+            var besideIt = WhatIsAt(oldPlace, onlyCapitalisation);
+            if (besideIt != UndoLinks.What.Nothing && besideIt != UndoLinks.What.CannotLook) continue;
+            // A link counts too (the mac's U4b2-15): a rename moves a linked
+            // folder as the link, so a link here may be an earlier run's.
+            var atTheNewName = WhatIsAt(place, onlyCapitalisation);
+            if (atTheNewName == UndoLinks.What.Folder || atTheNewName == UndoLinks.What.Link || atTheNewName == UndoLinks.What.CannotLook)
+                places.Add(inside);
+        }
+        return places;
+    }
+
+    /// <summary>
+    /// What is at a path, never followed (<see cref="UndoLinks.Look"/>; the
+    /// mac's <c>presence</c>). <paramref name="spelledExactly"/> (a
+    /// capitalisation-only rename) also asks the folder's listing for this
+    /// spelling, since another spelling "exists" too on a volume that
+    /// ignores capitals: not listed is nothing there, a listing that fails is
+    /// <see cref="UndoLinks.What.CannotLook"/>.
+    /// </summary>
+    internal static UndoLinks.What WhatIsAt(string path, bool spelledExactly)
+    {
+        var what = UndoLinks.Look(path);
+        if (!spelledExactly || what == UndoLinks.What.Nothing || what == UndoLinks.What.CannotLook) return what;
+        string name = Path.GetFileName(path);
+        try
+        {
+            foreach (string entry in Directory.EnumerateFileSystemEntries(Path.GetDirectoryName(path)!))
+                if (string.Equals(Path.GetFileName(entry), name, StringComparison.Ordinal)) return what;
+            return UndoLinks.What.Nothing;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return UndoLinks.What.CannotLook; }
+    }
 
     /// <summary>What the teacher is told afterwards: what moved, and what else changed.</summary>
     public static string DoneMessage(string oldName, string newName, int relinked)
@@ -930,10 +1062,36 @@ internal sealed class RenameRecordClaim
 
     // ---- Functions -------------------------------------------------------------------
 
-    /// <summary>Written BEFORE the rename's step is made, when folders will move.</summary>
+    /// <summary>
+    /// Written BEFORE the rename's step is made, when folders will move (the
+    /// mac's <c>renameIsStarting</c>, #899 W8b-18a). It names every place this
+    /// rename has moved: when the earlier record is of this same rename, the
+    /// places it says an earlier run moved, then this run's moves. The places
+    /// an earlier run may have moved without its record saying so, read
+    /// before anything moves, are carried forward as <c>mayHaveMoved</c>,
+    /// less anything in <c>moved</c>.
+    /// </summary>
     internal void RenameIsStarting(IReadOnlyList<(string From, string To, int? Section)> moves, IReadOnlyList<int> sectionNumbers)
     {
-        SpecialFolderRenamer.RecordRenameStarting(_oldName, _newName, _scope, _courseDirectory);
+        var earlier = SpecialFolderRenamer.ReadRenameRecord(_earlierRecord);
+        var moved = new List<string>();
+        if (SpecialFolderRenamer.PlacesMoved(earlier, _oldName, _newName, _scope) is { } recorded)
+        {
+            foreach (string place in recorded)
+                if (!SpecialFolderRenamer.HoldsThePlace(moved, place)) moved.Add(place);
+        }
+        foreach (var move in moves)
+        {
+            string place = SpecialFolderRenamer.PlaceInside(move.To, _courseDirectory);
+            if (!SpecialFolderRenamer.HoldsThePlace(moved, place)) moved.Add(place);
+        }
+        var mayHaveMoved = new List<string>();
+        foreach (string place in SpecialFolderRenamer.PlacesAnEarlierRunMayHaveMoved(
+                     earlier, _oldName, _newName, _scope, _courseDirectory, sectionNumbers))
+        {
+            if (!SpecialFolderRenamer.HoldsThePlace(moved, place) && !SpecialFolderRenamer.HoldsThePlace(mayHaveMoved, place)) mayHaveMoved.Add(place);
+        }
+        SpecialFolderRenamer.RecordRenameStarting(_oldName, _newName, _scope, _courseDirectory, moved, mayHaveMoved);
         _thisRunWroteTheRecord = true;
     }
 
@@ -948,7 +1106,7 @@ internal sealed class RenameRecordClaim
     /// <summary>The step is made, so this rename is whole.</summary>
     internal void RenameIsWhole()
     {
-        JObject? earlier = SpecialFolderRenamer.RenameRecordObject(_earlierRecord);
+        var earlier = SpecialFolderRenamer.ReadRenameRecord(_earlierRecord);
         bool finishesTheRecordedRename = SpecialFolderRenamer.RecordNames(earlier, _oldName, _newName, _scope);
         bool recordsThisFolder = SpecialFolderRenamer.RecordNamesTheFolder(earlier, _oldName, _scope);
         bool oldNameIsGone = _thisRunWroteTheRecord || _changesTheSettings;
