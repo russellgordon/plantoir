@@ -175,6 +175,7 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         try stopped.assertEveryPlannedPageIsBackAsItWas()
         XCTAssertEqual(StartOfYearRestoreOfferTests.count("start", in: preview.events), 1, "started again once: \(preview.events)")
         await stopped.model.restoreCourse()
+        stopped.model.leaveAsItIs()
         XCTAssertEqual(StartOfYearRestoreOfferTests.count("start", in: preview.events), 1, "nothing starts it twice: \(preview.events)")
     }
 
@@ -196,6 +197,71 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         XCTAssertNil(stopped.workspace.backupProblem, stopped.workspace.backupProblem ?? "")
         try stopped.assertEveryPlannedPageIsBackAsItWas()
         XCTAssertEqual(other.events, ["stop-begins", "stop-ends", "start"], "stopped before the restore, started once after")
+    }
+
+    /// Leave As It Is starts again the preview Go stopped, once, and
+    /// changes no file of the working folder.
+    func testLeaveAsItIsStartsThePreviewAgainOnceAndChangesNothing() async throws {
+        let stopped: Stopped = try await stopPartWay(sections: [1])
+        defer { try? FileManager.default.removeItem(at: stopped.root) }
+        let preview: FakePreview = FakePreview.shared
+        preview.register(folderPath: stopped.root.path, courseCode: "ICS3U", sectionNumber: 1, holdingALease: true)
+        try await stopped.goAhead()
+        XCTAssertEqual(preview.events, ["stop-begins", "stop-ends"], "not started again before the answer")
+        // The course's own files: the preview's lease under `.internal` is
+        // the preview starting again, not a change to the course.
+        let before: [String: Data] = try StartOfYearRestoreOfferTests.everyFile(under: stopped.course.directoryURL)
+
+        stopped.model.leaveAsItIs()
+        stopped.model.leaveAsItIs()
+        await stopped.model.restoreCourse()
+
+        XCTAssertEqual(preview.events, ["stop-begins", "stop-ends", "start"], "started again once, and nothing restored")
+        XCTAssertEqual(try StartOfYearRestoreOfferTests.everyFile(under: stopped.course.directoryURL), before)
+    }
+
+    /// A deploy of the course in flight cannot be stopped: Restore Course is
+    /// held back with the restore's own busy sentence, nothing is stopped
+    /// or restored, the offer stays; once the deploy ends it works.
+    func testADeployHoldsRestoreCourseBackAndTheOfferStillWorksAfter() async throws {
+        let stopped: Stopped = try await stopPartWay(sections: [1])
+        defer { try? FileManager.default.removeItem(at: stopped.root) }
+        let preview: FakePreview = FakePreview.shared
+        preview.register(folderPath: stopped.root.path, courseCode: "ICS3U", sectionNumber: 1, holdingALease: true)
+        try await stopped.goAhead()
+        CourseActivity.beginPublish(folderPath: stopped.root.path, courseCode: "ICS3U", sectionNumber: 1)
+
+        XCTAssertTrue(stopped.model.restoreIsHeldBackByADeploy())
+        await stopped.model.restoreCourse()
+
+        let busy: String = WholeCourseRestore.sentence(for: WholeCourseRestore.Refusal.busy, courseCode: "ICS3U", assistant: nil)
+        XCTAssertEqual(stopped.model.restoreHeldBack, busy)
+        XCTAssertEqual(stopped.model.restoreHeldBackTitle, BackupProblemTitle.restoring("ICS3U"))
+        guard case .stoppedPartWay = stopped.model.stage else {
+            return XCTFail("the offer is gone: \(stopped.model.stage)")
+        }
+        XCTAssertEqual(preview.events, ["stop-begins", "stop-ends"], "nothing started or stopped while the deploy runs")
+        XCTAssertTrue(StartOfYearTests.trail().contains(WholeCourseRestore.DidNotGoAhead.busy.rawValue), StartOfYearTests.trail())
+
+        CourseActivity.endPublish(folderPath: stopped.root.path, courseCode: "ICS3U", sectionNumber: 1)
+        stopped.model.restoreHeldBack = nil
+        XCTAssertFalse(stopped.model.restoreIsHeldBackByADeploy())
+        await stopped.model.restoreCourse()
+
+        XCTAssertNil(stopped.workspace.backupProblem, stopped.workspace.backupProblem ?? "")
+        try stopped.assertEveryPlannedPageIsBackAsItWas()
+        XCTAssertEqual(preview.events, ["stop-begins", "stop-ends", "start"])
+    }
+
+    /// The trail line after a part-way stop (review 1, LOW 2).
+    func testTheStoppedPartWayLineCountsWhatWasKept() {
+        let none: String = ActivityTrail.startOfYearStoppedPartWayLine(source: "app", keptCount: 0, backupFileName: "B.zip")
+        let one: String = ActivityTrail.startOfYearStoppedPartWayLine(source: "app", keptCount: 1, backupFileName: "B.zip")
+        let two: String = ActivityTrail.startOfYearStoppedPartWayLine(source: "app", keptCount: 2, backupFileName: "B.zip")
+        XCTAssertFalse(none.contains("kept"), none)
+        XCTAssertTrue(none.contains("some pages went into draft; offered the backup B.zip"), none)
+        XCTAssertTrue(one.contains(", 1 file kept beside its page;"), one)
+        XCTAssertTrue(two.contains(", 2 files kept beside their pages;"), two)
     }
 
     // MARK: - The sentences
@@ -249,8 +315,18 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         let leaveDoes: String = String(source[leaveStart.upperBound..<restoreStart.lowerBound])
         let restoreDoes: String = String(source[restoreStart.upperBound..<restoreEnd.lowerBound])
         XCTAssertTrue(leaveDoes.contains("dismiss()"), leaveDoes)
-        XCTAssertFalse(leaveDoes.contains("model."), "Leave As It Is changes nothing: \(leaveDoes)")
+        // Leave As It Is changes no file: it only starts again the preview
+        // Go stopped (`testLeaveAsItIsStartsThePreviewAgainOnceAndChangesNothing`).
+        XCTAssertTrue(leaveDoes.contains("model.leaveAsItIs()"), leaveDoes)
+        XCTAssertFalse(leaveDoes.contains("restore"), "Leave As It Is restores nothing: \(leaveDoes)")
         XCTAssertFalse(leaveDoes.contains("Task"), "Leave As It Is changes nothing: \(leaveDoes)")
+        // A deploy holds the restore back before the sheet closes.
+        let heldAt: Range<String.Index>? = restoreDoes.range(of: "model.restoreIsHeldBackByADeploy()")
+        let dismissAt: Range<String.Index>? = restoreDoes.range(of: "dismiss()")
+        XCTAssertNotNil(heldAt, restoreDoes)
+        if let heldAt, let dismissAt {
+            XCTAssertTrue(heldAt.lowerBound < dismissAt.lowerBound, "asked before the sheet closes: \(restoreDoes)")
+        }
         XCTAssertTrue(restoreDoes.contains("dismiss()"), restoreDoes)
         XCTAssertTrue(restoreDoes.contains("await model.restoreCourse()"), restoreDoes)
         XCTAssertFalse(buttons[restore].arguments.contains("role:"), "Restore Course is not destructive and not a cancel: \(restoreChain)")

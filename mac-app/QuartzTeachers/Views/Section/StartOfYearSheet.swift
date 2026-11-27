@@ -76,7 +76,22 @@ final class StartOfYearSheetModel {
     /// restored it, and shows "Could not restore" when it could not.
     private let restoreWholeCourse: (BackupItem) async -> Void
 
+    /// Set when Restore Course is held back because this app is deploying
+    /// the course: the restore's own busy sentence, shown in the restore's
+    /// own alert ("Could not restore {CODE}") over the offer, which stays
+    /// open with its two buttons (review 1, HIGH 1, decision 2).
+    var restoreHeldBack: String?
+
+    /// The offer is answered once: a second press, or both buttons, never
+    /// restarts a preview twice (review 1, HIGH 1).
+    private var offerAnswered: Bool = false
+
     // MARK: - Computed properties
+
+    /// The title of the restore's alert, as Restore from Backup… titles it.
+    var restoreHeldBackTitle: String {
+        return BackupProblemTitle.restoring(course.code)
+    }
 
     var title: String {
         switch mode {
@@ -192,23 +207,55 @@ final class StartOfYearSheetModel {
         ]
     }
 
-    /// The backup Go made, as Restore from Backup… lists it.
-    static func backupItem(for stopped: StartOfYearPreparation.StoppedPartWay) -> BackupItem? {
-        return BackupItem.from(fileURL: stopped.backupURL, courseCode: stopped.courseCode)
+    /// Restore Course waits while this app is deploying the course: a
+    /// deploy cannot be stopped safely. True when it is held back, with
+    /// `restoreHeldBack` set to the restore's busy sentence and the refusal
+    /// on the trail, as the restore's own refusal leaves it; the offer stays
+    /// open and works once the deploy has ended.
+    func restoreIsHeldBackByADeploy() -> Bool {
+        guard case .stoppedPartWay(let stopped) = stage, !offerAnswered else {
+            return false
+        }
+        guard let sentence = StartOfYearPreparation.deployHoldsTheRestore(stopped, workspaceURL: workspaceURL) else {
+            return false
+        }
+        WholeCourseRestore.noteDidNotGoAhead(
+            WholeCourseRestore.DidNotGoAhead.refused(WholeCourseRestore.Refusal.busy),
+            courseCode: stopped.courseCode,
+            backupFileName: stopped.backupFileName,
+            asked: WholeCourseRestore.AskedWhen.beforeTheArchive
+        )
+        restoreHeldBack = sentence
+        return true
     }
 
     /// Press Restore Course: the existing whole-course restore, from the
     /// backup Go made, with no second confirmation (it can be got back:
-    /// Archived holds the course as it is now). The sheet has closed by
-    /// now, so the restore's own alert can show if it fails.
+    /// Archived holds the course as it is now). The course's previews are
+    /// stopped first and started again after (`StartOfYearPreparation.
+    /// restoreCourse`). The sheet has closed by now, so the restore's own
+    /// alert can show if it fails.
     func restoreCourse() async {
-        guard case .stoppedPartWay(let stopped) = stage else {
+        guard case .stoppedPartWay(let stopped) = stage, !offerAnswered else {
             return
         }
-        guard let item = StartOfYearSheetModel.backupItem(for: stopped) else {
+        if restoreIsHeldBackByADeploy() {
             return
         }
-        await restoreWholeCourse(item)
+        offerAnswered = true
+        await StartOfYearPreparation.restoreCourse(
+            stopped, in: course, workspaceURL: workspaceURL, restore: restoreWholeCourse
+        )
+    }
+
+    /// Press Leave As It Is: nothing is changed; the preview Go stopped is
+    /// started again, as it would have been.
+    func leaveAsItIs() {
+        guard case .stoppedPartWay(let stopped) = stage, !offerAnswered else {
+            return
+        }
+        offerAnswered = true
+        StartOfYearPreparation.leaveAsItIs(stopped, workspaceURL: workspaceURL)
     }
 
     /// Press "Put Them Back".
@@ -380,6 +427,17 @@ struct StartOfYearSheet: View {
         .onAppear {
             model.load()
         }
+        // Restore Course held back by a deploy of the course (#899, review
+        // 1): the restore's own alert, title and sentence, over the offer,
+        // which stays open with both buttons (HIG Alerts: an alert may sit
+        // over a sheet; it is not a second sheet).
+        .alert(model.restoreHeldBackTitle, isPresented: restoreHeldBackIsPresented) {
+            Button("OK") {
+                model.restoreHeldBack = nil
+            }
+        } message: {
+            Text(model.restoreHeldBack ?? "")
+        }
         // `.contain` BEFORE the identifier, or not at all (#366, the rule of
         // #353): SwiftUI applies an identifier on a stack to every element
         // inside it, and the inner identifiers (startOfYearGo, startOfYearUndo,
@@ -393,6 +451,19 @@ struct StartOfYearSheet: View {
     }
 
     // MARK: - Parts
+
+    var restoreHeldBackIsPresented: Binding<Bool> {
+        return Binding<Bool>(
+            get: {
+                return model.restoreHeldBack != nil
+            },
+            set: { (isPresented: Bool) in
+                if !isPresented {
+                    model.restoreHeldBack = nil
+                }
+            }
+        )
+    }
 
     @ViewBuilder
     var content: some View {
@@ -716,11 +787,17 @@ struct StartOfYearSheet: View {
                 // Course trailing with Return (Buttons ▸ Role: the default
                 // is the most likely choice, and a restore can be got back).
                 Button(StartOfYearWording.leaveAsItIsButton, role: .cancel) {
+                    model.leaveAsItIs()
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("startOfYearLeaveAsItIs")
                 Button(StartOfYearWording.restoreCourseButton) {
+                    // A deploy of the course holds the restore back: the
+                    // restore's alert over this sheet, which stays open.
+                    if model.restoreIsHeldBackByADeploy() {
+                        return
+                    }
                     dismiss()
                     Task { @MainActor in
                         await model.restoreCourse()
