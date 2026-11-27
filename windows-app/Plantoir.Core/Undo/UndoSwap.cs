@@ -838,15 +838,50 @@ internal static class UndoSwap
     }
 
     /// <summary>
-    /// The visible name a folder set aside is kept under when something else
-    /// holds its place: <c>&lt;name&gt; (kept by Undo)</c>, then
-    /// <c>(kept by Undo 2)</c> and on. It is a REAL folder beside its place:
-    /// under <c>courses/</c> it is part of the course, so a build and a deploy
-    /// include its pages (Russell's ruling of 2026-11-19 and the mac's, the
-    /// first review of W6's LOW 4: nothing of the teacher's stays hidden).
+    /// The visible name a folder set aside, or a page kept only in its hidden
+    /// original, is kept under when something else holds its place:
+    /// <c>&lt;name&gt; (kept by Undo)</c>, then <c>(kept by Undo 2)</c> and
+    /// on. A folder's words go after its whole name; a page's before its
+    /// extension, <c>Unit 1, Day 3 (kept by Undo).md</c> (Russell's ruling of
+    /// 2026-11-26; the mac's <c>visibleName(for:number:isAPage:)</c>). The one
+    /// naming function for both. It is a REAL item beside its place: under
+    /// <c>courses/</c> it is part of the course, so a build and a deploy
+    /// include it (Russell's ruling of 2026-11-19 and the mac's, the first
+    /// review of W6's LOW 4: nothing of the teacher's stays hidden).
     /// </summary>
-    internal static string VisibleName(string place, int number, bool isAPage = false) =>
-        number <= 1 ? place + " (kept by Undo)" : place + $" (kept by Undo {number.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+    internal static string VisibleName(string place, int number, bool isAPage = false)
+    {
+        string words = number <= 1 ? " (kept by Undo)" : $" (kept by Undo {number.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+        string extension = Path.GetExtension(place);
+        if (isAPage && extension.Length > 1 && extension.Length < place.Length)
+            return place[..^extension.Length] + words + extension;
+        return place + words;
+    }
+
+    /// <summary>
+    /// The one naming loop for a folder and a page (the mac's
+    /// <c>renameToAVisibleName</c>): renames the hidden item to the first
+    /// visible name beside <paramref name="place"/> that nothing holds, in a
+    /// rename that never replaces (<c>MoveFileEx</c> without
+    /// <c>MOVEFILE_REPLACE_EXISTING</c>); a name taken is skipped, and one taken
+    /// in the instant before the rename is never overwritten.
+    /// <paramref name="tellingFirst"/> is told the visible name just BEFORE the
+    /// rename (the intent first). True when it went.
+    /// </summary>
+    internal static bool RenameToAVisibleName(string hidden, string place, bool isAPage, Action<string> tellingFirst)
+    {
+        string folder = Path.GetDirectoryName(place)!;
+        string placeName = Path.GetFileName(place);
+        for (int number = 1; number <= 1000; number++)
+        {
+            string kept = Path.Combine(folder, VisibleName(placeName, number, isAPage));
+            if (UndoLinks.Look(kept) != UndoLinks.What.Nothing) continue;
+            tellingFirst(kept);
+            if (RenameWithRetries(hidden, kept, replace: false, null) == 0) return true;
+            if (UndoLinks.Look(kept) == UndoLinks.What.Nothing) return false;   // not taken in that instant: the rename itself failed
+        }
+        return false;
+    }
 
     /// <summary>
     /// One file's swap; the refusal, or null when it went in.
@@ -1325,15 +1360,8 @@ internal static class UndoSwap
             onAside?.Invoke(new UndoAsideFolder(place, hiddenName, aside, null, matched));
             return RenameWithRetries(aside, place, replace: false, null) == 0;
         }
-        for (int number = 1; number <= 1000; number++)
-        {
-            string kept = Path.Combine(folder, VisibleName(placeName, number));
-            if (UndoLinks.Look(kept) != UndoLinks.What.Nothing) continue;
-            onAside?.Invoke(new UndoAsideFolder(place, hiddenName, aside, kept, matched));
-            if (RenameWithRetries(aside, kept, replace: false, null) == 0) return true;
-            if (UndoLinks.Look(kept) == UndoLinks.What.Nothing) return false;   // not taken in that instant: the rename itself failed
-        }
-        return false;
+        return RenameToAVisibleName(aside, place, isAPage: false,
+                                    kept => onAside?.Invoke(new UndoAsideFolder(place, hiddenName, aside, kept, matched)));
     }
 
     /// <summary>

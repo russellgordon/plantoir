@@ -69,6 +69,29 @@ public sealed class UndoKeptPageUnderAVisibleNameTests
         Assert.Equal($"the undo list keeps the page {PagePath}, removed or moved away by a change that stopped, as {SecondVisible}, because something else now holds {PagePath}", said.Words);
     }
 
+    /// <summary>
+    /// A file that appears at the visible name in the instant before the
+    /// rename (after the line is said) is never overwritten: the next free
+    /// name is taken. MUST FAIL with MOVEFILE_REPLACE_EXISTING passed.
+    /// </summary>
+    [Fact]
+    public void ANameTakenInTheInstantBeforeTheRenameIsNeverOverwritten()
+    {
+        using var scribe = new UndoScribe();
+        (UndoStep step, string root, string kept) = ARemovedPageWhosePlaceIsTaken(scribe);
+        var lines = new List<UndoTrailLine>();
+
+        Assert.True(UndoRecovery.KeepPagesWhosePlaceIsTaken(step, root, line =>
+        {
+            if (lines.Count == 0) scribe.WritePage("A", FirstVisible, Earlier);
+            lines.Add(line);
+        }));
+
+        Assert.Equal(Earlier, scribe.Page("A", FirstVisible));
+        Assert.Equal(Three, scribe.Page("A", SecondVisible));
+        Assert.False(File.Exists(kept), "the page is still hidden");
+    }
+
     /// <summary>One naming function: a folder's words after its whole name, a page's before its extension.</summary>
     [Fact]
     public void TheFolderAndThePageAreNamedByOneFunction()

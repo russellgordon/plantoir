@@ -82,6 +82,16 @@ internal static class UndoTrail
     /// <c>foundAFolderSetAsideLine</c>). Written just before the rename, so it
     /// says what is being done.
     /// </summary>
+    /// <summary>
+    /// <c>the undo list keeps the page courses/ICS3U/section1/Unit 1, Day 3.md,
+    /// removed or moved away by a change that stopped, as courses/ICS3U/section1/Unit 1,
+    /// Day 3 (kept by Undo).md, because something else now holds …</c> (the
+    /// mac's <c>keptAPageLine</c>; "undo kept a page under a visible name").
+    /// Written just before the rename. Never page text.
+    /// </summary>
+    internal static string KeptAPageWords(string place, string keptAs) =>
+        $"the undo list keeps the page {place}, removed or moved away by a change that stopped, as {keptAs}, because something else now holds {place}";
+
     internal static string FoundAFolderSetAsideWords(string place, string? keptAs, string changes) =>
         keptAs is not null
             ? $"the undo list keeps the folder {place}, set aside by a change that stopped, as {keptAs}, because something else now holds {place}"
@@ -310,6 +320,7 @@ internal static class UndoTrail
             ActivityTrail.Event.UndoRolledBack => ActivityTrail.Event.UndoRolledBack,
             ActivityTrail.Event.UndoCouldNotRecordAStep => ActivityTrail.Event.UndoCouldNotRecordAStep,
             ActivityTrail.Event.UndoFoundAFolderSetAside => ActivityTrail.Event.UndoFoundAFolderSetAside,
+            ActivityTrail.Event.UndoKeptAPageUnderAVisibleName => ActivityTrail.Event.UndoKeptAPageUnderAVisibleName,
             ActivityTrail.Event.UndoCouldNotPutBack => ActivityTrail.Event.UndoCouldNotPutBack,
             ActivityTrail.Event.UndoKeptWhatAPageHeld => ActivityTrail.Event.UndoKeptWhatAPageHeld,
             ActivityTrail.Event.UndoKeptWhatItReplaced => ActivityTrail.Event.UndoKeptWhatItReplaced,
@@ -423,7 +434,7 @@ internal static class UndoRecovery
         // (ChangesOnlyFilesAndMoves, since W8-7), never a folder set aside or
         // made (the mac's tidyClosedSteps(onlyStepsOfFiles:)), and keeps a
         // kept original that differs from its page.
-        TidyClosedSteps(writer, journal, trail, onlyStepsOfFiles: mode == UndoMode.Shadow);
+        TidyClosedSteps(writer, journal, trail, onlyStepsOfFiles: mode == UndoMode.Shadow, live: mode == UndoMode.Live);
         return new UndoRecoveryRun(settled, StoppedByATest: false, left);
     }
 
@@ -620,9 +631,10 @@ internal static class UndoRecovery
     /// the director's ruling 6 on U1's third round). Once per process; one
     /// whose file could not be removed is looked for again at the next lock.
     /// </summary>
+    /// <param name="live">A live recovery's: a page kept only in its hidden original while something else holds its place is kept under a visible name (<see cref="KeepPagesWhosePlaceIsTaken"/>).</param>
     /// <param name="onlyStepsOfFiles">Shadow's: only a step whose every op changes a file in place or moves a file or folder whole (<see cref="ChangesOnlyFilesAndMoves"/>).</param>
     internal static void TidyClosedSteps(UndoJournalWriter writer, UndoJournal journal, Action<UndoTrailLine>? trail = null,
-                                         bool onlyStepsOfFiles = false)
+                                         bool onlyStepsOfFiles = false, bool live = false)
     {
         foreach (UndoFoldedStep record in writer.Folded.Steps.Values)
         {
@@ -633,6 +645,11 @@ internal static class UndoRecovery
             if (RootOf(record.Step, journal) is not { } root) continue;
             bool allGone;
             UndoStep closedStep = record.Step;
+            // A page the step removed or moved away, kept only in its hidden
+            // original because something else now holds its place, is kept
+            // under a visible name beside it first (live only: shadow never
+            // writes into a working folder; U4b3 kept-original-named).
+            bool pagesNamed = !live || KeepPagesWhosePlaceIsTaken(closedStep, root, trail);
             try
             {
                 // Nothing will put a closed step's page back: a kept original
@@ -642,7 +659,7 @@ internal static class UndoRecovery
                                                  found => NoteAnAsideFolder(found, closedStep, root, journal, trail), keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { allGone = false; }
-            if (allGone) journal.Memory.NoteTidied(key);
+            if (allGone && pagesNamed) journal.Memory.NoteTidied(key);
         }
     }
 
@@ -667,9 +684,56 @@ internal static class UndoRecovery
 
     // ---- Kept originals (the mac's U3c) --------------------------------------------
 
-    /// <summary>W8b-21c, tests first: not built yet.</summary>
+    /// <summary>
+    /// U4b3 kept-original-named (#899 W8b-21c; the mac's
+    /// <c>keepPagesWhosePlaceIsTaken</c>): for a step a live recovery closes
+    /// without settling it, every kept original FILE of the step's beside a
+    /// place an op leaves or fills whole (<see cref="UndoOp.PlaceLeftBy"/>,
+    /// <see cref="UndoOp.PlaceFilledBy"/>: a page removed or moved away, going
+    /// one way or the other) that is the only copy of what it holds while
+    /// something else (a file, a folder or a link) now holds that place is
+    /// renamed, never over anything, to the first free visible name beside it,
+    /// <c>Unit 1, Day 3 (kept by Undo).md</c>, then <c>(kept by Undo 2)</c>
+    /// (<see cref="UndoSwap.RenameToAVisibleName"/>, the folder's own loop).
+    /// The trail line naming the place and the visible name is written just
+    /// before the rename. A kept original whose place is free, or that is a
+    /// copy of what its place holds, is left as it is; one beside its own page
+    /// (a page changed in place) is never looked at, since no op leaves or
+    /// fills that place. False when a place cannot be read now: the page stays
+    /// hidden for a later try and nothing is said.
+    /// </summary>
+    /// <param name="lookAt">How a place is looked at (<see cref="UndoLinks.Look(string)"/>); a test passes one that cannot.</param>
     internal static bool KeepPagesWhosePlaceIsTaken(UndoStep step, string root, Action<UndoTrailLine>? trail,
-                                                     Func<string, UndoLinks.What>? lookAt = null) => true;
+                                                     Func<string, UndoLinks.What>? lookAt = null)
+    {
+        lookAt ??= UndoLinks.Look;
+        var places = new List<string>();
+        foreach (UndoOp op in step.Ops)
+        {
+            foreach (string? place in new[] { UndoOp.PlaceLeftBy(op), UndoOp.PlaceFilledBy(op) })
+            {
+                if (place is not null && !places.Contains(place)) places.Add(place);
+            }
+        }
+        bool allNamed = true;
+        foreach (string place in places)
+        {
+            string full = UndoDoor.FullPath(root, place);
+            int slash = place.LastIndexOf('/');
+            string placeFolder = slash < 0 ? "" : place[..(slash + 1)];
+            foreach (string kept in KeptOriginalFiles(step, full))
+            {
+                UndoLinks.What there = lookAt(full);
+                if (there == UndoLinks.What.CannotLook) { allNamed = false; continue; }   // neither free nor taken: a later try
+                if (there == UndoLinks.What.Nothing || UndoSwap.IsACopyOfItsPlace(kept, full)) continue;
+                bool named = UndoSwap.RenameToAVisibleName(kept, full, isAPage: true, keptAs =>
+                    trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoKeptAPageUnderAVisibleName, step.Course, step.Section,
+                                                    UndoTrail.KeptAPageWords(place, placeFolder + Path.GetFileName(keptAs)))));
+                if (!named) allNamed = false;
+            }
+        }
+        return allNamed;
+    }
 
     /// <summary>Every kept original (<c>-orig</c>, <c>-&lt;n&gt;-orig</c>, a file) of this step's beside one place, by name order.</summary>
     internal static List<string> KeptOriginalFiles(UndoStep step, string place)
@@ -1424,6 +1488,11 @@ internal static class UndoRecovery
                             UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root), null, keepingOnlyCopies: true);
                         }
                         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+                        // A page the step removed or moved away whose place is now
+                        // taken is kept under a visible name, never left hidden;
+                        // its line comes first, and the line below names only
+                        // what is still hidden.
+                        if (live) KeepPagesWhosePlaceIsTaken(step, root, trail);
                         List<string> keptLeft = KeptOriginalsLeft(step, root);
                         trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoCouldNotPutBack, course, section,
                                                         UndoTrail.CouldNotPutBackWords(phase, CountShown(leftPartWay), keptLeft), keptLeft));
