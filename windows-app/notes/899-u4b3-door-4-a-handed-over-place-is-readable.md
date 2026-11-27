@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # #899 U4b3 door-4: a step that hands a place over is readable
 
 Brief: `vm-tools/briefs/2026-11-26-899-u4b3-door-4-a-handed-over-place-is-readable.md` (chain: `2026-11-26-899-u4b3-ORDER.md`). Branch `issue/899-u4b3-linked-class-page-moves-its-link`, worktree `wt-899-u4b3`, from door-3's head b0fed2c19. **`contracts/` touched: both gates.**

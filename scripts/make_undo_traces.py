@@ -1084,20 +1084,6 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
     # is before the move and made after it; backward it is taken back first,
     # and the move is judged as if it were.
     carriers = carried_edits(ops)
-    # U4b3 (opKinds.wholeOps' second exception): a place handed over. The
-    # second of the pair in this plan's order is judged against the place
-    # free when the first is a change of this plan, and the step's changes
-    # go in this plan's order.
-    handed = handovers(ops)
-    position = {}
-    for index, op in enumerate(ordered):
-        position[id(op)] = index
-    second_of = {}
-    for leaver, filler in handed:
-        first, second = (filler, leaver) if backward else (leaver, filler)
-        second_of[id(ops[second])] = ops[first]
-    changed = set()
-    in_order = []
     moving_now = set()
     group_stays_apart = leaves_apart and any(
         op["kind"] == "moveApart" and whole_state(op, pages_by_path) == "neither" for op in ordered
@@ -1139,12 +1125,6 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                             seen.pop(path, None)
                         else:
                             seen[path] = working[path]
-            first = second_of.get(id(op))
-            if first is not None and id(first) in changed:
-                # The place this move fills (forward, its `to`) or left
-                # (backward, its `from`) is free.
-                seen = dict(seen)
-                seen.pop(op["from"] if backward else op["to"], None)
             state = whole_state(op, seen)
             place = op.get("path") or op.get("from") or op.get("target")
             if group_stays_apart and kind == "moveApart" and state in ("neither", wanted_from):
@@ -1166,20 +1146,10 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                 return ("contentMissing", place)
             if carries and not backward:
                 moving_now.add(op["to"])
-            moved_now = whole_moved(op, backward, seen)
-            whole_changes.update(moved_now)
-            changed.add(id(op))
-            in_order.append(moved_now)
+            whole_changes.update(whole_moved(op, backward, seen))
             continue
         path = op["path"]
-        first = second_of.get(id(op))
-        if first is not None and id(first) in changed:
-            # A new file (forward) or a removal taken back (backward) at a
-            # handed-over place starts from the place free, never read
-            # through what is leaving it.
-            original.setdefault(path, pages_by_path.get(path))
-            working[path] = None
-        elif path not in original:
+        if path not in original:
             read_path = path
             carrier = carriers.get(path)
             if carrier is not None and carrier["to"] in moving_now:
@@ -1193,7 +1163,6 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             continue
         if state != wanted_from:
             continue
-        changed.add(id(op))
         if op["kind"] == "writeFile":
             target = op["beforeText"] if backward else op["afterText"]
             if content_missing and target is not None:
@@ -1221,16 +1190,8 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             source = op["after"] if backward else op["before"]
             target = op["before"] if backward else op["after"]
             working[path] = moving(op, source, target, working[path])
-        in_order.append({path: working[path]})
     if in_the_way:
         return ("changedSince", in_the_way[0], len(in_the_way) - 1)
-    if handed:
-        # Each change in this plan's order: what each place holds once the
-        # last op naming it is made.
-        changes = {}
-        for made in in_order:
-            changes.update(made)
-        return ("ready", changes, left_apart)
     file_changes = {}
     for path in original:
         if original[path] != working[path]:
@@ -1247,52 +1208,6 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
 
 
 EDIT_KINDS = ("writeFile", "editLine", "replaceText", "editJSON")
-
-
-def handovers(ops):
-    """UndoCheck.handovers (U4b3 door-1, opKinds.wholeOps' second
-    exception): each handed-over place of a step, as (leaver index, filler
-    index), in the step's order. A leaver is a file's or a link's move (its
-    `from`) or a removal; a filler such a move (its `to`) or a new file; the
-    filler later, the exact place by part_inside, at least one a move. Each
-    leaver hands its place to the first filler after it."""
-    found = []
-    for leaver_index, leaver in enumerate(ops):
-        place = place_left(leaver)
-        if place is None:
-            continue
-        for filler_index in range(leaver_index + 1, len(ops)):
-            filler = ops[filler_index]
-            filled = place_filled(filler)
-            if filled is not None and part_inside(place, filled) == "" and (
-                    hands_over_as_a_move(leaver) or hands_over_as_a_move(filler)):
-                found.append((leaver_index, filler_index))
-                break
-    return found
-
-
-def hands_over_as_a_move(op):
-    """UndoCheck.handsOverAsAMove: a file's or a link's `move`, never a
-    folder's, a capitalisation-only one, a moveApart or a setAside."""
-    if op.get("kind") != "move" or "listingSha" in op or is_case_only_move(op):
-        return False
-    return "sha" in op or "linkSha" in op
-
-
-def place_left(op):
-    if hands_over_as_a_move(op):
-        return op["from"]
-    if op.get("kind") == "writeFile" and op.get("afterSha") is None and op.get("beforeSha") is not None:
-        return op["path"]
-    return None
-
-
-def place_filled(op):
-    if hands_over_as_a_move(op):
-        return op["to"]
-    if op.get("kind") == "writeFile" and op.get("beforeSha") is None and op.get("afterSha") is not None:
-        return op["path"]
-    return None
 
 
 def place_as_found(op, backward):
@@ -1405,25 +1320,8 @@ def swap_groups(ops, backward):
     one group of ops per target: forward, each move that carries edits
     first, then each file in the order the ops first name it, then every
     other whole op; backward, each file in the reversed ops' order, then
-    every whole op, reversed (U4b, opKinds.wholeOps' order). A step with a
-    handed-over place goes in the step's order instead (U4b3)."""
+    every whole op, reversed (U4b, opKinds.wholeOps' order)."""
     ordered = list(reversed(ops)) if backward else list(ops)
-    if handovers(ops):
-        # U4b3 (opKinds.wholeOps' second exception): a step that hands a
-        # place over goes in the step's order, reversed going back; a file
-        # at the first op naming it.
-        groups, by_path = [], {}
-        for op in ordered:
-            if op["kind"] == "recompute":
-                continue
-            if op["kind"] in WHOLE_KINDS:
-                groups.append([op])
-                continue
-            if op["path"] not in by_path:
-                by_path[op["path"]] = []
-                groups.append(by_path[op["path"]])
-            by_path[op["path"]].append(op)
-        return groups
     carriers = carried_edits(ops)
     carrying = [op for op in ordered if any(carrier is op for carrier in carriers.values())]
     leading = [] if backward else [[op] for op in carrying]
@@ -1471,31 +1369,17 @@ def recovery_states(ops, pages):
     judged as if the step's edits inside it were taken back (U4b). The
     model holds no staged files, so it cannot show the swap's own kept
     originals inside the folder being left out: only the Swift replay
-    shows that.
-
-    A handed-over place's two ops are judged together (U4b3 door-3, the
-    one rule `handovers`): the leaver with the place free once its filler
-    stands after, the filler with the place absent while its leaver stands
-    before, again until nothing changes. A move that hands a place over is
-    judged under its two places (`place_judged`), apart from the page at
-    the same place."""
+    shows that."""
     carriers = carried_edits(ops)
-    pairs = handovers(ops)
-    moving = moves_handing_over(ops, pairs)
-    free_from, free_to, absent = set(), set(), set()
-
-    def judge(index):
-        op = ops[index]
+    states = {}
+    for op in ops:
         kind = op["kind"]
+        if kind == "recompute":
+            continue
         if kind in WHOLE_KINDS:
+            place = op.get("path") or op.get("from") or op.get("target")
             seen = pages
-            if index in free_from or index in free_to:
-                seen = dict(pages)
-                if index in free_from:
-                    seen.pop(op["from"], None)
-                if index in free_to:
-                    seen.pop(op["to"], None)
-            elif any(carrier is op for carrier in carriers.values()):
+            if any(carrier is op for carrier in carriers.values()):
                 old_place = move_is_at_its_old_place(op, pages)
                 seen = dict(pages)
                 for path, carrier in carriers.items():
@@ -1506,86 +1390,17 @@ def recovery_states(ops, pages):
                     taken_back = plan(edits, True, seen)
                     if taken_back[0] == "ready" and side in taken_back[1]:
                         seen[side] = taken_back[1][side]
-            return whole_state(op, seen)
-        if index in absent:
-            return op_state(op, None)
+            states[place] = whole_state(op, seen)
+            continue
         path = op["path"]
         read_path = path
         carrier = carriers.get(path)
         if carrier is not None and move_is_at_its_old_place(carrier, pages):
             read_path = place_before_the_move(path, carrier)
-        current = pages.get(read_path)
-        if current is not None and not isinstance(current, str):
-            # A link or a folder where a page is named: neither of its sides.
-            return "neither"
-        return op_state(op, current)
-
-    judged = [None if op["kind"] == "recompute" else judge(index) for index, op in enumerate(ops)]
-    for _ in range(len(ops) + 1):
-        changed = False
-        for leaver, filler in pairs:
-            if judged[filler] == "after" and leaver not in free_from and leaver not in absent:
-                (free_from if ops[leaver]["kind"] in WHOLE_KINDS else absent).add(leaver)
-                judged[leaver] = judge(leaver)
-                changed = True
-            if judged[leaver] == "before" and filler not in free_to and filler not in absent:
-                (free_to if ops[filler]["kind"] in WHOLE_KINDS else absent).add(filler)
-                judged[filler] = judge(filler)
-                changed = True
-        if not changed:
-            break
-    states = {}
-    for index, op in enumerate(ops):
-        if op["kind"] == "recompute":
-            continue
-        place = place_judged(op, index, moving)
-        if op["kind"] in WHOLE_KINDS:
-            states[place] = judged[index]
-            continue
-        earlier = states.get(place)
-        states[place] = judged[index] if earlier in (None, judged[index]) else "neither"
+        state = op_state(op, pages.get(read_path))
+        earlier = states.get(path)
+        states[path] = state if earlier in (None, state) else "neither"
     return states
-
-
-def moves_handing_over(ops, pairs):
-    """UndoRecovery.movesHandingOver: the indices of the step's moves that
-    leave or fill a handed-over place."""
-    found = set()
-    for leaver, filler in pairs:
-        for index in (leaver, filler):
-            if ops[index]["kind"] in WHOLE_KINDS:
-                found.add(index)
-    return found
-
-
-def place_judged(op, index, moving):
-    """UndoRecovery.placeJudged: the name recovery judges an op under: a
-    move that hands a place over by its two places ("from → to"), every
-    other op by its path, its from or its target."""
-    if index in moving:
-        return op["from"] + " → " + op["to"]
-    return op.get("path") or op.get("from") or op.get("target")
-
-
-def place_shown(ops, place):
-    """U4b3 door-5: the plain path a judged place is shown as on the trail
-    and to a teacher: a handed-over move under its own place (its from),
-    as every other move is named."""
-    moving = moves_handing_over(ops, handovers(ops))
-    for index, op in enumerate(ops):
-        if index in moving and place_judged(op, index, moving) == place:
-            return op["from"]
-    return place
-
-
-def places_shown(ops, places):
-    """Each judged place shown as a plain path, each path once, in order."""
-    shown = []
-    for place in places:
-        plain = place_shown(ops, place)
-        if plain not in shown:
-            shown.append(plain)
-    return shown
 
 
 def recover(ops, pages, started_from_before):
@@ -1593,13 +1408,12 @@ def recover(ops, pages, started_from_before):
     took effect put back, judged by content alone. A place that is neither
     is in the way (changed by hand since): every place NOT in the way that
     took effect is still put back, and the step is interrupted naming the
-    places in the way (U4b2-13, as Swift's settle does), each a plain path
-    once (`places_shown`, U4b3 door-5). Answers (outcome,
+    places in the way (U4b2-13, as Swift's settle does). Answers (outcome,
     pages, the places the interrupted line names).
 
     Two known differences from settle, which no row run through this model
-    reaches today (it runs only the withAMovedFolder and withAHandedOverPlace
-    rows, none of which has an external op or stops after the edit inside with a hand edit), so a
+    reaches today (it runs only the withAMovedFolder and withAPlainPageMove rows, none of which has
+    an external op or stops after the edit inside with a hand edit), so a
     new row of either kind must not be trusted because it passes here:
     - the model names an external op's target among the places; settle
       never does (`pathsOnly`);
@@ -1625,9 +1439,9 @@ def recover(ops, pages, started_from_before):
         for place in in_the_way:
             if place not in named:
                 named.append(place)
-        return ("interrupted", pages, places_shown(ops, named))
+        return ("interrupted", pages, named)
     if in_the_way:
-        return ("interrupted", put_back, places_shown(ops, in_the_way))
+        return ("interrupted", put_back, in_the_way)
     return ("rolledBack", put_back, [])
 
 
@@ -1685,9 +1499,8 @@ def put_back_what_took_effect(ops, places, started_from_before, pages):
     are."""
     if not places:
         return pages
-    moving = moves_handing_over(ops, handovers(ops))
-    at_end = [op for index, op in enumerate(ops) if op["kind"] != "recompute"
-              and place_judged(op, index, moving) in places]
+    at_end = [op for op in ops if op["kind"] != "recompute"
+              and (op.get("path") or op.get("from") or op.get("target")) in places]
     result = plan(at_end, started_from_before, pages)
     if result[0] != "ready":
         return None

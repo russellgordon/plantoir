@@ -803,7 +803,7 @@ nonisolated enum UndoContractReplay {
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
         "movedFolder", "caseOnlyFolder", "refusalNamed", "keptWhatItReplacedSays", "madeFolder", "foldersInside",
-        "linkedFolder", "handedOver",
+        "linkedFolder",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1443,9 +1443,6 @@ nonisolated enum UndoContractReplay {
             if let wanted = string(testCase["linkedFolder"]), UndoContractKinds.linkedFolder(in: root) != wanted {
                 failures.append("stackCases '\(name)': the moved link is \(UndoContractKinds.linkedFolder(in: root)), not \(wanted)")
             }
-            if let wanted = string(testCase["handedOver"]), UndoContractKinds.handedOver(in: root) != wanted {
-                failures.append("stackCases '\(name)': the handed-over class pages are \(UndoContractKinds.handedOver(in: root)), not \(wanted)")
-            }
             if let wanted = int(testCase["keptWhatItReplacedLines"]), keptWhatItReplacedLines != wanted {
                 failures.append("stackCases '\(name)': \(keptWhatItReplacedLines) 'undo kept what it replaced' lines, not \(wanted)")
             }
@@ -1626,7 +1623,7 @@ nonisolated enum UndoContractReplay {
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
         "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored", "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
-        "withAHandedOverPlace", "handedOver",
+        "withAPlainPageMove",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1715,31 +1712,24 @@ nonisolated enum UndoContractReplay {
             }
             let places: UndoMemoryPlaces = UndoMemoryPlaces()
             _ = places.write(UndoContractKinds.preference, .string("a"))
-            // U4b3 door-5: in place of the two pages, a step that hands a
-            // place over, made as stackCases' call of the same name makes
-            // it. What section 1's class pages hold before and after it is
-            // read from a twin folder: the step made whole, then undone.
-            let handedOverCalls: [String: String] = [
-                "afterALinksMove": "handAPlaceOverAfterALinksMove",
-                "beforeALinksMove": "handAPlaceOverBeforeALinksMove",
-            ]
-            var handedOverCall: String? = nil
-            var handedOverBefore: String = ""
-            var handedOverAfter: String = ""
-            if let shape = string(testCase["withAHandedOverPlace"]) {
-                guard let call = handedOverCalls[shape] else {
-                    failures.append("recoveryCases '\(name)': withAHandedOverPlace '\(shape)' is not a value this replay knows")
-                    continue
-                }
-                handedOverCall = call
+            // #1055 M5: in place of the two pages, the kept-page guard's
+            // plain step (`withAPlainPageMove`), made by its own call. What
+            // section 1's class pages hold before and after it is read from
+            // a twin folder: the step made whole, then undone.
+            var plainPageMoveCall: String? = nil
+            var classPagesBefore: String = ""
+            var classPagesAfter: String = ""
+            if testCase["withAPlainPageMove"] as? Bool == true {
+                let call: String = "movePlainPageAwayFromDay3"
+                plainPageMoveCall = call
                 let twin: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "recovery-\(number)-twin")
                 let twinJournal: UndoJournal = UndoJournal(folderURL: twin.journalFolder)
                 let twinPlaces: UndoMemoryPlaces = UndoMemoryPlaces()
                 let made: String? = try UndoContractKinds.call(call, root: twin.root, journal: twinJournal, places: twinPlaces)
-                handedOverAfter = UndoContractKinds.handedOver(in: twin.root)
+                classPagesAfter = UndoContractKinds.classPages(in: twin.root)
                 let undone: UndoOutcome = twinJournal.undoNewest(resolveRoot: { _ in twin.root }, places: twinPlaces)
-                handedOverBefore = UndoContractKinds.handedOver(in: twin.root)
-                if made != "applied" || outcomeWord(undone) != "undone" || handedOverBefore == handedOverAfter {
+                classPagesBefore = UndoContractKinds.classPages(in: twin.root)
+                if made != "applied" || outcomeWord(undone) != "undone" || classPagesBefore == classPagesAfter {
                     failures.append("recoveryCases '\(name)': the twin of \(call) came to \(made ?? "nil") and \(outcomeWord(undone))")
                 }
             }
@@ -1758,11 +1748,11 @@ nonisolated enum UndoContractReplay {
                 }
             }
             func makeTheStep() -> JournaledWriteOutcome {
-                if let handedOverCall {
+                if let plainPageMoveCall {
                     // The call answers in a word: only "stopped by a test"
                     // is compared, so anything else is answered as
                     // changedNothing, which no row asks for.
-                    let made: String? = try? UndoContractKinds.call(handedOverCall, root: root, journal: dying, places: places)
+                    let made: String? = try? UndoContractKinds.call(plainPageMoveCall, root: root, journal: dying, places: places)
                     return made == UndoContractKinds.word(.stoppedByATest) ? .stoppedByATest : .changedNothing
                 }
                 if !withAMove && !withATree && !withAPreference && !withAMovedFolder {
@@ -1867,15 +1857,7 @@ nonisolated enum UndoContractReplay {
                 failures.append("recoveryCases '\(name)': handEdit is not a string, so not a value this replay knows")
             }
             if let page = string(testCase["handEdit"]) {
-                if page == "handedOverPlace" && handedOverCall != nil {
-                    // U4b3 door-5: someone's page written at Day 3, the
-                    // place the link's move hands over.
-                    let day3: URL = root.appendingPathComponent(UndoContractKinds.classPage(3))
-                    if UndoItem.read(at: day3) != .absent {
-                        try FileManager.default.removeItem(at: day3)
-                    }
-                    try write("Someone else's.\n", to: UndoContractKinds.classPage(3), in: root)
-                } else if page == "carried" && withAMovedFolder {
+                if page == "carried" && withAMovedFolder {
                     // U4b2-13: the page inside the moved folder, wherever
                     // the folder is now, its line `Line one: …` set by hand.
                     if !(try UndoContractKinds.editTheCarriedPageByHand(in: root)) {
@@ -1999,8 +1981,17 @@ nonisolated enum UndoContractReplay {
                 let held: String = (UndoContractKinds.mediaFiles["a.md"] ?? "").replacingOccurrences(of: "Line one: old.", with: "Line one: new.")
                 try Data(held.utf8).write(to: UndoSwap.besideURL(for: page, label: "\(workSeq)-undo", role: "orig"))
             }
+            if testCase["withAPlainPageMove"] as? Bool == true {
+                // #1055 M5: someone's page written at Day 3, where the
+                // plain step removed a page.
+                let day3: URL = root.appendingPathComponent(UndoContractKinds.classPage(3))
+                if UndoItem.read(at: day3) != .absent {
+                    try FileManager.default.removeItem(at: day3)
+                }
+                try write("Someone else's.\n", to: UndoContractKinds.classPage(3), in: root)
+            }
             if testCase["visibleNameTaken"] as? Bool == true {
-                if handedOverCall != nil {
+                if plainPageMoveCall != nil {
                     // U4b3 kept-original-named: the removed page's visible name.
                     try write("earlier\n", to: UndoContractReplay.keptPageName, in: root)
                 } else {
@@ -2138,7 +2129,7 @@ nonisolated enum UndoContractReplay {
                 failures.append("recoveryCases '\(name)': the preference is \(places.read(UndoContractKinds.preference)), not \(wanted)")
             }
             if let wanted = string(testCase["keptVisibleAs"]) {
-                if handedOverCall != nil {
+                if plainPageMoveCall != nil {
                     // U4b3 kept-original-named: the removed page, a file
                     // holding `Three.` byte for byte.
                     if UndoItem.read(at: root.appendingPathComponent(wanted)) != .file(Data("Three.\n".utf8)) {
@@ -2151,7 +2142,7 @@ nonisolated enum UndoContractReplay {
                     }
                 }
             }
-            if testCase["visibleNameTaken"] as? Bool == true && handedOverCall != nil,
+            if testCase["visibleNameTaken"] as? Bool == true && plainPageMoveCall != nil,
                UndoItem.read(at: root.appendingPathComponent(UndoContractReplay.keptPageName)) != .file(Data("earlier\n".utf8)) {
                 failures.append("recoveryCases '\(name)': the taken name \(UndoContractReplay.keptPageName) was changed")
             }
@@ -2209,26 +2200,23 @@ nonisolated enum UndoContractReplay {
                 JournaledWrite.finish(seq: heldSeq, with: .applied, phase: nil, reason: nil, in: UndoJournal(folderURL: place.journalFolder), mode: .live)
             }
 
-            if let wanted = string(testCase["handedOver"]), UndoContractKinds.handedOver(in: root) != wanted {
-                failures.append("recoveryCases '\(name)': the class pages are \(UndoContractKinds.handedOver(in: root)), not \(wanted)")
-            }
-            if handedOverCall != nil {
-                // files: section 1's class pages and the library, exactly as
-                // before or after the step (the two pages are not in it).
-                let nowHandedOver: String = UndoContractKinds.handedOver(in: root)
+            if plainPageMoveCall != nil {
+                // files: section 1's class pages, exactly as before or after
+                // the step (the two pages are not in it).
+                let classPagesNow: String = UndoContractKinds.classPages(in: root)
                 switch string(testCase["files"]) ?? "" {
                 case "before":
-                    if nowHandedOver != handedOverBefore {
-                        failures.append("recoveryCases '\(name)': the class pages are not before (\(nowHandedOver))")
+                    if classPagesNow != classPagesBefore {
+                        failures.append("recoveryCases '\(name)': the class pages are not before (\(classPagesNow))")
                     }
                 case "after":
-                    if nowHandedOver != handedOverAfter {
-                        failures.append("recoveryCases '\(name)': the class pages are not after (\(nowHandedOver))")
+                    if classPagesNow != classPagesAfter {
+                        failures.append("recoveryCases '\(name)': the class pages are not after (\(classPagesNow))")
                     }
                 case "unchecked":
                     break
                 default:
-                    failures.append("recoveryCases '\(name)': files '\(string(testCase["files"]) ?? "")' is not a value this replay knows with withAHandedOverPlace")
+                    failures.append("recoveryCases '\(name)': files '\(string(testCase["files"]) ?? "")' is not a value this replay knows with withAPlainPageMove")
                 }
             }
             let now: [String?] = [hash(of: first, in: root), hash(of: second, in: root)]
@@ -2249,7 +2237,7 @@ nonisolated enum UndoContractReplay {
             default:
                 failures.append("recoveryCases '\(name)': files '\(string(testCase["files"]) ?? "")' is not a value this replay knows")
             }
-            if handedOverCall != nil {
+            if plainPageMoveCall != nil {
                 wanted = nil
             }
             if let wanted, now != wanted {

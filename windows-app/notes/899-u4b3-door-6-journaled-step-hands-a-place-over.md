@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # U4b3 door-6 (#899): JournaledStep reads a link move's old place as free and makes its ops in a handing-over order
 
 Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from door-5's head bf6f9b229. `origin/dev` 461ee3943 was already merged in (by door-5) at both points this piece checked, so no new merge commit. No `contracts/` change.

@@ -566,18 +566,7 @@ def readable_step(step):
     for op in step["ops"]:
         if not readable_op(op):
             return False
-    # opKinds.wholeOps: no other op shares a whole op's places, but for its
-    # two exceptions. U4b3, the second: a place handed over, by exactly the
-    # two ops of the pair, each place once, in a step that carries no edit.
-    handed = traces.handovers(step["ops"])
-    if handed:
-        if traces.carried_edits(step["ops"]):
-            return False
-        places = [traces.place_left(step["ops"][leaver]) for leaver, _ in handed]
-        for first in range(len(places)):
-            for second in range(first + 1, len(places)):
-                if traces.part_inside(places[first], places[second]) == "":
-                    return False
+    # opKinds.wholeOps: no other op shares a whole op's places.
     whole = ("move", "moveApart", "setAside", "createTree", "removeTree", "external")
     for index, op in enumerate(step["ops"]):
         if op["kind"] not in whole:
@@ -593,23 +582,9 @@ def readable_step(step):
                 # after the move (opKinds.wholeOps' order).
                 continue
             theirs = [other[key] for key in ("path", "from", "to") if key in other]
-            for a in mine:
-                for b in theirs:
-                    if overlap(a, b) and not handed_over(a, b, index, other_index, step["ops"], handed):
-                        return False
+            if any(overlap(a, b) for a in mine for b in theirs):
+                return False
     return True
-
-
-def handed_over(mine, theirs, first, second, ops, handed):
-    """UndoStep.isHandedOver (U4b3): two places two ops name are the one
-    place a handover between exactly those two ops hands over."""
-    for leaver, filler in handed:
-        if {leaver, filler} != {first, second}:
-            continue
-        place = traces.place_left(ops[leaver])
-        if traces.part_inside(place, mine) == "" and traces.part_inside(place, theirs) == "":
-            return True
-    return False
 
 
 def made_by_parts(made_by):
@@ -791,7 +766,7 @@ class ContractCaseTests(unittest.TestCase):
                   "blobKept", "interrupted", "markers", "folderKept", "movedFolder", "caseOnlyFolder", "rederived", "nothingMovedOutside",
                   "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
                   "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
-                  "refusalNamed", "madeFolder", "handedOver",
+                  "refusalNamed", "madeFolder",
                   # U4b2-4: the whole of the line's words, which the model
                   # does not write; the Swift replay checks it.
                   "keptWhatItReplacedSays",
@@ -1044,40 +1019,6 @@ class ContractCaseTests(unittest.TestCase):
             seq = model.begin(ops, readable=readable_step({"ops": ops}))
             model.find(seq)["phase"] = "done"
             return None
-        if call == "handAPlaceOverAfterALinksMove":
-            # U4b3 door-4, shape A: the link leaves Day 3, a new page fills it.
-            if pages.get(self.day(3)) is None and pages.get(self.day(4)) is None:
-                pages[self.HANDED_LIBRARY + "/Day 3.md"] = "Linked.\n"
-                pages[self.day(3)] = ("link", self.handed_target(3))
-            return self.vetted_ops_step(model, [
-                {"kind": "move", "from": self.day(3), "to": self.day(4), "linkSha": traces.sha(self.handed_target(3))},
-            ] + traces.ops_for_change(self.day(3), None, "New.\n"))
-        if call == "handAPlaceOverBeforeALinksMove":
-            # Shape B: Day 3's page moves up a day, the link fills Day 3, a
-            # new page fills Day 2.
-            if pages.get(self.day(2)) is None and pages.get(self.day(3)) is None:
-                pages[self.HANDED_LIBRARY + "/Day 2.md"] = "Two.\n"
-                pages[self.day(2)] = ("link", self.handed_target(2))
-                pages[self.day(3)] = "Three.\n"
-            return self.vetted_ops_step(model,
-                traces.ops_for_change(self.day(4), None, "Three.\n")
-                + traces.ops_for_change(self.day(3), "Three.\n", None)
-                + [{"kind": "move", "from": self.day(2), "to": self.day(3), "linkSha": traces.sha(self.handed_target(2))}]
-                + traces.ops_for_change(self.day(2), None, "New.\n"))
-        if call == "editTheHandedOverPageByHand":
-            pages[self.day(3)] = "Hand.\n"
-            return None
-        if call in ("stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace"):
-            if call == "stepFillingAPlaceBeforeItIsLeft":
-                ops = traces.ops_for_change(self.day(3), None, "New.\n") + [
-                    {"kind": "move", "from": self.day(3), "to": self.day(4), "linkSha": traces.sha(self.handed_target(3))}]
-            else:
-                folder = "courses/TST1O/section1/media"
-                ops = [{"kind": "move", "from": folder, "to": "courses/TST1O/section1/renamed", "listingSha": "a" * 64}
-                       ] + traces.ops_for_change(folder, None, "New.\n")
-            seq = model.begin(ops, readable=readable_step({"ops": ops}))
-            model.find(seq)["phase"] = "done"
-            return None
         if call == "stepEditingInsideAMovesFrom":
             ops = [{"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": "a" * 64},
                    {"kind": "replaceText", "path": self.MEDIA + "/a.md", "before": "old", "after": "new",
@@ -1105,46 +1046,6 @@ class ContractCaseTests(unittest.TestCase):
                     page = "new" if "Line one: new." in text else "old" if "Line one: old." in text else "byHand"
                 return spelling.rsplit("/", 1)[1] + ", " + page
         return "none"
-
-    HANDED_LIBRARY = "courses/TST1O/library"
-
-    def vetted_ops_step(self, model, ops):
-        """JournaledWrite.perform(ops:): a step is read back as a reader of
-        this version reads it before anything is written (vet), so one
-        this version cannot read is refused and nothing is made."""
-        if not readable_step({"ops": ops}):
-            return "refused"
-        return model.ops_step(ops)
-
-    def day(self, number):
-        return "courses/TST1O/section1/Unit 1, Day %d.md" % number
-
-    def handed_target(self, number):
-        return "../library/Day %d.md" % number
-
-    def handed_over(self, model):
-        """U4b3 door-4's handedOver: what Day 2, Day 3 and Day 4 hold, then
-        whether the pages the links lead to are as the calls laid them."""
-        parts = []
-        for number in (2, 3, 4):
-            held = model.pages.get(self.day(number))
-            if held is None:
-                what = "nothing"
-            elif isinstance(held, tuple) and held[0] == "link":
-                what = "link " + held[1]
-            elif isinstance(held, str):
-                what = "page " + (held[:-1] if held.endswith("\n") else held)
-            else:
-                what = "other"
-            parts.append("Day %d: %s" % (number, what))
-        laid = {"Day 2.md": "Two.\n", "Day 3.md": "Linked.\n"}
-        library = "untouched"
-        for path, held in model.pages.items():
-            if isinstance(path, str) and path.startswith(self.HANDED_LIBRARY + "/"):
-                if laid.get(path[len(self.HANDED_LIBRARY) + 1:]) != held:
-                    library = "changed"
-        parts.append("library: " + library)
-        return "; ".join(parts)
 
     LINK_FROM = "courses/TST1O/section1/media"
     LINK_TO = "courses/TST1O/section1/renamed"
@@ -1222,9 +1123,7 @@ class ContractCaseTests(unittest.TestCase):
                   "linkItsNewFolderOutside", "moveAFolderWithAFileMadeInANewFolderInside", "addAFolderInsideTheMadeFolder",
                   "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt",
                   "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt", "finderRecordsAWindowInTheMadeFolder",
-                  "moveALinkToAFolder", "stepEditingInsideALinksMove",
-                  "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
-                  "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace")
+                  "moveALinkToAFolder", "stepEditingInsideALinksMove")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -1510,8 +1409,6 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(self.made_folder(model), case["madeFolder"])
                 if "linkedFolder" in case:
                     self.assertEqual(self.linked_folder(model), case["linkedFolder"])
-                if "handedOver" in case:
-                    self.assertEqual(self.handed_over(model), case["handedOver"])
                 if "caseOnlyFolder" in case:
                     self.assertEqual(self.case_only_folder(model), case["caseOnlyFolder"])
                 if "folderKept" in case:
@@ -1579,64 +1476,41 @@ class ContractCaseTests(unittest.TestCase):
                 else:
                     self.assertEqual(named, [])
 
-    def test_recovery_cases_with_a_handed_over_place(self):
-        """undo.recoveryCases' U4b3 door-5 rows (withAHandedOverPlace): a
-        step that hands a place over, killed before any of its swaps, going
-        forward or back, settles whole, judged by content with the pair
-        judged together (door-3)."""
-        cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAHandedOverPlace")]
-        self.assertEqual(len(cases), 10)
-        phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
-                  ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done"}
-        calls = {"afterALinksMove": "handAPlaceOverAfterALinksMove", "beforeALinksMove": "handAPlaceOverBeforeALinksMove"}
+    def day(self, number):
+        """Section 1's class page for a day (#1055 M5's plain step)."""
+        return "courses/TST1O/section1/Unit 1, Day %d.md" % number
+
+    def test_recovery_cases_with_a_plain_page_move(self):
+        """undo.recoveryCases' two kept-page rows re-laid by #1055 M5
+        (withAPlainPageMove): a plain step with no link, Day 3's page moved
+        to Day 4 and a new page at Day 5, stopped before its third swap,
+        someone's page then written at Day 3: the removed page is kept under
+        a visible name, named once, never over anything."""
+        cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAPlainPageMove")]
+        self.assertEqual(len(cases), 2)
         for case in cases:
             with self.subTest(case["name"]):
-                pages = {}
-                if case["withAHandedOverPlace"] == "afterALinksMove":
-                    pages[self.HANDED_LIBRARY + "/Day 3.md"] = "Linked.\n"
-                    pages[self.day(3)] = ("link", self.handed_target(3))
-                    ops = ([{"kind": "move", "from": self.day(3), "to": self.day(4), "linkSha": traces.sha(self.handed_target(3))}]
-                           + traces.ops_for_change(self.day(3), None, "New.\n"))
-                else:
-                    self.assertEqual(calls[case["withAHandedOverPlace"]], "handAPlaceOverBeforeALinksMove")
-                    pages[self.HANDED_LIBRARY + "/Day 2.md"] = "Two.\n"
-                    pages[self.day(2)] = ("link", self.handed_target(2))
-                    pages[self.day(3)] = "Three.\n"
-                    ops = (traces.ops_for_change(self.day(4), None, "Three.\n")
-                           + traces.ops_for_change(self.day(3), "Three.\n", None)
-                           + [{"kind": "move", "from": self.day(2), "to": self.day(3), "linkSha": traces.sha(self.handed_target(2))}]
-                           + traces.ops_for_change(self.day(2), None, "New.\n"))
-                self.assertTrue(traces.handovers(ops))
-                work, stop = case["work"], case["stopAt"]
-                swapped = int(stop.split(":")[1])
-                after_pages = traces.stopped_part_way(ops, False, pages, None)
-                starting = after_pages if work == "undo" else pages
-                left = traces.stopped_part_way(ops, work == "undo", starting, swapped)
-                stopped = left
-                if case.get("handEdit") == "handedOverPlace":
-                    left = dict(left)
-                    left[self.day(3)] = "Someone else's.\n"
+                pages = {self.day(3): "Three.\n"}
+                ops = (traces.ops_for_change(self.day(4), None, "Three.\n")
+                       + traces.ops_for_change(self.day(3), "Three.\n", None)
+                       + traces.ops_for_change(self.day(5), None, "Five.\n"))
+                self.assertEqual(case["work"], "step")
+                swapped = int(case["stopAt"].split(":")[1])
+                stopped = traces.stopped_part_way(ops, False, pages, swapped)
+                left = dict(stopped)
+                left[self.day(3)] = "Someone else's.\n"
                 taken = "courses/TST1O/section1/Unit 1, Day 3 (kept by Undo).md"
                 if case.get("visibleNameTaken"):
-                    left = dict(left)
                     left[taken] = "earlier\n"
-                outcome, settled, named = traces.recover(ops, left, work != "undo")
-                # U4b3 kept-original-named: a removed page whose place is
-                # taken is kept under a visible name, named once each.
-                settled, kept_lines = traces.keep_pages_whose_place_is_taken(ops, starting, stopped, settled, outcome)
-                self.assertEqual(len(kept_lines), case.get("keptPageLines", 0))
-                if "keptVisibleAs" in case:
-                    self.assertEqual(kept_lines, [(self.day(3), case["keptVisibleAs"])])
-                    self.assertEqual(settled.get(case["keptVisibleAs"]), "Three.\n")
+                outcome, settled, named = traces.recover(ops, left, True)
+                settled, kept_lines = traces.keep_pages_whose_place_is_taken(ops, pages, stopped, settled, outcome)
+                self.assertEqual(outcome, case["phase"])
+                self.assertEqual(len(kept_lines), case["keptPageLines"])
+                self.assertEqual(kept_lines, [(self.day(3), case["keptVisibleAs"])])
+                self.assertEqual(settled.get(case["keptVisibleAs"]), "Three.\n")
+                self.assertEqual(settled.get(self.day(3)), "Someone else's.\n")
                 if case.get("visibleNameTaken"):
                     self.assertEqual(settled.get(taken), "earlier\n")
-                self.assertEqual(phases.get((work, outcome), outcome), case["phase"])
-                settled_model = type("Settled", (), {"pages": settled})
-                if case["files"] != "unchecked":
-                    wanted = {"before": pages, "after": after_pages}[case["files"]]
-                    self.assertEqual(self.handed_over(settled_model), self.handed_over(type("Wanted", (), {"pages": wanted})))
-                self.assertEqual(self.handed_over(settled_model), case["handedOver"])
-                self.assertEqual(named, case.get("pathsNamed", []))
 
     def edited_by_hand(self, pages, page, first, second):
         """recoveryCasesHow's handEdit: `first` or `second`, the publish line
@@ -1730,28 +1604,6 @@ class ContractFileReadabilityTests(unittest.TestCase):
         self.assertNotIn("editJSONCases", shared_undo())
         self.assertNotIn("editJSONCasesHow", shared_undo())
         self.assertGreaterEqual(len(json_cases()["editJSONCases"]), 16)
-
-
-class HandedOverOrderTests(unittest.TestCase):
-    """U4b3 door-4: a step that hands a place over is swapped in the step's
-    order, reversed going back (opKinds.wholeOps' second exception), as
-    UndoCheck.plan orders its targets (doors 1 and 2)."""
-
-    def test_shape_b_goes_in_the_steps_order_and_back_reversed(self):
-        day = "courses/TST1O/section1/Unit 1, Day %d.md"
-        ops = (traces.ops_for_change(day % 4, None, "Three.\n")
-               + traces.ops_for_change(day % 3, "Three.\n", None)
-               + [{"kind": "move", "from": day % 2, "to": day % 3, "linkSha": traces.sha("../library/Day 2.md")}]
-               + traces.ops_for_change(day % 2, None, "New.\n"))
-        self.assertEqual(len(traces.handovers(ops)), 2)
-        forward = []
-        for group in traces.swap_groups(ops, False):
-            forward.append(group[0].get("path") or group[0]["from"])
-        self.assertEqual(forward, [day % 4, day % 3, day % 2, day % 2])
-        backward = []
-        for group in traces.swap_groups(ops, True):
-            backward.append(group[0].get("path") or group[0]["from"])
-        self.assertEqual(backward, [day % 2, day % 2, day % 3, day % 4])
 
 
 class OneComparisonTests(unittest.TestCase):

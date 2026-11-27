@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # #899 U4b3 door-5: a step that hands a place over, killed before any of its swaps, settles whole
 
 Brief: `vm-tools/briefs/2026-11-26-899-u4b3-door-5-a-killed-handover-settles-whole.md` (chain: `2026-11-26-899-u4b3-ORDER.md`, fifth link). Branch `issue/899-u4b3-linked-class-page-moves-its-link`, worktree `wt-899-u4b3`, from door-4's head 84bee6dc4. **`contracts/` touched: both gates.**

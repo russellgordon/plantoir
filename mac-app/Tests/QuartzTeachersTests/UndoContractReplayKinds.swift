@@ -43,8 +43,7 @@ nonisolated enum UndoContractKinds {
         "finderRecordsAWindowInTheMadeFolder",
         "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
         "moveALinkToAFolder", "stepEditingInsideALinksMove",
-        "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
-        "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
+        "movePlainPageAwayFromDay3",
     ]
 
     /// U4b: the three spellings of the folder a capitalisation-only rename
@@ -71,17 +70,12 @@ nonisolated enum UndoContractKinds {
     static let linkedLibrary: String = "courses/TST1O/library"
     static let libraryFiles: [String: String] = ["a.md": "A\n", "pictures/b.md": "B\n"]
 
-    /// U4b3 door-4: the class pages `handAPlaceOverAfterALinksMove` and
-    /// `handAPlaceOverBeforeALinksMove` hand over, by day, and the library
-    /// their links lead to (relative targets).
-    static let handedOverDays: [Int] = [2, 3, 4]
+    /// #1055 M5: the class pages `movePlainPageAwayFromDay3` changes, by
+    /// day.
+    static let classPageDays: [Int] = [3, 4, 5]
 
     static func classPage(_ day: Int) -> String {
         return "courses/TST1O/section1/Unit 1, Day \(day).md"
-    }
-
-    static func libraryTarget(_ day: Int) -> String {
-        return "../library/Day \(day).md"
     }
 
     static let asidePage: String = "courses/TST1O/old/a.md"
@@ -486,59 +480,21 @@ nonisolated enum UndoContractKinds {
             try UndoContractReplay.appendRaw(begin, to: journal)
             try UndoContractReplay.appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\"}", to: journal)
             return nil
-        case "handAPlaceOverAfterALinksMove":
-            // U4b3 door-4, shape A: Day 3 a link; ONE step: the link moved to
-            // Day 4, then a new page at the place it left.
+        case "movePlainPageAwayFromDay3":
+            // #1055 M5: the kept-page guard's plain step, no link anywhere:
+            // Day 3's page to Day 4 (a new file, Day 3 removed), then a new
+            // page at Day 5, as Insert Class moves an ordinary class.
             if !somethingIsAt(classPage(3), in: root) && !somethingIsAt(classPage(4), in: root) {
-                try UndoContractReplay.write("Linked.\n", to: "courses/TST1O/library/Day 3.md", in: root)
-                try layALink(classPage(3), leadingTo: libraryTarget(3), root: root)
-            }
-            let new: Data = Data("New.\n".utf8)
-            let ops: [UndoOp] = [
-                UndoOp.moveLink(from: classPage(3), to: classPage(4), linkSha: UndoHash.sha256(of: Data(libraryTarget(3).utf8))),
-                UndoOp.writeFile(path: classPage(3), beforeSha: nil, afterSha: UndoHash.sha256(of: new)),
-            ]
-            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [new], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
-        case "handAPlaceOverBeforeALinksMove":
-            // U4b3 door-4, shape B: Day 2 a link, Day 3 a page; ONE step:
-            // Day 3's page to Day 4, Day 3 removed, the link moved into Day
-            // 3, a new page at Day 2.
-            if !somethingIsAt(classPage(2), in: root) && !somethingIsAt(classPage(3), in: root) {
-                try UndoContractReplay.write("Two.\n", to: "courses/TST1O/library/Day 2.md", in: root)
-                try layALink(classPage(2), leadingTo: libraryTarget(2), root: root)
                 try UndoContractReplay.write("Three.\n", to: classPage(3), in: root)
             }
             let three: Data = Data("Three.\n".utf8)
-            let new: Data = Data("New.\n".utf8)
+            let five: Data = Data("Five.\n".utf8)
             let ops: [UndoOp] = [
                 UndoOp.writeFile(path: classPage(4), beforeSha: nil, afterSha: UndoHash.sha256(of: three)),
                 UndoOp.writeFile(path: classPage(3), beforeSha: UndoHash.sha256(of: three), afterSha: nil),
-                UndoOp.moveLink(from: classPage(2), to: classPage(3), linkSha: UndoHash.sha256(of: Data(libraryTarget(2).utf8))),
-                UndoOp.writeFile(path: classPage(2), beforeSha: nil, afterSha: UndoHash.sha256(of: new)),
+                UndoOp.writeFile(path: classPage(5), beforeSha: nil, afterSha: UndoHash.sha256(of: five)),
             ]
-            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [three, new], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
-        case "editTheHandedOverPageByHand":
-            try? FileManager.default.removeItem(at: root.appendingPathComponent(classPage(3)))
-            try UndoContractReplay.write("Hand.\n", to: classPage(3), in: root)
-            return nil
-        case "stepFillingAPlaceBeforeItIsLeft":
-            // Written as another version might write it, changing nothing: a
-            // new page at Day 3, THEN the link's move away from Day 3.
-            let linkSha: String = UndoHash.sha256(of: Data(libraryTarget(3).utf8))
-            let newSha: String = UndoHash.sha256(of: Data("New.\n".utf8))
-            let ops: String = "[{\"kind\":\"writeFile\",\"path\":\"\(classPage(3))\",\"beforeSha\":null,\"afterSha\":\"\(newSha)\"},"
-                + "{\"kind\":\"move\",\"from\":\"\(classPage(3))\",\"to\":\"\(classPage(4))\",\"linkSha\":\"\(linkSha)\"}]"
-            try appendAStepChangingNothing(ops: ops, root: root, journal: journal)
-            return nil
-        case "stepHandingOverAFoldersPlace":
-            // The same, a folder's move away from section 1's media and then
-            // a new file at that place: a folder never hands a place over.
-            let folder: String = "courses/TST1O/section1/media"
-            let newSha: String = UndoHash.sha256(of: Data("New.\n".utf8))
-            let ops: String = "[{\"kind\":\"move\",\"from\":\"\(folder)\",\"to\":\"courses/TST1O/section1/renamed\",\"listingSha\":\"\(String(repeating: "a", count: 64))\"},"
-                + "{\"kind\":\"writeFile\",\"path\":\"\(folder)\",\"beforeSha\":null,\"afterSha\":\"\(newSha)\"}]"
-            try appendAStepChangingNothing(ops: ops, root: root, journal: journal)
-            return nil
+            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [three, five], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
         case "addAFileInsideTheMovedFolder":
             try UndoContractReplay.write("C\n", to: renamedFolder + "/c.md", in: root)
             return nil
@@ -664,13 +620,6 @@ nonisolated enum UndoContractKinds {
         return inByteOrder.joined(separator: ", ")
     }
 
-    /// U4b3 door-4: a symbolic link at a place, holding a target as written.
-    static func layALink(_ path: String, leadingTo target: String, root: URL) throws {
-        let url: URL = root.appendingPathComponent(path)
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try FileManager.default.createSymbolicLink(atPath: url.path, withDestinationPath: target)
-    }
-
     /// A begin and an applied line, as another version might write them,
     /// for a step of these ops (JSON) that changes nothing.
     static func appendAStepChangingNothing(ops: String, root: URL, journal: UndoJournal) throws {
@@ -682,19 +631,14 @@ nonisolated enum UndoContractKinds {
         try UndoContractReplay.appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\"}", to: journal)
     }
 
-    /// U4b3 door-4's `handedOver`: section 1's class pages Day 2, Day 3
-    /// and Day 4, in that order, each as `Day <n>: page <text>` (its text without its last line end),
-    /// `Day <n>: link <target>` or `Day <n>: nothing`, then `library:
-    /// untouched` when every page the links lead to holds what the call laid
-    /// (else `changed`), joined by `; `.
-    static func handedOver(in root: URL) -> String {
+    /// #1055 M5's class pages: section 1's Day 3, Day 4 and Day 5, in that
+    /// order, each as `Day <n>: page <text>` (its text without its last
+    /// line end), `Day <n>: other` or `Day <n>: nothing`, joined by `; `.
+    static func classPages(in root: URL) -> String {
         var parts: [String] = []
-        for day in handedOverDays {
-            let url: URL = root.appendingPathComponent(classPage(day))
+        for day in classPageDays {
             var what: String = "nothing"
-            if let bytes = UndoTreeReading.linkTarget(at: url), let target = UndoText.decode(bytes) {
-                what = "link " + target
-            } else if let content = text(at: classPage(day), in: root) {
+            if let content = text(at: classPage(day), in: root) {
                 var trimmed: String = content
                 if trimmed.hasSuffix("\n") {
                     trimmed.removeLast()
@@ -705,17 +649,6 @@ nonisolated enum UndoContractKinds {
             }
             parts.append("Day \(day): " + what)
         }
-        // The pages the links lead to, each exactly as the call laid it.
-        let laid: [String: String] = ["Day 2.md": "Two.\n", "Day 3.md": "Linked.\n"]
-        var library: String = "untouched"
-        let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("courses/TST1O/library").path)) ?? []
-        for name in names {
-            if let wanted = laid[name], text(at: "courses/TST1O/library/" + name, in: root) == wanted {
-                continue
-            }
-            library = "changed"
-        }
-        parts.append("library: " + library)
         return parts.joined(separator: "; ")
     }
 
