@@ -24,6 +24,11 @@ struct ReDatedPage: Equatable {
     let title: String
     let fileURL: URL
     let isSectionLocal: Bool
+
+    /// The key the new date is written under: the place of the FILE the
+    /// page is decides it, through every link (#1048, `ClassPages.dateKey`),
+    /// while `isSectionLocal` still decides the visibility key.
+    let dateKey: String
     let from: CalendarDay?
     let to: CalendarDay
     let reason: Reason
@@ -160,6 +165,14 @@ enum SectionReDatePlanner {
             guard let page = graph.page(titled: summary.title) else {
                 continue
             }
+            // A shared lesson several classes link to keeps the date of the
+            // FIRST of them, always (Russell on #899, 2026-11-26): a later
+            // class that leads to the same file plans nothing for it, so the
+            // file is written once, with the first class's day, whatever
+            // order the moves are written in (#1048).
+            if !ClassPages.isTheFirstClassLeadingToItsFile(summary.fileURL, among: classes) {
+                continue
+            }
             let isOverflow: Bool = index >= remembered.dates.count
             let unpublishes: Bool = isOverflow && page.isVisibleToStudents
             if page.date == day && !unpublishes {
@@ -168,6 +181,7 @@ enum SectionReDatePlanner {
             moves.append(ReDatedPage(
                 title: page.displayTitle, fileURL: page.fileURL,
                 isSectionLocal: page.isSectionLocal,
+                dateKey: page.dateKey,
                 from: page.date, to: day, reason: .aClass,
                 unpublishes: unpublishes
             ))
@@ -191,6 +205,7 @@ enum SectionReDatePlanner {
             moves.append(ReDatedPage(
                 title: page.displayTitle, fileURL: page.fileURL,
                 isSectionLocal: page.isSectionLocal,
+                dateKey: page.dateKey,
                 from: page.date, to: firstDay, reason: .yearRound,
                 unpublishes: false
             ))
@@ -229,6 +244,7 @@ enum SectionReDatePlanner {
                 moves.append(ReDatedPage(
                     title: page.displayTitle, fileURL: page.fileURL,
                     isSectionLocal: page.isSectionLocal,
+                    dateKey: page.dateKey,
                     from: page.date, to: day, reason: .broughtBy(classPage.displayTitle),
                     unpublishes: false
                 ))
@@ -298,9 +314,7 @@ enum SectionReDatePlanner {
                 let before: String = try step.readTextOrThrow(move.fileURL)
                 let dated: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                     in: before,
-                    key: PageFrontmatter.createdKey(
-                        forSection: sectionNumber, isSectionLocal: move.isSectionLocal
-                    ),
+                    key: move.dateKey,
                     to: move.to,
                     fallbackTail: tail
                 )

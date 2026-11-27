@@ -1724,20 +1724,20 @@ enum AssistPublishPlanner {
     ) throws -> PlannedWrites {
         // Every file this plan touches, gathered first, so a page that both
         // changes visibility and moves date is written once.
-        var editsByPath: [String: (url: URL, isSectionLocal: Bool)] = [:]
+        var editsByPath: [String: (url: URL, isSectionLocal: Bool, dateKey: String)] = [:]
         var publishByPath: [String: Bool] = [:]
         var dateByPath: [String: CalendarDay] = [:]
         var titleByPath: [String: String] = [:]
 
         for change in plan.changes {
             let path: String = change.page.fileURL.path
-            editsByPath[path] = (change.page.fileURL, change.page.isSectionLocal)
+            editsByPath[path] = (change.page.fileURL, change.page.isSectionLocal, change.page.dateKey)
             publishByPath[path] = change.willBeVisible
             titleByPath[path] = change.page.displayTitle
         }
         for move in plan.dateMoves {
             let path: String = move.page.fileURL.path
-            editsByPath[path] = (move.page.fileURL, move.page.isSectionLocal)
+            editsByPath[path] = (move.page.fileURL, move.page.isSectionLocal, move.page.dateKey)
             dateByPath[path] = move.to
             titleByPath[path] = move.page.displayTitle
         }
@@ -1785,9 +1785,8 @@ enum AssistPublishPlanner {
                 if let day = dateByPath[path] {
                     let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                         in: text,
-                        key: PageFrontmatter.createdKey(
-                            forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
-                        ),
+                        // The file's own place decides, through a link (#1048).
+                        key: edit.dateKey,
                         to: day,
                         fallbackTail: tail
                     )
