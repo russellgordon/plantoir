@@ -29,7 +29,7 @@ public sealed class UndoFoldMovesContractTests
         // leaves the contract. Every other row is compared word for word.
         var deferred = NamedGapLedger.GapsIn(
             NamedGapLedger.UndoFoldMoves, contract.Select(RowKey), here.Select(RowKey));
-        Assert.Equal(20, contract.Count - deferred.Count);   // the table, not a case list: any change is one to read
+        Assert.Equal(21, contract.Count - deferred.Count);   // the table, not a case list: any change is one to read
         Assert.Equal(contract.Where(row => !deferred.Contains(RowKey(row))).ToList(), here);
     }
 
