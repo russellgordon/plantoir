@@ -316,7 +316,10 @@ nonisolated enum UndoTrail {
         case .cannotTellNow(let path):
             why = "\(path) could not be read just now"
         case .couldNotWrite(let path):
-            why = "nothing could be written beside \(path) (the disk may be full)"
+            // True for a full disk, a folder that will not take a new file
+            // and a volume that refuses the one exchange a link's change
+            // needs (mac-2; the day27b-2 sweep, point 3).
+            why = "\(path) could not be changed in its folder, which may be full or may not allow the change"
         case .changedSince(let path, _):
             why = "\(path) changed while it was being put back"
         case .contentMissing(let path):

@@ -23927,8 +23927,9 @@ the other way). It no longer catches every staged name beside a relink's
 place: in Insert Class's shape (a new page written at the relink's `from`)
 the write's staged page and its kept original had been read as the
 teacher's, kept as `Unit 1, Day 4 (kept by Undo).md` and reported as a kept
-page. The live swap now says the kept-page or kept-folder line wherever it
-keeps an item visible (`tellingKept`, threaded through `UndoSwap.swap`); a
+page. The live swap now says the line 'undo kept an item found where a link
+was being changed' (mac-2; it said the kept-page or kept-folder line until
+the day27b-2 sweep) wherever it keeps an item visible (`tellingKept`, threaded through `UndoSwap.swap`); a
 rename back refused because the place filled meanwhile keeps the item
 visible rather than hidden; and an item that cannot be read refuses
 `cannotTellNow`, only a refused move `couldNotWrite`.
@@ -23937,7 +23938,7 @@ Review 2 and the pass after it (final behaviour). One function,
 a relink's staged name: an item there is removed only when it is a link
 holding one of the step's texts; anything else is the teacher's, renamed back
 when the place is empty, otherwise kept under `<name> (kept by Undo)` with the
-kept-page or kept-folder line said first. In the live swap only, a teacher's
+line 'undo kept an item found where a link was being changed' said first. In the live swap only, a teacher's
 item is exchanged back while the place holds the swap's own new link; a
 recovery tidy never takes a step's link out (it cannot tell which way a
 stopped exchange went), so the place keeps the swap's link and the item is

@@ -771,7 +771,7 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         try FileManager.default.createSymbolicLink(atPath: hop.path, withDestinationPath: "../section1/All Classes/Unit 1, Day 4.md")
         try replaceWithALink("Unit 1, Day 5", holding: "../../elsewhere/hop.md", in: made)
         let before: [String: String] = everything(under: made)
-        let stepsBefore: Int = try stepCount()
+        let onTheListBefore: Int = try UndoJournalLocation.standardJournal().read().stepsOnTheList.count
         UndoKillPoints.relinkRenameInFails = { url in
             return url.lastPathComponent == "hop.md"
         }
@@ -797,7 +797,10 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
             XCTAssertFalse(line.contains("(the disk may be full)"), line)
         }
         XCTAssertEqual(everything(under: made), before, "nothing changed")
-        XCTAssertEqual(try stepCount(), stepsBefore, "no step recorded")
+        XCTAssertEqual(
+            try UndoJournalLocation.standardJournal().read().stepsOnTheList.count, onTheListBefore,
+            "nothing new on the list (the refused step is closed failed)"
+        )
     }
 
     // MARK: - Tests: a class only re-dated (mac-2)
