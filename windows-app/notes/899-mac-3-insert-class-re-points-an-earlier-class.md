@@ -19,7 +19,7 @@ Five `undo.stackCases` rows ("mac-3, Insert Class with an earlier class …") he
 
 ## Must-fail lines
 
-See `899-mac-3-mustfail.log` (filled below after the runs).
+5 of 5 RED (`899-mac-3-mustfail.log`): M1 (loop back to re-date-only) RED the four earlier-class tests (8 failures); M2 (text unchanged) RED 10; M3 (a date written at Day 1's place) RED by the door's refusal, 3 tests; M4 (Python) RED `test_stack_cases` 3; S1054 (#1054: the same bytes written back through the link) RED `UndoRelinkTests.testARelinkKilledAtAnyMomentIsWholeAfterRecovery` and two `JournaledStepTests` on modification time alone. After M3's first form showed the hop-inside test pinned no dates, that test now pins Day 4's and Day 3's dates and the page count.
 
 ## Runs (`.dd/`)
 
@@ -27,6 +27,7 @@ See `899-mac-3-mustfail.log` (filled below after the runs).
 2. run-red (tests only, the planner as on the base): 41 tests, 8 failures in 4 tests (`testAnEarlierClassLinkedToAClassItRenamesIsRePointed` 3, `…ThroughAHopInsideRePointsTheHop` 2, `…ThroughAHopOutsideRePointsItsOwnLink` 2, the kill table 1). Green before: the shared-hop test (the later class already re-points the hop) and the plan-leaves test, as they guard.
 3. run-green1: 161 tests, 1 failure (the new stackCases rows' placeholder dates; read off and set). run-green2: `UndoMakeRoomLinkedPageTests`, `MakeRoomForClassesTests`, `DateKeyByTheTargetsPlaceTests`, `UndoJournalContractTests`, `SharedRulesContractTests`, `ClassPlanningContractTests`, `ActivityTrailWiringTests`: 189 tests, 0 failures.
 4. `python3 scripts/test_make_undo_traces.py`: 46 tests OK, traces current (nothing regenerated).
+5. run-green3 (#1054 helpers): `UndoRelinkTests`, `JournaledStepTests`, `UndoMakeRoomLinkedPageTests`: 109 tests, 0 failures. Must-fail runs A, B, C, C2 to C4. run-green4 (strengthened hop-inside test): `UndoMakeRoomLinkedPageTests`, `UndoJournalContractTests`: 60, 0 failures. Then a plain Debug build.
 
 ## Left for the next piece
 
@@ -38,3 +39,5 @@ See `899-mac-3-mustfail.log` (filled below after the runs).
 - Out of scope, not tested: class pages of other sections and non-class pages that link to a renamed class page.
 
 ## Self-check
+
+1. Must-fail 5 of 5 RED, each restored (`git checkout`, diff clean). 2. No timed waits; the kill table makes its own lists and asserts once on the main actor. 3. No sentence a teacher reads added or changed; no interface change, so no HIG section applies. 4. `origin/dev` (35b54c40a) merged before proving and before hand-back: already contained. 5. No number tuned. 6. Contract checks from the JSON by script: each held name once in each file; no unescaped quote in the C# constant, parentheses balanced; the three `UndoMakeRoomStepTests.cs` substrings once each. 7. House-style grep over every added Swift line empty; the new tests sit in their own MARK section; no new type. 8. Review 3 of mac-2 LOW 1 fixed (documentation, by reading); LOW 2 left for the stop figure (above, with a proposed sentence); #1054 fixed with a sabotage seen red. 9. Switch off, rename record untouched. 10. Every new contract row is in the Mac's replay (green) and the Python model, and held on Windows by exact name.

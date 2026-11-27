@@ -1075,7 +1075,14 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
             ResolvedFile.throughLinks(at: dayOne), ResolvedFile.ofThePlace(at: made.classes.appendingPathComponent("Unit 1, Day 4.md")),
             "the same lesson, now Day 4's page"
         )
-        XCTAssertEqual(try text("Unit 1, Day 4", in: made).components(separatedBy: "created").count, 2)
+        let day4: String = try text("Unit 1, Day 4", in: made)
+        XCTAssertEqual(day4.components(separatedBy: "created").count, 2, "dated once: \(day4)")
+        XCTAssertTrue(day4.contains("created: 2026-09-18T07:00:00.000-0400"), "its own move's date only: \(day4)")
+        XCTAssertTrue(day4.contains("Three.") && day4.contains("title: Unit 1, Day 4"), day4)
+        let day3: String = try text("Unit 1, Day 3", in: made)
+        XCTAssertTrue(day3.contains("Two.") && day3.contains("created: 2026-09-16T07:00:00.000-0400"), "nothing written through Day 1: \(day3)")
+        XCTAssertEqual(day3.components(separatedBy: "created").count, 2, "dated once: \(day3)")
+        XCTAssertEqual(everything(under: made).count, before.count + 1, "one new page, nothing else")
         try checkUndoAndRedoAreExact(made, before: before)
     }
 
