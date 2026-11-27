@@ -53,23 +53,40 @@ nonisolated enum UndoRestoreSetAside {
         return paths
     }
 
-    /// Whether the step lies inside what the restore replaces: made in this
-    /// working folder (by its identifier) and naming at least one file under
-    /// `replaced` (one stopped file there is enough: none of the step can be
-    /// judged honestly once part of it is replaced).
-    static func liesInside(_ step: UndoStep, workingFolderID: String, replaced: String) -> Bool {
-        guard let folder = step.workingFolder, folder.id.lowercased() == workingFolderID.lowercased() else {
-            return false
-        }
-        for path in pathsNamed(by: step) where isInside(path, replaced) {
+    /// Whether `path` is inside any of `replaced`.
+    static func isInsideAny(_ path: String, _ replaced: [String]) -> Bool {
+        for place in replaced where isInside(path, place) {
             return true
         }
         return false
     }
 
-    /// Closes every step in flight whose files lie inside `replaced` (a
-    /// path inside the working folder at `workingFolderRoot`, such as
-    /// `courses/ICS3U` for a whole course), inside the list's own lock, and
+    /// Whether the step lies WHOLLY inside what the restore replaces: made
+    /// in this working folder (by its identifier), naming at least one file,
+    /// and every file it names under one of `replaced`. A step only partly
+    /// inside (a section's page and a page every section shares, which a
+    /// one-section restore edits only by its per-section keys) is left in
+    /// flight: no rule of the list says yet what such a step is once half
+    /// of it is replaced (parked, #899), so it is judged by recovery as
+    /// before.
+    static func liesInside(_ step: UndoStep, workingFolderID: String, replaced: [String]) -> Bool {
+        guard let folder = step.workingFolder, folder.id.lowercased() == workingFolderID.lowercased() else {
+            return false
+        }
+        let paths: [String] = pathsNamed(by: step)
+        if paths.isEmpty {
+            return false
+        }
+        for path in paths where !isInsideAny(path, replaced) {
+            return false
+        }
+        return true
+    }
+
+    /// Closes every step in flight whose files lie wholly inside `replaced`
+    /// (paths inside the working folder at `workingFolderRoot`: `courses/ICS3U`
+    /// for a whole course; `courses/ICS3U/section1` and the section's files
+    /// outside it for one section), inside the list's own lock, and
     /// leaves one trail line for each. Steps of other courses and other
     /// working folders are never touched. Returns the numbers of the steps
     /// it closed. A list that cannot be locked or written changes nothing
@@ -77,7 +94,7 @@ nonisolated enum UndoRestoreSetAside {
     /// this rule, and is said on the trail.
     @discardableResult
     static func setAsideStepsInFlight(
-        inside replaced: String,
+        inside replaced: [String],
         workingFolderRoot: URL,
         course: String,
         journal: UndoJournal,

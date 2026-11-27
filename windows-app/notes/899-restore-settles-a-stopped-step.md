@@ -57,23 +57,54 @@ other door would wait). A live process's step is set aside too: the restore
 already refuses while another program's session is open on the course
 (#458), so a step still in flight there is one that stopped.
 
-## For the director (parked, budget)
+## Round two (the coordinator's follow-up)
 
-- Tests owed: Restore from Backup… with a settings step in flight (the
-  unreadable outcome, Not Now chosen); a step in another course that
-  survives the restore and is still recovered end to end (only the
-  selection rule is unit tested); and a restore that fails part way, with
-  the step's state asserted.
-- Not built: a ONE-SECTION restore (`restoreSectionFromTheMenu`,
-  `restoreSection`) does not set aside yet. It needs `inside:
-  "courses/<CODE>/section<N>"` plus the per-section keys it writes into
-  shared pages, so a step naming those files counts too.
-- What the unfixed tree actually does: in the end-to-end test, recovery
-  as at launch left the OLD step IN FLIGHT (not closed as made). So the
-  doubled Get Ready the earlier notes predicted did not happen in this
-  fixture, but the step stayed open for a later judgement against the
-  restored course, which is the fault. The test asserts both: one Get Ready
-  done and nothing in flight.
+- One-section restore: built. `swapSectionInPlace`, which the menu's and
+  the assistant's one-section restores share, sets aside the steps that lie
+  WHOLLY inside `courses/<CODE>/section<N>` plus the section's outside files
+  it moves, before its first move.
+- The rule changed for both kinds of restore. A step is set aside only when
+  every file it names is inside what the restore replaces. A step only
+  PARTLY inside is left in flight, as before. No rule of the list settles
+  this case: `undo.rule.recovery` judges a step file by file but assumes
+  nothing replaced its files, and `undo.rule.clearing` speaks only of
+  changes by hand. So nothing is set aside for it, and today's behaviour is
+  pinned by a test.
+- Example of a partly-inside step (PARKED for a ruling): Get Ready for
+  section 1 stops part way. Its step names section 1's class pages and the
+  shared page `courses/ICS3U/index.md`, whose `publishForSection1` key it
+  set. The teacher then restores section 1 only. The section's pages become
+  the backup's, the shared page's body stays, and its per-section key is
+  restored. The step stays in flight, and recovery later judges it against
+  the restored section, which is the original fault for that half. A
+  whole-course restore of a step that also names a file outside the course
+  is the same case (none is known today).
+- The three owed tests are built in `UndoRestoreSetAsideRestoreTests`. The
+  settings step is a Course Settings save killed after its swap and before
+  `applied`, which is the state Not Now leaves (file new, step open). This
+  stands in for the unreadable outcome, which needs the window.
+- A restore that fails part way, every file put back: the step is
+  `interrupted`. That is true of the disk, because the course again holds
+  what the stopped save left. Recovery never writes over it (the test
+  checks every byte).
+
+## Must-fail log, round two (each break run on its own)
+
+| Break | RED |
+|---|---|
+| the one-section set-aside call skipped | testAOneSectionRestoreSetsAsideOnlyAStepWhollyInsideTheSection (the section's step left begun) |
+| `liesInside` back to "any file inside" | the same test (the partly-inside step set aside) |
+
+The one-section test was also RED on the round-one head (4aa5f8ae2), before
+any one-section code. The three whole-course tests prove round one's fix: they
+passed on 4aa5f8ae2 apart from one wrong assertion of the test's own (it
+compared the backup with a course that keeps `.git` in place), now fixed.
+
+Proof: the round-one four, the new class and every restore class touched
+(AssistSectionRestoreTests, CourseRestorerStagedTests, CourseRestorerTests,
+OneSectionRestoreContractTests, OneSectionRestoreOrderTests,
+OneSectionRestoreTests, SectionRestoredTrailTests): 137 of 137 green after
+`origin/dev` was merged.
 
 ## Must-fail log (each break run on its own, UndoRestoreSetAsideTests)
 

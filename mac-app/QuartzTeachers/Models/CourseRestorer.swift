@@ -311,7 +311,7 @@ enum CourseRestorer {
         let settingAsideFirst: (URL) throws -> Void = { (staging: URL) throws in
             try beforeTheSwap(staging)
             UndoRestoreSetAside.setAsideStepsInFlight(
-                inside: "courses/" + courseCode, workingFolderRoot: workingFolderRoot,
+                inside: ["courses/" + courseCode], workingFolderRoot: workingFolderRoot,
                 course: courseCode, journal: UndoJournalLocation.standardJournal()
             )
         }
@@ -843,6 +843,21 @@ enum CourseRestorer {
         try fileManager.createDirectory(at: liveSectionURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: asideSectionURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: asideOutsideURL, withIntermediateDirectories: true)
+
+        // Every Undo step left in flight wholly inside what this restore
+        // replaces (the section's folder and its files outside it) is set
+        // aside first, inside the list's lock, before anything moves (#899;
+        // `UndoRestoreSetAside`). Shared by the menu's and the assistant's
+        // one-section restores.
+        let courseCode: String = courseURL.lastPathComponent
+        var replacedPlaces: [String] = ["courses/" + courseCode + "/" + folderName]
+        for file in outsideFiles where file.treatment != .leftAsItIs {
+            replacedPlaces.append("courses/" + courseCode + "/" + file.path(forSection: sectionNumber))
+        }
+        UndoRestoreSetAside.setAsideStepsInFlight(
+            inside: replacedPlaces, workingFolderRoot: courseURL.deletingLastPathComponent().deletingLastPathComponent(),
+            course: courseCode, journal: UndoJournalLocation.standardJournal()
+        )
 
         var done: [SwapStep] = []
         do {

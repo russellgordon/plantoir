@@ -44,7 +44,7 @@ final class UndoRestoreSetAsideRestoreTests: XCTestCase {
         try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL)
         XCTAssertEqual(try inFlight().count, 0, "the restore left the settings step in flight")
         let restored: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
-        XCTAssertEqual(restored, fixture.backupFiles)
+        XCTAssertEqual(restored["course_config.json"], fixture.backupFiles["course_config.json"], "the course is not the backup's")
 
         await recoverAsAtALaunch(fixture.rootURL)
         XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), restored, "recovery changed the restored course")

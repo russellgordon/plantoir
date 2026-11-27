@@ -94,9 +94,9 @@ final class UndoRestoreSetAsideTests: XCTestCase {
         let inside: UndoStep = UndoRestoreSetAsideTests.step(writing: "courses/ICS3U/section1/a.md", in: here)
         let otherCourse: UndoStep = UndoRestoreSetAsideTests.step(writing: "courses/ICS3UX/section1/a.md", in: here)
         let otherFolder: UndoStep = UndoRestoreSetAsideTests.step(writing: "courses/ICS3U/section1/a.md", in: elsewhere)
-        XCTAssertTrue(UndoRestoreSetAside.liesInside(inside, workingFolderID: "AAAA", replaced: "courses/ICS3U"))
-        XCTAssertFalse(UndoRestoreSetAside.liesInside(otherCourse, workingFolderID: "aaaa", replaced: "courses/ICS3U"))
-        XCTAssertFalse(UndoRestoreSetAside.liesInside(otherFolder, workingFolderID: "aaaa", replaced: "courses/ICS3U"))
+        XCTAssertTrue(UndoRestoreSetAside.liesInside(inside, workingFolderID: "AAAA", replaced: ["courses/ICS3U"]))
+        XCTAssertFalse(UndoRestoreSetAside.liesInside(otherCourse, workingFolderID: "aaaa", replaced: ["courses/ICS3U"]))
+        XCTAssertFalse(UndoRestoreSetAside.liesInside(otherFolder, workingFolderID: "aaaa", replaced: ["courses/ICS3U"]))
     }
 
     // MARK: - Helpers
