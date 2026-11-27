@@ -633,6 +633,82 @@ class DatesFollowTheClassTests(unittest.TestCase):
         self.assertEqual(again["rewritten"], [], "a second build rewrote pages")
         self.assertEqual({path: path.read_bytes() for path in course.rglob("*.md")}, settled)
 
+    def test_a_file_a_numbered_class_owns_keeps_that_classs_date(self):
+        # #1048b: the cases are class-planning.json →
+        # datingPagesAClassBrings.frontmatterKey.firstClassKeepsASharedLessonCases,
+        # each built for every section it has classes in, then built again.
+        cases = _load("datingPagesAClassBrings", "frontmatterKey", "firstClassKeepsASharedLessonCases")
+        self.assertGreater(len(cases), 0)
+        for index, case in enumerate(cases):
+            with self.subTest(case=case["name"]):
+                self.run_a_first_class_case(case, index)
+
+    def run_a_first_class_case(self, case: dict, index: int) -> None:
+        course = self.temporary / f"first-class-{index}" / "courses" / "TEST"
+        for place, keys in case["files"].items():
+            file = course / place
+            file.parent.mkdir(parents=True, exist_ok=True)
+            lines = ["---", f"title: {file.stem}"]
+            for key, value in keys.items():
+                lines.append(f"{key}: {value}")
+            lines.extend(["---", "The lesson.", ""])
+            file.write_text("\n".join(lines), encoding="utf-8")
+        sections: list = []
+        for page in case["classes"]:
+            place = course / page["page"]
+            place.parent.mkdir(parents=True, exist_ok=True)
+            section = int(page["page"].split("/")[0][len("section"):])
+            if section not in sections:
+                sections.append(section)
+            if page.get("linkHolds") is not None:
+                _link_or_skip(self, place, Path(page["linkHolds"]))
+                continue
+            place.write_text(
+                f"---\ntitle: {place.stem}\npublish: true\ncreated: {page['created']}\n---\n"
+                f"{page.get('says', '')}\n", encoding="utf-8")
+
+        def build(section: int) -> dict:
+            content = self.temporary / f"first-class-{index}" / f"content{section}"
+            if content.exists():
+                shutil.rmtree(content)
+            content.mkdir()
+            build_site.forget_vault_sources(course)
+            for root, _dirs, files in os.walk(course / "Shared"):
+                relative = Path(root).relative_to(course)
+                (content / relative).mkdir(parents=True, exist_ok=True)
+                for file in files:
+                    shutil.copy2(Path(root) / file, content / relative / file)
+                    build_site.remember_vault_source(content / relative / file, Path(root) / file, False)
+                    build_site.process_frontmatter(content / relative / file, section)
+            build_site.copy_the_per_section_folders(course / f"section{section}", content,
+                                                    ["All Classes"], section)
+            first = build_site._find_first_class_created(content)
+            if first is not None:
+                build_site._sync_non_class_pages_created(content, first)
+            return build_site._date_pages_from_their_classes(content, section)
+
+        def every_file() -> dict:
+            files: dict = {}
+            for path in sorted(course.rglob("*.md")):
+                if not path.is_symlink():
+                    files[path] = path.read_bytes()
+            return files
+
+        for section in sections:
+            build(section)
+        for place, expected in case["expect"].items():
+            metadata = frontmatter.load(course / place).metadata
+            for key, value in expected.items():
+                self.assertEqual(str(metadata.get(key)), value, f"{place}: {key}")
+            for key in metadata:
+                if key.startswith("created"):
+                    self.assertIn(key, expected, f"{place}: a key the case does not expect, {key}")
+        settled = every_file()
+        for section in sections:
+            again = build(section)
+            self.assertEqual(again["rewritten"], [], "a second build rewrote pages")
+        self.assertEqual(every_file(), settled, "a second build changed the teacher's files")
+
     # MARK: - Assertions
 
     def copy_of(self, content: Path, title: str) -> Path:
