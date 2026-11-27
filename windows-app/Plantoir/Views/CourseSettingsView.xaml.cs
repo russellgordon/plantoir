@@ -475,7 +475,9 @@ public sealed partial class CourseSettingsView : UserControl
             return error.Message;
         }
 
-        SpecialFolderRenamer.ClearRenameRecord(courseDirectory);
+        // The interrupted-rename record is the rename's own to leave
+        // (RenameRecordClaim, #899 W8b-17): it is cleared, put back or kept
+        // inside SpecialFolderRenamer.Rename, never here.
         ActivityTrail.Note(ActivityTrail.Event.FolderRenamed,
             $"renamed the folder {oldName} to {newName} in {_course.Code} ({SpecialFolderRenamer.ConfigurationKey(scope)}, {outcome.FoldersMoved} moved, {outcome.PagesRelinked} pages relinked)");
 
