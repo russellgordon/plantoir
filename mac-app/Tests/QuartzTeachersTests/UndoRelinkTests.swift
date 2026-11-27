@@ -17,13 +17,6 @@ final class UndoRelinkTests: XCTestCase {
 
     let section: String = "courses/TST1O/section1/"
 
-    /// The shapes `testChainedRelinksKilledAtEveryStopPointLoseNoLink` runs. The two with a plain link
-    /// move are laid but NOT run: review F's rule considers relinks only,
-    /// and both lose a link at some stop point (`aMoveThenARelinkIntoItsPlace`
-    /// at `afterBegin`, `aRelinkThenAMoveIntoItsPlace` at `beforeApplied`,
-    /// and in their Undo and Redo), a counter-example handed to the
-    /// director (`windows-app/notes/899-u4b3-review-F-fixes.md`).
-    let shapesTheRuleHolds: [ChainShape] = [.twoChainedRelinks, .threeChainedRelinks]
 
     /// Where the relinked link's texts lead.
     enum Leads: CaseIterable {
@@ -472,19 +465,21 @@ final class UndoRelinkTests: XCTestCase {
         return points
     }
 
-    /// Review F of U4b3, MEDIUM: two and three chained relinks, each killed
-    /// at EVERY stop point of the door (`afterBegin`, `afterTheCheck`, each
+    /// Review F of U4b3, MEDIUM: two and three chained relinks, and a plain
+    /// link move chained to a relink either way round, each killed at
+    /// EVERY stop point of the door (`afterBegin`, `afterTheCheck`, each
     /// `beforeSwap`, both halves inside each relink's swap, `afterUndoing`,
     /// `afterRedoing`, `beforeApplied`, `beforeUndone`, `beforeRedone`,
     /// `whileDeletingAFolder`), going forward, back and forward again: after
     /// recovery every link of the step is exactly as before or exactly as
     /// after, nothing staged is left, and the step is settled on the side
     /// its links show. MUST FAIL with review D's rule (one look along the
-    /// chain).
-    func testChainedRelinksKilledAtEveryStopPointLoseNoLink() async throws {
+    /// chain) and with plain link moves left out of the reading (8 of the
+    /// 40 move-chained kills).
+    func testChainedLinkMovesKilledAtEveryStopPointLoseNoLink() async throws {
         var reached: Int = 0
         var expected: Int = 0
-        for shape in shapesTheRuleHolds {
+        for shape in ChainShape.allCases {
             let swaps: Int = shape == .threeChainedRelinks ? 3 : 2
             let relinks: Int = shape == .twoChainedRelinks || shape == .threeChainedRelinks ? swaps : 1
             for work in RelinkWork.allCases {

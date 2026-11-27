@@ -1478,7 +1478,9 @@ def remove_the_links_just_made(ops, pages, started_from_before):
     passes when it stands both ways, every relink before it holds its end
     text at its end side and every relink after it holds its start text at
     its start side; of the moves that pass, the last one's just-made link
-    is removed, and none when no move passes."""
+    is removed, and none when no move passes. Every link move is read, a
+    plain one (linkSha, one text at both sides) as a constraint only: its
+    swap is one rename, so it is never the one in flight."""
     pages = dict(pages)
 
     def holds(place, text_sha):
@@ -1488,12 +1490,13 @@ def remove_the_links_just_made(ops, pages, started_from_before):
     ordered = list(ops) if started_from_before else list(reversed(ops))
     relinks = []
     for op in ordered:
-        if "linkShaBefore" not in op:
+        if op.get("kind") != "move" or ("linkShaBefore" not in op and "linkSha" not in op):
             continue
-        from_holds = holds(op["from"], op["linkShaBefore"])
-        to_holds = holds(op["to"], op["linkShaAfter"])
+        is_a_relink = "linkShaBefore" in op
+        from_holds = holds(op["from"], op["linkShaBefore"] if is_a_relink else op["linkSha"])
+        to_holds = holds(op["to"], op["linkShaAfter"] if is_a_relink else op["linkSha"])
         start_holds, end_holds = (from_holds, to_holds) if started_from_before else (to_holds, from_holds)
-        relinks.append((op, from_holds and to_holds, start_holds, end_holds))
+        relinks.append((op, is_a_relink and from_holds and to_holds, start_holds, end_holds))
     in_flight = None
     for index, (op, stands_both_ways, _, _) in enumerate(relinks):
         if not stands_both_ways:
