@@ -1792,9 +1792,18 @@ final class UndoRelinkTests: XCTestCase {
     }
 
     /// The same with the exchange back refused too: the item stays under
-    /// the staged name, and the refusal names that name, so it is said.
+    /// the staged name while the step's new link stands at the place. That
+    /// is a step left part way, never "nothing was changed": the refusal
+    /// names the VISIBLE place, never the hidden staged name (review 1 of
+    /// mac-2, LOW 1), and the step is left in flight for recovery, which
+    /// gives the item back or keeps it under a visible name and says so.
     func testAnItemThatCannotGoBackAfterTheExchangeIsNamedByTheRefusal() throws {
-        let laid: LaidRelink = try layARelinkWhereItStands(named: "unreadable-stays", leads: .inside)
+        try checkAnItemThatCannotGoBack(live: false)
+        try checkAnItemThatCannotGoBack(live: true)
+    }
+
+    func checkAnItemThatCannotGoBack(live: Bool) throws {
+        let laid: LaidRelink = try layARelinkWhereItStands(named: "unreadable-stays-\(live)", leads: .inside)
         let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 4.md")
         let stagedURL: URL = UndoSwap.besideURL(for: place, label: "1-apply", role: "new")
         defer {
@@ -1813,10 +1822,23 @@ final class UndoRelinkTests: XCTestCase {
         UndoKillPoints.relinkExchangeBackFails = { _ in
             return true
         }
+        let visiblePlace: String = section + "Unit 1, Day 4.md"
+        if live {
+            let blobs: [Data] = [Data(laid.oldText.utf8), Data(laid.newText.utf8)]
+            let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [laid.op], blobs: blobs, root: laid.root, action: "insertClass")
+            let outcome: JournaledWriteOutcome = JournaledWrite.perform(ops: draft, in: laid.journal, mode: .live, places: UndoMemoryPlaces())
+            UndoKillPoints.hook = nil
+            UndoKillPoints.relinkExchangeBackFails = nil
+            XCTAssertEqual(outcome, .leftPartWay(.cannotTellNow(path: visiblePlace), keptOriginals: []))
+            let said: String = JournaledStepError.leftPartWay(.cannotTellNow(path: visiblePlace), fileName: "Unit 1, Day 4.md", keptOriginals: []).localizedDescription
+            XCTAssertFalse(said.contains("plantoir-undo"), said)
+            return
+        }
         let result: UndoSwapResult = UndoSwap.swap(forward, label: "1-apply", root: laid.root)
         UndoKillPoints.hook = nil
         UndoKillPoints.relinkExchangeBackFails = nil
-        XCTAssertEqual(result, .refused(.cannotTellNow(path: section + stagedURL.lastPathComponent)))
+        XCTAssertEqual(result, .notPutBack(.cannotTellNow(path: visiblePlace), keptOriginals: []))
+        XCTAssertTrue(UndoSwap.isALink(place), "the step's new link stands at the place")
     }
 
     /// The director's shape from Windows' kill table: a teacher's own page

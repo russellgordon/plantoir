@@ -755,6 +755,39 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         try checkUndoAndRedoAreExact(made, before: before)
     }
 
+    /// Review 1 of mac-2, LOW 2: two later classes reach ONE in-between
+    /// link by two spellings (letter case, which the volume ignores; a
+    /// linked folder above it). The link is judged by its own identity on
+    /// disk, as the hop walk judges it, never by spelling: re-pointed once,
+    /// and Insert Class is never refused.
+    func testTwoSpellingsOfOneHopRePointItOnce() throws {
+        let spellings: [String] = ["../../Elsewhere/HOP.md", "../../alias/hop.md"]
+        for spelling in spellings {
+            let made = try makeCourse()
+            let hop: URL = made.course.directoryURL.appendingPathComponent("elsewhere/hop.md")
+            try FileManager.default.createSymbolicLink(atPath: hop.path, withDestinationPath: "../section1/All Classes/Unit 1, Day 2.md")
+            try FileManager.default.createSymbolicLink(
+                atPath: made.course.directoryURL.appendingPathComponent("alias").path, withDestinationPath: "elsewhere"
+            )
+            try replaceWithALink("Unit 1, Day 3", holding: "../../elsewhere/hop.md", in: made)
+            try replaceWithALink("Unit 1, Day 4", holding: spelling, in: made)
+            let before: [String: String] = everything(under: made)
+
+            let result = try makeRoom(atDay: 2, in: made)
+
+            XCTAssertEqual(result.steps, 1, spelling)
+            XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: hop.path), "../section1/All Classes/Unit 1, Day 3.md", spelling)
+            XCTAssertEqual(linkTarget("Unit 1, Day 4", in: made), "../../elsewhere/hop.md", spelling)
+            XCTAssertEqual(linkTarget("Unit 1, Day 5", in: made), spelling, spelling)
+            var relinksWhereTheyStand: Int = 0
+            for op in try newestOps() where op.isARelinkWhereItStands {
+                relinksWhereTheyStand += 1
+            }
+            XCTAssertEqual(relinksWhereTheyStand, 1, "the hop planned once: \(spelling)")
+            try checkUndoAndRedoAreExact(made, before: before)
+        }
+    }
+
     /// The day27b-2 sweep, point 3: Insert Class on a volume that refuses
     /// the one exchange the in-between link's re-point needs is refused
     /// `couldNotWrite` naming the in-between link, nothing changed and no
