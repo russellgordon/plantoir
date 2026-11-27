@@ -89,11 +89,20 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
         File.CreateSymbolicLink(Full(place), "../library/" + libraryPage);
     }
 
-    private UndoCheck.PlanResult PlanForward(IReadOnlyList<UndoOp> ops)
+    private UndoCheck.PlanResult PlanForward(IReadOnlyList<UndoOp> ops) => PlanIn(ops, backward: false, readAt: null);
+
+    /// <summary>The plan going back (an Undo); each place the check reads a file op at is told to <paramref name="readAt"/>.</summary>
+    private UndoCheck.PlanResult PlanBackward(IReadOnlyList<UndoOp> ops, List<string>? readAt = null) => PlanIn(ops, backward: true, readAt);
+
+    private UndoCheck.PlanResult PlanIn(IReadOnlyList<UndoOp> ops, bool backward, List<string>? readAt)
     {
         var blobs = new Dictionary<string, byte[]>(StringComparer.Ordinal);
-        foreach (string text in new[] { "New.\n", "Three.\n", "A\n", "A2\n", "B\n", "C\n" }) blobs[UndoCheck.Sha(Bytes(text))] = Bytes(text);
-        return UndoCheck.Plan(ops, backward: false, relative => UndoCurrent.Read(Full(relative)),
+        foreach (string text in new[] { "New.\n", "Three.\n", "Two.\n", "A\n", "A2\n", "B\n", "C\n" }) blobs[UndoCheck.Sha(Bytes(text))] = Bytes(text);
+        return UndoCheck.Plan(ops, backward, relative =>
+                              {
+                                  readAt?.Add(relative);
+                                  return UndoCurrent.Read(Full(relative));
+                              },
                               sha => blobs.TryGetValue(sha, out byte[]? bytes) ? bytes : null,
                               whole: new UndoWholeReads(_root, new UndoMemoryPlaces()));
     }
@@ -213,7 +222,7 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
         return UndoDoor.TargetsOf(ready, _root);
     }
 
-    private void CheckShapeA(bool leadingOut)
+    private List<UndoOp> CheckShapeA(bool leadingOut)
     {
         LayLink(Day(3), "Day 3.md", leadingOut);
         List<UndoOp> ops = [LinkMove(Day(3), Day(4)), NewFile(Day(3), "New.\n")];
@@ -234,9 +243,10 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
         Assert.Equal("New.\n", File.ReadAllText(Full(Day(3))));
         string linkedPage = leadingOut ? Path.Combine(_outside, "Day 3.md") : Full(Library + "/Day 3.md");
         Assert.Equal("Linked.\n", File.ReadAllText(linkedPage));
+        return ops;
     }
 
-    private void CheckShapeB(bool leadingOut)
+    private List<UndoOp> CheckShapeB(bool leadingOut)
     {
         LayLink(Day(2), "Day 2.md", leadingOut);
         WritePage(Day(3), "Three.\n");
@@ -256,6 +266,7 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
         Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(Day(2))));
         Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(Full(Day(3))));
         Assert.Equal(linkTarget, new FileInfo(Full(Day(3))).LinkTarget);
+        return ops;
     }
 
     /// <summary>Shape A, the link leading to a library page in the course: the new page at Day 3 is judged against the place free, and goes in after the link has left.</summary>
@@ -311,5 +322,198 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
         List<UndoSwapTarget> withAFile = ReadyTargets(PlanForward([FileMove(Day(7), Day(8), "Three.\n"), NewFile(Day(7), "New.\n")]));
         Assert.Equal([Day(8), Day(7)], PlacesOf(withAFile));
         Assert.False(withAFile[1].HandedOver);
+    }
+
+    // ---- Going back: the leaver judged with the place free (W8b-21a2) --------
+
+    /// <summary>
+    /// Shape A made forward, then taken back from its after state: the new
+    /// page at Day 3 is taken back first, and the link's move back to Day 3
+    /// is judged with Day 3 FREE, though the new page stands there when the
+    /// plan is made. The new page goes before the link comes back.
+    /// </summary>
+    private void CheckShapeATakenBack(bool leadingOut)
+    {
+        List<UndoOp> ops = CheckShapeA(leadingOut);
+        string linkTarget = new FileInfo(Full(Day(4))).LinkTarget!;
+
+        UndoCheck.PlanResult plan = PlanBackward(ops);
+        Assert.True(plan is UndoCheck.PlanResult.Ready, "shape A going back was planned " + Described(plan));
+        List<UndoSwapTarget> targets = ReadyTargets(plan);
+        // The filler's taking-back before its leaver's: the new page, then the link.
+        Assert.Equal(2, targets.Count);
+        Assert.Equal(Day(3), targets[0].RelativePath);
+        Assert.Null(targets[0].Change);
+        Assert.IsType<UndoSwapChange.MoveHere>(targets[1].Change);
+
+        UndoSwapResult result = UndoSwap.Swap(targets, "1-undo", _root);
+
+        Assert.True(result is UndoSwapResult.Swapped, "shape A going back was swapped " + Described(result));
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(Day(4))));
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(Full(Day(3))));
+        Assert.Equal(linkTarget, new FileInfo(Full(Day(3))).LinkTarget);
+        string linkedPage = leadingOut ? Path.Combine(_outside, "Day 3.md") : Full(Library + "/Day 3.md");
+        Assert.Equal("Linked.\n", File.ReadAllText(linkedPage));
+    }
+
+    /// <summary>
+    /// Shape B made forward, then taken back from its after state: the link's
+    /// move back to Day 2 first, then the removal at Day 3 taken back, judged
+    /// from "absent" and never by reading Day 3, where the link still stands
+    /// when the plan is made.
+    /// </summary>
+    private void CheckShapeBTakenBack(bool leadingOut)
+    {
+        List<UndoOp> ops = CheckShapeB(leadingOut);
+        string linkTarget = new FileInfo(Full(Day(3))).LinkTarget!;
+        var readAt = new List<string>();
+
+        UndoCheck.PlanResult plan = PlanBackward(ops, readAt);
+        Assert.True(plan is UndoCheck.PlanResult.Ready, "shape B going back was planned " + Described(plan));
+        Assert.DoesNotContain(Day(3), readAt);
+        List<UndoSwapTarget> targets = ReadyTargets(plan);
+        // In the step's ops reversed: the link's move back, then Day 3's page.
+        Assert.Equal(2, targets.Count);
+        Assert.IsType<UndoSwapChange.MoveHere>(targets[0].Change);
+        Assert.Equal(Day(3), targets[1].RelativePath);
+        Assert.Null(targets[1].Change);
+        Assert.True(targets[1].HandedOver);
+
+        UndoSwapResult result = UndoSwap.Swap(targets, "1-undo", _root);
+
+        Assert.True(result is UndoSwapResult.Swapped, "shape B going back was swapped " + Described(result));
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(Full(Day(2))));
+        Assert.Equal(linkTarget, new FileInfo(Full(Day(2))).LinkTarget);
+        Assert.Equal(UndoLinks.What.File, UndoLinks.Look(Full(Day(3))));
+        Assert.Equal("Three.\n", File.ReadAllText(Full(Day(3))));
+    }
+
+    /// <summary>Shape A taken back, the link leading to a library page in the course.</summary>
+    [SymbolicLinkFact]
+    public void ShapeATakenBackJudgesTheLinksOriginFree() => CheckShapeATakenBack(leadingOut: false);
+
+    /// <summary>Shape A taken back, the link leading out of the working folder.</summary>
+    [SymbolicLinkFact]
+    public void ShapeAWithTheLinkLeadingOutTakenBackJudgesTheLinksOriginFree() => CheckShapeATakenBack(leadingOut: true);
+
+    /// <summary>Shape B taken back, the link leading to a library page in the course.</summary>
+    [SymbolicLinkFact]
+    public void ShapeBTakenBackStartsTheRemovalFromAbsent() => CheckShapeBTakenBack(leadingOut: false);
+
+    /// <summary>Shape B taken back, the link leading out of the working folder: Day 3 is never read through it.</summary>
+    [SymbolicLinkFact]
+    public void ShapeBWithTheLinkLeadingOutTakenBackStartsTheRemovalFromAbsent() => CheckShapeBTakenBack(leadingOut: true);
+
+    /// <summary>
+    /// A removal at Day 3, then a file's move from Day 2 into it, with the
+    /// move already back (Day 2 holds its page, Day 3 is free): the filler is
+    /// skipped as already back, so the removal's taking-back is judged from
+    /// the disk at Day 3, as today, and puts the page back.
+    /// </summary>
+    [Fact]
+    public void ALeaverWhoseFillerIsAlreadyBackIsJudgedFromTheDisk()
+    {
+        WritePage(Day(2), "Two.\n");
+        List<UndoOp> ops = [Removal(Day(3), "Three.\n"), FileMove(Day(2), Day(3), "Two.\n")];
+        Assert.Single(UndoOp.Handovers(ops));
+        var readAt = new List<string>();
+
+        UndoCheck.PlanResult plan = PlanBackward(ops, readAt);
+
+        Assert.True(plan is UndoCheck.PlanResult.Ready, "the step was planned " + Described(plan));
+        Assert.Contains(Day(3), readAt);
+        List<UndoSwapTarget> targets = ReadyTargets(plan);
+        UndoSwapTarget target = Assert.Single(targets);
+        Assert.Equal(Day(3), target.RelativePath);
+        Assert.Equal("Three.\n", Encoding.UTF8.GetString(target.Replacement!));
+    }
+
+    /// <summary>
+    /// A file's move from Day 3 to Day 4, then a new page at Day 3, with the
+    /// new page edited by hand since: going back the new page is in the way,
+    /// so the plan is refused naming Day 3 (the move's origin counts as free
+    /// only for the plan's own taking-back of the filler, never to let one
+    /// through).
+    /// </summary>
+    [Fact]
+    public void GoingBackOverAnEditedNewPageIsRefusedNamingIt()
+    {
+        WritePage(Day(4), "Three.\n");
+        WritePage(Day(3), "New, edited by hand.\n");
+        List<UndoOp> ops = [FileMove(Day(3), Day(4), "Three.\n"), NewFile(Day(3), "New.\n")];
+
+        UndoCheck.PlanResult plan = PlanBackward(ops);
+
+        Assert.Equal("changedSince " + Day(3), Described(plan));
+    }
+
+    /// <summary>
+    /// A file's move from Day 3 to Day 4, then a new page at Day 3, taken
+    /// back with no link: ready, the new page taken away before the move
+    /// comes back (the step's ops reversed).
+    /// </summary>
+    [Fact]
+    public void AFilesMoveTakenBackAfterItsFillerIsReadyInTheStepsOrderReversed()
+    {
+        WritePage(Day(4), "Three.\n");
+        WritePage(Day(3), "New.\n");
+        List<UndoOp> ops = [FileMove(Day(3), Day(4), "Three.\n"), NewFile(Day(3), "New.\n")];
+
+        UndoCheck.PlanResult plan = PlanBackward(ops);
+        Assert.True(plan is UndoCheck.PlanResult.Ready, "the step was planned " + Described(plan));
+        List<UndoSwapTarget> targets = ReadyTargets(plan);
+
+        Assert.Equal(2, targets.Count);
+        Assert.Null(targets[0].Change);
+        Assert.IsType<UndoSwapChange.MoveHere>(targets[1].Change);
+        Assert.True(UndoSwap.Swap(targets, "1-undo", _root) is UndoSwapResult.Swapped);
+        Assert.Equal("Three.\n", File.ReadAllText(Full(Day(3))));
+        Assert.False(File.Exists(Full(Day(4))));
+    }
+
+    /// <summary>
+    /// A removal at Day 3, then a file's move from Day 2 into it, taken back
+    /// with no link: the move goes back before the removal is taken back,
+    /// which is the step's ops reversed and NOT today's backward order (files,
+    /// then whole ops).
+    /// </summary>
+    [Fact]
+    public void AHandoverStepGoesBackInTheStepsOrderReversed()
+    {
+        WritePage(Day(3), "Two.\n");
+        List<UndoOp> ops = [Removal(Day(3), "Three.\n"), FileMove(Day(2), Day(3), "Two.\n")];
+
+        UndoCheck.PlanResult plan = PlanBackward(ops);
+        Assert.True(plan is UndoCheck.PlanResult.Ready, "the step was planned " + Described(plan));
+        List<UndoSwapTarget> targets = ReadyTargets(plan);
+
+        Assert.Equal(2, targets.Count);
+        Assert.IsType<UndoSwapChange.MoveHere>(targets[0].Change);
+        Assert.Null(targets[1].Change);
+        Assert.Equal(Day(3), targets[1].RelativePath);
+        Assert.True(UndoSwap.Swap(targets, "1-undo", _root) is UndoSwapResult.Swapped);
+        Assert.Equal("Two.\n", File.ReadAllText(Full(Day(2))));
+        Assert.Equal("Three.\n", File.ReadAllText(Full(Day(3))));
+    }
+
+    /// <summary>A step with no handed-over place keeps today's backward order: every file the check met, then the whole ops.</summary>
+    [Fact]
+    public void AStepWithNoHandoverGoesBackInTodaysOrder()
+    {
+        WritePage(Section + "/a.md", "A2\n");
+        WritePage(Section + "/e.md", "B\n");
+        List<UndoOp> ops =
+        [
+            Op(new JsonObject { ["kind"] = "writeFile", ["path"] = Section + "/a.md", ["beforeSha"] = UndoCheck.Sha(Bytes("A\n")), ["afterSha"] = UndoCheck.Sha(Bytes("A2\n")) }),
+            FileMove(Section + "/b.md", Section + "/e.md", "B\n"),
+        ];
+        Assert.Empty(UndoOp.Handovers(ops));
+
+        List<UndoSwapTarget> targets = ReadyTargets(PlanBackward(ops));
+
+        Assert.Equal(2, targets.Count);
+        Assert.Equal(Section + "/a.md", targets[0].RelativePath);
+        Assert.Null(targets[0].Change);
+        Assert.IsType<UndoSwapChange.MoveHere>(targets[1].Change);
     }
 }
