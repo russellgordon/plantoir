@@ -39,12 +39,21 @@ class WebPreviewController {
     @ObservationIgnored private var ledger: PreviewNavigationLedger = PreviewNavigationLedger()
     @ObservationIgnored private var appNavigation: WKNavigation?
 
-    /// How many loads the app has asked for (a first load, a fresh build,
-    /// Reload), counted as each is asked, before the caches are emptied
-    /// and the load reaches WebKit. Read by the tests, which judge this
-    /// controller's own decision to load rather than how quickly WebKit's
-    /// processes answer (#1046).
+    /// How many app loads this controller has decided on (a first load, a
+    /// fresh build, Reload, by either of Reload's two branches), counted
+    /// the moment each is decided, before the caches are emptied. Read by
+    /// the tests, which judge the decision to load at once (#1046).
     @ObservationIgnored private(set) var appLoadsAskedFor: Int = 0
+
+    /// How many of those loads WebKit has been handed: counted only where
+    /// `webView.load` or `webView.reloadFromOrigin` returned a navigation,
+    /// which for a load that empties the caches is in the completion,
+    /// after they are emptied (#1046).
+    @ObservationIgnored private(set) var appLoadsHandedToWebKit: Int = 0
+
+    /// Called each time a load is handed to WebKit, after the count above
+    /// moves. Set by the tests, which await the hand-off itself (#1046).
+    @ObservationIgnored var whenALoadIsHandedToWebKit: () -> Void = {}
 
     /// Tells this controller when a navigation ends (#504).
     let navigationWatcher: PreviewNavigationWatcher
@@ -182,8 +191,20 @@ class WebPreviewController {
             guard let self else {
                 return
             }
-            self.appNavigation = self.webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+            let navigation: WKNavigation? = self.webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+            self.appNavigation = navigation
+            self.recordHandOff(of: navigation)
         }
+    }
+
+    /// Counts a load WebKit was handed, and says so (#1046). A load WebKit
+    /// did not take (no navigation came back) is not counted.
+    private func recordHandOff(of navigation: WKNavigation?) {
+        if navigation == nil {
+            return
+        }
+        appLoadsHandedToWebKit += 1
+        whenALoadIsHandedToWebKit()
     }
 
     /// Says that what the web view is showing is no longer current, so the
@@ -235,7 +256,10 @@ class WebPreviewController {
             return
         }
         ledger.appLoadBegan()
-        appNavigation = webView.reloadFromOrigin()
+        appLoadsAskedFor += 1
+        let navigation: WKNavigation? = webView.reloadFromOrigin()
+        appNavigation = navigation
+        recordHandOff(of: navigation)
     }
 
     /// The web view's address changed. Counted as the teacher's only when no

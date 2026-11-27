@@ -4,6 +4,12 @@ import XCTest
 
 final class WebPreviewControllerTests: XCTestCase {
 
+    // MARK: - Stored properties
+
+    /// How long a load may take to reach WebKit before the test says it
+    /// never did: a hang guard, never a settling time (#1046).
+    static let longestWaitForAHandOff: TimeInterval = 60
+
     // MARK: - Functions
 
     @MainActor
@@ -33,30 +39,47 @@ final class WebPreviewControllerTests: XCTestCase {
     /// The teacher kept the page from before their change with no reload
     /// coming. `showFreshBuild` must start a load anyway.
     ///
-    /// Judged by the loads the controller ASKS for, counted as each is
-    /// asked (#1046). The test used to wait, on a fixed six seconds, for
-    /// WebKit to begin each navigation; a load reaches WebKit only after the
-    /// website data store has emptied its caches in WebKit's own process,
-    /// and with another build running on the same Mac that round trip once
-    /// took longer than the six seconds, so the test failed with nothing
-    /// wrong in the preview. Whether to load is this controller's decision
-    /// alone, and the count says it the moment it is made.
+    /// Judged twice (#1046): by the loads the controller DECIDES on,
+    /// counted the moment each is decided, and by the loads it HANDS to
+    /// WebKit, which happens only after the website data store has emptied
+    /// its caches in WebKit's own process. The test awaits each hand-off
+    /// itself: the controller calls `whenALoadIsHandedToWebKit` where
+    /// `webView.load` returns, and that call fulfils the expectation. The
+    /// test used to wait, on a fixed six seconds, for WebKit to begin each
+    /// navigation, and with another build running on the same Mac the
+    /// round trip once took longer. The bound below is not a settling
+    /// time: it only ends a test whose hand-off never comes.
     @MainActor
     func testShowFreshBuildLoadsEvenWhenTheAddressWasAlreadyRequested() {
         let controller: WebPreviewController = WebPreviewController()
-        let url: URL = URL(string: "http://127.0.0.1:8081/")!
+        let url: URL = URL(string: "http://localhost:8081/")!
 
         // The phantom load that re-arms the last-requested address.
+        let firstHandOff: XCTestExpectation = expectation(description: "the first load is handed to WebKit")
+        controller.whenALoadIsHandedToWebKit = {
+            firstHandOff.fulfill()
+        }
         controller.loadIfNeeded(url)
         XCTAssertEqual(controller.appLoadsAskedFor, 1, "the first request for an address did not load it")
         controller.loadIfNeeded(url)
         XCTAssertEqual(controller.appLoadsAskedFor, 1, "a repeated request for the same address loaded it again")
+        wait(for: [firstHandOff], timeout: WebPreviewControllerTests.longestWaitForAHandOff)
+        XCTAssertEqual(controller.appLoadsHandedToWebKit, 1, "the first load was not handed to WebKit once")
 
+        let freshHandOff: XCTestExpectation = expectation(description: "showFreshBuild's load is handed to WebKit")
+        controller.whenALoadIsHandedToWebKit = {
+            freshHandOff.fulfill()
+        }
         controller.showFreshBuild(url)
         XCTAssertEqual(controller.appLoadsAskedFor, 2, "showFreshBuild did not load an address that was already requested")
+        wait(for: [freshHandOff], timeout: WebPreviewControllerTests.longestWaitForAHandOff)
+        XCTAssertEqual(controller.appLoadsHandedToWebKit, 2, "showFreshBuild's load was not handed to WebKit once")
 
         // And the mounting view's own loadIfNeeded is then the no-op, so
         // this stays a single load per rebuild.
+        controller.whenALoadIsHandedToWebKit = {
+            XCTFail("loadIfNeeded after showFreshBuild handed WebKit another load")
+        }
         controller.loadIfNeeded(url)
         XCTAssertEqual(controller.appLoadsAskedFor, 2, "loadIfNeeded after showFreshBuild must not start another load")
     }
