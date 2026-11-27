@@ -35,18 +35,16 @@ public sealed class UndoRecoveryContractTests
         "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored",
         // U4b's (W8-7)
         "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
-        // U4b3 door-5's (W8b-21a5)
-        "withAHandedOverPlace", "handedOver",
-        // U4b3 kept-original-named's (W8b-21c, W8b-21c2)
-        "keptPageLines",
+        // U4b3 kept-original-named's (W8b-21c, W8b-21c2), re-laid on a plain step (#1055 M5, W3)
+        "keptPageLines", "withAPlainPageMove",
     };
 
     private const string First = "courses/TST1O/Section 1/Classes/first.md";
     private const string Second = "courses/TST1O/Section 1/Classes/second.md";
     private const string Third = "courses/TST1O/Section 1/Classes/third.md";
 
-    /// <summary>visibleNameTaken with withAHandedOverPlace: the page's first visible name, already a file holding <c>earlier</c>.</summary>
-    private const string KeptPageTaken = UndoHandoverForTheCases.ClassSection + "/Unit 1, Day 3 (kept by Undo).md";
+    /// <summary>visibleNameTaken with withAPlainPageMove: the page's first visible name, already a file holding <c>earlier</c>.</summary>
+    private const string KeptPageTaken = UndoPlainPageMoveForTheCases.ClassSection + "/Unit 1, Day 3 (kept by Undo).md";
     private static readonly byte[] KeptPageTakenHolds = "earlier\n"u8.ToArray();
 
     public static IEnumerable<object[]> Cases() =>
@@ -141,14 +139,10 @@ public sealed class UndoRecoveryContractTests
         // pages, then a replaceText on renamed/a.md inside it, in that order
         // (opKinds.wholeOps' one exception: the edit carried by the move).
         bool withAMovedFolder = Flag(recoveryCase, "withAMovedFolder");
-        // U4b3 door-5 (W8b-21a5): in place of the two pages, a step that
-        // hands a place over (opKinds.wholeOps' second exception), made as
-        // stackCases' call of the same name makes it.
-        string? handoverShape = recoveryCase.TryGetProperty("withAHandedOverPlace", out JsonElement shapeNamed) ? shapeNamed.GetString()! : null;
-        if (handoverShape is not (null or "afterALinksMove" or "beforeALinksMove"))
-            Assert.Fail("a key this replay does not check: withAHandedOverPlace " + handoverShape);
-        var handover = new UndoHandoverForTheCases(scribe);
-        bool byOps = withAMove || withATree || withAPreference || withAMovedFolder || handoverShape is not null;
+        // #1055 M5 (W3): in place of the two pages, the kept-page guard's
+        // plain step, no link anywhere (UndoPlainPageMoveForTheCases).
+        bool plainPageMove = Flag(recoveryCase, "withAPlainPageMove");
+        bool byOps = withAMove || withATree || withAPreference || withAMovedFolder || plainPageMove;
         scribe.Places.Write(UndoKindsForTheCases.Preference, new UndoJson.Text("a"));
         JsonArray? ops = null;
         var blobs = new List<byte[]>();
@@ -160,15 +154,12 @@ public sealed class UndoRecoveryContractTests
                 UndoKindsForTheCases.LayTheMediaFolder(scribe);
                 ops.Add(UndoKindsForTheCases.MoveTheMediaFolder(scribe));
             }
-            if (handoverShape is not null)
+            if (plainPageMove)
             {
-                if (handoverShape == "afterALinksMove") handover.LayAfterALinksMove();
-                else handover.LayBeforeALinksMove();
-                (JsonArray handingOver, List<byte[]> handoverBlobs) = handoverShape == "afterALinksMove"
-                    ? handover.HandAPlaceOverAfterALinksMove()
-                    : handover.HandAPlaceOverBeforeALinksMove();
-                foreach (JsonNode? op in handingOver) ops.Add(op!.DeepClone());
-                blobs.AddRange(handoverBlobs);
+                UndoPlainPageMoveForTheCases.Lay(scribe);
+                (JsonArray plainOps, List<byte[]> plainBlobs) = UndoPlainPageMoveForTheCases.Ops(scribe);
+                foreach (JsonNode? op in plainOps) ops.Add(op!.DeepClone());
+                blobs.AddRange(plainBlobs);
             }
             else
             {
@@ -195,10 +186,6 @@ public sealed class UndoRecoveryContractTests
             if (withAMove) ops.Add(UndoKindsForTheCases.FrontPageRecompute());
             if (withAMovedFolder) ops.Add(UndoKindsForTheCases.EditInside(UndoKindsForTheCases.RenamedFolder + "/a.md"));
         }
-        // The class pages and the library as laid, and as the step leaves them
-        // made whole (made in a scribe of its own, so this one is untouched).
-        string? handoverBefore = handoverShape is null ? null : UndoHandoverForTheCases.Snapshot(scribe);
-        string? handoverAfter = handoverShape is null ? null : UndoHandoverForTheCases.MadeWhole(handoverShape);
         UndoOutcome MakeTheStep(UndoDoor door) => byOps ? door.Perform(scribe.OpsDraft("A", (JsonArray)ops!.DeepClone(), blobs)) : door.Perform(draft);
 
         UndoOutcome stopped;
@@ -251,12 +238,6 @@ public sealed class UndoRecoveryContractTests
             if (handEdited == "carried" && withAMovedFolder)
             {
                 Assert.True(UndoKindsForTheCases.EditTheCarriedPageByHand(scribe), "no page inside the moved folder to change by hand");
-            }
-            else if (handEdited == "handedOverPlace" && handoverShape is not null)
-            {
-                // Someone's page written at Day 3, the place the step hands over.
-                Assert.True(handover.Nothing(UndoHandoverForTheCases.ClassPage(3)), "Day 3 is not free to write someone's page at");
-                scribe.WritePage("A", UndoHandoverForTheCases.ClassPage(3), "Someone else's.\n"u8.ToArray());
             }
             else
             {
@@ -323,7 +304,9 @@ public sealed class UndoRecoveryContractTests
             string gone = Assert.Single(Directory.EnumerateDirectories(parent).Where(folder => folder.EndsWith("-gone", StringComparison.Ordinal)));
             File.Delete(Path.Combine(gone, "a.md"));
         }
-        if (Flag(recoveryCase, "visibleNameTaken") && handoverShape is not null)
+        // #1055 M5: someone's page written at Day 3, where the plain step removed a page.
+        if (plainPageMove) UndoPlainPageMoveForTheCases.WriteSomeoneElsesPageAtDay3(scribe);
+        if (Flag(recoveryCase, "visibleNameTaken") && plainPageMove)
             scribe.WritePage("A", KeptPageTaken, KeptPageTakenHolds);   // a page's visible name taken: a file
         else if (Flag(recoveryCase, "visibleNameTaken"))
             scribe.WritePage("A", UndoKindsForTheCases.ExtraFolder + " (kept by Undo)/earlier.md", "earlier\n"u8.ToArray());
@@ -399,14 +382,14 @@ public sealed class UndoRecoveryContractTests
             Assert.Equal(folderKept.GetBoolean(), UndoKindsForTheCases.FolderIsThere(scribe));
         if (recoveryCase.TryGetProperty("preference", out JsonElement preference))
             Assert.True(scribe.Places.Read(UndoKindsForTheCases.Preference).Matches(new UndoJson.Text(preference.GetString()!)));
-        if (recoveryCase.TryGetProperty("keptVisibleAs", out JsonElement keptVisibleAs) && handoverShape is not null)
+        if (recoveryCase.TryGetProperty("keptVisibleAs", out JsonElement keptVisibleAs) && plainPageMove)
         {
             // U4b3 kept-original-named: the removed Day 3 page, a FILE under its visible name, byte for byte.
             Assert.Equal("Three.\n"u8.ToArray(), scribe.Page("A", keptVisibleAs.GetString()!));
         }
         else if (recoveryCase.TryGetProperty("keptVisibleAs", out JsonElement keptFolderAs))
             Assert.True(File.Exists(Path.Combine(scribe.FullPath("A", keptFolderAs.GetString()!), "a.md")), "the folder is not kept as " + keptFolderAs.GetString());
-        if (Flag(recoveryCase, "visibleNameTaken") && handoverShape is not null)
+        if (Flag(recoveryCase, "visibleNameTaken") && plainPageMove)
             Assert.Equal(KeptPageTakenHolds, scribe.Page("A", KeptPageTaken));
         if (recoveryCase.TryGetProperty("keptPageLines", out JsonElement keptPageLines))
         {
@@ -445,8 +428,6 @@ public sealed class UndoRecoveryContractTests
             var said = keptLines.SelectMany(line => line.NoLongerInTheList ?? []).OrderBy(name => name, StringComparer.Ordinal).ToList();
             Assert.Equal(noLonger.GetBoolean() ? keptNamedOnTheTrail : [], said);
         }
-        if (recoveryCase.TryGetProperty("handedOver", out JsonElement handedOver))
-            Assert.Equal(handedOver.GetString(), handover.HandedOver());
         if (recoveryCase.TryGetProperty("movedFolder", out JsonElement movedFolder))
             Assert.Equal(movedFolder.GetString(), UndoKindsForTheCases.MovedFolder(scribe));
         if (recoveryCase.TryGetProperty("keptAside", out JsonElement keptAside))
@@ -469,11 +450,10 @@ public sealed class UndoRecoveryContractTests
 
         // The pages.
         string files = recoveryCase.GetProperty("files").GetString()!;
-        if (handoverShape is not null && files != "unchecked")
+        if (plainPageMove && files != "unchecked")
         {
-            // handAPlaceOver's pages and the library, not first and second.
-            Assert.True(files is "before" or "after", "a files value this replay does not know with withAHandedOverPlace: " + files);
-            Assert.Equal(files == "before" ? handoverBefore : handoverAfter, UndoHandoverForTheCases.Snapshot(scribe));
+            // Every row that lays the plain step leaves its pages unchecked.
+            Assert.Fail("a files value this replay does not check with withAPlainPageMove: " + files);
         }
         else if (files != "unchecked")
         {
