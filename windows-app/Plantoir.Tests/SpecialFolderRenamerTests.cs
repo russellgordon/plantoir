@@ -642,6 +642,9 @@ public class SpecialFolderRenamerTests : IDisposable
     /// <summary>The contract's sentence with its places filled and <c>{said}</c> left off: what a sentence must start with.</summary>
     private static string Before(string sentence) => sentence.Substring(0, sentence.IndexOf("{said}", StringComparison.Ordinal));
 
+    /// <summary>The renames a swap tried, as a failing assertion names them.</summary>
+    private List<string> Seen { get; } = new();
+
     private string InCourse(string relative) => Path.Combine(RecordCourse, relative.Replace('/', Path.DirectorySeparatorChar));
 
     [Fact]
@@ -723,21 +726,22 @@ public class SpecialFolderRenamerTests : IDisposable
         TheRecordCourse();
         File.SetAttributes(InCourse("section1/index.md"), FileAttributes.ReadOnly);
         string sectionTwosOldPlace = Path.GetFullPath(InCourse("section2/Tasks"));
-        string sectionTwosNewPlace = Path.GetFullPath(InCourse("section2/Assessments"));
         var seams = new UndoSeams
         {
             EachRename = (from, onto) =>
             {
-                // Compared by their ends: the swap may name them with the long-path prefix.
-                bool puttingSectionTwoBack = from.EndsWith(sectionTwosNewPlace.Substring(2), StringComparison.OrdinalIgnoreCase)
-                    && onto.EndsWith(sectionTwosOldPlace.Substring(2), StringComparison.OrdinalIgnoreCase);
+                // Compared by their last two parts: the swap names them from the
+                // working folder as it reads it, which may be spelled otherwise.
+                bool puttingSectionTwoBack = from.Replace('/', '\\').EndsWith(@"\section2\Assessments", StringComparison.OrdinalIgnoreCase)
+                    && onto.Replace('/', '\\').EndsWith(@"\section2\Tasks", StringComparison.OrdinalIgnoreCase);
+                Seen.Add(from + " -> " + onto);
                 if (puttingSectionTwoBack) File.WriteAllText(sectionTwosOldPlace, "made meanwhile");
             },
         };
 
         var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(() => RenameAsTheSheetDoes(seams: seams));
 
-        Assert.True(Directory.Exists(InCourse("section2/Assessments")), "section 2 stayed at the new name");
+        Assert.True(Directory.Exists(InCourse("section2/Assessments")), "section 2 stayed at the new name; renames: " + string.Join(" | ", Seen) + "; said: " + refused.Message);
         Assert.False(Directory.Exists(InCourse("section1/Assessments")), "section 1 went back");
         Assert.StartsWith(Before(Wording("renameFolderRenamedOnlyInPart").Replace("{old}", "Tasks").Replace("{new}", "Assessments")
                                      .Replace("{places}", "“section2/Assessments”")),
