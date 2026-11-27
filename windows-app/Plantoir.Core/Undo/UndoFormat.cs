@@ -391,12 +391,31 @@ internal sealed record UndoStep
     /// <c>opKinds.wholeOps</c>: no other op of the step names a whole op's
     /// places (a move's two, a tree's folder or anything inside it) or its
     /// target. A step that breaks it is one this version cannot read: a
-    /// barrier, never undone in a guessed order. The one exception: an edit a
-    /// move carries (<see cref="UndoOp.MoveCarries"/>), after the move; one
-    /// inside the move's <c>from</c>, or before it, is still a barrier.
+    /// barrier, never undone in a guessed order. Two exceptions (the mac's
+    /// <c>UndoStep.wholeOpsStandAlone</c>). U4b: an edit a move carries
+    /// (<see cref="UndoOp.MoveCarries"/>), after the move; one inside the
+    /// move's <c>from</c>, or before it, is still a barrier. U4b3: a place
+    /// HANDED OVER (<see cref="UndoOp.Handovers"/>, the one finder the plan
+    /// and recovery use too; #899 W8b-21a4): the pair may share exactly that
+    /// place, and nothing else may. A step with a handed-over place hands
+    /// each place over once and carries no edit; a filler before its leaver,
+    /// or a third op at, inside or above the place, still overlaps a whole
+    /// op and is refused here with no rule of its own.
     /// </summary>
     internal static bool WholeOpsStandAlone(IReadOnlyList<UndoOp> ops)
     {
+        IReadOnlyList<UndoHandover> handovers = UndoOp.Handovers(ops);
+        if (handovers.Count > 0)
+        {
+            if (UndoCheck.Carriers(ops).Count > 0) return false;
+            for (int first = 0; first < handovers.Count; first++)
+            {
+                for (int second = first + 1; second < handovers.Count; second++)
+                {
+                    if (UndoOp.PartInside(handovers[first].Place, handovers[second].Place) is "") return false;
+                }
+            }
+        }
         for (int index = 0; index < ops.Count; index++)
         {
             UndoOp op = ops[index];
@@ -414,12 +433,28 @@ internal sealed record UndoStep
                 {
                     foreach (string theirs in second.PathsNamed)
                     {
-                        if (UndoOp.PlacesOverlap(mine, theirs)) return false;
+                        if (UndoOp.PlacesOverlap(mine, theirs) && !IsHandedOver(mine, theirs, index, other, handovers)) return false;
                     }
                 }
             }
         }
         return true;
+    }
+
+    /// <summary>
+    /// U4b3: whether two places two ops of a step name are the one place a
+    /// handover between exactly those two ops hands over (the exact place,
+    /// never one inside it; the mac's <c>UndoStep.isHandedOver</c>).
+    /// </summary>
+    private static bool IsHandedOver(string mine, string theirs, int first, int second, IReadOnlyList<UndoHandover> handovers)
+    {
+        foreach (UndoHandover handover in handovers)
+        {
+            bool samePair = (handover.LeaverIndex == first && handover.FillerIndex == second)
+                            || (handover.LeaverIndex == second && handover.FillerIndex == first);
+            if (samePair && UndoOp.PartInside(handover.Place, mine) is "" && UndoOp.PartInside(handover.Place, theirs) is "") return true;
+        }
+        return false;
     }
 }
 
