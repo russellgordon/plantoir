@@ -1316,12 +1316,19 @@ nonisolated enum ActivityTrail {
         /// else holds that place (#899, U4b3 kept-original-named). Both
         /// named. Written just before the rename. Never page text.
         case undoKeptAPageUnderAVisibleName = "undo kept a page under a visible name"
-        /// A restore that replaces a course closed a change, an undo or a
-        /// redo left part way in it, before it moved anything (#899, ahead
-        /// of U5), so recovery never judges the restored files against a
-        /// step that stopped before the restore; or the list could not be
-        /// reached to do so. The course and section, which work had
-        /// stopped, and how many files it names. Never page text.
+        /// A restore that replaced files of a course set aside a change, an
+        /// undo or a redo left part way in it (#899, ahead of U5), so
+        /// recovery never judges the restored files against a step that
+        /// stopped before the restore. It is per file and written only
+        /// after the files are replaced (or the swap stopped part way
+        /// without putting everything back), inside the Undo list's lock
+        /// held by `UndoRestoreSetAside.swapHoldingTheList` from before the
+        /// first move; a failed first move or a full put-back sets nothing
+        /// aside and the step stays in flight. The restore settle's finish
+        /// path sets aside inside the lock too. The journal event is
+        /// `filesReplacedByARestore`. Or the list could not be reached to
+        /// do so. The course and section, which work had stopped, and how
+        /// many files it names. Never page text.
         case undoSetAsideByARestore = "undo set aside a change a restore replaced"
         /// Recovery could not put back a step left part way (#899, U3c):
         /// content it needs is gone from the list and no kept original beside

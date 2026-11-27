@@ -672,16 +672,28 @@ internal static class UndoLinks
 
     private const uint NameSurrogate = 0x20000000;
 
-    internal static What Look(string fullPath)
+    internal static What Look(string fullPath) => Look(fullPath, out _);
+
+    /// <summary>
+    /// <see cref="Look(string)"/>, keeping what the system said when it is
+    /// <see cref="What.CannotLook"/> (null otherwise): a part-way rename
+    /// names a place it could not look at with its reason (#899 W8b-18b).
+    /// </summary>
+    internal static What Look(string fullPath, out string? said)
     {
+        said = null;
         FileAttributes attributes;
         try { attributes = File.GetAttributes(fullPath); }
         catch (FileNotFoundException) { return What.Nothing; }
         catch (DirectoryNotFoundException) { return What.Nothing; }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return What.CannotLook; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { said = error.Message; return What.CannotLook; }
         if (attributes.HasFlag(FileAttributes.ReparsePoint))
         {
-            if (ReparseTag(fullPath) is not { } tag) return What.CannotLook;
+            if (ReparseTag(fullPath) is not { } tag)
+            {
+                said = new System.ComponentModel.Win32Exception(Marshal.GetLastPInvokeError()).Message;
+                return What.CannotLook;
+            }
             if ((tag & NameSurrogate) != 0) return What.Link;
         }
         return attributes.HasFlag(FileAttributes.Directory) ? What.Folder : What.File;

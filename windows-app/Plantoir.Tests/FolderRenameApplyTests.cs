@@ -83,9 +83,9 @@ public sealed class FolderRenameApplyTests : IDisposable
         Assert.Contains("(Assignments/Quiz.md)", index);
         Assert.Contains("[[Assignments/Quiz]]", index);
         Assert.Equal(SpecialFolderRenamer.DoneMessage("Tasks", "Assignments", 1), outcome.Message);
-        // The record is written before the move and is the caller's to clear
-        // once the configuration is written.
-        Assert.True(File.Exists(SpecialFolderRenamer.RenameRecordPath(CourseDir)));
+        // The record is written before the move and cleared by the rename
+        // itself once it is whole (#899 W8b-17): there was none before it.
+        Assert.False(File.Exists(SpecialFolderRenamer.RenameRecordPath(CourseDir)));
     }
 
     [Fact]
@@ -227,8 +227,12 @@ public sealed class FolderRenameApplyTests : IDisposable
     public void AnInterruptedRenameIsRecognisedOnlyWhenTheRecordAndTheDiskAgree()
     {
         MakeCourse(Config);
-        // The folders moved; the configuration write never happened.
-        SpecialFolderRenamer.Rename("Tasks", "Assignments", FolderScope.PerSection, CourseDir, Sections);
+        // The folders moved; the configuration write never happened: the
+        // record written before the move, and the moves, as a run that
+        // stopped there leaves them.
+        SpecialFolderRenamer.RecordRenameStarting("Tasks", "Assignments", FolderScope.PerSection, CourseDir);
+        foreach (int section in Sections)
+            Directory.Move(Path.Combine(CourseDir, $"section{section}", "Tasks"), Path.Combine(CourseDir, $"section{section}", "Assignments"));
 
         Assert.Equal("Assignments",
             SpecialFolderRenamer.InterruptedRenameTarget("Tasks", FolderScope.PerSection, CourseDir, Sections));

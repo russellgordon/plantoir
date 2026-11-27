@@ -15,6 +15,11 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
     private var previousTrail: ProblemReportStore = ActivityTrail.store
     private var trailFolder: URL = URL(fileURLWithPath: "/")
 
+    /// The Undo list of this test alone. A Get Ready stopped part way
+    /// leaves its step in flight, and on the list the whole suite shares
+    /// a later test's recovery would close it (day27-7).
+    private var listFolder: URL = URL(fileURLWithPath: "/")
+
     // MARK: - Set up
 
     override func setUp() async throws {
@@ -22,6 +27,9 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         trailFolder = FileManager.default.temporaryDirectory
             .appendingPathComponent("start-of-year-offer-trail-\(UUID().uuidString)")
         ActivityTrail.store = ProblemReportStore(folderURL: trailFolder)
+        listFolder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("start-of-year-offer-list-\(UUID().uuidString)", isDirectory: true)
+        UndoJournalLocation.folderOverride = listFolder
         StartOfYearUndoRegistry.shared.forgetAll()
     }
 
@@ -30,6 +38,8 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         UndoKillPoints.putBackFailsAt = nil
         ActivityTrail.store = previousTrail
         try? FileManager.default.removeItem(at: trailFolder)
+        UndoJournalLocation.folderOverride = nil
+        try? FileManager.default.removeItem(at: listFolder)
         StartOfYearUndoRegistry.shared.forgetAll()
         FakePreview.shared.forget()
         SectionWindowControllers.shared.forgetAll()
