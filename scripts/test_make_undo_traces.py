@@ -471,6 +471,42 @@ class LineModelTests(unittest.TestCase):
         self.assertEqual(result, ("ready", {path: text + "Written since.\n"}, []))
 
 
+class RelinkRecoveryByStateTests(unittest.TestCase):
+    """Windows' recovery of a relink where the link stands, by state
+    (opKinds.move; review 2 of mac-1, LOW 2): what is at the place and
+    what is set aside decide, a rule for every state."""
+
+    PLACE = "courses/TST1O/section1/Unit 1, Day 4.md"
+
+    def settled(self, at_the_place, set_aside):
+        op = {"kind": "move", "from": self.PLACE, "to": self.PLACE,
+              "linkShaBefore": traces.sha("Unit 1, Day 3.md"),
+              "linkShaAfter": traces.sha("Unit 1, Day 5.md")}
+        pages = {self.PLACE + traces.SET_ASIDE: set_aside}
+        if at_the_place is not None:
+            pages[self.PLACE] = at_the_place
+        return traces.settle_what_was_set_aside([op], pages, True)
+
+    def test_the_place_empty_takes_back_whatever_was_set_aside(self):
+        for set_aside in (("link", "Unit 1, Day 3.md"), "Teacher's save.\n"):
+            self.assertEqual(self.settled(None, set_aside), {self.PLACE: set_aside})
+
+    def test_a_link_of_the_steps_at_the_place_gives_the_teachers_item_back(self):
+        self.assertEqual(self.settled(("link", "Unit 1, Day 5.md"), "Teacher's save.\n"),
+                         {self.PLACE: "Teacher's save.\n"})
+        self.assertEqual(self.settled(("link", "Unit 1, Day 5.md"), ("link", "Unit 1, Day 3.md")),
+                         {self.PLACE: ("link", "Unit 1, Day 5.md")})
+
+    def test_a_third_item_at_the_place_keeps_the_teachers_item_visible(self):
+        kept = "courses/TST1O/section1/Unit 1, Day 4 (kept by Undo).md"
+        self.assertEqual(self.settled("Another save.\n", "Teacher's save.\n"),
+                         {self.PLACE: "Another save.\n", kept: "Teacher's save.\n"})
+
+    def test_a_third_item_at_the_place_removes_a_link_of_the_steps_set_aside(self):
+        self.assertEqual(self.settled("Another save.\n", ("link", "Unit 1, Day 3.md")),
+                         {self.PLACE: "Another save.\n"})
+
+
 def safe_path(path):
     if not isinstance(path, str) or not path:
         return False

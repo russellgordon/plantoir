@@ -50920,6 +50920,26 @@
         "why": "Review 1 of mac-1, MEDIUM 1: from spells the place with a composed \u00e9 (U+00E9) and to with e and a combining acute (U+0301). They are not one path byte for byte, so the op is not a relink where the link stands; on a volume that folds Unicode normalisation (APFS) the two spellings are one item, so its places overlap, and a move whose places overlap is a shape this version cannot read. Compared as UTF-8 bytes, never Unicode equivalence, as replaceText's windows are."
       },
       {
+        "name": "mac-1, a rename that changes both case and Unicode normalisation in the last part (\u00e9cole decomposed to \u00c9cole composed): a capitalisation-only move, as the step left it",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/m/e\u0301cole.json",
+          "to": "courses/TST1O/m/\u00c9cole.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "Review 2 of mac-1, LOW 1: at or inside, overlap and capitalisation-only are ONE comparison of names, part by part, equal after NFC normalisation and lowercasing (opKinds.wholeOps); only the one-place test of a relink where the link stands compares bytes. from spells e and a combining acute (U+0301) in lower case and to a composed capital \u00c9 (U+00C9): equal after NFC and lowercasing, differing in the last part only, so a capitalisation-only rename, readable, judged by the spelling the folder lists."
+      },
+      {
         "name": "editJSON: a whole number beyond 2^53 in the file cannot be compared exactly: cannot tell, never a guess",
         "op": {
           "kind": "editJSON",

@@ -89,3 +89,46 @@ Brief `vm-tools/briefs/2026-11-27-899-mac-1-review-2-fixes.md`. Tests first in 4
 Runs: run-f2-red; run-f2-green1 (3 failures, test faults and the third-text expectation, see above); run-f2-green2 (UndoRelinkTests 32 of 32, the chained kill table included); run-f2-classes (UndoJournalContractTests, UndoWriterScanTests, FileFormatsContractTests, JournaledStepTests, UndoHandedOverPlaceTests, RestoreRecoveryTests: 125, 0 failures); `python3 scripts/test_make_undo_traces.py` OK; run-f2-mf-G, run-f2-mf-H.
 
 Self-check: 1 broke each fix (F-G, F-H red). 2 No timed waits. 3 No new sentence; existing trail lines. 4 dev merged before and after (up to date). 5 No number tuned. 6 Contract cases from the JSON. 7 House-style grep over added Swift empty; `UndoStepLinks` has MARK sections. 8 LOW 4 fixed with the MEDIUM's tests; LOWs 1 to 3 written above with the reason. 9 Switch off, rename record untouched. 10 No new contract row.
+
+## Fix round three (review 2: LOWs 1 to 3)
+
+Brief: the director's round-three brief over `vm-tools/briefs/2026-11-27-899-mac-1-review-2-fixes.md` (LOW 1, LOW 2, LOW 3). Merges of `origin/dev`: before proving and before handing back, both "Already up to date" (no merge commit).
+
+- **LOW 3, done** (1d442f6d8). Documentation 12's "Left for a contract pass (not changed here)" line now says the pass is done and what it changed; `SpecialFolderRenamer.swift`'s comment says "a released Windows build or an older Mac build", as the contract does. `UndoWriterScanTests` (reads that file as text) re-run.
+- **LOW 1, done.** `opKinds.wholeOps`' ONE-comparison sentence names the rule: two names are one part when equal after NFC normalisation and lowercasing; the same comparison decides a capitalisation-only rename (equal after NFC and lowercasing, not after NFC alone); only the one-place test of a relink where the link stands compares bytes. The Mac already did exactly this (Swift `==` after `lowercased()` is canonical equivalence), so no Mac behaviour changed (a comment in `UndoFormat.swift` now says so instead of "noted, not changed here"). Python's `is_case_only_move` (and `move_carries`' own-part test) now compare NFC forms, as `part_inside` does. New `checkCases` row "mac-1, a rename that changes both case and Unicode normalisation in the last part (école decomposed to École composed): a capitalisation-only move, as the step left it" (canUndo, alreadyRedone): seen RED on the Python model before the fix (it read notReadable), green after; on the Mac see must-fail F-I. Windows: it passes there today by another road (NTFS keeps the two spellings as two names, so the replay reads a plain move); W8b 21b must make `IsCaseOnlyMove` compare NFC-normalised, lowercased names, as `PartInside` must (round one).
+- **LOW 2, done.** `opKinds.move` rewritten from the guarantee on: THE GUARANTEE now names the case round two made true (another program's item at the place stands there instead, given back or the newest; nothing of the teacher's deleted by name or left hidden: given back when it can be, else kept under `<name> (kept by Undo)` with the kept-page or kept-folder line said first). Windows' mechanism names its two staged names (NEW and ASIDE), defines "taken back out" (renamed from the place back to the new name, exclusively, never removed at the place), and its recovery is a rule BY STATE for every state of each staged name against what is at the place (below). The Mac's recovery is stated by state in the same terms. The one difference between the platforms is named with its reason. The stale closing sentence ("one holding a text that is neither of the step's is left as it is") is gone. Python's `settle_what_was_set_aside` follows the Windows table (a third item at the place: the teacher's item kept visible, a step's link set aside removed by its text); four new `RelinkRecoveryByStateTests`. `Reason899W8RelinkedLink` reworded (by state, kept visible); checked by script: no double quote inside the string.
+
+### What Windows must hold (replaces round one's list where they differ)
+
+W8b 21b1 to 21b5 build from `opKinds.move` exactly. Recovery of a relink where the link stands, after the swap is settled the place is judged as any op; first the ASIDE name, then the NEW name:
+
+| Under ASIDE | Place empty | Place holds a link with one of the step's texts | Place holds anything else |
+|---|---|---|---|
+| nothing | (nothing to do) | (nothing to do) | (nothing to do) |
+| link with the source's text | renamed back (kill after (2)) | removed by its text | removed by its text |
+| anything else (teacher's) | renamed back (kill after (2) or inside (4)) | settled back as in (4): the step's link renamed from the place to NEW exclusively, the item renamed back exclusively, the link at NEW removed by its text | kept under `<name> (kept by Undo)`, kept-page or kept-folder line said first |
+
+| Under NEW | Place empty | Place taken |
+|---|---|---|
+| nothing | (nothing to do) | (nothing to do) |
+| link with one of the step's texts | removed by its text | removed by its text |
+| anything else | renamed back | kept under the visible name, said first |
+
+A rename back refused because the place filled meanwhile goes to the last column. The Mac differs only in the middle cell of the ASIDE table's last row: its one staged name cannot tell which way a stopped exchange went, so its recovery never takes a step's link out and keeps the item visible. Plus: `IsCaseOnlyMove` and `PartInside` by NFC-and-lowercase (LOW 1). Held rows unchanged: the four `platform: windows` rows and the eleven earlier, under `Reason899W8RelinkedLink`; they still fail on Windows because its replay knows neither the key `platform` nor the stop points `relinkSetAside` and `relinkRenamedIn`, nor the call `relinkALinkWhereItStands`, and `ShapeIsKnown` reads the op notReadable.
+
+### Owed from round two
+
+- **The two-place relink's pre-clean** (`UndoSwap.relinkLink`, `removeAStagedLink(stagedURL, holdingOneOf: [oldText, newText])`) still removes only nothing or a link holding one of the step's two texts. It never deletes the teacher's item by name, but it does NOT fully satisfy the one rule: anything else under its staged name is left there, hidden, and the relink fails (`makeALink` cannot take the name) without saying the item is there; it is neither given back nor kept visible. Only an outside program writing that exact hidden name can put an item there (the two-place mechanism never moves the teacher's item into its staged name, and recovery's tidies of it already go through `settleUnderARelinksStagedName`). Not fixed here, as the brief says: for the director.
+- **Debug build after the last test run:** see Runs.
+
+### Must-fail (fix round three)
+
+F-P3 (Python): `settle_what_was_set_aside` with round two's by-stop-point rule (the item set aside always overwrites the place unless it is the start link): `test_a_third_item_at_the_place_keeps_the_teachers_item_visible` RED; restored, `cmp` equal. F-I (Mac): see the must-fail log.
+
+### Runs (fix round three)
+
+run-f3-green (UndoRelinkTests whole, the chained kill table included, 32; UndoJournalContractTests 19; FileFormatsContractTests; UndoWriterScanTests; JournaledStepTests; UndoHandedOverPlaceTests; RestoreRecoveryTests; SpecialFolderRenamerTests: 209 tests, 0 failures); run-f3-mf-I (19, 1 failure: F-I); run-f3-build (plain Debug build, after the last test run: BUILD SUCCEEDED); `python3 scripts/test_make_undo_traces.py`: 46 OK, traces current (no row's trace changed).
+
+### Self-check (fix round three)
+
+1 Broke each fix: F-I, F-P3, F-P4 red. 2 No timed waits. 3 No new sentence a teacher reads; the kept-page and kept-folder lines named, not changed. 4 `dev` merged before proving and before hand-back (up to date both times). 5 No number tuned. 6 Contract cases from the JSON. 7 House-style grep over the changed Swift lines empty (comments only). 8 LOWs 1 to 3 fixed, LOW 1 and LOW 2 with tests that failed first. 9 Switch off, rename record untouched. 10 One new `checkCases` row, run by the Mac's replay and the Python model, not held (Windows reads it as a plain move today). No existing contract row changed verdict.

@@ -810,8 +810,12 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     /// (`Café` composed equals `Café` decomposed). The one same-place test a
     /// relink where the link stands is asked by (review 1 of mac-1, MEDIUM
     /// 1): the op, `JournaledStep`, the swap's dispatch and recovery.
-    /// (`isCaseOnlyMove`'s `from != to` is older and still compares by
-    /// canonical equivalence; noted, not changed here.)
+    /// Every other comparison of names (`partInside`, `placesOverlap`,
+    /// `isCaseOnlyMove`) is Swift's `==` after `lowercased()`, canonical
+    /// equivalence, which is equality after NFC normalisation and
+    /// lowercasing: the rule `opKinds.wholeOps` names (review 2 of mac-1,
+    /// LOW 1), so a rename that changes both case and normalisation is a
+    /// capitalisation-only move.
     static func isOnePathByteForByte(_ first: String, _ second: String) -> Bool {
         return first.utf8.elementsEqual(second.utf8)
     }

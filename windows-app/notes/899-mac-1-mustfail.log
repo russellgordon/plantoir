@@ -36,3 +36,8 @@ F-G run-f2-mf-G: the one rule's block in UndoSwap.tidyLeftovers switched off (`i
 F-H run-f2-mf-H: settleUnderARelinksStagedName never keeps under a visible name (returns .notNow before the rename).
    RED, 6 failures: case (a) file and folder, case (b) (the older save left under the staged name), and the third-text test.
 Each restored with git checkout; git status clean of Swift after each.
+
+## Fix round three
+F-I (Mac): UndoOp.isCaseOnlyMove compares the lowercased names as UTF-8 bytes (from.lowercased().utf8.elementsEqual(to.lowercased().utf8)) instead of Swift ==. RED: UndoJournalContractTests.testCheckCases, checkCases 'mac-1, a rename that changes both case and Unicode normalisation in the last part (école decomposed to École composed): a capitalisation-only move, as the step left it' (undo read other than canUndo). Log .dd/run-f3-mf-I.log, 19 tests, 1 failure. Restored with git checkout (UndoFormat.swift then held only the comment change, re-applied).
+F-P3 (Python): settle_what_was_set_aside with round two's by-stop-point rule (the item set aside overwrites any place unless it is the start link). RED: RelinkRecoveryByStateTests.test_a_third_item_at_the_place_keeps_the_teachers_item_visible. Restored from a copy, cmp equal.
+F-P4 (Python, seen before the fix): is_case_only_move without NFC. RED: test_check_cases on the case-and-normalisation row (read notReadable).

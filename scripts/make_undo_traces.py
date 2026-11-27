@@ -1339,7 +1339,8 @@ def part_inside(place, path):
     move carrying an edit, a carried page's place before the move). Two
     parts that differ only in Unicode normalisation are one part, as
     Swift's String comparison (canonical equivalence) and APFS hold them
-    (review 1 of mac-1, MEDIUM 1)."""
+    (review 1 of mac-1, MEDIUM 1): equal after NFC and lowercasing, the
+    rule opKinds.wholeOps names (review 2 of mac-1, LOW 1)."""
     place_parts, path_parts = place.split("/"), path.split("/")
     if len(path_parts) < len(place_parts):
         return None
@@ -1380,9 +1381,12 @@ def move_carries(move, edit):
     if is_case_only_move(move):
         # One place under two spellings: named at the new one. Only the
         # moved item's own part is compared as spelled (review 1 of
-        # U4b2-9, L3).
+        # U4b2-9, L3), with case but by NFC, as Swift's `!=` compares
+        # (review 2 of mac-1, LOW 1).
         depth = len(move["from"].split("/"))
-        return edit["path"].split("/")[depth - 1] != move["from"].split("/")[depth - 1]
+        edit_part = unicodedata.normalize("NFC", edit["path"].split("/")[depth - 1])
+        from_part = unicodedata.normalize("NFC", move["from"].split("/")[depth - 1])
+        return edit_part != from_part
     return not places_overlap(move["from"], edit["path"])
 
 
@@ -1403,11 +1407,20 @@ def is_case_only_move(op):
     alike but for case, in their last part only. The model's pages are
     keyed as spelled, as on a case-sensitive volume, where the ordinary
     pair rule gives the answers the spelling a case-insensitive folder
-    lists gives."""
+    lists gives.
+
+    Compared as part_inside compares (review 2 of mac-1, LOW 1): spelled
+    alike means equal after NFC normalisation, alike but for case equal
+    after NFC and lowercasing, as Swift's canonical equivalence holds them.
+    A rename that changes both case and normalisation is case-only."""
     if op.get("kind") != "move":
         return False
     source, destination = op.get("from"), op.get("to")
-    if not isinstance(source, str) or not isinstance(destination, str) or source == destination:
+    if not isinstance(source, str) or not isinstance(destination, str):
+        return False
+    source = unicodedata.normalize("NFC", source)
+    destination = unicodedata.normalize("NFC", destination)
+    if source == destination:
         return False
     if source.lower() != destination.lower():
         return False
@@ -1519,23 +1532,43 @@ SET_ASIDE = "\u0000set-aside"
 
 def settle_what_was_set_aside(ops, pages, started_from_before):
     """Windows' recovery of a relink where the link stands killed inside
-    its swap (opKinds.move, mac-1's fix round): an item set aside goes back
-    to an empty place; where the new link stands, the item set aside is
-    removed only when it is the link the swap started from, by its text,
-    and otherwise the step is settled back (the new link taken out, the
-    item renamed back). The staged new link is never shown by the model."""
+    its swap (opKinds.move, mac-1's fix rounds), by STATE: what is at the
+    place and what is set aside. The item set aside goes back to an empty
+    place, whatever it is. Set aside beside a link of the step's at the
+    place: removed when it is the link the swap started from, by its text;
+    anything else is the teacher's and the step is settled back (the
+    step's link renamed out to its staged name, then removed by its text,
+    and the item renamed back). Set aside beside a third item at the place
+    (another program filled it): a link of the step's is removed by its
+    text, anything else is kept under the visible name `<name> (kept by
+    Undo)` (review 2 of mac-1, LOW 2). The staged new link is never shown
+    by the model: a link of the step's under it is removed by its text."""
     pages = dict(pages)
     for op in ops:
         if not is_a_relink_in_place(op) or op["from"] + SET_ASIDE not in pages:
             continue
         place = op["from"]
         held = pages.pop(place + SET_ASIDE)
-        if pages.get(place) is None:
+        at_the_place = pages.get(place)
+        if at_the_place is None:
             pages[place] = held
             continue
+        step_texts = (op["linkShaBefore"], op["linkShaAfter"])
         start = op["linkShaBefore"] if started_from_before else op["linkShaAfter"]
-        if not (isinstance(held, tuple) and held[0] == "link" and sha(held[1]) == start):
-            pages[place] = held
+        held_is_the_start = isinstance(held, tuple) and held[0] == "link" and sha(held[1]) == start
+        held_is_the_steps = isinstance(held, tuple) and held[0] == "link" and sha(held[1]) in step_texts
+        place_is_the_steps = (isinstance(at_the_place, tuple) and at_the_place[0] == "link"
+                              and sha(at_the_place[1]) in step_texts)
+        if place_is_the_steps:
+            if not held_is_the_start:
+                pages[place] = held
+            continue
+        if held_is_the_steps:
+            continue
+        number = 1
+        while visible_name(place, number, is_a_page=True) in pages:
+            number += 1
+        pages[visible_name(place, number, is_a_page=True)] = held
     return pages
 
 
