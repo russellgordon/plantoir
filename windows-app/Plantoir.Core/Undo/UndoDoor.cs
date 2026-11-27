@@ -945,13 +945,26 @@ internal sealed class UndoDoor
     /// The swap's targets in the plan's order: a move that carries edits first
     /// going forward (<see cref="UndoCheck.PlanResult.Ready.Leading"/>), then
     /// every file in the order the check met it, a carried one staged only at
-    /// its turn, then the other whole ops (#899 W8-2).
+    /// its turn, then the other whole ops (#899 W8-2). A step with a
+    /// handed-over place goes in the order of the ops each target comes from
+    /// instead, so every filler goes in after its leaver
+    /// (<see cref="UndoCheck.PlanResult.Ready.InTheStepsOrder"/>; #899 W8b-21a1).
     /// </summary>
     internal static List<UndoSwapTarget> TargetsOf(UndoCheck.PlanResult.Ready ready, string root)
     {
-        var targets = new List<UndoSwapTarget>(ready.Leading);
+        var files = new List<UndoSwapTarget>();
         foreach ((string path, byte[]? expected, byte[]? replacement) in ready.InOrder)
-            targets.Add(new UndoSwapTarget(FullPath(root, path), path, expected, replacement) { StagesAtItsTurn = ready.StagedAtItsTurn.Contains(path) });
+        {
+            files.Add(new UndoSwapTarget(FullPath(root, path), path, expected, replacement)
+            {
+                StagesAtItsTurn = ready.StagedAtItsTurn.Contains(path),
+                HandedOver = ready.HandedOver.Contains(path),
+            });
+        }
+        if (ready.InTheStepsOrder)
+            return UndoCheck.TargetsInTheStepsOrder([ready.Leading, files, ready.Whole], [ready.LeadingOps, ready.InOrderOps, ready.WholeOps]);
+        var targets = new List<UndoSwapTarget>(ready.Leading);
+        targets.AddRange(files);
         targets.AddRange(ready.Whole);
         return targets;
     }

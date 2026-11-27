@@ -418,7 +418,7 @@ internal static class UndoSwap
         for (int index = 0; index < count; index++)
         {
             UndoSwapTarget target = targets[index];
-            if (root is not null && PlaceLeadingOut(target, root) is { } leadingOut)
+            if (root is not null && PlaceLeadingOut(target, root, atStaging: true) is { } leadingOut)
             {
                 Tidy();
                 return new UndoSwapResult.Refused(new UndoRefusal(UndoRefusalKind.ChangedSince, leadingOut));
@@ -531,9 +531,17 @@ internal static class UndoSwap
     /// U4b2-2 review 1, MEDIUM 1; #899 W8-1), never the other side of the
     /// move; none for an external target; for any other change, the place it
     /// changes.
+    ///
+    /// <para><paramref name="atStaging"/> is true for the look before staging:
+    /// a file target at a handed-over place (<see cref="UndoSwapTarget.HandedOver"/>)
+    /// is then judged on the folders above it only, as the link leaving it,
+    /// or arriving at it, still stands there (#899 W8b-21a1; the mac's U4b3
+    /// door-1). Before its own change the leaver has gone, and the place is
+    /// judged whole, as any file's (<see cref="SwapAFile"/>'s own look).</para>
     /// </summary>
-    private static string? PlaceLeadingOut(UndoSwapTarget target, string root) => target.Change switch
+    private static string? PlaceLeadingOut(UndoSwapTarget target, string root, bool atStaging = false) => target.Change switch
     {
+        null when atStaging && target.HandedOver => UndoPlaces.StaysInsideAbove(root, target.RelativePath) ? null : target.RelativePath,
         UndoSwapChange.SetExternal => null,
         // The places the swap touches are the op's two; should they ever
         // differ in spelling, a place the op does not name that leads out is

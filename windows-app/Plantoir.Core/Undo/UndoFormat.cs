@@ -258,10 +258,63 @@ internal sealed record UndoOp
 
     /// <summary>
     /// The handed-over places of a step, in the step's order (#899 W8b-21a1;
-    /// the mac's <c>UndoCheck.handovers(in:)</c>, U4b3 door-1). STUB until
-    /// the piece's product commit: none.
+    /// the mac's <c>UndoCheck.handovers(in:)</c>, U4b3 door-1). A place is
+    /// handed over when an EARLIER op leaves it (<see cref="PlaceLeftBy"/>: a
+    /// file's or a link's move away from it, or a <c>writeFile</c> that
+    /// removes it) and a LATER op fills it (<see cref="PlaceFilledBy"/>: a
+    /// file's or a link's move into it, or a <c>writeFile</c> that makes a new
+    /// file), at least one of the two a move (<see cref="HandsOverAsAMove"/>).
+    /// The exact place only, compared by <see cref="PartInside"/>, the one
+    /// comparison (part by part, no regard to case). Each leaver hands its
+    /// place to the FIRST filler after it. The ONE finder: the plan, the
+    /// format check and recovery all call it.
     /// </summary>
-    internal static IReadOnlyList<UndoHandover> Handovers(IReadOnlyList<UndoOp> ops) => [];
+    internal static IReadOnlyList<UndoHandover> Handovers(IReadOnlyList<UndoOp> ops)
+    {
+        var found = new List<UndoHandover>();
+        for (int leaverIndex = 0; leaverIndex < ops.Count; leaverIndex++)
+        {
+            UndoOp leaver = ops[leaverIndex];
+            if (PlaceLeftBy(leaver) is not { } place) continue;
+            for (int fillerIndex = leaverIndex + 1; fillerIndex < ops.Count; fillerIndex++)
+            {
+                UndoOp filler = ops[fillerIndex];
+                if (PlaceFilledBy(filler) is not { } filled || PartInside(place, filled) is not "") continue;
+                if (!HandsOverAsAMove(leaver) && !HandsOverAsAMove(filler)) continue;
+                found.Add(new UndoHandover(leaverIndex, fillerIndex, place, leaver.LinkSha is not null || filler.LinkSha is not null));
+                break;
+            }
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// A move that can hand a place over: a plain <c>move</c> with
+    /// <c>sha</c> (a file's) or <c>linkSha</c> (a link's), never a folder's
+    /// (<c>listingSha</c>), a capitalisation-only one, a <c>moveApart</c> or
+    /// a <c>setAside</c> (the mac's <c>handsOverAsAMove</c>).
+    /// </summary>
+    internal static bool HandsOverAsAMove(UndoOp op)
+    {
+        if (op.Kind != Move || op.ListingSha is not null || op.IsCaseOnlyMove) return false;
+        return op.Sha is not null || op.LinkSha is not null;
+    }
+
+    /// <summary>The place an op leaves: a handing-over move's <c>from</c>, or a removed file's path (the mac's <c>placeLeft(by:)</c>).</summary>
+    internal static string? PlaceLeftBy(UndoOp op)
+    {
+        if (HandsOverAsAMove(op)) return op.From;
+        if (op.Kind == WriteFile && op.AfterSha is null && op.BeforeSha is not null) return op.Path;
+        return null;
+    }
+
+    /// <summary>The place an op fills: a handing-over move's <c>to</c>, or a new file's path (the mac's <c>placeFilled(by:)</c>).</summary>
+    internal static string? PlaceFilledBy(UndoOp op)
+    {
+        if (HandsOverAsAMove(op)) return op.To;
+        if (op.Kind == WriteFile && op.BeforeSha is null && op.AfterSha is not null) return op.Path;
+        return null;
+    }
 }
 
 /// <summary>
