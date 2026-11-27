@@ -252,56 +252,104 @@ enum ClassPages {
     /// the section's own folder, `createdSection<N>` when it is a course-level
     /// page every section shares. Never by the place of the link.
     static func dateKey(ofPageAt url: URL, forSection sectionNumber: Int, in course: Course) -> String? {
-        var file: URL = url
-        if ResolvedFile.isALink(url) {
-            if ClassInsertionPlanner.isALinkToNothing(url) {
-                return nil
-            }
-            guard let target = ClassInsertionPlanner.fileALinkLeadsTo(url) else {
-                return nil
-            }
-            file = target
+        if ClassInsertionPlanner.isALinkToNothing(url) {
+            return nil
         }
-        let isSectionLocal: Bool = AssistPageVisibility.isSectionLocal(
-            pageAt: file, forSection: sectionNumber, in: course
+        // The place of the file the page really IS, every link resolved, a
+        // linked folder on the way included (review 1, LOW 5): judged by the
+        // link's spelling, a link into `section1/Lessons`, itself a link to
+        // a course-level folder, read as a page of the section.
+        let filePath: String = UndoFolderPlaces.canonicalPath(of: url)
+        let sectionPath: String = UndoFolderPlaces.canonicalPath(
+            of: course.sectionDirectoryURL(forSection: sectionNumber)
         )
+        let isSectionLocal: Bool = filePath.hasPrefix(sectionPath + "/")
         return PageFrontmatter.createdKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
     }
 
-    /// False when a class page of the section that comes EARLIER by unit and
-    /// day leads to the same file as `classPage` does.
+    /// Whether the class page at `classPage` is the one that dates the file
+    /// it leads to, among the section's class pages `classes`.
     ///
-    /// Russell on #899, 2026-11-26: two or more classes of one section that
-    /// link to the same shared lesson leave it with "the date of the first
-    /// Unit x, Day y page that linked to it. Always." So a writer dates such
-    /// a file only for its first class, whatever order it writes in. A page
-    /// with no unit and day, or that leads to nothing, is first by itself.
+    /// The rule in one sentence: the class page that IS the file, when one
+    /// of the section's class pages is that file and not a link, owns its
+    /// date; otherwise, among the class pages whose link leads to the file
+    /// without passing through another class page of the section, the one
+    /// with the lowest unit and day owns it.
+    ///
+    /// So a class page that is not a link always owns its own date (review
+    /// 1, MEDIUM 1: Day 2 a link to Day 3's own page never gives Day 3 Day
+    /// 2's date), and a class page whose link reaches another class page of
+    /// the section writes nothing through it, as Insert Class already held
+    /// (#899 U4b3). Russell on #899, 2026-11-26: a shared lesson several
+    /// classes link to keeps "the date of the first Unit x, Day y page that
+    /// linked to it. Always." A page that leads to nothing owns nothing
+    /// (callers write nothing for it); a link with no unit and day, and no
+    /// owner above it, owns its file.
     static func isTheFirstClassLeadingToItsFile(
         _ classPage: URL, among classes: [ClassPageSummary]
     ) -> Bool {
+        if !ResolvedFile.isALink(classPage) {
+            return true
+        }
         guard let ownFile = ResolvedFile.throughLinks(at: classPage) else {
             return true
+        }
+        var places: [ClassPagePlace] = []
+        for summary in classes {
+            if let identity = ResolvedFile.ofThePlace(at: summary.fileURL) {
+                places.append(ClassPagePlace(identity: identity, newPlace: nil))
+            }
+        }
+        if ClassInsertionPlanner.reachOfALinkedClass(at: classPage, classPagePlaces: places) != .elsewhere {
+            return false
         }
         let ownPath: String = classPage.standardizedFileURL.path
         var ownUnitAndDay: UnitDay? = nil
         for summary in classes where summary.fileURL.standardizedFileURL.path == ownPath {
             ownUnitAndDay = summary.unitAndDay
         }
-        guard let own = ownUnitAndDay else {
-            return true
-        }
         for summary in classes {
-            guard let other = summary.unitAndDay, other < own else {
-                continue
-            }
             if summary.fileURL.standardizedFileURL.path == ownPath {
                 continue
             }
-            if ResolvedFile.throughLinks(at: summary.fileURL) == ownFile {
+            if ResolvedFile.throughLinks(at: summary.fileURL) != ownFile {
+                continue
+            }
+            // The file's own class page owns it.
+            if !ResolvedFile.isALink(summary.fileURL) {
+                return false
+            }
+            // An earlier link that leads there directly owns it.
+            guard let own = ownUnitAndDay, let other = summary.unitAndDay, other < own else {
+                continue
+            }
+            if ClassInsertionPlanner.reachOfALinkedClass(at: summary.fileURL, classPagePlaces: places) == .elsewhere {
                 return false
             }
         }
         return true
+    }
+
+    /// Every file the section's class pages are, through their links: no
+    /// other write in a change that dates classes may date one of them (a
+    /// page a class brings, a year-round page, publishing a later class),
+    /// so a shared lesson keeps its first class's date (review 1, MEDIUM 2).
+    static func filesTheClassesAre(_ classes: [ClassPageSummary]) -> [ResolvedFile] {
+        var files: [ResolvedFile] = []
+        for summary in classes {
+            if let file = ResolvedFile.throughLinks(at: summary.fileURL) {
+                files.append(file)
+            }
+        }
+        return files
+    }
+
+    /// Whether the page at `url` is one of `files`, through its links.
+    static func isOneOf(_ files: [ResolvedFile], pageAt url: URL) -> Bool {
+        guard let file = ResolvedFile.throughLinks(at: url) else {
+            return false
+        }
+        return files.contains(file)
     }
 
     /// Every markdown page belonging to one section: the section's own folder,

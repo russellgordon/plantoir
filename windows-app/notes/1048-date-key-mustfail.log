@@ -23,3 +23,17 @@ Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheKeyIsDecid
 	 Executed 11 tests, with 11 failures (0 unexpected) in 0.738 (0.740) seconds
 	 Executed 11 tests, with 11 failures (0 unexpected) in 0.738 (0.740) seconds
 	 Executed 11 tests, with 11 failures (0 unexpected) in 0.738 (0.741) seconds
+
+## Fix round one: the new tests on ffda0ce59 code (tests commit 007d43d92), 2026-11-26
+	 Executed 19 tests, with 10 failures (0 unexpected) in 0.960 (0.964) seconds
+	 Executed 19 tests, with 10 failures (0 unexpected) in 0.960 (0.965) seconds
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:240: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheKeyCasesInTheContract] : XCTAssertEqual failed: ("Optional("created")") is not eq
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:408: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateKeepsALinkedToClassOnItsOwnDay] : XCTAssertEqual failed: ("---
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:409: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateKeepsALinkedToClassOnItsOwnDay] : XCTAssertEqual failed: ("["courses/ICS3U/sec
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:426: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testInsertClassMovesALinkedToClassOwnDate] : XCTAssertTrue failed - the shifted class mo
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:444: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateKeepsTheFirstClassesDateWhenALaterClassBringsTheLesson] : XCTAssertTrue failed
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:445: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateKeepsTheFirstClassesDateWhenALaterClassBringsTheLesson] : XCTAssertEqual faile
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:465: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingALaterClassLeavesTheLessonAnEarlierClassIs] : XCTAssertNotEqual failed: ("
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:469: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingALaterClassLeavesTheLessonAnEarlierClassIs] : XCTAssertTrue failed
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:515: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateDoesNotCountALaterLinkedClassAsADraftOnTheLastDay] : XCTAssertEqual failed: ("
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:560: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testALinkThroughALinkedFolderIsDatedByTheFilesRealPlace] : XCTAssertEqual failed: ("Opti

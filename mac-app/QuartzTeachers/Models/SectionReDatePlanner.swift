@@ -155,6 +155,14 @@ enum SectionReDatePlanner {
 
         var moves: [ReDatedPage] = []
         var spokenFor: Set<String> = []
+        // The files the classes ARE, through their links (review 1, MEDIUM
+        // 2): claimed by step 1 by file, not by title, so neither a page a
+        // class brings nor a year-round page dates a shared lesson again.
+        let filesTheClassesAre: [ResolvedFile] = ClassPages.filesTheClassesAre(everyClass)
+        // Classes past the last date that are actually put on it as drafts
+        // (review 1, MEDIUM 3): a later class linked to the same file as an
+        // earlier one is neither moved nor hidden, so it is not counted.
+        var overflowing: Int = 0
 
         // 1. The classes themselves, by position.
         for (index, summary) in classes.enumerated() {
@@ -170,10 +178,13 @@ enum SectionReDatePlanner {
             // class that leads to the same file plans nothing for it, so the
             // file is written once, with the first class's day, whatever
             // order the moves are written in (#1048).
-            if !ClassPages.isTheFirstClassLeadingToItsFile(summary.fileURL, among: classes) {
+            if !ClassPages.isTheFirstClassLeadingToItsFile(summary.fileURL, among: everyClass) {
                 continue
             }
             let isOverflow: Bool = index >= remembered.dates.count
+            if isOverflow {
+                overflowing += 1
+            }
             let unpublishes: Bool = isOverflow && page.isVisibleToStudents
             if page.date == day && !unpublishes {
                 continue
@@ -194,6 +205,7 @@ enum SectionReDatePlanner {
         for page in graph.pages {
             guard yearRound.contains(page.lowercasedTitle),
                   !spokenFor.contains(page.lowercasedTitle),
+                  !ClassPages.isOneOf(filesTheClassesAre, pageAt: page.fileURL),
                   !page.isFolderIndex,
                   !AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course) else {
                 continue
@@ -234,6 +246,11 @@ enum SectionReDatePlanner {
                 if spokenFor.contains(page.lowercasedTitle) || page.isClassPage || page.isFolderIndex {
                     continue
                 }
+                // The file a class page of the section IS keeps the date
+                // step 1 gave it, its first class's (review 1, MEDIUM 2).
+                if ClassPages.isOneOf(filesTheClassesAre, pageAt: page.fileURL) {
+                    continue
+                }
                 if AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course) {
                     continue
                 }
@@ -258,7 +275,7 @@ enum SectionReDatePlanner {
             firstDay: firstDay,
             lastDay: SectionReDatePlanner.date(at: classes.count - 1, from: remembered.dates),
             spareDates: max(0, remembered.dates.count - classes.count),
-            overflowing: max(0, classes.count - remembered.dates.count),
+            overflowing: overflowing,
             moves: moves
         )
     }
@@ -399,7 +416,10 @@ struct SectionReDatePlan {
     let lastDay: CalendarDay
     let spareDates: Int
 
-    /// Classes with no day of their own, all sitting on the last one.
+    /// Classes with no day of their own, all sitting on the last one as
+    /// drafts. A later class linked to the same file as an earlier one is
+    /// not among them: nothing is written for it, so it keeps its first
+    /// class's lesson and date, and its visibility, as it is (#1048).
     let overflowing: Int
 
     let moves: [ReDatedPage]
