@@ -483,8 +483,9 @@ public sealed partial class UndoStoppedStepTests : IDisposable
 
     /// <summary>
     /// A step closed meanwhile (here judged as made once the file could be
-    /// read) is never swapped: Put It Back refuses and the new year stays.
-    /// MUST FAIL with Put It Back swapping a step already closed.
+    /// read) is never swapped: Put It Back answers that it was made (review 1
+    /// of W8c-1, LOW 4) and the new year stays. MUST FAIL with Put It Back
+    /// swapping a step already closed.
     /// </summary>
     [Fact]
     public void PutItBackNeverSwapsAStepClosedMeanwhile()
@@ -496,7 +497,7 @@ public sealed partial class UndoStoppedStepTests : IDisposable
         LetGoOfTheFile();
         Assert.Equal(UndoStoppedStepVerdict.Finished, Door(list).JudgeAtOnce(couldNotFinish.Seq));
 
-        Assert.Equal(UndoPutBackVerdict.CouldNotPutBack, Door(list).PutBackAtOnce(couldNotFinish.Seq));
+        Assert.Equal(UndoPutBackVerdict.WasMade, Door(list).PutBackAtOnce(couldNotFinish.Seq));
 
         Assert.Equal(2027, YearOnDisk());
         Assert.Equal(UndoStepState.Done, StateOf(list, couldNotFinish.Seq));
