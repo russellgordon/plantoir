@@ -667,6 +667,10 @@ internal static class UndoRecovery
 
     // ---- Kept originals (the mac's U3c) --------------------------------------------
 
+    /// <summary>W8b-21c, tests first: not built yet.</summary>
+    internal static bool KeepPagesWhosePlaceIsTaken(UndoStep step, string root, Action<UndoTrailLine>? trail,
+                                                     Func<string, UndoLinks.What>? lookAt = null) => true;
+
     /// <summary>Every kept original (<c>-orig</c>, <c>-&lt;n&gt;-orig</c>, a file) of this step's beside one place, by name order.</summary>
     internal static List<string> KeptOriginalFiles(UndoStep step, string place)
     {

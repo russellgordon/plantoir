@@ -37,11 +37,17 @@ public sealed class UndoRecoveryContractTests
         "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
         // U4b3 door-5's (W8b-21a5)
         "withAHandedOverPlace", "handedOver",
+        // U4b3 kept-original-named's (W8b-21c)
+        "keptPageLines",
     };
 
     private const string First = "courses/TST1O/Section 1/Classes/first.md";
     private const string Second = "courses/TST1O/Section 1/Classes/second.md";
     private const string Third = "courses/TST1O/Section 1/Classes/third.md";
+
+    /// <summary>visibleNameTaken with withAHandedOverPlace: the page's first visible name, already a file holding <c>earlier</c>.</summary>
+    private const string KeptPageTaken = UndoHandoverForTheCases.ClassSection + "/Unit 1, Day 3 (kept by Undo).md";
+    private static readonly byte[] KeptPageTakenHolds = "earlier\n"u8.ToArray();
 
     public static IEnumerable<object[]> Cases() =>
         UndoContract.Undo.GetProperty("recoveryCases").EnumerateArray()
@@ -317,7 +323,9 @@ public sealed class UndoRecoveryContractTests
             string gone = Assert.Single(Directory.EnumerateDirectories(parent).Where(folder => folder.EndsWith("-gone", StringComparison.Ordinal)));
             File.Delete(Path.Combine(gone, "a.md"));
         }
-        if (Flag(recoveryCase, "visibleNameTaken"))
+        if (Flag(recoveryCase, "visibleNameTaken") && handoverShape is not null)
+            scribe.WritePage("A", KeptPageTaken, KeptPageTakenHolds);   // a page's visible name taken: a file
+        else if (Flag(recoveryCase, "visibleNameTaken"))
             scribe.WritePage("A", UndoKindsForTheCases.ExtraFolder + " (kept by Undo)/earlier.md", "earlier\n"u8.ToArray());
         if (Flag(recoveryCase, "deployBeforeRecovery"))
             scribe.WritePage("A", UndoKindsForTheCases.MarkerFrom, Encoding.UTF8.GetBytes(UndoKindsForTheCases.NewMarker));
@@ -391,8 +399,21 @@ public sealed class UndoRecoveryContractTests
             Assert.Equal(folderKept.GetBoolean(), UndoKindsForTheCases.FolderIsThere(scribe));
         if (recoveryCase.TryGetProperty("preference", out JsonElement preference))
             Assert.True(scribe.Places.Read(UndoKindsForTheCases.Preference).Matches(new UndoJson.Text(preference.GetString()!)));
-        if (recoveryCase.TryGetProperty("keptVisibleAs", out JsonElement keptVisibleAs))
-            Assert.True(File.Exists(Path.Combine(scribe.FullPath("A", keptVisibleAs.GetString()!), "a.md")), "the folder is not kept as " + keptVisibleAs.GetString());
+        if (recoveryCase.TryGetProperty("keptVisibleAs", out JsonElement keptVisibleAs) && handoverShape is not null)
+        {
+            // U4b3 kept-original-named: the removed Day 3 page, a FILE under its visible name, byte for byte.
+            Assert.Equal("Three.\n"u8.ToArray(), scribe.Page("A", keptVisibleAs.GetString()!));
+        }
+        else if (recoveryCase.TryGetProperty("keptVisibleAs", out JsonElement keptFolderAs))
+            Assert.True(File.Exists(Path.Combine(scribe.FullPath("A", keptFolderAs.GetString()!), "a.md")), "the folder is not kept as " + keptFolderAs.GetString());
+        if (Flag(recoveryCase, "visibleNameTaken") && handoverShape is not null)
+            Assert.Equal(KeptPageTakenHolds, scribe.Page("A", KeptPageTaken));
+        if (recoveryCase.TryGetProperty("keptPageLines", out JsonElement keptPageLines))
+        {
+            int said;
+            lock (scribe.TrailLines) said = scribe.TrailLines.Count(line => Plantoir.Core.Scripting.ActivityTrail.KeyFor(line.Event) == "undo kept a page under a visible name");
+            Assert.Equal(keptPageLines.GetInt32(), said);
+        }
         if (recoveryCase.TryGetProperty("folderLines", out JsonElement folderLines))
         {
             int said;

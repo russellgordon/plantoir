@@ -845,7 +845,7 @@ internal static class UndoSwap
     /// include its pages (Russell's ruling of 2026-11-19 and the mac's, the
     /// first review of W6's LOW 4: nothing of the teacher's stays hidden).
     /// </summary>
-    internal static string VisibleName(string place, int number) =>
+    internal static string VisibleName(string place, int number, bool isAPage = false) =>
         number <= 1 ? place + " (kept by Undo)" : place + $" (kept by Undo {number.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
 
     /// <summary>
