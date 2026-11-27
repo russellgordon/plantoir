@@ -45,8 +45,9 @@ VERIFY = REPOSITORY_ROOT / "verify.sh"
 # The mount form verify.sh uses for every file it hands a run:
 #   --mount "$(bind_mount_argument "$(pwd)/scripts/x.py" /opt/scripts/x.py),readonly"
 MOUNTED_SCRIPT = re.compile(r'bind_mount_argument\s+"[^"]*"\s+/opt/scripts/([A-Za-z0-9_]+)\.py\)')
-# The script a run executes: python3 /opt/scripts/x.py
-RUN_SCRIPT = re.compile(r'python3\s+/opt/scripts/([A-Za-z0-9_]+)\.py')
+# The script a run executes: python3 /opt/scripts/x.py, or, since #1052,
+# python3 "/opt/scripts/$(ran_by_name x.py)", which lists the file as run.
+RUN_SCRIPT = re.compile(r'python3\s+"?/opt/scripts/(?:\$\(ran_by_name\s+)?([A-Za-z0-9_]+)\.py')
 
 
 def baked_scripts() -> set:

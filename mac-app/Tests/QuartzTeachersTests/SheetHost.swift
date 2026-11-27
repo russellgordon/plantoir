@@ -46,6 +46,10 @@ final class SheetHost {
     /// and was ordered out.
     private(set) var reachedAScreen: Bool = false
 
+    /// How long a sheet asked for may take to open before the host stops
+    /// waiting for it: a failure bound, never a settling time.
+    static let longestWaitForTheSheet: TimeInterval = 30
+
     // MARK: - Computed properties
 
     /// The presented sheet's window.
@@ -70,11 +74,43 @@ final class SheetHost {
         window.setFrameOrigin(origin)
         window.orderFrontRegardless()
         pump()
+        // Registered BEFORE the sheet is asked for, so a sheet that begins
+        // on this same turn of the run loop cannot be missed.
+        let sheetBegins: XCTNSNotificationExpectation = XCTNSNotificationExpectation(
+            name: NSWindow.willBeginSheetNotification, object: window
+        )
         presentation.isShown = true
-        pump(0.6)
+        waitForTheSheetToOpen(sheetBegins)
     }
 
     // MARK: - Functions
+
+    /// Waits for AppKit to say the sheet asked for is being hung from this
+    /// host's window (#1050): `NSWindow.willBeginSheetNotification`, the
+    /// event itself, never a poll or a settling time. SwiftUI presents a
+    /// sheet on a later turn of the run loop, and how much later depends on
+    /// how busy the Mac is: the fixed 0.6 seconds this host used to give it
+    /// was once too short on a Mac running another build beside the suite,
+    /// and the verb sheet's test found no sheet.
+    ///
+    /// Measured on 2026-11-27: `window.attachedSheet` is still nil while
+    /// the notification is delivered, because AppKit posts it from inside
+    /// `-[NSWindow _attachSheetWindow:]`, under SwiftUI's own presentation,
+    /// and sets the sheet before that call returns. `XCTWaiter` turns the
+    /// run loop that SwiftUI presents on, so it can only return once that
+    /// call has finished: the sheet is attached when the wait ends.
+    /// `attachedSheet` is not observable by key-value observing (measured
+    /// the same day: an observer of it was never told), so this is the
+    /// event to wait on. The host is not an `XCTestCase` and its
+    /// initializer is not `async`, hence a waiter rather than `await`. The
+    /// bound only keeps a sheet that never opens from holding the suite,
+    /// and the caller's `XCTUnwrap(host.sheet)` then says so.
+    private func waitForTheSheetToOpen(_ sheetBegins: XCTNSNotificationExpectation) {
+        if window.attachedSheet == nil {
+            _ = XCTWaiter().wait(for: [sheetBegins], timeout: SheetHost.longestWaitForTheSheet)
+        }
+        keepOffTheScreens()
+    }
 
     /// Lets SwiftUI and AppKit settle, then checks nothing reached a display.
     func pump(_ seconds: Double = 0.3) {

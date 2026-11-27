@@ -4,6 +4,12 @@ import XCTest
 
 final class WebPreviewControllerTests: XCTestCase {
 
+    // MARK: - Stored properties
+
+    /// How long a load may take to reach WebKit before the test says it
+    /// never did: a hang guard, never a settling time (#1046).
+    static let longestWaitForAHandOff: TimeInterval = 60
+
     // MARK: - Functions
 
     @MainActor
@@ -31,75 +37,55 @@ final class WebPreviewControllerTests: XCTestCase {
     /// fresh build, arriving at the SAME address because a section keeps its
     /// port, then looked "already loaded" to `loadIfNeeded`, which skipped.
     /// The teacher kept the page from before their change with no reload
-    /// coming. `showFreshBuild` must start a navigation anyway.
+    /// coming. `showFreshBuild` must start a load anyway.
+    ///
+    /// Judged twice (#1046): by the loads the controller DECIDES on,
+    /// counted the moment each is decided, and by the loads it HANDS to
+    /// WebKit, which happens only after the website data store has emptied
+    /// its caches in WebKit's own process. The test awaits each hand-off
+    /// itself: the controller calls `whenALoadIsHandedToWebKit` where
+    /// `webView.load` returns, and that call fulfils the expectation. The
+    /// test used to wait, on a fixed six seconds, for WebKit to begin each
+    /// navigation, and with another build running on the same Mac the
+    /// round trip once took longer. The bound below is not a settling
+    /// time: it only ends a test whose hand-off never comes.
     @MainActor
     func testShowFreshBuildLoadsEvenWhenTheAddressWasAlreadyRequested() {
         let controller: WebPreviewController = WebPreviewController()
         let url: URL = URL(string: "http://127.0.0.1:8081/")!
 
         // The phantom load that re-arms the last-requested address.
+        let firstHandOff: XCTestExpectation = expectation(description: "the first load is handed to WebKit")
+        controller.whenALoadIsHandedToWebKit = {
+            firstHandOff.fulfill()
+        }
         controller.loadIfNeeded(url)
+        XCTAssertEqual(controller.appLoadsAskedFor, 1, "the first request for an address did not load it")
+        controller.loadIfNeeded(url)
+        XCTAssertEqual(controller.appLoadsAskedFor, 1, "a repeated request for the same address loaded it again")
+        // WebKit empties its caches and calls back on a later turn, so no
+        // load may have reached WebKit yet: one that has went ahead of the
+        // emptying (#1046).
+        XCTAssertEqual(controller.appLoadsHandedToWebKit, 0, "the first load reached WebKit before the caches were emptied")
+        wait(for: [firstHandOff], timeout: WebPreviewControllerTests.longestWaitForAHandOff)
+        XCTAssertEqual(controller.appLoadsHandedToWebKit, 1, "the first load was not handed to WebKit once")
 
-        // Let that first navigation actually begin, so a navigation seen
-        // below can only belong to showFreshBuild.
-        let firstLoadBegan: XCTestExpectation = expectation(description: "first navigation begins")
-        pollUntil(deadline: Date().addingTimeInterval(5), expectation: firstLoadBegan) {
-            return controller.webView.url != nil
+        let freshHandOff: XCTestExpectation = expectation(description: "showFreshBuild's load is handed to WebKit")
+        controller.whenALoadIsHandedToWebKit = {
+            freshHandOff.fulfill()
         }
-        wait(for: [firstLoadBegan], timeout: 6)
-
-        let recorder: NavigationStartRecorder = NavigationStartRecorder()
-        controller.webView.navigationDelegate = recorder
-        let freshNavigationBegan: XCTestExpectation = expectation(description: "showFreshBuild begins a navigation")
-        recorder.onStart = {
-            freshNavigationBegan.fulfill()
-        }
-
         controller.showFreshBuild(url)
-        wait(for: [freshNavigationBegan], timeout: 6)
+        XCTAssertEqual(controller.appLoadsAskedFor, 2, "showFreshBuild did not load an address that was already requested")
+        XCTAssertEqual(controller.appLoadsHandedToWebKit, 1, "showFreshBuild's load reached WebKit before the caches were emptied")
+        wait(for: [freshHandOff], timeout: WebPreviewControllerTests.longestWaitForAHandOff)
+        XCTAssertEqual(controller.appLoadsHandedToWebKit, 2, "showFreshBuild's load was not handed to WebKit once")
 
         // And the mounting view's own loadIfNeeded is then the no-op, so
         // this stays a single load per rebuild.
-        recorder.onStart = {
-            XCTFail("loadIfNeeded after showFreshBuild must not start another navigation")
+        controller.whenALoadIsHandedToWebKit = {
+            XCTFail("loadIfNeeded after showFreshBuild handed WebKit another load")
         }
         controller.loadIfNeeded(url)
-    }
-
-    /// Checks the condition on a timer until it holds or the deadline
-    /// passes, fulfilling the expectation when it holds.
-    @MainActor
-    private func pollUntil(
-        deadline: Date, expectation: XCTestExpectation, condition: @escaping () -> Bool
-    ) {
-        if condition() {
-            expectation.fulfill()
-            return
-        }
-        if Date() > deadline {
-            return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            guard let self else {
-                return
-            }
-            Task { @MainActor in
-                self.pollUntil(deadline: deadline, expectation: expectation, condition: condition)
-            }
-        }
-    }
-}
-
-/// Reports when the web view begins a provisional navigation.
-private final class NavigationStartRecorder: NSObject, WKNavigationDelegate {
-
-    // MARK: - Stored properties
-
-    var onStart: () -> Void = {}
-
-    // MARK: - Functions
-
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        onStart()
+        XCTAssertEqual(controller.appLoadsAskedFor, 2, "loadIfNeeded after showFreshBuild must not start another load")
     }
 }
