@@ -239,8 +239,10 @@ The image is layered as follows (in order):
    image build.
 
    **Run directly on a Mac, the image's tests say so (#907).** Seven of those
-   tests need python-frontmatter (and the PyYAML it reads with), which a Mac's
-   own Python lacks: measured 2026-11-13 on Homebrew Python 3.14, two stopped
+   tests need python-frontmatter (and the PyYAML it reads with), and an eighth,
+   `test_grove_colours.py`, needs Pillow (#1052: it imports `social_card.py`,
+   which imports Pillow at its top, and a second Mac's Python had none); a Mac's
+   own Python lacks the first two and may lack Pillow. For the seven: measured 2026-11-13 on Homebrew Python 3.14, two stopped
    with `ModuleNotFoundError` and five ran with dozens of wrong counts,
    because `build_site.py` reads pages without frontmatter when the module is
    missing; all seven passed in a venv that has both. Each now opens with the
@@ -251,7 +253,8 @@ The image is layered as follows (in order):
    failure (1). Anywhere else the block does nothing: in the image a missing
    module is a fault in the image, and on Windows, whose fetched runtime
    carries the modules, `PythonToolchainTests` must keep reading one as a
-   failure. `verify.sh` runs the seven's tests in the image and reads any
+   failure. `verify.sh` runs the seven's tests, and `test_grove_colours.py` (its block names
+   `PIL`; it is in `tests_run_by_name_later`), in the image and reads any
    exit but 0 as a FAIL, 77 included. It also runs one of them on the HOST,
    in a mode that needs neither module: step 6a2's `python3
    scripts/test_page_sources.py --site <built> <course>`, which reads a real
@@ -287,8 +290,8 @@ The image is layered as follows (in order):
    trusts a written list. Every named run hands its file to `python3` through
    `ran_by_name`, which appends the name to `/tmp/verify_ran_by_name.list` and
    prints it; at the end of step 0.5 the discovery runs every `scripts/test_*.py`
-   that list does not hold, and each must pass (a file needing python-frontmatter
-   exits 77 on a Mac without it and fails there on purpose, since it belongs in
+   that list does not hold, and each must pass (a file needing python-frontmatter, or
+   Pillow for `test_grove_colours.py`, exits 77 on a Mac without it and fails there on purpose, since it belongs in
    the image runs). The list, not the script's text, is the record, so a name in
    a message or comment can neither hide a file nor run it twice. Files run by
    name only after step 0.5 (the image runs, two `--site` runs) are written in
