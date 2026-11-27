@@ -343,6 +343,68 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         }
     }
 
+    /// A preview running before the assistant's Get Ready is running after
+    /// it, whatever the outcome: done, nothing to do, write failed, stopped
+    /// part way. Over MCP, with the section's window registered and its
+    /// preview showing (a window the local assistant would open is not
+    /// opened here).
+    func testAPreviewRunningBeforeTheAssistantsGetReadyIsRunningAfterEveryOutcome() async throws {
+        let rules: [String: Any] = try StartOfYearTests.rules("startOfYear")
+        let plainYear: [String: Any] = try XCTUnwrap((rules["cases"] as? [[String: Any]])?.first)
+        let layout: [[String: Any]] = try XCTUnwrap(plainYear["pages"] as? [[String: Any]])
+        let outcomes: [String] = ["done", "nothingToDo", "writeFailed", "stoppedPartWay"]
+
+        for outcome in outcomes {
+            let made = try AssistFixture.makeRunner(registeringPreview: true, surface: .mcp)
+            defer { try? FileManager.default.removeItem(at: made.root) }
+            if outcome == "nothingToDo" {
+                try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-08",
+                                        body: "One.", in: made.course)
+            } else {
+                _ = try StartOfYearTests.layOut(layout, in: made.course)
+            }
+            let shown: AssistToolOutcome = await made.runner.run(call: StartOfYearTests.call(
+                "plan_prepare_for_start_of_year", ["course": "ICS3U", "section": 1]
+            ))
+            let code: String = try XCTUnwrap(StartOfYearPlanner.planCode(in: shown.detail), "\(outcome): \(shown.detail)")
+            if outcome == "writeFailed" {
+                UndoKillPoints.fileInUseAtSwap = { (index: Int) -> Bool in
+                    return index == 0
+                }
+            }
+            if outcome == "stoppedPartWay" {
+                UndoKillPoints.fileInUseAtSwap = { (index: Int) -> Bool in
+                    return index == 1
+                }
+                UndoKillPoints.putBackFailsAt = { (index: Int) -> Bool in
+                    return index == 0
+                }
+            }
+            let reply: AssistToolOutcome = await made.runner.run(call: StartOfYearTests.call(
+                "prepare_for_start_of_year", ["course": "ICS3U", "section": 1, "planCode": code]
+            ))
+            UndoKillPoints.fileInUseAtSwap = nil
+            UndoKillPoints.putBackFailsAt = nil
+
+            if outcome == "writeFailed" {
+                XCTAssertTrue(reply.summary.hasPrefix("Plantoir could not finish"), "\(outcome): \(reply.summary)")
+            }
+            if outcome == "stoppedPartWay" {
+                XCTAssertTrue(reply.summary.hasPrefix(StartOfYearWording.stoppedPartWay(course: "ICS3U", section: "1")), "\(outcome): \(reply.summary)")
+            }
+            if outcome == "nothingToDo" {
+                XCTAssertFalse(reply.summary.contains("Plantoir could not"), "\(outcome): \(reply.summary)")
+            }
+            let controller: SectionWindowControllers.Controller? = SectionWindowControllers.shared.controller(
+                folderPath: made.root.path, courseCode: "ICS3U", sectionNumber: 1
+            )
+            let running: Bool = controller?.isPreviewRunning() ?? false
+            XCTAssertTrue(running, "\(outcome): the preview is not running again: \(FakePreview.shared.events) \(reply.summary)")
+            FakePreview.shared.forget()
+            SectionWindowControllers.shared.forgetAll()
+        }
+    }
+
     /// The offer through the assistant names the menu item as the menu
     /// titles it.
     func testTheAssistantsOfferNamesTheMenuItemAsItIsTitled() {
