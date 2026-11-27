@@ -1233,9 +1233,11 @@ final class UndoRelinkTests: XCTestCase {
 
     /// Every tidy recovery makes removes a staged link by the text it
     /// holds: a link under the step's staged name holding a THIRD text
-    /// (neither of the step's) is not the step's and is left as it is,
-    /// while the step is settled. MUST FAIL with any tidy removing a staged
-    /// link by its name alone (review 1, LOW 2).
+    /// (neither of the step's) is not the step's: it is never removed, and
+    /// (review 2's one rule) never left hidden: its place holds the step's
+    /// old link, so it is kept under a visible name beside it, while the
+    /// step is settled. MUST FAIL with any tidy removing a staged link by
+    /// its name alone (review 1, LOW 2).
     func testRecoveryLeavesAStagedLinkHoldingAnotherText() async throws {
         let laid: LaidRelink = try layARelinkWhereItStands(named: "third-text", leads: .inside)
         let root: URL = laid.root
@@ -1264,7 +1266,8 @@ final class UndoRelinkTests: XCTestCase {
         let survivor: UndoJournal = UndoJournal(folderURL: journalFolder)
         await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in root }, places: places)
         XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: root), laid.oldText)
-        XCTAssertEqual(linkText(name, root: root), "Unit 1, Day 1.md", "a staged link holding another text was removed")
+        XCTAssertEqual(linkText(section + "Unit 1, Day 4 (kept by Undo).md", root: root), "Unit 1, Day 1.md", "a staged link holding another text was removed")
+        XCTAssertFalse(UndoSwap.isALink(root.appendingPathComponent(name)), "left under the hidden name")
         let phase: UndoStepPhase? = try survivor.read().records[1]?.phase
         XCTAssertNotEqual(phase, .begun)
     }
@@ -1411,9 +1414,10 @@ final class UndoRelinkTests: XCTestCase {
     /// and the exchange, and the process is killed just after the exchange
     /// (`relinkSwapped`): the teacher's item is under the staged name, the
     /// swap's new link at the place. Recovery never removes the teacher's
-    /// item for its name: it is given back to the place (the swap's own
-    /// link exchanged out and removed by its text), nothing staged is left.
-    /// MUST FAIL with the item deleted by the tidy.
+    /// item for its name: the place holds a link of the step's, so it is
+    /// kept under a visible name beside the place (said on the trail), the
+    /// link stays, nothing staged is left. MUST FAIL with the item deleted
+    /// by the tidy.
     func testAKillAfterTheExchangeOnceThePlaceChangedGivesTheTeachersItemBack() async throws {
         for kind in ["file", "folder"] {
             let laid: LaidRelink = try layARelinkWhereItStands(named: "replaced-\(kind)", leads: .inside)
@@ -1444,15 +1448,15 @@ final class UndoRelinkTests: XCTestCase {
             _ = JournaledWrite.perform(ops: draft, in: dying, mode: .live, places: places)
             UndoKillPoints.hook = nil
             XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: root), laid.newText, kind)
-            XCTAssertEqual(stagedLeft(under: root).count, 1, kind)
+            XCTAssertFalse(stagedLeft(under: root).isEmpty, kind)
 
             let survivor: UndoJournal = UndoJournal(folderURL: journalFolder)
             await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in root }, places: places)
-            XCTAssertFalse(UndoSwap.isALink(place), kind)
+            XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: root), laid.newText, kind)
             if kind == "file" {
-                XCTAssertEqual(try? text(section + "Unit 1, Day 4.md", root: root), "The teacher's own.\n", kind)
+                XCTAssertEqual(try? text(section + "Unit 1, Day 4 (kept by Undo).md", root: root), "The teacher's own.\n", kind)
             } else {
-                XCTAssertEqual(try? text(section + "Unit 1, Day 4.md/inside.md", root: root), "Inside.\n", kind)
+                XCTAssertEqual(try? text(section + "Unit 1, Day 4.md (kept by Undo)/inside.md", root: root), "Inside.\n", kind)
             }
             XCTAssertEqual(stagedLeft(under: root), [], kind)
         }

@@ -258,14 +258,14 @@ nonisolated enum UndoRecovery {
             listHolds = UndoRecovery.listHolds(step, root: root, from: journal)
         }
         var allGone: Bool = true
-        let linkTexts: Set<String> = UndoRecovery.linkTexts(of: step)
+        let linkTexts: UndoStepLinks = UndoRecovery.links(of: step, root: root)
         for work in ["apply", "undo", "redo"] {
             if !UndoSwap.tidyLeftovers(
                 label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: nil) },
                 root: root, keepingOnlyCopies: keepingOnlyCopies,
                 unlessTheListHolds: listHolds, keepingCopiesHolding: notInTheList,
-                linkTextsOfTheStep: linkTexts
+                linksOfTheStep: linkTexts
             ) {
                 allGone = false
             }
@@ -273,19 +273,42 @@ nonisolated enum UndoRecovery {
         return allGone
     }
 
-    /// mac-1: every text a link's move of the step holds on either side
-    /// (`linkSha`, `linkShaBefore`, `linkShaAfter`), by its SHA-256: what a
-    /// staged link the step's swaps made, or exchanged out, may hold.
-    static func linkTexts(of step: UndoStep) -> Set<String> {
+    /// mac-1: what a tidy needs of the step's links (review 2's one rule,
+    /// `UndoSwap.settleUnderARelinksStagedName`): every text a link's move
+    /// of the step holds on either side (`linkSha`, `linkShaBefore`,
+    /// `linkShaAfter`, by SHA-256), each place a relinking move stages its
+    /// new link beside (its `to`, for either direction of a relink where
+    /// the link stands, and its `from` and `to` for a two-place relink,
+    /// whose reversal stages beside `from`), and the trail line said before
+    /// a teacher's item found there is kept under a visible name.
+    static func links(of step: UndoStep, root: URL) -> UndoStepLinks {
         var texts: Set<String> = []
+        var relinkPlaces: Set<String> = []
         for op in step.ops where op.isALinksMove {
             for text in [op.linkSha, op.linkShaBefore, op.linkShaAfter] {
                 if let text {
                     texts.insert(text)
                 }
             }
+            if op.isARelink {
+                for path in [op.from, op.to] {
+                    if let path {
+                        relinkPlaces.insert(root.appendingPathComponent(path).standardizedFileURL.path)
+                    }
+                }
+            }
         }
-        return texts
+        let course: String = step.course ?? ""
+        let section: Int? = step.section
+        return UndoStepLinks(texts: texts, relinkPlaces: relinkPlaces, onKept: { place, foundAt, keptAs, isAFolder in
+            let placeInside: String = UndoRecovery.insideTheFolder(place, root: root)
+            let keptInside: String = UndoRecovery.insideTheFolder(keptAs, root: root)
+            if isAFolder {
+                UndoTrailHook.foundAFolderSetAsideLine?(course, section, placeInside, foundAt.lastPathComponent, keptInside, "")
+            } else {
+                UndoTrailHook.keptAPageLine?(course, section, placeInside, keptInside)
+            }
+        })
     }
 
     /// Whether a kept original's bytes are exactly what the list gives for
@@ -1265,7 +1288,7 @@ nonisolated enum UndoRecovery {
             UndoSwap.tidyLeftovers(
                 label: label, beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) },
-                root: root, keepingOnlyCopies: true, linkTextsOfTheStep: UndoRecovery.linkTexts(of: step)
+                root: root, keepingOnlyCopies: true, linksOfTheStep: UndoRecovery.links(of: step, root: root)
             )
             if UndoKillPoints.stopsHere(.afterRecoveryTidied) {
                 return nil
@@ -1447,10 +1470,10 @@ nonisolated enum UndoRecovery {
                     // under its hidden name (the list cannot put the page
                     // back, so `tidyClosedSteps` keeps it too). Only the
                     // staged new content and copies go.
-                    let linkTexts: Set<String> = UndoRecovery.linkTexts(of: step)
-                    UndoSwap.tidyLeftovers(label: label, beside: urls, root: root, keepingOnlyCopies: true, linkTextsOfTheStep: linkTexts)
+                    let linkTexts: UndoStepLinks = UndoRecovery.links(of: step, root: root)
+                    UndoSwap.tidyLeftovers(label: label, beside: urls, root: root, keepingOnlyCopies: true, linksOfTheStep: linkTexts)
                     UndoSwap.tidyLeftovers(
-                        label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true, linkTextsOfTheStep: linkTexts
+                        label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true, linksOfTheStep: linkTexts
                     )
                     // A page the step removed or moved away whose place is now
                     // taken is kept under a visible name, never left hidden.
@@ -1477,7 +1500,7 @@ nonisolated enum UndoRecovery {
                 UndoSwap.tidyLeftovers(
                     label: label, beside: urls, root: root, keepingOnlyCopies: true,
                     unlessTheListHolds: UndoRecovery.listHolds(step, root: root, from: writer.journal),
-                    linkTextsOfTheStep: UndoRecovery.linkTexts(of: step)
+                    linksOfTheStep: UndoRecovery.links(of: step, root: root)
                 )
                 let notTaken: UndoWhatTheListCouldNotTake = UndoRecovery.storeWhatKeptOriginalsGive(uses, writer)
                 var keepingTheOriginalsOf: Set<String> = []
@@ -1542,12 +1565,12 @@ nonisolated enum UndoRecovery {
                 UndoSwap.tidyLeftovers(
                     label: label, beside: urls, root: root, keepingOnlyCopies: true,
                     unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken,
-                    linkTextsOfTheStep: UndoRecovery.linkTexts(of: step)
+                    linksOfTheStep: UndoRecovery.links(of: step, root: root)
                 )
                 UndoSwap.tidyLeftovers(
                     label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true,
                     unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken,
-                    linkTextsOfTheStep: UndoRecovery.linkTexts(of: step)
+                    linksOfTheStep: UndoRecovery.links(of: step, root: root)
                 )
                 let kept: [String] = UndoRecovery.keptOriginalsLeft(of: step, root: root)
                 if !kept.isEmpty {

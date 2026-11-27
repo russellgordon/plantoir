@@ -190,11 +190,11 @@ nonisolated enum UndoStoppedStep {
                     let listHolds: (URL, URL) -> Bool = UndoRecovery.listHolds(record.step, root: root, from: journal)
                     _ = UndoSwap.tidyLeftovers(
                         label: "\(seq)-apply", beside: urls, root: root, keepingOnlyCopies: true, unlessTheListHolds: listHolds,
-                        linkTextsOfTheStep: UndoRecovery.linkTexts(of: record.step)
+                        linksOfTheStep: UndoRecovery.links(of: record.step, root: root)
                     )
                     _ = UndoSwap.tidyLeftovers(
                         label: label, beside: urls, root: root, keepingOnlyCopies: true, unlessTheListHolds: listHolds,
-                        linkTextsOfTheStep: UndoRecovery.linkTexts(of: record.step)
+                        linksOfTheStep: UndoRecovery.links(of: record.step, root: root)
                     )
                 }
                 return .putBack
