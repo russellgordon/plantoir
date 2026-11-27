@@ -74,7 +74,7 @@ dialogs are not tested this way. No follow-up.
 ## #1052: `verify.sh` ran a written list of Python tests
 
 **Cause.** Step 0.5 ran each `scripts/test_*.py` by name; nothing noticed a
-file that was not named, so 17 files ran on Windows only, and six more
+file that was not named, so 14 files ran on Windows only, and six more
 (`test_marking_*.py`) were named only through a loop variable. The gate was
 green on a tree where `test_make_undo_traces.py` failed.
 
@@ -90,8 +90,8 @@ file passed on this Mac. The header no longer says the list is written by
 hand.
 
 **Proof.** Step 0.5 alone (the lock and terminal check left out, nothing
-else changed): 141 pass, 0 fail; the discovery ran the 17 files that were
-named nowhere (test_make_undo_traces.py among them), all green; the six
+else changed): 141 pass, 0 fail; the discovery ran 17 files, but only 14 were
+named nowhere (3 were duplicates; corrected in fix round one) (test_make_undo_traces.py among them), all green; the six
 marking files ran by name. Must-fail: a planted `scripts/test_zz_mustfail_1052.py`
 that exits 1 gave "FAIL scripts/test_zz_mustfail_1052.py, found by the
 discovery of every scripts/test_*.py (#1052)" and `FAILED=true`; removed, the
@@ -120,3 +120,71 @@ writer never runs it); the director's gate does.
   changed Swift (the one `DispatchQueue` that was there, in the old test, is
   removed); MARK sections kept; no timed wait added (the 0.6 s settle in
   `SheetHost` is the one that was there, now after the event).
+
+## Fix round one (review 1, 2026-11-27)
+
+Merged `origin/dev` before proving and before handing back: up to date both
+times (still 35b54c40a).
+
+**#1046 (MEDIUM 1, LOW 1).** The test now guards the real hand-off.
+`WebPreviewController` counts `appLoadsHandedToWebKit` only where
+`webView.load` returns a navigation, in the completion after the caches are
+emptied (and where `reloadFromOrigin` returns one, Reload's other branch,
+which is now counted in `appLoadsAskedFor` too; both doc comments say what
+is counted). Each count calls `whenALoadIsHandedToWebKit`; the test sets it,
+before each call, to fulfil an `XCTestExpectation`, and waits on that with a
+60 s bound that only ends a hung test. The instant decision assertions stay.
+A further hand-off after `showFreshBuild` is an `XCTFail`.
+
+**#1050 (MEDIUM 2, LOW 2, LOW 3).** `SheetHost` registers an
+`XCTNSNotificationExpectation` for `NSWindow.willBeginSheetNotification`
+(object: its window) BEFORE `isShown = true`, and if `attachedSheet` is
+still nil waits on it with `XCTWaiter` (30 s bound, failure only). Measured,
+not guessed: at the notification `attachedSheet` is still nil, and the call
+stack shows AppKit posting it from inside `-[NSWindow _attachSheetWindow:]`
+under SwiftUI's `SheetBridge`, all inside the waiter's run-loop turn, so the
+waiter cannot return before the sheet is attached (it was, every run). KVO
+on `attachedSheet` (`XCTKVOExpectation`, options `.new`) never fired: the
+property is not KVO-compliant, so it is not used. `await` is not used
+because the host's initializer is synchronous and every caller would change.
+The 0.6 s settle after the event is removed (nothing after attachment
+needed it: the four classes are green without it) and so is the `print`.
+
+**#1052 (MEDIUM 3, LOW 4, LOW 5).** "Run by name" now comes from ONE list
+the runs write themselves: every named run hands its file to `python3`
+through `ran_by_name`, which appends the name to
+`/tmp/verify_ran_by_name.list` and prints it (116 run lines, the marking
+loop and the #835 stem loop included). The discovery reads that list, never
+the script's text, so a name in a message or comment can neither hide nor
+double a file. Files run by name only after step 0.5 (the image runs, and
+two `--site` runs) are written in `tests_run_by_name_later`; at the end of
+the run a check fails the gate if that list and what those steps named
+through `ran_by_name` differ either way. The discovery prints once
+"N run by name in this script, M found and run by the discovery", and for a
+discovered file whose unittest skipped cases, one line with the number
+skipped (not a failure). Two shared tests read `verify.sh`'s run lines
+as text and lost them to the new form (seen red in the first step 0.5 run of
+this round): `scripts/test_image_only_tests_say_so.py` (`IMAGE_RUN`,
+`HOST_RUN`) and `scripts/test_image_runs_find_their_modules.py`
+(`RUN_SCRIPT`). Their patterns now also read `"$(ran_by_name test_x.py)"`;
+checked by script against the old `verify.sh`: the same 14 image runs, the
+same 101 host runs and the same mounted-script runs found as before. So
+`scripts/` changed in this round (it did not in the first). Windows: nothing
+to do (it discovers the files and does not read `verify.sh`). Not done: the stale docstring in
+`scripts/test_build_keeps_a_readonly_hidden_page_hidden.py` (not a file
+changed here).
+
+### Must-fail and runs (fix round one)
+
+| Check | Sabotage | Result | Log |
+|---|---|---|---|
+| #1046 hand-off | `webView.load(...)` in the completion replaced by `nil` | RED 3 of 3 (line 66 "Asynchronous wait failed", line 67 count 0) | `run-fix1-sabotage.log` |
+| #1052 discovery | planted `scripts/test_zz_mustfail_1052.py` (exit 1) with its name echoed in a message line | "FAIL scripts/test_zz_mustfail_1052.py, found by the discovery ..." and `FAILED=true`: a name in a message no longer hides a file; file removed | `mustfail-1052.log` |
+| #1050 late sheet | `isShown` set by a run-loop `Timer` 0.8 s late | green 3 of 3 | `run-fix1-sabotage.log` |
+
+- `run-fix1-30.log`: both tests, 30 iterations each, restored code: 60 of 60 green.
+- `run-fix1-classes.log`: WebPreviewControllerTests, LayoutAndSmallBehaviourTests, PageTablesSheetTests, PreviewStartPageTests: 59 tests, 0 failures (PageTablesSheetTests 30.7 s, was 40.3 s with the settle).
+- `run-fix1-kvo.log`: the KVO attempt, timed out every time (why KVO is not used).
+- Step 0.5 alone (lines 1 to 109 and step 0.5 of `verify.sh`, the terminal check and lock left out; `.dd/step05-fix1b.log`): **PASS 138, FAIL 0, `FAILED=false`** (141 before, less the 3 duplicate runs). Printed: "119 run by name in this script, 14 found and run by the discovery"; `test_handout_starters.py` "skipped 1 of its own test case(s)". Checked by script against the run's own list and log: each of the 133 `scripts/test_*.py` ran exactly once in step 0.5, or is in `tests_run_by_name_later` (image runs) and ran zero times there. The first run of this round (`step05-fix1.log`) was 136 and 2, the two readers above; fixed.
+- The end-of-run check of `tests_run_by_name_later` sits before the summary and was not run (it needs the image steps; the director's gate runs it). It would go red if a later step that names a listed file is ever made conditional and skipped.
+
