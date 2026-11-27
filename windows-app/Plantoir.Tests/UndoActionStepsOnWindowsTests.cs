@@ -35,7 +35,8 @@ internal static class WindowsActionsOnTheMacFixture
         "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
         "reDateClasses", "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear",
         "showTodaysClassOnTheFrontPage", "notTodayOnTheFrontPage", "keepClassesDatedLater", "answerTheLinksChecklist",
-        "makeRoomForClasses", "duplicateClass", "duplicateAsTheNextClass",
+        "makeRoomForClasses", "duplicateClass", "duplicateAsTheNextClass", "setSchoolYear", "saveCourseSettings",
+        "addFolder",
     ];
 
     /// <summary>
@@ -141,6 +142,11 @@ internal static class WindowsActionsOnTheMacFixture
             LayTheMorning(workingFolder, recorded);
             return;
         }
+        if (recorded.GetProperty("name").GetString() == "addFolder")
+        {
+            LayTheSettingsCourse(workingFolder);
+            return;
+        }
         string course = Path.Combine(workingFolder, "courses", Course);
         Directory.CreateDirectory(course);
         File.WriteAllText(Path.Combine(course, "course_config.json"),
@@ -151,6 +157,27 @@ internal static class WindowsActionsOnTheMacFixture
         foreach ((string path, string text) in MacSection()) WriteAt(workingFolder, path, new UTF8Encoding(false).GetBytes(text));
         foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray())
             WriteAt(workingFolder, file.GetProperty("path").GetString()!, Bytes(file.GetProperty("before")));
+    }
+
+    /// <summary>
+    /// The mac's <c>CourseSettingsGestureScript.makeCourse</c>, the course its
+    /// <c>addFolder</c> was recorded on (#899 W8-13): its folders, the
+    /// curriculum folder among them and EMPTY, so the page to duplicate has no
+    /// curriculum connection, and its settings.
+    /// </summary>
+    private static void LaySettingsCourseFolders(string course)
+    {
+        foreach (string folder in new[] { "section1/All Classes", "section1/Tasks", "Concepts", "Curriculum", "Tasks", "Tests", "Portfolios/Tasks" })
+            Directory.CreateDirectory(Path.Combine(course, folder.Replace('/', Path.DirectorySeparatorChar)));
+    }
+
+    private static void LayTheSettingsCourse(string workingFolder)
+    {
+        string course = Path.Combine(workingFolder, "courses", Course);
+        LaySettingsCourseFolders(course);
+        File.WriteAllText(Path.Combine(course, "course_config.json"),
+            "{\"course_code\":\"ICS3U\",\"course_name\":\"Introduction to Computer Science\",\"curriculum_folder\":\"Curriculum\",\"expandable\":[\"Concepts\"],\"hidden\":[\"Media\",\"Tasks\"],\"include_curriculum_coverage\":true,\"num_sections\":1,\"per_section_files\":[\"index.md\",\"Announcements.md\"],\"per_section_folders\":[\"All Classes\",\"Tasks\"],\"section_numbers\":[1],\"shared_files\":[\"Learning Goals.md\"],\"shared_folders\":[\"Concepts\",\"Curriculum\",\"Tasks\",\"Tests\"]}");
+        File.WriteAllText(Path.Combine(workingFolder, Workspace.MarkerLauncher), "");
     }
 
     /// <summary>
@@ -285,6 +312,44 @@ internal static class WindowsActionsOnTheMacFixture
             return LinksChecklist.WriteAnswered(workspace.FolderPath, Course, courseDirectory, 1,
                 ["section1/All Classes/Unit 1, Day 2.md"], [], new DateTime(2026, 9, 8, 11, 0, 0, DateTimeKind.Utc),
                 new UndoStepMaker("sheet", LinksChecklist.AnsweredActionKey), workspace.UndoList, workspace.UndoDoorOfATest).ToString();
+        }
+        // Set School Year is the sheet's write, given the year and the day
+        // the mac's SetSchoolYearSheet.write(2025, to:on:) was given, on the
+        // workspace's list and door (#899 W8-11).
+        // Save of Course Settings is the sheet's Save, given the edits the
+        // mac's recording made (the first Marks tick, Tests, and the sidebar
+        // hiding Media alone), on the workspace's list and door (#899 W8-12).
+        // Add folder is the sheet's add, given the name, scope and moment the
+        // mac's createFoldersOnDisk(named: "Labs", scope: .shared, created:)
+        // was given, the bundled template and the course's curriculum pages,
+        // on the workspace's list and door (#899 W8-13).
+        if (stepName == "addFolder")
+        {
+            string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);
+            var configuration = CourseConfiguration.Load(Path.Combine(courseDirectory, "course_config.json"));
+            string templatePath = Path.Combine(ContractLoader.RepositoryRoot, "support", Path.Combine(FolderScaffold.TemplatePathInSupport));
+            var outcome = SpecialFolderRenamer.CreateFoldersOnDisk("Labs", FolderScope.Shared, courseDirectory, configuration.SectionNumbers,
+                FolderScaffold.ReadTemplate(templatePath), () => FolderScaffold.CurriculumPageNames(configuration, courseDirectory),
+                "2026-09-08T07:00:00.000-0400", workspace.UndoList, workspace.UndoDoorOfATest);
+            return "folders created " + outcome.FoldersCreated;
+        }
+        if (stepName == "saveCourseSettings")
+        {
+            string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);
+            var course = new Plantoir.Core.Models.Course(Course, courseDirectory,
+                CourseConfiguration.Load(Path.Combine(courseDirectory, "course_config.json")));
+            course.Configuration.GradedFolders = ["Tests"];
+            course.Configuration.HiddenItems = ["Media"];
+            CourseConfiguration.SaveCourseSettings(course, workspace.UndoList, workspace.UndoDoorOfATest);
+            return "saved";
+        }
+        if (stepName == "setSchoolYear")
+        {
+            string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);
+            var course = new Plantoir.Core.Models.Course(Course, courseDirectory,
+                CourseConfiguration.Load(Path.Combine(courseDirectory, "course_config.json")));
+            return ReferenceCourseUpkeep.WriteSchoolYear(course, 2025, new DateOnly(2026, 11, 20),
+                workspace.UndoList, workspace.UndoDoorOfATest) ?? "filed";
         }
         var tools = new PlantoirTools(workspace);
         // The MCP server always hands a tool a progress (the SDK's own when the
@@ -627,6 +692,12 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
         var recordedPaths = new List<string>();
         foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray()) recordedPaths.Add(file.GetProperty("path").GetString()!);
         if (holdsOneMore) recordedPaths.Add(ownFile.Path);
+        // A step with trees: each folder made, after the files, as the mac
+        // orders its createTree ops (#899 W8-13).
+        if (recorded.TryGetProperty("trees", out JsonElement recordedTrees))
+        {
+            foreach (JsonElement tree in recordedTrees.EnumerateArray()) recordedPaths.Add(tree.GetProperty("path").GetString()!);
+        }
         Assert.True(recordedPaths.SequenceEqual(paths), $"{name}: files {string.Join(" | ", paths)}");
         var recordedKinds = recorded.GetProperty("ops").EnumerateArray().Select(op => op.GetString()!).ToList();
         if (holdsOneMore)
@@ -639,6 +710,31 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
         foreach (JsonElement recompute in recorded.GetProperty("recomputes").EnumerateArray())
             recordedRecomputes.Add(recompute.GetProperty("maintainer").GetString() + " " + recompute.GetProperty("path").GetString() + " " + recompute.GetProperty("section").GetInt64());
         Assert.True(recordedRecomputes.SequenceEqual(recomputes), $"{name}: recomputes {string.Join(" | ", recomputes)}");
+        // A step with members: each editJSON op is the recorded member, its
+        // path, key path, before and after, in the recorded order (#899 W8-11).
+        if (recorded.TryGetProperty("members", out JsonElement members))
+        {
+            var editJsonOps = new List<JsonObject>();
+            foreach (JsonNode? op in step["ops"]!.AsArray())
+            {
+                if ((string?)op!["kind"] == UndoOp.EditJson) editJsonOps.Add(op.AsObject());
+            }
+            Assert.True(members.GetArrayLength() == editJsonOps.Count, $"{name}: {editJsonOps.Count} editJSON ops");
+            for (int index = 0; index < editJsonOps.Count; index++)
+            {
+                JsonElement member = members[index];
+                JsonObject op = editJsonOps[index];
+                Assert.Equal(member.GetProperty("path").GetString(), (string?)op["path"]);
+                Assert.True(JsonNode.DeepEquals(JsonNode.Parse(member.GetProperty("keyPath").GetRawText()), op["keyPath"]), $"{name}: keyPath {op["keyPath"]?.ToJsonString()}");
+                foreach (string side in new[] { "before", "after" })
+                {
+                    bool recordedHasIt = member.TryGetProperty(side, out JsonElement value);
+                    Assert.True(recordedHasIt == op.ContainsKey(side), $"{name}: {side} {(recordedHasIt ? "missing" : "present")}");
+                    if (recordedHasIt)
+                        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(value.GetRawText()), op[side]), $"{name}: {side} {op[side]?.ToJsonString()}");
+                }
+            }
+        }
 
         foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray())
         {
@@ -659,6 +755,28 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             }
             Assert.True(want is null ? have is null : have is not null && want.AsSpan().SequenceEqual(have),
                         $"{name}: {path} after is not the recorded after:\n{(have is null ? "(absent)" : Encoding.UTF8.GetString(have))}");
+        }
+        // Each tree made is the recorded one: its folders, and every file's
+        // bytes by its path inside it (#899 W8-13).
+        if (recorded.TryGetProperty("trees", out JsonElement madeTrees))
+        {
+            foreach (JsonElement tree in madeTrees.EnumerateArray())
+            {
+                string path = tree.GetProperty("path").GetString()!;
+                var reading = UndoTreeReading.Read(UndoDoor.FullPath(Folder, path), keepingContents: true);
+                Assert.True(reading is UndoTreeReading.Tree, $"{name}: {path} is not a folder made: {reading}");
+                var made = (UndoTreeReading.Tree)reading;
+                var folders = tree.GetProperty("folders").EnumerateArray().Select(folder => folder.GetString()!).ToList();
+                Assert.True(folders.Order(StringComparer.Ordinal).SequenceEqual(made.Listing.Folders.Order(StringComparer.Ordinal)), $"{name}: {path}'s folders");
+                var files = tree.GetProperty("files").EnumerateObject().ToList();
+                Assert.True(files.Count == made.Contents.Count, $"{name}: {path} holds {made.Contents.Count} files");
+                foreach (JsonProperty file in files)
+                {
+                    Assert.True(made.Contents.TryGetValue(file.Name, out byte[]? bytes), $"{name}: {path}/{file.Name} was not made");
+                    Assert.True(new UTF8Encoding(false).GetBytes(file.Value.GetString()!).AsSpan().SequenceEqual(bytes),
+                                $"{name}: {path}/{file.Name} is not the recorded file:\n{Encoding.UTF8.GetString(bytes!)}");
+                }
+            }
         }
         if (holdsOneMore)
         {

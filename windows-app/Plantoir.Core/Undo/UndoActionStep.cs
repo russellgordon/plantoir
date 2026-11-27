@@ -12,6 +12,25 @@ internal sealed record UndoStepMaker(string MadeBy, string ActionKey)
 }
 
 /// <summary>
+/// One member of a JSON file a step changes (#899 W8-11; the mac's
+/// <c>(keyPath, before, after)</c> of <c>JournaledStep.editJSON</c>): null
+/// before or after is the member absent.
+/// </summary>
+internal sealed record UndoMemberChange(IReadOnlyList<string> KeyPath, UndoJson? Before, UndoJson? After)
+{
+    /// <summary>The member as its <c>editJSON</c> op, at <paramref name="relativePath"/> inside the working folder.</summary>
+    internal JsonObject Op(string relativePath)
+    {
+        var keyPath = new JsonArray();
+        foreach (string part in KeyPath) keyPath.Add(part);
+        var op = new JsonObject { ["kind"] = UndoOp.EditJson, ["path"] = relativePath, ["keyPath"] = keyPath };
+        if (Before is not null) op["before"] = JsonNode.Parse(Before.Spelled()!);
+        if (After is not null) op["after"] = JsonNode.Parse(After.Spelled()!);
+        return op;
+    }
+}
+
+/// <summary>
 /// A daily action's step that the door refused (#899 W7a; the mac's
 /// <c>JournaledStepError.refused</c>): NOTHING of it was written. An
 /// <see cref="IOException"/>, so a caller that said "Nothing was changed: …"
@@ -94,6 +113,10 @@ internal sealed class UndoActionStep
     private readonly HashSet<string> _notForToday = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>Planned files the step removed at some point (a rename's old name), whatever it writes there after.</summary>
     private readonly HashSet<string> _removedOnce = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>A JSON file planned member by member (<see cref="EditJson"/>): its members, by the file's full path.</summary>
+    private readonly Dictionary<string, IReadOnlyList<UndoMemberChange>> _members = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Each folder the step makes whole (<see cref="MakeTree"/>), in the order planned.</summary>
+    private readonly List<(string FullPath, UndoTreeListing Listing, Dictionary<string, byte[]> Contents)> _trees = [];
 
     // ---- Initializer ---------------------------------------------------------------
 
@@ -134,6 +157,7 @@ internal sealed class UndoActionStep
     {
         get
         {
+            if (_trees.Count > 0) return true;
             foreach (string path in _order)
             {
                 if (!Same(_before[path], _after[path])) return true;
@@ -167,6 +191,37 @@ internal sealed class UndoActionStep
         if (!todaysUndoKeepsIt) _notForToday.Add(Path.GetFullPath(fullPath));
     }
 
+    /// <summary>Plans <paramref name="bytes"/> as the file's content, exactly as given.</summary>
+    internal void WriteBytes(string fullPath, byte[] bytes) => Plan(fullPath, bytes);
+
+    /// <summary>
+    /// Plans a JSON file's change as one <c>editJSON</c> per member (#899 W8-11;
+    /// the mac's <c>JournaledStep.editJSON</c>, U4a): <paramref name="read"/>
+    /// is the bytes the caller's plan was built from, read when planned and
+    /// never again at <see cref="Make"/> (the U3a trap), and the step's before
+    /// for the file; <paramref name="after"/> the bytes the members leave it
+    /// holding, which the caller worked out with the member rule. Made, each
+    /// member is moved in the file as it is THEN, so a member another window
+    /// changed meanwhile is kept, and one of this step's own changed meanwhile
+    /// refuses the step (<c>changedSince</c>). A file already planned in this
+    /// step is planned whole instead.
+    /// </summary>
+    internal void EditJson(string fullPath, byte[] read, IReadOnlyList<UndoMemberChange> members, byte[] after)
+    {
+        string key = Path.GetFullPath(fullPath);
+        if (_before.ContainsKey(key))
+        {
+            Plan(fullPath, after);
+            return;
+        }
+        if (Directory.Exists(key)) throw new IOException($"“{Path.GetFileName(key)}” is a folder, so it could not be written.");
+        _before[key] = read;
+        _order.Add(key);
+        _shownAs[key] = fullPath;
+        _after[key] = after;
+        if (members.Count > 0) _members[key] = members;
+    }
+
     /// <summary>
     /// Plans the file's removal (the mac's <c>remove</c>): the step leaves it
     /// absent, read as absent through the step from now on. A rename is a
@@ -176,6 +231,50 @@ internal sealed class UndoActionStep
     /// (#899 W7b2-1, Make Room for Classes).
     /// </summary>
     internal void Remove(string fullPath) => Plan(fullPath, null);
+
+    /// <summary>
+    /// Plans a folder made whole at <paramref name="fullPath"/>, where nothing
+    /// is yet, as ONE <c>createTree</c> (#899 W8-13; the mac's
+    /// <c>JournaledStep.makeTree</c>, U4a): <paramref name="folders"/> the
+    /// folders inside it and <paramref name="files"/> every file inside it by
+    /// its path in the folder (<c>/</c>-separated), with its bytes. Made, the
+    /// door is given the listing and every listed file's content as blobs, so
+    /// the folder can always be made again.
+    /// </summary>
+    internal void MakeTree(string fullPath, IReadOnlyList<string> folders, IReadOnlyDictionary<string, byte[]> files)
+    {
+        var paths = new List<string>();
+        foreach (string path in files.Keys) paths.Add(path);
+        paths.Sort((first, second) => Encoding.UTF8.GetBytes(first).AsSpan().SequenceCompareTo(Encoding.UTF8.GetBytes(second)));
+        var listed = new List<(string Path, string Sha)>();
+        var contents = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (string path in paths)
+        {
+            listed.Add((path, UndoCheck.Sha(files[path])));
+            contents[path] = files[path];
+        }
+        _trees.Add((Path.GetFullPath(fullPath), new UndoTreeListing(new List<string>(folders), listed), contents));
+    }
+
+    /// <summary>Each planned folder's <c>createTree</c> op and the blobs it needs (its listing, then every listed file's bytes), or null when one cannot be named in a step.</summary>
+    private List<(JsonObject Op, List<byte[]> Blobs)>? RecordableTrees()
+    {
+        var result = new List<(JsonObject, List<byte[]>)>();
+        foreach ((string full, UndoTreeListing listing, Dictionary<string, byte[]> contents) in _trees)
+        {
+            if (RelativeOf(full) is not { } relative || !UndoPlaces.StaysInside(_root!, relative)) return null;
+            var names = new JsonArray(listing.Sha);
+            var blobs = new List<byte[]> { listing.Bytes };
+            var seen = new HashSet<string>(StringComparer.Ordinal) { listing.Sha };
+            foreach ((string path, string sha) in listing.Files)
+            {
+                if (seen.Add(sha)) names.Add(sha);
+                blobs.Add(contents[path]);
+            }
+            result.Add((new JsonObject { ["kind"] = UndoOp.CreateTree, ["path"] = relative, ["listingSha"] = listing.Sha, ["blobs"] = names }, blobs));
+        }
+        return result;
+    }
 
     /// <summary>Every planned file the step leaves with content, as its full path, in the order first planned.</summary>
     internal IReadOnlyList<string> PlannedWithContent
@@ -243,6 +342,8 @@ internal sealed class UndoActionStep
         }
         _after[key] = after;
         if (after is null) _removedOnce.Add(key);
+        // Planned again as a whole file: no longer member by member.
+        _members.Remove(key);
     }
 
     /// <summary>
@@ -257,7 +358,7 @@ internal sealed class UndoActionStep
             RederiveTheFrontPages();
             return;
         }
-        if (RecordableChanges() is not { } changes)
+        if (RecordableChanges() is not { } changes || (_trees.Count > 0 && RecordableTrees() is null))
         {
             if (_mode == UndoMode.Live)
             {
@@ -276,6 +377,11 @@ internal sealed class UndoActionStep
                 ["kind"] = UndoOp.Recompute, ["maintainer"] = UndoOp.SectionFrontPage,
                 ["path"] = RelativeOf(full)!, ["section"] = section,
             });
+        }
+        if (_members.Count > 0 || _trees.Count > 0)
+        {
+            MakeAsOps(changes, recomputes);
+            return;
         }
         var draft = new UndoStepDraft
         {
@@ -303,6 +409,87 @@ internal sealed class UndoActionStep
             CouldNotRecord("the list could not be written", UndoUnrecordedChange.WentAhead, after: WritePlainlyQuietly);
             return;
         }
+        Answer(outcome, keptBefore);
+    }
+
+    /// <summary>
+    /// A step holding a JSON file planned member by member (#899 W8-11; the
+    /// mac's <c>makeAsOps</c>): its files in the order planned, a member-planned
+    /// file as its <c>editJSON</c> ops (no blob) and every other file by the
+    /// door's own rule, then its recomputes, through the door that takes every
+    /// kind (<see cref="UndoDoor.Perform(UndoOpsDraft)"/>), which plans them
+    /// forward from the disk as it is at the make. In shadow, a list that
+    /// cannot take the step leaves one trail line and the files are written
+    /// as planned, all or none, unrecorded (the mac's <c>makeWithoutARecord</c>).
+    /// </summary>
+    private void MakeAsOps(List<UndoFileChange> changes, List<JsonObject> recomputes)
+    {
+        var ops = new JsonArray();
+        var blobs = new List<byte[]>();
+        int index = 0;
+        foreach (string path in _order)
+        {
+            if (Same(_before[path], _after[path])) continue;
+            UndoFileChange change = changes[index++];
+            if (_members.TryGetValue(path, out IReadOnlyList<UndoMemberChange>? members))
+            {
+                foreach (UndoMemberChange member in members) ops.Add(member.Op(change.RelativePath));
+                continue;
+            }
+            foreach (JsonNode? op in UndoLineOps.ForAFile(change.RelativePath, change.Before, change.After))
+            {
+                ops.Add(op!.DeepClone());
+                if ((string?)op["kind"] != UndoOp.WriteFile) continue;
+                if (change.Before is { } before) blobs.Add(before);
+                if (change.After is { } after) blobs.Add(after);
+            }
+        }
+        // Each folder made whole after the files, as the mac's makeAsOps
+        // orders them, counted in pageCount as the mac counts it (W8-13).
+        foreach ((JsonObject treeOp, List<byte[]> treeBlobs) in RecordableTrees()!)
+        {
+            ops.Add(treeOp);
+            blobs.AddRange(treeBlobs);
+        }
+        foreach (JsonObject recompute in recomputes) ops.Add(recompute);
+        var draft = new UndoOpsDraft
+        {
+            ActionKey = _maker.ActionKey,
+            ActionArguments = new Dictionary<string, string>(StringComparer.Ordinal) { ["pageCount"] = (changes.Count + _trees.Count).ToString(System.Globalization.CultureInfo.InvariantCulture) },
+            MadeBy = _maker.MadeBy,
+            WorkingFolder = _root!,
+            Course = _course,
+            Section = _section,
+            Class = "A",
+            Holds = _holds,
+            Ops = ops,
+            Blobs = blobs,
+        };
+        HashSet<string> keptBefore = KeptOriginalsNow();
+        UndoOutcome outcome;
+        try { outcome = _door.Perform(draft); }
+        catch (Exception error) when (_mode == UndoMode.Shadow && error is not (IOException or UnauthorizedAccessException))
+        {
+            // As in Make: an unforeseen failure of the list changed nothing.
+            CouldNotRecord("the list could not be written", UndoUnrecordedChange.WentAhead, after: WritePlainlyQuietly);
+            return;
+        }
+        // The door that takes every kind refuses, in either mode, a step the
+        // list cannot take; in shadow the action still goes ahead (the mac's
+        // makeAsOps), live it is refused before anything changes.
+        if (outcome.Kind == UndoOutcomeKind.CouldNotRecordTheStep)
+        {
+            if (_mode == UndoMode.Live)
+                throw new UndoStepRefusedException(new UndoRefusal(UndoRefusalKind.CouldNotWrite), "the list of changes could not be written");
+            CouldNotRecord("the list could not take the step", UndoUnrecordedChange.WentAhead, after: WritePlainlyQuietly);
+            return;
+        }
+        Answer(outcome, keptBefore);
+    }
+
+    /// <summary>What the door's outcome means for the action: nothing more to do, or the refusal it throws.</summary>
+    private void Answer(UndoOutcome outcome, HashSet<string> keptBefore)
+    {
         switch (outcome.Kind)
         {
             case UndoOutcomeKind.Applied or UndoOutcomeKind.AppliedWithoutARecord:
@@ -375,6 +562,8 @@ internal sealed class UndoActionStep
             // inside, and the refusal's sentence checks the page it names.
             targets.Add(new UndoSwapTarget(place, place, _before[path], _after[path]));
         }
+        foreach ((string full, UndoTreeListing listing, Dictionary<string, byte[]> contents) in _trees)
+            targets.Add(new UndoSwapTarget(full, full, null, null) { Change = new UndoSwapChange.MakeTree(listing, contents) });
         HashSet<string> keptBefore = KeptOriginalsNow();
         switch (UndoSwap.Swap(targets, UndoSwap.PlainLabel(), null, _plainSeams))
         {

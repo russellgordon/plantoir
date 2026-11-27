@@ -1,6 +1,7 @@
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Models;
 
@@ -144,12 +145,26 @@ public sealed class CourseConfiguration
     /// </summary>
     public SaveReport Write(string path)
     {
-        JObject? onDisk = null;
         // Any refusal of a file that is there (held, a build's replace in
         // flight, a deny rule) refuses the Save: nothing is written blind over
         // what is on disk (#874).
         var read = ReadBytes(path);
         if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) throw HeldFiles.Refusal(path, read);
+        var (written, data, kept, replaced) = WholeOver(read);
+        ReplaceWith(path, data);
+        _values = written;
+        _lastSavedData = data;
+        return new SaveReport(kept, replaced);
+    }
+
+    /// <summary>
+    /// The whole file a Save writes over what <paramref name="read"/> found:
+    /// this copy's changes merged per key over the file (<see cref="Merged"/>),
+    /// or this copy alone when the file is not there or not valid JSON.
+    /// </summary>
+    private (JObject Written, byte[] Data, List<string> Kept, List<string> Replaced) WholeOver(HeldFiles.FileBytes read)
+    {
+        JObject? onDisk = null;
         try { if (read.Outcome == HeldFiles.ReadOutcome.Read) onDisk = ParseObject(read.Data!); }
         catch { onDisk = null; }   // not valid JSON: this copy is the only truth left
         JObject? lastRead = null;
@@ -163,11 +178,251 @@ public sealed class CourseConfiguration
         // for a key this copy did not change, which would keep a raw name.
         if (written["course_name"] is JValue { Type: JTokenType.String } storedName)
             written["course_name"] = OneLineText.CourseName((string)storedName!);
-        byte[] data = Serialize(written);
-        ReplaceWith(path, data);
-        _values = written;
-        _lastSavedData = data;
-        return new SaveReport(kept, replaced);
+        return (written, Serialize(written), kept, replaced);
+    }
+
+    /// <summary>
+    /// Writes ONE top-level member as this copy holds it, as ONE step through
+    /// the door (#899 W8-11, Set School Year; the mac's <c>writeAsOneStep</c>
+    /// for its one member, U4a). Each try plans into a new step from
+    /// <paramref name="newStep"/>, the caller's maker and list
+    /// (<see cref="PlanMemberWrite"/>) and makes it; a step refused because
+    /// the member changed between the plan and the make is planned again from
+    /// the file, up to three times. False when the file already holds the
+    /// member's value: nothing written, no step.
+    /// </summary>
+    internal bool WriteMemberAsOneStep(string path, string member, Func<UndoActionStep> newStep)
+    {
+        int attempts = 0;
+        while (true)
+        {
+            UndoActionStep step = newStep();
+            if (!PlanMemberWrite(path, member, step)) return false;
+            try { step.Make(); }
+            catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince && attempts < 3)
+            {
+                attempts++;
+                continue;
+            }
+            FollowTheFile(path);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Plans the member into <paramref name="step"/> from the file as it is
+    /// NOW, the step's before (never read again at the make): one
+    /// <c>editJSON</c> whose before is the member as the file holds it (none
+    /// when it is absent) and whose bytes move by the member rule
+    /// (<c>undo-json-cases.json</c> → <c>editJSONCases</c>), so nothing else
+    /// of the file is re-spelled. A file that is missing, not one JSON
+    /// object, or that the member rule cannot move is planned whole: today's
+    /// whole bytes, as <see cref="Write"/> writes them. False, and nothing
+    /// planned, when the file already holds this copy's value of the member.
+    /// </summary>
+    internal bool PlanMemberWrite(string path, string member, UndoActionStep step)
+    {
+        // A settings file that is a link is planned where it leads, as Save's is (W8-12).
+        path = FileALinkLeadsTo(path);
+        var read = ReadBytes(path);
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) throw HeldFiles.Refusal(path, read);
+        JToken? wanted = _values[member];
+        JObject? onDisk = null;
+        try { if (read.Outcome == HeldFiles.ReadOutcome.Read) onDisk = ParseObject(read.Data!); }
+        catch { onDisk = null; }
+        // A choice that changes nothing writes nothing and makes no step,
+        // whatever else the file holds or however it is spelled.
+        if (onDisk is not null && JToken.DeepEquals(onDisk[member], wanted)) return false;
+        if (read.Outcome == HeldFiles.ReadOutcome.Read && MemberMoved(read.Data!, member, wanted) is { } moved)
+        {
+            step.EditJson(path, read.Data!, [moved.Change], moved.Bytes);
+            return true;
+        }
+        step.WriteBytes(path, WholeOver(read).Data);
+        return true;
+    }
+
+    /// <summary>
+    /// Save of Course Settings as ONE step on the list (#899 W8-12; the mac's
+    /// <c>writeAsOneStep</c>, U4a): made by <c>sheet</c>, held by the course,
+    /// planned by <see cref="PlanWrite"/> and made through the door. A step
+    /// refused because one of its own members changed between the plan and
+    /// the make is planned again from the file, up to three times (four tries
+    /// in all); any other refusal, and the fourth, throws with nothing
+    /// written, this copy's edits left unsaved. Once made, this copy is the
+    /// file as it is then (<see cref="TakeTheFile"/>).
+    /// </summary>
+    /// <param name="undo">The list, mode and trail: this process's by default, a test's own in a test.</param>
+    /// <param name="door">A test's door over <paramref name="undo"/>; the list's own by default.</param>
+    internal static SaveReport SaveCourseSettings(Course course, UndoForThisProcess? undo = null, UndoDoor? door = null)
+    {
+        string? workingFolder = HowITeachSettingsRow.WorkingFolderOf(course.DirectoryPath);
+        CourseConfiguration configuration = course.Configuration;
+        int attempts = 0;
+        while (true)
+        {
+            var step = new UndoActionStep(new UndoStepMaker("sheet", SaveCourseSettingsActionKey), workingFolder, course.Code,
+                                          section: null, holds: "course", undo: undo, door: door);
+            PlannedSave planned = configuration.PlanWrite(course.ConfigFilePath, step);
+            try { step.Make(); }
+            catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince && attempts < 3)
+            {
+                attempts++;
+                continue;
+            }
+            configuration.TakeTheFile(course.ConfigFilePath, planned);
+            return planned.Report;
+        }
+    }
+
+    /// <summary>The Course Settings sheet's Save, as Plantoir's window calls it: <see cref="SaveCourseSettings(Course, UndoForThisProcess?, UndoDoor?)"/> on this process's list.</summary>
+    public static SaveReport SaveCourseSettings(Course course) => SaveCourseSettings(course, null, null);
+
+    /// <summary><c>undo-action-steps.json</c> → <c>saveCourseSettings</c>'s action key.</summary>
+    internal const string SaveCourseSettingsActionKey = "saveCourseSettings";
+
+    /// <summary>What a Save's plan says the file will hold, and what it kept or replaced from elsewhere.</summary>
+    internal sealed record PlannedSave(SaveReport Report, JObject Values, byte[] Bytes);
+
+    /// <summary>
+    /// Plans this copy's Save into <paramref name="step"/> from the file as it
+    /// is NOW, read once here and never again at the make: this copy's
+    /// changes merged per key over the file (<see cref="WholeOver"/>, the
+    /// same merge <see cref="Write"/> makes), then one <c>editJSON</c> per
+    /// top-level member whose VALUE that changes, keys sorted, each moved by
+    /// the member rule (<c>undo-json-cases.json</c> → <c>editJSONCases</c>),
+    /// a member absent before having no before. A file that is missing, not
+    /// one JSON object, or that the member rule cannot move is one
+    /// <c>writeFile</c> of the whole bytes. A Save that changes no value plans
+    /// nothing, so the step writes nothing and is no step. A settings file
+    /// that is a link is planned at the file it leads to
+    /// (<see cref="FileALinkLeadsTo"/>), and the link stays a link.
+    /// </summary>
+    internal PlannedSave PlanWrite(string path, UndoActionStep step)
+    {
+        string place = FileALinkLeadsTo(path);
+        var read = ReadBytes(place);
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) throw HeldFiles.Refusal(place, read);
+        var (written, whole, kept, replaced) = WholeOver(read);
+        var report = new SaveReport(kept, replaced);
+        JObject? onDisk = null;
+        try { if (read.Outcome == HeldFiles.ReadOutcome.Read) onDisk = ParseObject(read.Data!); }
+        catch { onDisk = null; }
+        if (onDisk is not null && JToken.DeepEquals(onDisk, written)) return new PlannedSave(report, written, read.Data!);
+        if (onDisk is not null && MembersMoved(read.Data!, onDisk, written) is { } moved)
+        {
+            step.EditJson(place, read.Data!, moved.Changes, moved.Bytes);
+            return new PlannedSave(report, written, moved.Bytes);
+        }
+        step.WriteBytes(place, whole);
+        return new PlannedSave(report, written, whole);
+    }
+
+    /// <summary>
+    /// Every top-level member whose value differs between the file and
+    /// <paramref name="wanted"/>, keys sorted, each as its change, and the
+    /// bytes the file holds once each is moved in turn by the member rule;
+    /// null when any one cannot be moved, or the bytes moved do not read back
+    /// as <paramref name="wanted"/> (the mac's <c>memberChanges</c>).
+    /// </summary>
+    private static (List<UndoMemberChange> Changes, byte[] Bytes)? MembersMoved(byte[] read, JObject onDisk, JObject wanted)
+    {
+        var keys = onDisk.Properties().Select(p => p.Name)
+            .Concat(wanted.Properties().Select(p => p.Name))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(k => k, StringComparer.Ordinal);
+        var changes = new List<UndoMemberChange>();
+        byte[] bytes = read;
+        foreach (string key in keys)
+        {
+            if (JToken.DeepEquals(onDisk[key], wanted[key])) continue;
+            if (MemberMoved(bytes, key, wanted[key]) is not { } moved) return null;
+            changes.Add(moved.Change);
+            bytes = moved.Bytes;
+        }
+        try { return JToken.DeepEquals(ParseObject(bytes), wanted) ? (changes, bytes) : null; }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// The file a settings file that is a link leads to, or
+    /// <paramref name="path"/> itself when it is not a link (the mac's
+    /// <c>fileALinkLeadsTo</c>, the U4a sweep's LOW 2): a link is told by
+    /// <see cref="UndoLinks.Look"/>, and followed to its final target. The
+    /// door never writes over a link, so a plan made at the link's own place
+    /// would be refused, or would replace the link with a file.
+    /// </summary>
+    internal static string FileALinkLeadsTo(string path)
+    {
+        if (UndoLinks.Look(path) != UndoLinks.What.Link) return path;
+        try { return File.ResolveLinkTarget(path, returnFinalTarget: true)?.FullName ?? path; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return path; }
+    }
+
+    /// <summary>
+    /// Once a Save's step is made, this copy IS the file as it is then, read
+    /// again, not the plan's read (the mac's <c>finishWrite</c>, U4a review 1,
+    /// LOW 2): the door moves each member on the file as it is at the make, so
+    /// a setting another program changed between the plan and the make is in
+    /// this copy too. Only when the file cannot be read back as one object
+    /// does this copy take what the plan said it would hold.
+    /// </summary>
+    private void TakeTheFile(string path, PlannedSave planned)
+    {
+        var read = ReadBytes(path);
+        if (read.Outcome == HeldFiles.ReadOutcome.Read)
+        {
+            try
+            {
+                _values = ParseObject(read.Data!);
+                _lastSavedData = read.Data!;
+                return;
+            }
+            catch { }
+        }
+        _values = planned.Values;
+        _lastSavedData = planned.Bytes;
+    }
+
+    /// <summary>The member's change and the bytes the member rule leaves the file holding, or null when the rule cannot move it.</summary>
+    private static (UndoMemberChange Change, byte[] Bytes)? MemberMoved(byte[] bytes, string member, JToken? wanted)
+    {
+        if (UndoJsonMember.TopLevel(bytes) is not { } tree) return null;
+        string[] keyPath = [member];
+        UndoJsonMember.Reading found = UndoJsonMember.ReadingOf(keyPath, tree);
+        if (found.CannotTell) return null;
+        UndoJson? after = null;
+        if (wanted is not null)
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(wanted.ToString(Formatting.None));
+            after = UndoJson.From(document.RootElement);
+            if (after is null) return null;
+        }
+        UndoJson? before = found.Absent ? null : found.Value;
+        if (before?.Spelled() is null && before is not null) return null;
+        if (after?.Spelled() is null && after is not null) return null;
+        var change = new UndoMemberChange(keyPath, before, after);
+        UndoOp op = UndoLineOps.Read(change.Op("course_config.json"));
+        return UndoJsonMember.Moved(op, bytes, backward: false) is { } moved ? (change, moved) : null;
+    }
+
+    /// <summary>
+    /// Once the step is made, this copy follows the file AS IT IS NOW, read
+    /// again (the mac's <c>finishWrite</c>, U4a review 1, LOW 2): a member
+    /// another window changed between the plan and the make is on disk, and
+    /// in this copy too, while this copy's own unsaved edits stay unsaved.
+    /// </summary>
+    private void FollowTheFile(string path)
+    {
+        var read = ReadBytes(path);
+        if (read.Outcome != HeldFiles.ReadOutcome.Read) return;
+        JObject now;
+        try { now = ParseObject(read.Data!); }
+        catch { return; }
+        JObject? lastRead = null;
+        try { if (_lastSavedData.Length > 0) lastRead = ParseObject(_lastSavedData); } catch { lastRead = null; }
+        _values = lastRead is null ? now : Merged(lastRead, now, _values).Written;
+        _lastSavedData = read.Data!;
     }
 
     /// <summary>
