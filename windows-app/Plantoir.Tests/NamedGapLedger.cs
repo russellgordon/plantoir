@@ -565,7 +565,7 @@ internal static class NamedGapLedger
         Owed(ShelfWording, 899, V200, Reason899SettingsFinishesItself,
              "settingCouldNotBeChanged", "settingCanBePutBack", "settingsCanBePutBack", "settingCouldNotBeChangedButtons"),
         Owed(StartOfYearSheetWording, 899, V200, Reason899GetReadyRestoreOffer,
-             "stoppedPartWay", "restoreOffer", "leaveAsItIsButton", "restoreCourseButton"),
+             "stoppedPartWay", "restoreOffer", "leaveAsItIsButton", "restoreCourseButton", "restoreOfferThroughTheAssistant"),
         Owed(SubjectMenuItems, 827, V200, Reason827, "moveToGroup"),
         Owed(ImportWording, 823, V200, Reason823,
              "explanation", "zipCouldNotBeOpened", "zipIsNotSafeToOpen", "zipHoldsNoCourse", "zipHoldsSeveralCourses",

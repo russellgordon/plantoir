@@ -27,6 +27,10 @@ struct CourseMenu: Commands {
 
     var presence: OutsideAssistantPresence = OutsideAssistantPresence.shared
 
+    /// The Course menu's Restore from Backup…, as a sentence names it too
+    /// (`startOfYear.wording.restoreOfferThroughTheAssistant`, #899).
+    nonisolated static let restoreFromBackupMenuItem: String = "Restore from Backup…"
+
     // MARK: - Computed properties
 
     var situation: SubjectMenuRules.Situation {
@@ -83,7 +87,7 @@ struct CourseMenu: Commands {
             // Not "Restore…": File ▸ Restore from Archive… restores an
             // archived row, and two items saying the same words is what
             // #457 item 4 rules out.
-            item("Restore from Backup…", .restoreFromBackup, enabled)
+            item(CourseMenu.restoreFromBackupMenuItem, .restoreFromBackup, enabled)
 
             Divider()
 

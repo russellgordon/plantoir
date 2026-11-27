@@ -3252,6 +3252,11 @@ final class AssistToolRunner {
             )
             change = applied.change
             leftAlone = applied.leftAlone
+        } catch JournaledStepError.leftPartWay(_, _, let keptOriginals) {
+            return await startOfYearStoppedPartWay(
+                plan, in: course, sectionNumber: sectionNumber,
+                keptCount: keptOriginals.count, backupURL: backupURL
+            )
         } catch {
             ActivityTrail.note(
                 .startOfTheYearNotDone,
@@ -3288,6 +3293,49 @@ final class AssistToolRunner {
                 + "first, as “\(backupURL.lastPathComponent)”, which is the way back after that."
         detail += "\n\n" + (await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber))
         return AssistToolOutcome.wrote(said, detail: detail)
+    }
+
+    /// The reply when Get Ready stopped PART WAY through the assistant (#899,
+    /// Russell's ruling of 2026-11-26): some pages went into draft and at
+    /// least one could not be put back. The same reply for the built-in
+    /// assistant and over MCP, since both reach `prepareForStartOfYear`.
+    /// It says the sheet's part-way sentence (one key, two surfaces), then
+    /// the backup in words (`restoreOfferThroughTheAssistant`), then the plan
+    /// (ruling 10), then the preview. Nothing is recorded for Undo: the step
+    /// never finished, and the backup is the way back.
+    ///
+    /// **The preview is brought up to date, unlike the sheet's.** The sheet
+    /// holds it stopped until its offer is answered, because a running
+    /// preview would make Restore Course refuse the course as busy. Here no
+    /// offer waits for an answer: the teacher is reading a reply, and a
+    /// restore, if they choose one, is Restore from Backup…, which stops
+    /// and starts previews itself. So the preview is put back as after any
+    /// assistant action, showing the section as it now is.
+    private func startOfYearStoppedPartWay(
+        _ plan: StartOfYearPlan,
+        in course: Course,
+        sectionNumber: Int,
+        keptCount: Int,
+        backupURL: URL
+    ) async -> AssistToolOutcome {
+        ActivityTrail.note(
+            .startOfTheYearNotDone,
+            ActivityTrail.startOfYearStoppedPartWayLine(
+                source: startOfYearSource, keptCount: keptCount, backupFileName: backupURL.lastPathComponent
+            ),
+            course: course.code, section: sectionNumber
+        )
+        let partWay: String = StartOfYearWording.stoppedPartWay(
+            course: course.displayCode, section: String(sectionNumber)
+        )
+        let offer: String = StartOfYearWording.restoreOfferThroughTheAssistant(
+            course: course.displayCode, backup: backupURL.lastPathComponent
+        )
+        let said: String = partWay + " " + offer
+        var detail: String = said
+        detail += "\n\n" + plan.describe()
+        detail += "\n\n" + (await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber))
+        return AssistToolOutcome(summary: said, detail: detail, shouldContinue: false)
     }
 
     /// What to call the pages a class-page add created, for the sentence an

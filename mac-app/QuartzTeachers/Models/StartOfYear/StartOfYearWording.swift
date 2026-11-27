@@ -212,6 +212,16 @@ nonisolated enum StartOfYearWording {
              + "the sidebar, so nothing is lost."
     }
 
+    /// The offer through an assistant, which has no sheet and no Restore
+    /// Course button (#899, Russell's ruling of 2026-11-26: offer it in
+    /// words). It names the menu item as the Course menu titles it. The
+    /// ruling's "Ask me to restore it" is parked: the assistant has no tool
+    /// that restores a course.
+    static func restoreOfferThroughTheAssistant(course: String, backup: String) -> String {
+        return "The backup “\(backup)” holds \(course) as it was before. Choose "
+             + CourseMenu.restoreFromBackupMenuItem + " to put it back."
+    }
+
     static let leaveAsItIsButton: String = "Leave As It Is"
 
     static let restoreCourseButton: String = "Restore Course"
