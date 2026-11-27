@@ -543,10 +543,18 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
 
     private void RemoveAt(string relative) => File.Delete(Full(relative));
 
-    private void LinkAt(string place, string libraryPage)
+    /// <summary>
+    /// A link at <paramref name="place"/> to a library page, its target held
+    /// as the mac writes it (<c>../library/…</c>, which is what a link move's
+    /// <c>linkSha</c> was taken of), or, <paramref name="spelledForWindows"/>,
+    /// with Windows' own separator, so the page it leads to can be read
+    /// through it (a mac-style target is not followed on NTFS: 21a1's note).
+    /// </summary>
+    private void LinkAt(string place, string libraryPage, bool spelledForWindows = false)
     {
         if (!File.Exists(Full(Library + "/" + libraryPage))) WritePage(Library + "/" + libraryPage, "Linked elsewhere.\n");
-        File.CreateSymbolicLink(Full(place), "../library/" + libraryPage);
+        string target = spelledForWindows ? Path.Combine("..", "library", libraryPage) : "../library/" + libraryPage;
+        File.CreateSymbolicLink(Full(place), target);
     }
 
     /// <summary>
@@ -591,7 +599,7 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
         if (disk != "old page at P, link at Day 2") RemoveAt(Day(3));
         if (disk == "link at P, Day 2 free" || disk == "a link with another target at P") RemoveAt(Day(2));
         if (disk == "link at P, Day 2 free") LinkAt(Day(3), "Day 2.md");
-        if (disk == "a link with another target at P") LinkAt(Day(3), "Another day.md");
+        if (disk == "a link with another target at P") LinkAt(Day(3), "Another day.md", spelledForWindows: true);
 
         Assert.Equal([Day(3) + "=" + removal, MoveNamed(Day(2), Day(3)) + "=" + move], Judged(ops));
     }
