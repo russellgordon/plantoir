@@ -321,14 +321,14 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         XCTAssertFalse(leaveDoes.contains("restore"), "Leave As It Is restores nothing: \(leaveDoes)")
         XCTAssertFalse(leaveDoes.contains("Task"), "Leave As It Is changes nothing: \(leaveDoes)")
         // A deploy holds the restore back before the sheet closes.
-        let heldAt: Range<String.Index>? = restoreDoes.range(of: "model.restoreIsHeldBackByADeploy()")
+        let heldAt: Range<String.Index>? = restoreDoes.range(of: "model.restoreCourseIsPressed()")
         let dismissAt: Range<String.Index>? = restoreDoes.range(of: "dismiss()")
         XCTAssertNotNil(heldAt, restoreDoes)
         if let heldAt, let dismissAt {
             XCTAssertTrue(heldAt.lowerBound < dismissAt.lowerBound, "asked before the sheet closes: \(restoreDoes)")
         }
         XCTAssertTrue(restoreDoes.contains("dismiss()"), restoreDoes)
-        XCTAssertTrue(restoreDoes.contains("await model.restoreCourse()"), restoreDoes)
+        XCTAssertTrue(restoreDoes.contains("await model.restoreCourse(from: stopped)"), restoreDoes)
         XCTAssertFalse(buttons[restore].arguments.contains("role:"), "Restore Course is not destructive and not a cancel: \(restoreChain)")
     }
 

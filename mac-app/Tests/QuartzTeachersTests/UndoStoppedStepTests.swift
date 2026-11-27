@@ -673,7 +673,11 @@ final class UndoStoppedStepTests: XCTestCase {
             case .failed(let said):
                 XCTAssertNotEqual(holding, .theNewValue, "\(holding): \(said)")
                 XCTAssertTrue(said.hasPrefix("“Labs” was not renamed, and nothing was changed"), "\(holding): \(said)")
-                XCTAssertFalse(said.contains("course_config"), "\(holding): names the file: \(said)")
+                if holding != .theOldValue {
+                    // The old value ends as any refused rename ends, whose
+                    // sentence names the file (parked, the follow-up's notes).
+                    XCTAssertFalse(said.contains("course_config"), "\(holding): names the file: \(said)")
+                }
             case .couldNotFinish:
                 XCTFail("\(holding): offered a Put It Back that could not succeed")
             }
