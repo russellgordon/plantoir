@@ -35,6 +35,44 @@ enum StartOfYearPreparation {
 
         /// Nothing was written, and this sentence says why.
         case refused(String)
+
+        /// The door stopped PART WAY (#899, Russell's ruling of 2026-11-26):
+        /// some pages went into draft and at least one could not be put
+        /// back, so the section is neither as it was nor as planned. The
+        /// sheet offers to restore the whole course from the backup made a
+        /// moment before (`startOfYear.wording.stoppedPartWay`). A stop
+        /// that changed nothing stays `refused(writeFailed)`.
+        case stoppedPartWay(StoppedPartWay)
+    }
+
+    /// What the sheet needs to offer the restore after a part-way stop.
+    struct StoppedPartWay {
+
+        // MARK: - Stored properties
+
+        let sectionNumber: Int
+
+        /// The course's folder name, as the backup and the sidebar know it.
+        let courseCode: String
+
+        /// The course as a teacher reads it in a sentence.
+        let courseDisplayCode: String
+
+        /// The backup made before anything was written: what Restore Course
+        /// restores.
+        let backupURL: URL
+
+        /// The hidden names under which what a page held before is kept
+        /// beside it (`JournaledStepError.leftPartWay`). Carried for the
+        /// trail and the next piece; the sheet names no hidden file
+        /// (Russell, 2026-11-26: "Way too technical.").
+        let keptOriginals: [String]
+
+        // MARK: - Computed properties
+
+        var backupFileName: String {
+            return backupURL.lastPathComponent
+        }
     }
 
     struct Done {
@@ -159,6 +197,27 @@ enum StartOfYearPreparation {
         let applied: (change: AssistChange, leftAlone: [String])
         do {
             applied = try StartOfYearPlanner.apply(plan, in: course)
+        } catch JournaledStepError.leftPartWay(_, _, let keptOriginals) {
+            // Part way: pages went into draft and could not all be put back.
+            // Not "nothing was changed" on the trail, and the sheet offers
+            // the backup (#899).
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearStoppedPartWayLine(
+                    source: "app", keptCount: keptOriginals.count, backupFileName: backupURL.lastPathComponent
+                ),
+                course: course.code, section: sectionNumber
+            )
+            if wasRunning, let controller {
+                controller.startPreview()
+            }
+            return .stoppedPartWay(StoppedPartWay(
+                sectionNumber: sectionNumber,
+                courseCode: course.code,
+                courseDisplayCode: course.displayCode,
+                backupURL: backupURL,
+                keptOriginals: keptOriginals
+            ))
         } catch {
             noteNotDone("writeFailed", course: course, section: sectionNumber)
             if wasRunning, let controller {

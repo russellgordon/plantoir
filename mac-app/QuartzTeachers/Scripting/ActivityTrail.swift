@@ -2092,6 +2092,15 @@ nonisolated enum ActivityTrail {
              + "changed (\(reason))"
     }
 
+    /// The words for `startOfTheYearNotDone` when the write stopped PART WAY
+    /// (#899): some pages went into draft, so "nothing was changed" would be
+    /// false. Counts and the backup's name only, never a page's name.
+    static func startOfYearStoppedPartWayLine(source: String, keptCount: Int, backupFileName: String) -> String {
+        let kept: String = keptCount == 1 ? "1 file" : "\(keptCount) files"
+        return "stopped part way getting ready for the start of the year \(startOfYearSource(source)) — some "
+             + "pages went into draft, \(kept) kept beside the page; offered the backup \(backupFileName)"
+    }
+
     /// The words for `assistantNamedNoPage`: what was being done, and which
     /// of the two shapes — never a page's name.
     static func namedNoPageLine(act: String, everyPageWord: String?, unknownCount: Int) -> String {

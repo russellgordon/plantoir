@@ -585,7 +585,10 @@ struct SidebarView: View {
                     course: request.course,
                     sectionNumber: request.sectionNumber,
                     workspaceURL: workspaceURL,
-                    mode: request.mode
+                    mode: request.mode,
+                    restoreWholeCourse: { (item: BackupItem) async in
+                        await workspace.restoreBackup(item)
+                    }
                 ))
             }
         }

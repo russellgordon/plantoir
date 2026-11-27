@@ -41,6 +41,9 @@ final class StartOfYearSheetModel {
         case undoReady(StartOfYearUndoRegistry.Entry, putBack: [URL], skipped: [URL])
         case undone(StartOfYearPreparation.Undone, backupFileName: String)
         case problem(String)
+
+        /// Go stopped part way: the offer to restore the course (#899).
+        case stoppedPartWay(StartOfYearPreparation.StoppedPartWay)
     }
 
     // MARK: - Stored properties
@@ -65,6 +68,13 @@ final class StartOfYearSheetModel {
     /// Injectable so a test can show the sheet with that warning (#589's
     /// worst case) without setting a real one.
     private let readScheduledDeploy: (Course, Int, URL) -> Date?
+
+    /// The app's whole-course restore, the one Restore from Backup… runs
+    /// (`WorkspaceModel.restoreBackup`): Restore Course hands it the backup
+    /// Go made (#899). Injected because the sheet's model has no workspace;
+    /// the sidebar passes the real one. It selects the course when it has
+    /// restored it, and shows "Could not restore" when it could not.
+    private let restoreWholeCourse: (BackupItem) async -> Void
 
     // MARK: - Computed properties
 
@@ -91,7 +101,8 @@ final class StartOfYearSheetModel {
              return ScheduledDeploy.nextRun(
                  courseCode: course.code, sectionNumber: sectionNumber, inWorkingFolder: workspaceURL
              )
-         }) {
+         },
+         restoreWholeCourse: @escaping (BackupItem) async -> Void = { _ in }) {
         self.course = course
         self.sectionNumber = sectionNumber
         self.workspaceURL = workspaceURL
@@ -99,6 +110,7 @@ final class StartOfYearSheetModel {
         self.readToday = today
         self.backUp = backUp
         self.readScheduledDeploy = scheduledDeploy
+        self.restoreWholeCourse = restoreWholeCourse
     }
 
     // MARK: - Functions
@@ -164,7 +176,39 @@ final class StartOfYearSheetModel {
             stage = .ready(fresh)
         case .refused(let sentence):
             stage = .problem(sentence)
+        case .stoppedPartWay(let stopped):
+            stage = .stoppedPartWay(stopped)
         }
+    }
+
+    /// What the sheet says after a part-way stop, in order (#899): what
+    /// happened, then the offer. No hidden file is named.
+    static func stoppedPartWaySentences(_ stopped: StartOfYearPreparation.StoppedPartWay) -> [String] {
+        return [
+            StartOfYearWording.stoppedPartWay(
+                course: stopped.courseDisplayCode, section: String(stopped.sectionNumber)
+            ),
+            StartOfYearWording.restoreOffer(course: stopped.courseDisplayCode, backup: stopped.backupFileName),
+        ]
+    }
+
+    /// The backup Go made, as Restore from Backup… lists it.
+    static func backupItem(for stopped: StartOfYearPreparation.StoppedPartWay) -> BackupItem? {
+        return BackupItem.from(fileURL: stopped.backupURL, courseCode: stopped.courseCode)
+    }
+
+    /// Press Restore Course: the existing whole-course restore, from the
+    /// backup Go made, with no second confirmation (it can be got back:
+    /// Archived holds the course as it is now). The sheet has closed by
+    /// now, so the restore's own alert can show if it fails.
+    func restoreCourse() async {
+        guard case .stoppedPartWay(let stopped) = stage else {
+            return
+        }
+        guard let item = StartOfYearSheetModel.backupItem(for: stopped) else {
+            return
+        }
+        await restoreWholeCourse(item)
     }
 
     /// Press "Put Them Back".
@@ -388,6 +432,10 @@ struct StartOfYearSheet: View {
             }
             Text(StartOfYearWording.undoEndsWhenYouQuit)
                 .foregroundStyle(.secondary)
+        case .stoppedPartWay(let stopped):
+            ForEach(StartOfYearSheetModel.stoppedPartWaySentences(stopped), id: \.self) { (sentence: String) in
+                Text(sentence)
+            }
         case .undone(let undone, let backup):
             if undone.skipped.isEmpty && undone.putBack == 0 {
                 Text(StartOfYearWording.undoAllAlreadyBack)
@@ -661,6 +709,25 @@ struct StartOfYearSheet: View {
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
+            case .stoppedPartWay:
+                // Russell's ruling of 2026-11-26 (#899). HIG Sheets: one
+                // sheet at a time, so the offer is this sheet, not a second.
+                // Leave As It Is on the leading side with Escape, Restore
+                // Course trailing with Return (Buttons ▸ Role: the default
+                // is the most likely choice, and a restore can be got back).
+                Button(StartOfYearWording.leaveAsItIsButton, role: .cancel) {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+                .accessibilityIdentifier("startOfYearLeaveAsItIs")
+                Button(StartOfYearWording.restoreCourseButton) {
+                    dismiss()
+                    Task { @MainActor in
+                        await model.restoreCourse()
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .accessibilityIdentifier("startOfYearRestoreCourse")
             case .undone, .problem:
                 Button("Done") {
                     dismiss()
