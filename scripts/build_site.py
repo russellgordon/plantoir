@@ -3137,6 +3137,20 @@ def set_class_page_scheme(scheme) -> str:
     return _class_page_scheme
 
 
+# The folders that hold this build's class pages (`class_pages.folder_names`),
+# recorded beside the word and the scheme so the date pass can tell the
+# section's class pages from its other pages (#1048b). Before a build records
+# them, the folders a course with no configuration has.
+_class_folders_of_this_build: list = class_pages.folder_names({})
+
+
+def set_class_folders(folders) -> list:
+    """Records the folders that hold this build's class pages, and returns them."""
+    global _class_folders_of_this_build
+    _class_folders_of_this_build = list(folders or class_pages.folder_names({}))
+    return _class_folders_of_this_build
+
+
 def unit_word() -> str:
     """What this build's course calls a unit."""
     return _unit_word
@@ -3693,7 +3707,8 @@ def _links_checklist_offer(content_root: Path, section_number: int,
 
     # What the BUILD's date pass dates: its own link reader, its own claim.
     dated_by_the_build = _first_linking_classes(
-        all_pages, pages_by_stem, pages_by_rel, [entry[2] for entry in dated_classes])
+        all_pages, pages_by_stem, pages_by_rel, [entry[2] for entry in dated_classes],
+        kept_by_their_class=_pages_a_numbered_class_owns(content_root, all_pages))
 
     # 1–2: the two-step walk.
     direct_claim = {}
@@ -5228,7 +5243,14 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
     for class_dt, class_title, class_fp, class_created in dated_classes:
         created_of[class_fp] = class_created
         in_order.append(class_fp)
-    first_class_of = _first_linking_classes(all_pages, pages_by_stem, pages_by_rel, in_order)
+    # A file one of the section's numbered classes owns keeps that class's
+    # date (#1048b, `class-planning.json` → `datingPagesAClassBrings.
+    # frontmatterKey.firstClassKeepsASharedLesson`): a shared lesson that Unit 1,
+    # Day 2 is a link to is never given Unit 1, Day 1's date because Day 1 also
+    # says [[Lesson]]. Its date is the class's, and the app writes it.
+    kept = _pages_a_numbered_class_owns(content_root, all_pages)
+    first_class_of = _first_linking_classes(all_pages, pages_by_stem, pages_by_rel, in_order,
+                                            kept_by_their_class=kept)
     for linked_fp, class_fp in first_class_of.items():
         if give_date(linked_fp, created_of[class_fp]):
             result["site_pages"] += 1
@@ -5243,7 +5265,8 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
     return result
 
 
-def _first_linking_classes(all_pages, pages_by_stem, pages_by_rel, classes_in_order) -> dict:
+def _first_linking_classes(all_pages, pages_by_stem, pages_by_rel, classes_in_order,
+                           kept_by_their_class=frozenset()) -> dict:
     """
     The class that first links each page DIRECTLY: {page: class page}, in the
     order the claims are made. `classes_in_order` is the visible, dated
@@ -5255,14 +5278,185 @@ def _first_linking_classes(all_pages, pages_by_stem, pages_by_rel, classes_in_or
     the date pass (`_date_pages_from_their_classes`), the links checklist's
     `datedByTheBuild` (`_links_checklist_offer`), and My Progress's grouping
     (#545, `myProgress.grouping`).
+
+    A page in `kept_by_their_class` is claimed by no class: it is a file one
+    of the section's numbered classes owns (`_pages_a_numbered_class_owns`,
+    #1048b), and it keeps that class's date.
     """
     claimed: dict = {}
     for class_fp in classes_in_order:
         for linked_fp in _pages_a_page_links_to(all_pages[class_fp], pages_by_stem, pages_by_rel):
             if linked_fp in claimed:
                 continue
+            if linked_fp in kept_by_their_class:
+                continue
             claimed[linked_fp] = class_fp
     return claimed
+
+
+# === #1048b: a file a numbered class owns keeps that class's date ===========
+# The rule is the contract's sentence, `class-planning.json` →
+# `datingPagesAClassBrings.frontmatterKey.firstClassKeepsASharedLesson`, the
+# same rule as the Mac's `ClassPages.isTheFirstClassLeadingToItsFile` and
+# `filesTheNumberedClassesOwn`, and its cases are the contract's
+# `firstClassKeepsASharedLessonCases`, which scripts/test_dates_follow_the_class.py
+# runs. Files are compared by identity (device and inode), never by name or
+# spelling: a link's own place by `lstat`, the file it leads to by `stat`.
+
+_MOST_LINK_HOPS = 32  # the Mac's `reachOfALinkedClass` stops at the same count
+
+
+def _identity_of_the_place(path) -> tuple | None:
+    """The place itself, a link not followed (`lstat`), or None."""
+    try:
+        status = os.lstat(path)
+    except OSError:
+        return None
+    return (status.st_dev, status.st_ino)
+
+
+def _identity_of_the_file(path) -> tuple | None:
+    """The file a page leads to, every link followed (`stat`), or None for a
+    link that leads to nothing."""
+    try:
+        status = os.stat(path)
+    except OSError:
+        return None
+    return (status.st_dev, status.st_ino)
+
+
+def _link_reaches_a_class_page(place: Path, class_places: set) -> bool:
+    """
+    Whether the class page at `place`, a link, passes through another class
+    page of the section on its way to its file, judged hop by hop: each hop
+    is the place the link before it names (a relative text read against that
+    link's folder), compared by its own identity with every class page's
+    place. The link's own place is never counted: a chain that comes round to
+    it reaches no class page.
+    """
+    own_place = _identity_of_the_place(place)
+    here = Path(place)
+    hops = 0
+    while here.is_symlink() and hops < _MOST_LINK_HOPS:
+        hops += 1
+        try:
+            written = os.readlink(here)
+        except OSError:
+            return False
+        following = Path(written)
+        if not following.is_absolute():
+            following = here.parent / written
+        hop = _identity_of_the_place(following)
+        if hop is None or hop == own_place:
+            return False
+        if hop in class_places:
+            return True
+        here = following
+    return False
+
+
+def _unit_and_day_of(name: str) -> tuple | None:
+    """A numbered class page's numbers from its file name ("Unit 2, Day 3"
+    gives (2, 3); "Week 3" gives (3,)), or None for any other page."""
+    stem = name[:-3] if name.lower().endswith(".md") else name
+    found = re.match(class_page_pattern(), stem.strip(), re.IGNORECASE)
+    if found is None:
+        return None
+    numbers: list = []
+    for group in found.groups():
+        numbers.append(int(group))
+    return tuple(numbers)
+
+
+def _owns_its_file(place: Path, class_pages_of_the_section: list) -> bool:
+    """
+    Whether the class page at `place` dates the file it leads to, among the
+    section's class pages `class_pages_of_the_section` (each a path in the
+    teacher's folder): the class page that IS the file, when one of the
+    section's class pages is that file and not a link, owns its date;
+    otherwise, among the class pages whose link leads to the file without
+    passing through another class page of the section, the one with the
+    lowest unit and day owns it.
+    """
+    if not Path(place).is_symlink():
+        return True
+    own_file = _identity_of_the_file(place)
+    if own_file is None:
+        return True
+    class_places: set = set()
+    for other in class_pages_of_the_section:
+        other_place = _identity_of_the_place(other)
+        if other_place is not None:
+            class_places.add(other_place)
+    if _link_reaches_a_class_page(place, class_places):
+        return False
+    own_numbers = _unit_and_day_of(Path(place).name)
+    for other in class_pages_of_the_section:
+        if Path(other) == Path(place):
+            continue
+        if _identity_of_the_file(other) != own_file:
+            continue
+        # The file's own class page owns it.
+        if not Path(other).is_symlink():
+            return False
+        # An earlier link that leads there without passing through a class page owns it.
+        other_numbers = _unit_and_day_of(Path(other).name)
+        if own_numbers is None or other_numbers is None or not other_numbers < own_numbers:
+            continue
+        if not _link_reaches_a_class_page(other, class_places):
+            return False
+    return True
+
+
+def _files_the_numbered_classes_own(class_pages_of_the_section: list) -> set:
+    """The identities of every file a NUMBERED class page of the section owns
+    (`_owns_its_file`), through its links. A file only an unnumbered page of
+    the class folder leads to is not among them."""
+    owned: set = set()
+    for place in class_pages_of_the_section:
+        if _unit_and_day_of(Path(place).name) is None:
+            continue
+        if not _owns_its_file(place, class_pages_of_the_section):
+            continue
+        identity = _identity_of_the_file(place)
+        if identity is not None:
+            owned.add(identity)
+    return owned
+
+
+def _pages_a_numbered_class_owns(content_root: Path, all_pages) -> set:
+    """
+    The pages of this build's copy whose teacher's file is one a numbered
+    class page of the section owns (`_files_the_numbered_classes_own`). The
+    section's class pages are its own pages inside a class folder of this
+    build (`set_class_folders`), read from the teacher's folder, where the
+    links are, never from the build's copy, where a link is a file of its own.
+    """
+    class_pages_of_the_section: list = []
+    for fp in all_pages:
+        source = _vault_sources.get(fp)
+        if source is None:
+            continue
+        source_path, is_section_page = source
+        if not is_section_page:
+            continue
+        try:
+            relative = fp.relative_to(content_root)
+        except ValueError:
+            continue
+        if _is_class_page_path(relative, _class_folders_of_this_build):
+            class_pages_of_the_section.append(source_path)
+    owned = _files_the_numbered_classes_own(class_pages_of_the_section)
+    kept: set = set()
+    if not owned:
+        return kept
+    for fp in all_pages:
+        source = _vault_sources.get(fp)
+        if source is None:
+            continue
+        if _identity_of_the_file(source[0]) in owned:
+            kept.add(fp)
+    return kept
 
 
 def _name_in_the_course(source: Path) -> str:
@@ -11057,7 +11251,7 @@ def build_section_site(
     # output of its own. What makes that acceptable is that the findings are
     # recorded when the build happens; what would NOT be acceptable is claiming
     # otherwise, which an earlier version of this comment did.
-    class_folders_here = class_folder_names(config)
+    class_folders_here = set_class_folders(class_folder_names(config))
     graded_folders_here, graded_was_configured_here = graded_folder_names(config)
     coverage_wanted = resolve_include_curriculum_coverage(config, section_number)
     # Every curriculum folder this build maps, primary first, and each map's
