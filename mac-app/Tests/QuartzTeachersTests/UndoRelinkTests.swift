@@ -494,17 +494,23 @@ final class UndoRelinkTests: XCTestCase {
     /// new page written at the relink's `from` (`aNewClassWrittenAtTheRelinksFrom`)
     /// leaves nothing kept under a visible name and no empty day; MUST FAIL
     /// with every staged name beside a relink's place judged by the one
-    /// rule (6 of its 20 kills, F-J).
+    /// rule (7 of its 20 kills, every run, F-J; each failing kill is
+    /// gathered and asserted once at the end, review 4 of mac-1, LOW).
     func testChainedLinkMovesKilledAtEveryStopPointLoseNoLink() async throws {
         var reached: Int = 0
         var expected: Int = 0
+        var faults: [String] = []
         for shape in ChainShape.allCases {
             let swaps: Int = shape == .threeChainedRelinks ? 3 : 2
             let relinks: Int = shape == .twoChainedRelinks || shape == .threeChainedRelinks ? swaps : 1
             for work in RelinkWork.allCases {
                 for point in everyStopPoint(swaps: swaps) {
-                    if try await killAChain(shape, work, at: point) {
+                    let killed: (reached: Bool, faults: [String]) = try await killAChain(shape, work, at: point)
+                    if killed.reached {
                         reached += 1
+                    }
+                    for fault in killed.faults {
+                        faults.append(fault)
                     }
                 }
                 // An apply: afterBegin, each swap, both halves of each
@@ -514,7 +520,17 @@ final class UndoRelinkTests: XCTestCase {
                 expected += work == .apply ? 2 + swaps + 2 * relinks : 3 + swaps + 2 * relinks
             }
         }
-        XCTAssertEqual(reached, expected)
+        // Every failing kill gathered and asserted ONCE, on the main actor
+        // (review 4 of mac-1, LOW): XCTest dropped some failures recorded
+        // after an `await`, so a count read from its summary was not the
+        // code's. One fault line per failing kill.
+        let reachedCount: Int = reached
+        let expectedCount: Int = expected
+        let failing: [String] = faults
+        await MainActor.run {
+            XCTAssertEqual(reachedCount, expectedCount)
+            XCTAssertEqual(failing, [], "\(failing.count) failing kills")
+        }
     }
 
     /// A swap of two links (Day 4 and Day 5, each relinked into the
@@ -547,9 +563,10 @@ final class UndoRelinkTests: XCTestCase {
         XCTAssertEqual(stagedLeft(under: root), [])
     }
 
-    /// Returns whether the kill point was reached (and so tested).
-    @discardableResult
-    func killAChain(_ shape: ChainShape, _ work: RelinkWork, at point: UndoKillPoint) async throws -> Bool {
+    /// Returns whether the kill point was reached (and so tested), and one
+    /// line per thing found wrong after recovery, gathered rather than
+    /// asserted after the `await` (review 4 of mac-1, LOW).
+    func killAChain(_ shape: ChainShape, _ work: RelinkWork, at point: UndoKillPoint) async throws -> (reached: Bool, faults: [String]) {
         let label: String = "\(shape)-\(work)-\(point)"
         let made: LaidChain = try layAChain(shape, named: "killed-" + label)
         let twin: LaidChain = try layAChain(shape, named: "twin-" + label)
@@ -590,26 +607,37 @@ final class UndoRelinkTests: XCTestCase {
         }
         UndoKillPoints.hook = nil
         if !reachedIt {
-            return false
+            return (reached: false, faults: [])
         }
+        var faults: [String] = []
 
         let survivor: UndoJournal = UndoJournal(folderURL: made.journalFolder)
         await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in root }, places: places)
         let links: [String?] = linksOn(made.days, root: root)
-        XCTAssertTrue(links == linksBefore || links == linksAfter, "\(label): links \(links)")
-        XCTAssertEqual(stagedLeft(under: root), [], label)
+        if links != linksBefore && links != linksAfter {
+            faults.append("\(label): links \(links)")
+        }
+        let staged: [String] = stagedLeft(under: root)
+        if !staged.isEmpty {
+            faults.append("\(label): staged \(staged)")
+        }
         // Undo's own staged items are never the teacher's: nothing is ever
         // kept under a visible name for them (review 3 of mac-1, MEDIUM).
-        XCTAssertEqual(keptLeft(under: root), [], label)
+        let kept: [String] = keptLeft(under: root)
+        if !kept.isEmpty {
+            faults.append("\(label): kept \(kept)")
+        }
         if shape == .aNewClassWrittenAtTheRelinksFrom {
             // Whole after: the new class page at Day 4, never an empty day;
             // whole before: Day 4's link, and nothing else there.
             let dayFour: URL = root.appendingPathComponent(section + "Unit 1, Day 4.md")
             if links == linksAfter {
                 let held: Data? = try? Data(contentsOf: dayFour)
-                XCTAssertEqual(held, Data(newClassText.utf8), "\(label): Day 4 is not the new class page")
-            } else {
-                XCTAssertTrue(UndoSwap.isALink(dayFour), label)
+                if held != Data(newClassText.utf8) {
+                    faults.append("\(label): Day 4 is not the new class page")
+                }
+            } else if !UndoSwap.isALink(dayFour) {
+                faults.append("\(label): Day 4 is not the link")
             }
         }
         let phase: UndoStepPhase? = try survivor.read().records[1]?.phase
@@ -624,8 +652,10 @@ final class UndoRelinkTests: XCTestCase {
         if let found = phase {
             settledThere = settledPhases.contains(found)
         }
-        XCTAssertTrue(settledThere, "\(label): phase \(String(describing: phase))")
-        return true
+        if !settledThere {
+            faults.append("\(label): phase \(String(describing: phase))")
+        }
+        return (reached: true, faults: faults)
     }
 
     /// The links on these class days, each its text or nil.
@@ -1637,6 +1667,164 @@ final class UndoRelinkTests: XCTestCase {
             found[name] = held
         }
         return found
+    }
+
+    // MARK: - The lows riding with mac-2
+
+    /// Review 3 of mac-1, LOW 5: a teacher's file under the TWO-place
+    /// relink's own staged name (`-new` beside `to`). The pre-clean follows
+    /// the one rule: the file is kept under a visible name beside `to`, said
+    /// first, and the relink is made; never left hidden with an untrue "in
+    /// use". MUST FAIL with the pre-clean's result ignored.
+    func testATeachersFileUnderTheTwoPlaceRelinksStagedNameIsKeptVisibleAndSaid() throws {
+        let laid: LaidRelink = try layARelink(named: "two-place-pre-clean", leads: .inside)
+        let to: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 5.md")
+        let stagedURL: URL = UndoSwap.besideURL(for: to, label: "1-apply", role: "new")
+        try Data("The teacher's own.\n".utf8).write(to: stagedURL)
+        let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
+        let said: [String] = try withTheKeptPageLine {
+            let result: UndoSwapResult = UndoSwap.swap(
+                forward, label: "1-apply", root: laid.root,
+                tellingKept: UndoRecovery.tellingWhatIsKept(course: "TST1O", section: 1, root: laid.root)
+            )
+            XCTAssertEqual(result, .swapped)
+        }
+        XCTAssertEqual(linkText(section + "Unit 1, Day 5.md", root: laid.root), laid.newText, "the relink made")
+        XCTAssertFalse(standsAnything(section + "Unit 1, Day 4.md", root: laid.root))
+        XCTAssertEqual(try? text(section + "Unit 1, Day 5 (kept by Undo).md", root: laid.root), "The teacher's own.\n")
+        XCTAssertEqual(stagedLeft(under: laid.root), [])
+        XCTAssertEqual(said, [section + "Unit 1, Day 5.md -> " + section + "Unit 1, Day 5 (kept by Undo).md"])
+    }
+
+    /// Review 4 of mac-1, LOW: the place changed under the swap to an item
+    /// that cannot be read (a folder no one may list). After the exchange
+    /// it is not ours whatever it holds, so it is exchanged back unread:
+    /// it stands at its place again, nothing is left under the staged name,
+    /// refused changed since. MUST FAIL with the item left hidden and the
+    /// refusal naming only the place.
+    func testAnUnreadableItemFoundAtThePlaceAfterTheExchangeIsGivenBack() throws {
+        let laid: LaidRelink = try layARelinkWhereItStands(named: "unreadable-after", leads: .inside)
+        let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 4.md")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: place.path)
+            let stagedURL: URL = UndoSwap.besideURL(for: place, label: "1-apply", role: "new")
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stagedURL.path)
+        }
+        let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
+        UndoKillPoints.hook = { reached in
+            if reached == .relinkStaged(0) {
+                _ = UndoSwap.removeALink(at: place)
+                try? FileManager.default.createDirectory(at: place.appendingPathComponent("inside"), withIntermediateDirectories: true)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: place.path)
+            }
+            return false
+        }
+        let result: UndoSwapResult = UndoSwap.swap(forward, label: "1-apply", root: laid.root)
+        UndoKillPoints.hook = nil
+        XCTAssertEqual(result, .refused(.changedSince(firstPath: section + "Unit 1, Day 4.md", others: 0)))
+        XCTAssertTrue(UndoSwap.isAFolder(place), "the other program's folder at its place")
+        XCTAssertEqual(stagedLeft(under: laid.root), [])
+    }
+
+    /// The same with the exchange back refused too: the item stays under
+    /// the staged name, and the refusal names that name, so it is said.
+    func testAnItemThatCannotGoBackAfterTheExchangeIsNamedByTheRefusal() throws {
+        let laid: LaidRelink = try layARelinkWhereItStands(named: "unreadable-stays", leads: .inside)
+        let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 4.md")
+        let stagedURL: URL = UndoSwap.besideURL(for: place, label: "1-apply", role: "new")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: place.path)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stagedURL.path)
+        }
+        let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
+        UndoKillPoints.hook = { reached in
+            if reached == .relinkStaged(0) {
+                _ = UndoSwap.removeALink(at: place)
+                try? FileManager.default.createDirectory(at: place.appendingPathComponent("inside"), withIntermediateDirectories: true)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: place.path)
+            }
+            return false
+        }
+        UndoKillPoints.relinkExchangeBackFails = { _ in
+            return true
+        }
+        let result: UndoSwapResult = UndoSwap.swap(forward, label: "1-apply", root: laid.root)
+        UndoKillPoints.hook = nil
+        UndoKillPoints.relinkExchangeBackFails = nil
+        XCTAssertEqual(result, .refused(.cannotTellNow(path: section + stagedURL.lastPathComponent)))
+    }
+
+    /// The director's shape from Windows' kill table: a teacher's own page
+    /// under a TWO-place relink's own staged name beside Day 5, a place
+    /// only link moves name (Day 5's link moves on to Day 6 and Day 4's is
+    /// relinked into Day 5). Made live, and killed before each swap and
+    /// recovered: the page is never deleted; it is kept under a visible
+    /// name and said (or given back), and nothing is left staged.
+    func testATeachersPageUnderAChainedRelinksStagedNameIsNeverDeleted() async throws {
+        let teachers: String = "The teacher's own page.\n"
+        var points: [UndoKillPoint?] = [nil]
+        for index in 0..<2 {
+            points.append(.beforeSwap(index))
+        }
+        var faults: [String] = []
+        for point in points {
+            var label: String = "live"
+            if let point {
+                label = "\(point)"
+            }
+            let laid: LaidChain = try layAChain(.twoChainedRelinks, named: "teachers-page-" + label)
+            let dayFive: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 5.md")
+            try Data(teachers.utf8).write(to: UndoSwap.besideURL(for: dayFive, label: "1-apply", role: "new"))
+            let journal: UndoJournal = UndoJournal(
+                folderURL: laid.journalFolder,
+                process: UndoContractReplay.goneProcess,
+                processIsAlive: { process in process.pid != 2_000_000_001 }
+            )
+            var said: [String] = []
+            let hookBefore = UndoTrailHook.keptAPageLine
+            UndoTrailHook.keptAPageLine = { _, _, place, keptAs in
+                said.append(place + " -> " + keptAs)
+            }
+            if let point {
+                UndoKillPoints.hook = { reached in
+                    return reached == point
+                }
+            }
+            let outcome: JournaledWriteOutcome = JournaledWrite.perform(ops: laid.draft, in: journal, mode: .live, places: UndoMemoryPlaces())
+            UndoKillPoints.hook = nil
+            if point == nil && outcome != .applied(seq: 1) {
+                faults.append("\(label): \(outcome)")
+            }
+            if point != nil {
+                let root: URL = laid.root
+                await UndoRecovery.recoverAndRederive(
+                    UndoJournal(folderURL: laid.journalFolder), resolveRoot: { _ in root }, places: UndoMemoryPlaces()
+                )
+            }
+            UndoTrailHook.keptAPageLine = hookBefore
+            var visibleHolders: [String] = []
+            let asFound: String = "file " + Data(teachers.utf8).base64EncodedString()
+            for (name, held) in try classPagesNow(laid.root) where held == asFound && !name.hasPrefix(".") {
+                visibleHolders.append(name)
+            }
+            if visibleHolders.isEmpty {
+                faults.append("\(label): the teacher's page is gone")
+            }
+            if !stagedLeft(under: laid.root).isEmpty {
+                faults.append("\(label): staged \(stagedLeft(under: laid.root))")
+            }
+            var keptOnes: Int = 0
+            for name in visibleHolders where name.contains("(kept by Undo)") {
+                keptOnes += 1
+            }
+            if keptOnes != said.count {
+                faults.append("\(label): kept \(visibleHolders), said \(said)")
+            }
+        }
+        let failing: [String] = faults
+        await MainActor.run {
+            XCTAssertEqual(failing, [])
+        }
     }
 
     // MARK: - Helpers
