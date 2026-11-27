@@ -516,4 +516,175 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
         Assert.Null(targets[0].Change);
         Assert.IsType<UndoSwapChange.MoveHere>(targets[1].Change);
     }
+
+    // ---- Recovery judges each op of a pair (W8b-21a3, the mac's door-3) -----
+
+    private static string MoveNamed(string from, string to) => from + " → " + to;
+
+    private static UndoStep StepOf(IReadOnlyList<UndoOp> ops) => new() { Seq = 1, Readable = true, Ops = ops };
+
+    private static byte[]? BlobOf(string sha)
+    {
+        foreach (string text in new[] { "New.\n", "Three.\n", "Two.\n" })
+        {
+            if (UndoCheck.Sha(Bytes(text)) == sha) return Bytes(text);
+        }
+        return null;
+    }
+
+    /// <summary>What recovery judges each place of the step to be, as "place=State", in its order.</summary>
+    private List<string> Judged(IReadOnlyList<UndoOp> ops)
+    {
+        var judged = new List<string>();
+        foreach ((string path, UndoOpState state) in UndoRecovery.FileStates(StepOf(ops), _root, new UndoMemoryPlaces(), BlobOf))
+            judged.Add(path + "=" + state);
+        return judged;
+    }
+
+    private void RemoveAt(string relative) => File.Delete(Full(relative));
+
+    private void LinkAt(string place, string libraryPage)
+    {
+        if (!File.Exists(Full(Library + "/" + libraryPage))) WritePage(Library + "/" + libraryPage, "Linked elsewhere.\n");
+        File.CreateSymbolicLink(Full(place), "../library/" + libraryPage);
+    }
+
+    /// <summary>
+    /// Shape A, a link's move from Day 3 (P) to Day 4 (Q), then a new page at
+    /// Day 3, judged by recovery at each point of the step. The move is named
+    /// by its two places, never by Day 3 alone, which is the new page's place.
+    /// </summary>
+    [SymbolicLinkTheory]
+    [InlineData("link at P, Q free", "Before", "Before")]
+    [InlineData("P free, link at Q", "After", "Before")]
+    [InlineData("new at P, link at Q", "After", "After")]
+    [InlineData("something else at P", "Neither", "Neither")]
+    public void RecoveryJudgesShapeAAtEachPoint(string disk, string move, string newPage)
+    {
+        LayLink(Day(3), "Day 3.md", leadingOut: false);
+        List<UndoOp> ops = [LinkMove(Day(3), Day(4)), NewFile(Day(3), "New.\n")];
+        if (disk != "link at P, Q free")
+        {
+            RemoveAt(Day(3));
+            LinkAt(Day(4), "Day 3.md");
+        }
+        if (disk == "new at P, link at Q") WritePage(Day(3), "New.\n");
+        if (disk == "something else at P") WritePage(Day(3), "Another page.\n");
+
+        Assert.Equal([MoveNamed(Day(3), Day(4)) + "=" + move, Day(3) + "=" + newPage], Judged(ops));
+    }
+
+    /// <summary>
+    /// Shape B, a removal at Day 3 (P), then a link's move from Day 2 into
+    /// it, judged by recovery at each point of the step.
+    /// </summary>
+    [SymbolicLinkTheory]
+    [InlineData("old page at P, link at Day 2", "Before", "Before")]
+    [InlineData("P free", "After", "Before")]
+    [InlineData("link at P, Day 2 free", "After", "After")]
+    [InlineData("a link with another target at P", "Neither", "Neither")]
+    public void RecoveryJudgesShapeBAtEachPoint(string disk, string removal, string move)
+    {
+        LayLink(Day(2), "Day 2.md", leadingOut: false);
+        WritePage(Day(3), "Three.\n");
+        List<UndoOp> ops = [Removal(Day(3), "Three.\n"), LinkMove(Day(2), Day(3))];
+        if (disk != "old page at P, link at Day 2") RemoveAt(Day(3));
+        if (disk == "link at P, Day 2 free" || disk == "a link with another target at P") RemoveAt(Day(2));
+        if (disk == "link at P, Day 2 free") LinkAt(Day(3), "Day 2.md");
+        if (disk == "a link with another target at P") LinkAt(Day(3), "Another day.md");
+
+        Assert.Equal([Day(3) + "=" + removal, MoveNamed(Day(2), Day(3)) + "=" + move], Judged(ops));
+    }
+
+    /// <summary>
+    /// A file's move from Day 3 to Day 4, then a new page at Day 3, both made:
+    /// recovery judges the move as "Day 3 → Day 4" and the new page as Day 3,
+    /// each after, and puts back the ops by that same name, each alone.
+    /// </summary>
+    [Fact]
+    public void AMoveThatHandsAPlaceOverIsNamedByItsTwoPlacesAndPutBackByThatName()
+    {
+        WritePage(Day(4), "Three.\n");
+        WritePage(Day(3), "New.\n");
+        List<UndoOp> ops = [FileMove(Day(3), Day(4), "Three.\n"), NewFile(Day(3), "New.\n")];
+
+        Assert.Equal([MoveNamed(Day(3), Day(4)) + "=After", Day(3) + "=After"], Judged(ops));
+        Assert.Equal([ops[0]], UndoRecovery.OpsToPutBack(StepOf(ops), [MoveNamed(Day(3), Day(4))]));
+        Assert.Equal([ops[1]], UndoRecovery.OpsToPutBack(StepOf(ops), [Day(3)]));
+    }
+
+    /// <summary>
+    /// Shape A before the step, a kept original holding the new page: the
+    /// page's op is planned together with the link's move, in the step's
+    /// order, so the list gives the new page and the kept original is no
+    /// only copy (planned alone, the page is judged against the link still
+    /// there and never ready). One holding anything else stays an only copy.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void AKeptOriginalIsTestedAsAnOnlyCopyWithThePagesOpPlannedWithItsPair()
+    {
+        LayLink(Day(3), "Day 3.md", leadingOut: false);
+        List<UndoOp> ops = [LinkMove(Day(3), Day(4)), NewFile(Day(3), "New.\n")];
+        WritePage(Section + "/kept new page", "New.\n");
+        WritePage(Section + "/kept other page", "Another page.\n");
+        Func<string, string, bool> listHolds = UndoRecovery.ListHolds(StepOf(ops), _root, BlobOf);
+
+        Assert.True(listHolds(Full(Section + "/kept new page"), Full(Day(3))));
+        Assert.False(listHolds(Full(Section + "/kept other page"), Full(Day(3))));
+    }
+
+    /// <summary>
+    /// The judging of a pair, with a judge that counts its calls and stops a
+    /// judging that never ends: the link's move is judged again once, with
+    /// its origin free, when the new page stands after; never a third time.
+    /// </summary>
+    [Fact]
+    public void EachOpOfAPairIsJudgedAgainAtMostOnce()
+    {
+        List<UndoOp> ops = [LinkMoveInMemory(Day(3), Day(4)), NewFile(Day(3), "New.\n")];
+        int[] calls = new int[ops.Count];
+        int total = 0;
+
+        UndoOpState?[] judged = UndoRecovery.JudgedTogether(ops, UndoOp.Handovers(ops), (index, sides) =>
+        {
+            total++;
+            if (total > 100) throw new InvalidOperationException("the judging of the pair does not stop");
+            calls[index]++;
+            if (index == 1) return UndoOpState.After;
+            return sides.FromIsFree ? UndoOpState.After : UndoOpState.Neither;
+        });
+
+        Assert.Equal(new UndoOpState?[] { UndoOpState.After, UndoOpState.After }, judged);
+        Assert.Equal(new[] { 2, 1 }, calls);
+    }
+
+    /// <summary>
+    /// A chain: a removal at Day 3, a file's move from Day 2 into it, then a
+    /// new page at Day 2. The new page after frees the move's origin; the move
+    /// after then frees the removal's page, which only a second round sees.
+    /// </summary>
+    [Fact]
+    public void AChainOfPlacesIsJudgedAgainUntilNothingChanges()
+    {
+        List<UndoOp> ops = [Removal(Day(3), "Three.\n"), FileMove(Day(2), Day(3), "Two.\n"), NewFile(Day(2), "New.\n")];
+        Assert.Equal(2, UndoOp.Handovers(ops).Count);
+        int[] calls = new int[ops.Count];
+        int total = 0;
+
+        UndoOpState?[] judged = UndoRecovery.JudgedTogether(ops, UndoOp.Handovers(ops), (index, sides) =>
+        {
+            total++;
+            if (total > 100) throw new InvalidOperationException("the judging of the chain does not stop");
+            calls[index]++;
+            return index switch
+            {
+                2 => UndoOpState.After,
+                1 => sides.FromIsFree ? UndoOpState.After : UndoOpState.Neither,
+                _ => sides.IsAbsent ? UndoOpState.After : UndoOpState.Neither,
+            };
+        });
+
+        Assert.Equal(new UndoOpState?[] { UndoOpState.After, UndoOpState.After, UndoOpState.After }, judged);
+        Assert.Equal(new[] { 2, 2, 1 }, calls);
+    }
 }
