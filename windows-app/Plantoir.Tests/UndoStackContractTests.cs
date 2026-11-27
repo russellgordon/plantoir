@@ -35,6 +35,8 @@ public sealed class UndoStackContractTests
         "linkedFolder",
         // U4b2-4's (W8-9)
         "keptWhatItReplacedSays",
+        // U4a review 1, LOW 4's (W8-10)
+        "keptBesideThePage",
     };
 
     /// <summary>Every case but those that lay a symbolic link (<see cref="LinkCases"/>).</summary>
@@ -183,6 +185,9 @@ public sealed class UndoStackContractTests
             Assert.NotNull(last);
             Assert.Equal(keptSays.GetString(), AsTheTrailWritesIt(last!));
         }
+        if (stackCase.TryGetProperty("keptBesideThePage", out JsonElement keptBeside))
+            Assert.True(keptBeside.GetInt32() == replay.KeptBesideP1().Count,
+                        $"{replay.KeptBesideP1().Count} files kept beside the page, not {keptBeside.GetInt32()}");
         if (stackCase.TryGetProperty("foreignKeptOriginalUntouched", out JsonElement untouched) && untouched.GetBoolean())
         {
             Assert.NotNull(replay.ForeignKept);
@@ -274,6 +279,24 @@ public sealed class UndoStackContractTests
             string blob = _scribe.Journal.BlobPath(sha);
             File.Delete(blob);
             _denials.FolderTakesNothingNew(Path.GetDirectoryName(blob)!);
+        }
+
+        /// <summary>
+        /// Every file kept beside p1 under a staged name ending <c>-orig</c>,
+        /// of any step, in p1's own folder (<c>keptBesideThePage</c>,
+        /// stackCasesHow, U4a review 1, LOW 4): its full paths.
+        /// </summary>
+        internal List<string> KeptBesideP1()
+        {
+            string page = _scribe.FullPath("A", _p1);
+            string prefix = "." + Path.GetFileName(page) + UndoSwap.StagedMarker;
+            var kept = new List<string>();
+            foreach (string entry in Directory.EnumerateFileSystemEntries(Path.GetDirectoryName(page)!))
+            {
+                string name = Path.GetFileName(entry);
+                if (name.StartsWith(prefix, StringComparison.Ordinal) && name.EndsWith("-orig", StringComparison.Ordinal)) kept.Add(entry);
+            }
+            return kept;
         }
 
         /// <summary>Every kept original beside p1, as their relative paths.</summary>
@@ -413,6 +436,21 @@ public sealed class UndoStackContractTests
                     (long seq, _) = HeadWriteFileOn(TwoIndexes[1]);
                     File.WriteAllBytes(UndoSwap.BesidePath(_scribe.FullPath("A", TwoIndexes[1]), $"{seq}-apply", "orig"),
                                        Encoding.UTF8.GetBytes($"What {TwoIndexes[1]} held before the step.\n"));
+                    return;
+                }
+                case "afterContentGone":
+                {
+                    // Only the newest step's content for what p1 holds after
+                    // it is gone from the list; the list still takes a new
+                    // file unless contentCannotBeStored follows (U4a review 1,
+                    // LOW 4). The blob's own folder goes too when that leaves
+                    // it empty, as on the mac, so a sealed content folder
+                    // cannot take the blob again.
+                    string blob = _scribe.Journal.BlobPath(HeadWriteFileOnP1().Op.AfterSha!);
+                    Assert.True(File.Exists(blob), "no after content of p1's newest whole-file step in the list to take away");
+                    File.Delete(blob);
+                    string prefixFolder = Path.GetDirectoryName(blob)!;
+                    if (!Directory.EnumerateFileSystemEntries(prefixFolder).Any()) Directory.Delete(prefixFolder);
                     return;
                 }
                 case "removeContent": _scribe.RemoveContent(); return;
