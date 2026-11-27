@@ -1011,17 +1011,7 @@ def move_state(op, at_from, at_to, listed_as=None):
     `.another`), whatever the item holds."""
     if listed_as is not None and is_case_only_move(op) and listed_as not in (op["from"], op["to"]):
         return "neither"
-    if is_a_relink_in_place(op):
-        # mac-1 (#899): a relink where the link stands, judged at its ONE
-        # place (at_from; at_to names the same place): the old text before,
-        # the new after, anything else neither.
-        reading = tree_reading(at_from)
-        if reading == ("link", op["linkShaBefore"]):
-            return "before"
-        if reading == ("link", op["linkShaAfter"]):
-            return "after"
-        return "neither"
-    def side(item, is_at_from):
+    def side(item):
         reading = tree_reading(item)
         if reading[0] == "absent":
             return "free"
@@ -1030,14 +1020,8 @@ def move_state(op, at_from, at_to, listed_as=None):
         if "linkSha" in op:
             # U4b2-14: a link moved as itself, judged by its target.
             return "holds" if reading == ("link", op["linkSha"]) else "else"
-        if "linkShaBefore" in op:
-            # U4b3 relink: a link whose text the move changes, each side
-            # judged by its own text (`from` by linkShaBefore, `to` by
-            # linkShaAfter), never followed.
-            text = op["linkShaBefore"] if is_at_from else op["linkShaAfter"]
-            return "holds" if reading == ("link", text) else "else"
         return "holds" if reading == ("tree", op["listingSha"]) else "else"
-    source, destination = side(at_from, True), side(at_to, False)
+    source, destination = side(at_from), side(at_to)
     if source == "free" and destination == "holds":
         return "after"
     if source == "holds" and destination == "free":
@@ -1292,16 +1276,7 @@ def hands_over_as_a_move(op):
     folder's, a capitalisation-only one, a moveApart or a setAside."""
     if op.get("kind") != "move" or "listingSha" in op or is_case_only_move(op):
         return False
-    # mac-1: a relink where the link stands leaves no place and fills none.
-    if is_a_relink_in_place(op):
-        return False
-    return "sha" in op or is_a_links_move(op)
-
-
-def is_a_links_move(op):
-    """UndoOp.isALinksMove (U4b3 relink-1): a plain link's move (linkSha)
-    or a relinking one (linkShaBefore and linkShaAfter)."""
-    return "linkSha" in op or "linkShaBefore" in op
+    return "sha" in op or "linkSha" in op
 
 
 def place_left(op):
@@ -1372,9 +1347,8 @@ def move_carries(move, edit):
     without regard to case (U4b2-9)."""
     if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
         return False
-    if is_a_links_move(move):
-        # A link's move carries nothing (review 1 of U4b2-14), a relinking
-        # one included (U4b3 relink).
+    if "linkSha" in move:
+        # A link's move carries nothing (review 1 of U4b2-14).
         return False
     if part_inside(move["to"], edit["path"]) is None:
         return False
@@ -1388,18 +1362,6 @@ def move_carries(move, edit):
         from_part = unicodedata.normalize("NFC", move["from"].split("/")[depth - 1])
         return edit_part != from_part
     return not places_overlap(move["from"], edit["path"])
-
-
-def is_a_relink_in_place(op):
-    """UndoOp.isARelinkWhereItStands (mac-1, #899): a `move`, never a
-    moveApart or a setAside, whose from and to are one path byte for byte,
-    carrying the relinking pair: the link's text changed where it stands.
-    Compared as UTF-8 bytes (review 1 of mac-1, MEDIUM 1): the same place
-    in another Unicode normalisation is not one path, so it overlaps and
-    is not readable."""
-    return (op.get("kind") == "move" and "linkShaBefore" in op
-            and isinstance(op.get("from"), str) and isinstance(op.get("to"), str)
-            and op["from"].encode("utf-8") == op["to"].encode("utf-8"))
 
 
 def is_case_only_move(op):
@@ -1479,23 +1441,10 @@ def swap_groups(ops, backward):
     return leading + files + wholes
 
 
-def stopped_part_way(ops, backward, pages, swapped, inside=None):
+def stopped_part_way(ops, backward, pages, swapped):
     """What a step's swap leaves when its process is killed before the
     target numbered `swapped` (None: every target in): each group made in
-    turn, judged and moved on its own. `inside` (U4b3 relink-3) stops
-    INSIDE that target's swap instead, a relinking move's: relinkStaged
-    (its new link made under its staged name, which the model, holding no
-    staged files, does not show) or relinkRenamedIn (the new link renamed
-    in at its destination, the old one not yet removed: both stand). For a
-    relink where the link stands (mac-1) each platform has its own
-    mechanism and its own stop points (opKinds.move): the Mac's
-    relinkSwapped is the moment after its one atomic exchange (the place
-    holds the new text, the old link waits under the staged name, not
-    shown); Windows' relinkSetAside is the moment after the standing item
-    is renamed aside (the place empty, the item set aside shown at
-    `place + SET_ASIDE`) and its relinkRenamedIn the moment after the
-    staged new link is renamed in (the new text at the place, the item
-    set aside still shown)."""
+    turn, judged and moved on its own."""
     pages = dict(pages)
     groups = swap_groups(ops, backward)
     for group in groups[:len(groups) if swapped is None else swapped]:
@@ -1506,120 +1455,6 @@ def stopped_part_way(ops, backward, pages, swapped, inside=None):
                 pages.pop(path, None)
             else:
                 pages[path] = text
-    if inside is not None:
-        op = groups[swapped][0]
-        assert "linkShaBefore" in op and inside in ("relinkStaged", "relinkRenamedIn", "relinkSwapped", "relinkSetAside"), (op, inside)
-        assert inside not in ("relinkSwapped", "relinkSetAside") or is_a_relink_in_place(op), (op, inside)
-        if is_a_relink_in_place(op) and inside in ("relinkSetAside", "relinkRenamedIn"):
-            # Windows (mac-1's fix round): the standing item renamed aside
-            # exclusively, then (relinkRenamedIn) the new link renamed in.
-            place = op["from"]
-            pages[place + SET_ASIDE] = pages.pop(place, None)
-            if inside == "relinkRenamedIn":
-                pages[place] = whole_moved(op, backward, pages)[place]
-        elif inside in ("relinkRenamedIn", "relinkSwapped"):
-            made = whole_moved(op, backward, pages)
-            for path, value in made.items():
-                if value is not None:
-                    pages[path] = value
-    return pages
-
-
-# Windows' staged name for the item a relink where the link stands renamed
-# aside (mac-1's fix round): a key the model's pages never otherwise hold.
-SET_ASIDE = "\u0000set-aside"
-
-
-def settle_what_was_set_aside(ops, pages, started_from_before):
-    """Windows' recovery of a relink where the link stands killed inside
-    its swap (opKinds.move, mac-1's fix rounds), by STATE: what is at the
-    place and what is set aside. The item set aside goes back to an empty
-    place, whatever it is. Set aside beside a link of the step's at the
-    place: removed when it is the link the swap started from, by its text;
-    anything else is the teacher's and the step is settled back (the
-    step's link renamed out to its staged name, then removed by its text,
-    and the item renamed back). Set aside beside a third item at the place
-    (another program filled it): a link of the step's is removed by its
-    text, anything else is kept under the visible name `<name> (kept by
-    Undo)` (review 2 of mac-1, LOW 2). The staged new link is never shown
-    by the model: a link of the step's under it is removed by its text."""
-    pages = dict(pages)
-    for op in ops:
-        if not is_a_relink_in_place(op) or op["from"] + SET_ASIDE not in pages:
-            continue
-        place = op["from"]
-        held = pages.pop(place + SET_ASIDE)
-        at_the_place = pages.get(place)
-        if at_the_place is None:
-            pages[place] = held
-            continue
-        step_texts = (op["linkShaBefore"], op["linkShaAfter"])
-        start = op["linkShaBefore"] if started_from_before else op["linkShaAfter"]
-        held_is_the_start = isinstance(held, tuple) and held[0] == "link" and sha(held[1]) == start
-        held_is_the_steps = isinstance(held, tuple) and held[0] == "link" and sha(held[1]) in step_texts
-        place_is_the_steps = (isinstance(at_the_place, tuple) and at_the_place[0] == "link"
-                              and sha(at_the_place[1]) in step_texts)
-        if place_is_the_steps:
-            if not held_is_the_start:
-                pages[place] = held
-            continue
-        if held_is_the_steps:
-            continue
-        number = 1
-        while visible_name(place, number, is_a_page=True) in pages:
-            number += 1
-        pages[visible_name(place, number, is_a_page=True)] = held
-    return pages
-
-
-def remove_the_links_just_made(ops, pages, started_from_before):
-    """UndoRecovery.removeTheLinksJustMade (U4b3 relink-3): a relinking
-    move with both links standing, each holding its own side's text, loses
-    the link its interrupted swap had just made: at `to` going forward, at
-    `from` going back. A plan never does this.
-
-    Review F of U4b3, MEDIUM: at most ONE link is removed, and only when
-    the folder reads as a point INSIDE one relink's swap. In the work's
-    swap order (index order going forward, reversed for an Undo), a move
-    passes when it stands both ways, every link move before it holds its end
-    text at its end side and every link move after it holds its start text
-    at its start side; of the moves that pass, the last one's just-made link
-    is removed, and none when no move passes. Every link move is read, a
-    plain one (linkSha, one text at both sides) as a constraint only: its
-    swap is one rename, so it is never the one in flight."""
-    pages = dict(pages)
-
-    def holds(place, text_sha):
-        held = pages.get(place)
-        return isinstance(held, tuple) and held[0] == "link" and sha(held[1]) == text_sha
-
-    ordered = list(ops) if started_from_before else list(reversed(ops))
-    relinks = []
-    for op in ordered:
-        if op.get("kind") != "move" or ("linkShaBefore" not in op and "linkSha" not in op):
-            continue
-        is_a_relink = "linkShaBefore" in op
-        from_holds = holds(op["from"], op["linkShaBefore"] if is_a_relink else op["linkSha"])
-        to_holds = holds(op["to"], op["linkShaAfter"] if is_a_relink else op["linkSha"])
-        start_holds, end_holds = (from_holds, to_holds) if started_from_before else (to_holds, from_holds)
-        # mac-1: a relink where the link stands is never in flight with two
-        # links standing (its swap is one atomic exchange at one place).
-        can_be_in_flight = is_a_relink and not is_a_relink_in_place(op)
-        relinks.append((op, can_be_in_flight and from_holds and to_holds, start_holds, end_holds))
-    in_flight = None
-    for index, (op, stands_both_ways, _, _) in enumerate(relinks):
-        if not stands_both_ways:
-            continue
-        consistent = True
-        for other_index, (_, _, start_holds, end_holds) in enumerate(relinks):
-            if other_index < index and not end_holds:
-                consistent = False
-            if other_index > index and not start_holds:
-                consistent = False
-        if consistent:
-            in_flight = op["to"] if started_from_before else op["from"]
-    if in_flight is not None:
-        pages.pop(in_flight, None)
     return pages
 
 
@@ -1774,10 +1609,6 @@ def recover(ops, pages, started_from_before):
       step's own kept copy inside the folder out, is refused and the step
       closes couldNotPutBack with nothing put back (the U7 gap)."""
     start, end = ("before", "after") if started_from_before else ("after", "before")
-    # U4b3 relink-3: the link an interrupted relink had just made goes
-    # first, so its op stands where its swap began.
-    pages = settle_what_was_set_aside(ops, pages, started_from_before)
-    pages = remove_the_links_just_made(ops, pages, started_from_before)
     states = recovery_states(ops, pages)
     in_the_way = [place for place, state in states.items() if state == "neither"]
     if not in_the_way and all(state == start for state in states.values()):
@@ -1970,16 +1801,6 @@ def whole_moved(op, backward, pages):
                 if isinstance(path, str) and path.startswith(prefix):
                     moved[destination + path[len(source):]] = value
             return moved
-        if "linkShaBefore" in op:
-            # U4b3 relink: the link made again at its destination holding
-            # that side's own text (the model's `linkTexts` stands for the
-            # list's two blobs: each sha's text).
-            wanted = op["linkShaBefore"] if backward else op["linkShaAfter"]
-            if source == destination:
-                # mac-1: where the link stands, the one place holds the
-                # other text; nothing is left anywhere else.
-                return {destination: ("link", op["linkTexts"][wanted])}
-            return {destination: ("link", op["linkTexts"][wanted]), source: None}
         return {destination: pages.get(source), source: None}
     if kind in ("createTree", "removeTree"):
         makes = (kind == "createTree") != backward

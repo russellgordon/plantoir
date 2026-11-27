@@ -1,0 +1,10 @@
+#1055 M4 tests first, on M3's head e6fd13c41 (14:09): run-red3.log
+/Users/russellgordon/plantoir/wt-1055-M4/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:887: error: -[QuartzTeachersTests.JournaledStepTests testALinksMoveThatChangesItsTextIsAShapeThisVersionCannotRead] : XCTAssertFalse failed
+/Users/russellgordon/plantoir/wt-1055-M4/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:890: error: -[QuartzTeachersTests.JournaledStepTests testALinksMoveThatChangesItsTextIsAShapeThisVersionCannotRead] : XCTAssertEqual failed: ("undone(seq: 1, leftApart: [], startsAtTheNextLogin: [])")
+/Users/russellgordon/plantoir/wt-1055-M4/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:891: error: -[QuartzTeachersTests.JournaledStepTests testALinksMoveThatChangesItsTextIsAShapeThisVersionCannotRead] : XCTAssertEqual failed: ("redone(seq: 1, leftApart: [], startsAtTheNextLogin: [])")
+Test Case '-[QuartzTeachersTests.JournaledStepTests testALinksMoveThatChangesItsTextIsAShapeThisVersionCannotRead]' failed (0.557 seconds).
+Test Case '-[QuartzTeachersTests.JournaledStepTests testAPlaceHandedOverAfterALinksMoveStillGoesBothWays]' passed (0.028 seconds).
+Test Case '-[QuartzTeachersTests.JournaledStepTests testAPlainLinksMoveIsStillJudgedAsToday]' passed (0.003 seconds).
+/Users/russellgordon/plantoir/wt-1055-M4/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:917: error: -[QuartzTeachersTests.JournaledStepTests testAStepLeftPartWayHoldingARelinkIsABarrierNotRecovered] : XCTAssertEqual failed: ("["section1/All Classes/Unit 1, Day 2.md": "file LS0tCnRpdGxlOi
+/Users/russellgordon/plantoir/wt-1055-M4/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:919: error: -[QuartzTeachersTests.JournaledStepTests testAStepLeftPartWayHoldingARelinkIsABarrierNotRecovered] : XCTAssertEqual failed: threw error "Error Domain=NSCocoaErrorDomain Code=260 "The file 
+Test Case '-[QuartzTeachersTests.JournaledStepTests testAStepLeftPartWayHoldingARelinkIsABarrierNotRecovered]' failed (0.014 seconds).

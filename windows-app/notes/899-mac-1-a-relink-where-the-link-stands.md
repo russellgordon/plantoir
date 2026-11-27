@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # mac-1 (#899 Undo): the door re-points a link where it stands
 
 Brief `vm-tools/briefs/2026-11-27-899-mac-1-a-relink-where-the-link-stands.md`, branch `issue/899-mac-1-a-relink-where-the-link-stands` from `origin/dev` 6dc36fcea. **`contracts/` touched: both gates.** Merges of `origin/dev`: before proving and again before handing back, `git merge origin/dev` at 6dc36fcea both times ("Already up to date", so no merge commit: `origin/dev` did not move).

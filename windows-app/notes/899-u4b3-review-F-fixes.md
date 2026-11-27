@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # #899 U4b3, fourth fix round: review F (2026-11-26, night)
 
 Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from 57afa8408. `origin/dev` merged in before proving and again before handing back: nothing new either time (`git log HEAD..origin/dev` empty).
