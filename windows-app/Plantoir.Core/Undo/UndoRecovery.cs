@@ -844,7 +844,10 @@ internal static class UndoRecovery
     /// that holds anything else, such as an edit that raced the swap into the
     /// original's file (the mac's <c>listHolds</c>; the third review of U3a, LOW 1).
     /// </summary>
-    internal static Func<string, string, bool> ListHolds(UndoStep step, string root, UndoJournal journal) =>
+    internal static Func<string, string, bool> ListHolds(UndoStep step, string root, UndoJournal journal) => ListHolds(step, root, journal.Blob);
+
+    /// <summary><see cref="ListHolds(UndoStep, string, UndoJournal)"/>, the list's content by sha read through <paramref name="blob"/>.</summary>
+    internal static Func<string, string, bool> ListHolds(UndoStep step, string root, Func<string, byte[]?> blob) =>
         (kept, place) =>
         {
             if (UndoCurrent.Read(kept) is not UndoCurrent.Bytes keptBytes) return false;
@@ -871,7 +874,7 @@ internal static class UndoRecovery
             foreach (bool backward in new[] { true, false })
             {
                 UndoCheck.PlanResult plan;
-                try { plan = UndoCheck.Plan(opsOnThePlace, backward, relative => UndoCurrent.Read(UndoDoor.FullPath(root, relative)), journal.Blob); }
+                try { plan = UndoCheck.Plan(opsOnThePlace, backward, relative => UndoCurrent.Read(UndoDoor.FullPath(root, relative)), blob); }
                 catch (UndoListUnreadableException) { continue; }
                 if (plan is not UndoCheck.PlanResult.Ready ready) continue;
                 foreach ((string path, _, byte[]? replacement) in ready.InOrder)
@@ -930,6 +933,19 @@ internal static class UndoRecovery
             }
         }
         return recorded;
+    }
+
+    /// <summary>The ops of a step to put back: each one whose place, by the name <see cref="FileStates"/> judged it under, took effect.</summary>
+    internal static List<UndoOp> OpsToPutBack(UndoStep step, IReadOnlyCollection<string> endPaths) =>
+        step.Ops.Where(op => op.Kind != UndoOp.Recompute && endPaths.Contains(op.PlaceName)).ToList();
+
+    /// <summary>Each op of a step judged once by <paramref name="judge"/>, by its index.</summary>
+    internal static UndoOpState?[] JudgedTogether(IReadOnlyList<UndoOp> ops, IReadOnlyList<UndoHandover> handovers,
+                                                  Func<int, UndoHandedOverSides, UndoOpState?> judge)
+    {
+        var states = new UndoOpState?[ops.Count];
+        for (int index = 0; index < ops.Count; index++) states[index] = judge(index, default);
+        return states;
     }
 
     private sealed record SettleAnswer(UndoRecoveryResult? Result, bool TryAgain, bool Stopped, UndoRefusal? Why = null)
@@ -1164,7 +1180,7 @@ internal static class UndoRecovery
         {
             if (live && endPaths.Count > 0)
             {
-                var opsToPutBack = step.Ops.Where(op => op.Kind != UndoOp.Recompute && endPaths.Contains(op.PlaceName)).ToList();
+                List<UndoOp> opsToPutBack = OpsToPutBack(step, endPaths);
                 UndoCheck.PlanResult plan;
                 // Content the list no longer holds is taken from the step's own
                 // kept original beside the page when its hash is the one
@@ -1353,3 +1369,11 @@ internal static class UndoRecovery
         }
     }
 }
+
+/// <summary>
+/// How one op of a handed-over pair is judged (#899 W8b-21a3, the mac's
+/// U4b3 door-3): a move with its <c>from</c> side free (its filler stands
+/// on its after side there), or its <c>to</c> side free (its leaver still
+/// stands on its before side there); a file op with its page read as absent.
+/// </summary>
+internal readonly record struct UndoHandedOverSides(bool FromIsFree, bool ToIsFree, bool IsAbsent);
