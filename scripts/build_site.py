@@ -4546,28 +4546,17 @@ def _yaml_text_for_date(value) -> str | None:
     return None
 
 
-def _reaches_the_page_through_a_link(source: Path) -> bool:
+def _has_a_second_name(source: Path) -> bool:
     """
-    Whether the teacher's page is a link to a file kept somewhere else — the
-    page itself, or a folder between it and the course folder — or one of two
-    names for the same file. Writing through it would change a file outside
-    this course, or one a second course shares, and two courses sharing one
-    page would overwrite each other's date on alternate builds (measured on
-    2026-09-25: a file outside the course was rewritten).
+    Whether the teacher's page is one of two names for the same file (a hard
+    link). Such a page is never written, since the safe write's rename would
+    part the two names (released, #275; question 3 of #1055 is open). A page
+    that is a symbolic link, or sits under a folder that is one, is not this:
+    it is written through the link (Russell's ruling of 2026-11-27, #1055).
     """
-    course_folders = _vault_course_folder[:1]
     try:
-        if source.is_symlink():
-            return True
         if source.stat().st_nlink > 1:
             return True
-        if course_folders:
-            course_folder = course_folders[0]
-            folder = source.parent
-            while folder != course_folder and course_folder in folder.parents:
-                if folder.is_symlink():
-                    return True
-                folder = folder.parent
     except OSError:
         return True
     return False
@@ -4681,11 +4670,18 @@ def _replace_the_page_safely(source: Path, original: str, rewritten: str,
     one; an Obsidian save that lands after the page was read is kept, and the
     next build tries again. Used by the date pass (#275, #276) and by the
     front page's title repair (#584), whose hidden file ends `suffix`.
+
+    A page that is a symbolic link, or sits under a folder that is one, is
+    written through the link (Russell's ruling of 2026-11-27, #1055: "Truly
+    write through"): the hidden file is made beside the file the link leads
+    to and renamed over THAT file, so the link stays a link with the same
+    target. The course dating lock is still found from the page's own place.
     """
-    folder = source.parent
+    page_itself = Path(os.path.realpath(source))
+    folder = page_itself.parent
     try:
         handle_number, temporary_name = tempfile.mkstemp(
-            dir=folder, prefix=f".{source.name}.", suffix=suffix)
+            dir=folder, prefix=f".{page_itself.name}.", suffix=suffix)
     except OSError:
         return False
     temporary = Path(temporary_name)
@@ -4694,16 +4690,16 @@ def _replace_the_page_safely(source: Path, original: str, rewritten: str,
             handle.write(rewritten)
             handle.flush()
             os.fsync(handle.fileno())
-        shutil.copymode(source, temporary)
+        shutil.copymode(page_itself, temporary)
         # The last look and the rename are one step for the whole course
         # (#835 F3): another section's build dating the same page waits here.
         with _HoldingTheCourseDatingLock(source):
-            with open(source, "r", encoding="utf-8", newline="") as handle:
+            with open(page_itself, "r", encoding="utf-8", newline="") as handle:
                 still_there = handle.read()
             if still_there != original:
                 temporary.unlink()
                 return False
-            os.replace(temporary, source)
+            os.replace(temporary, page_itself)
         return True
     except Exception:
         try:
@@ -4733,8 +4729,9 @@ def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
     write itself goes to a file beside the page and is renamed over it, after
     checking the page has not changed since it was read.
 
-    Returns "written", "linked" when the date is wrong but the page is a link
-    to a file kept elsewhere (never written through — the build names it),
+    Returns "written", "linked" when the date is wrong but the page is one of
+    two names for the same file, a hard link (never written — the build names
+    it; a symbolic link is written through, #1055),
     "locked" when the date is wrong but the page is locked or read-only (not
     written — the build names it), or None when nothing was written for any
     other reason.
@@ -4752,7 +4749,7 @@ def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
         return None
     if _date_for_this_section(before.metadata, section_number) == value:
         return None
-    if _reaches_the_page_through_a_link(source):
+    if _has_a_second_name(source):
         return "linked"
     if _is_locked(source):
         return "locked"
@@ -4944,7 +4941,7 @@ def _quote_the_front_page_title(section_index: Path, copy: Path, frozen_course: 
         return None
     if frozen_course:
         return "reference"
-    if _reaches_the_page_through_a_link(section_index):
+    if _has_a_second_name(section_index):
         return "linked"
     if _is_locked(section_index):
         return "locked"
@@ -5121,8 +5118,10 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
              "site_pages": pages whose date changed in the build's copy,
              "rewritten": the teacher's pages rewritten, by their place in the
                           course folder,
-             "left_linked": pages whose date is wrong but which are links to
-                          a file kept elsewhere, and so are never written}.
+             "left_linked": pages whose date is wrong but which are one of
+                          two names for the same file (a hard link), and so
+                          are never written; a symbolic link is written
+                          through, #1055}.
     """
     all_pages, pages_by_stem, pages_by_rel = _read_pages_for_linking(content_root)
 
