@@ -71,9 +71,11 @@ internal sealed class UndoStepLeftPartWayException(UndoRefusal refusal, IReadOnl
 /// changed by hand closed it and cleared the list. Nothing is written over
 /// what the file holds, nothing is offered, and a caller never tries it
 /// again (it is not a <see cref="UndoStepRefusedException"/>). Its message
-/// names no file.
+/// names no file: the mac's <c>notMade</c> description, "The file couldn’t be
+/// saved." (<see cref="Plantoir.Core.Models.SettingPutBack.NamingNoFile"/>), which a caller's
+/// sentence carries as its <c>{said}</c> (review 1 of W8c-1, LOW 1).
 /// </summary>
-internal sealed class UndoStepNotMadeException() : IOException("the change was not made");
+internal sealed class UndoStepNotMadeException() : IOException(Plantoir.Core.Models.SettingPutBack.NamingNoFile);
 
 /// <summary>
 /// A one-file settings step stopped part way that the door could not judge

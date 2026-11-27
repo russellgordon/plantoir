@@ -96,9 +96,14 @@ public static class SettingPutBack
     public static string OfferedLine(string setting, string course) =>
         "the " + setting + " for " + course + " could not be changed — stopped part way, offered to put back";
 
-    /// <summary>The trail's line for Not Now (<c>SettingStopTrail.notNow</c>).</summary>
+    /// <summary>
+    /// The trail's line for Not Now (<c>SettingStopTrail.notNow</c>). Windows
+    /// says "the next change or the next launch": the next change's hold
+    /// settles the step by content in this session, where the mac waits for
+    /// the next launch (review 1 of W8c-1, LOW 2).
+    /// </summary>
     public static string NotNowLine(string setting, string course) =>
-        "the " + setting + " for " + course + " was left as it stopped (Not Now): the next launch settles it";
+        "the " + setting + " for " + course + " was left as it stopped (Not Now): the next change or the next launch settles it";
 
     /// <summary>The trail's line for Put It Back (<c>SettingStopTrail.putItBack</c>).</summary>
     public static string PutItBackLine(string setting, string course, bool putBack) =>
@@ -107,8 +112,9 @@ public static class SettingPutBack
             : "the " + setting + " for " + course + " could not be put back either (Put It Back): left for the next launch";
 
     /// <summary>
-    /// Acts on the answer. Not Now leaves the step for the next launch's
-    /// recovery and its line. Put It Back writes the old value back through
+    /// Acts on the answer. Not Now leaves the step for the next change's or
+    /// the next launch's recovery, and its line. A step settled as made
+    /// meanwhile is said as saved: nothing. Put It Back writes the old value back through
     /// the door (<see cref="UndoDoor.PutBackAtOnce"/>), has the caller read the
     /// settings from the file again, and leaves its line; null when put back,
     /// else <paramref name="failedSentence"/>, the caller's own failure
@@ -124,8 +130,12 @@ public static class SettingPutBack
             return null;
         }
         UndoDoor theDoor = door ?? UndoForThisProcess.Current.Door();
-        bool putBack = theDoor.PutBackAtOnce(offer.Seq) == UndoPutBackVerdict.PutBack;
+        UndoPutBackVerdict verdict = theDoor.PutBackAtOnce(offer.Seq);
         try { readTheFileAgain(); } catch { }
+        // Settled as made meanwhile: the new value is saved, said as the new
+        // value's row says it, by nothing (review 1 of W8c-1, LOW 4).
+        if (verdict == UndoPutBackVerdict.WasMade) return null;
+        bool putBack = verdict == UndoPutBackVerdict.PutBack;
         ActivityTrail.Note(trailEvent, PutItBackLine(trailSetting, course, putBack));
         return putBack ? null : failedSentence;
     }

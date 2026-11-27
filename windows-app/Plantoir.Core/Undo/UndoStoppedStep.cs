@@ -44,6 +44,13 @@ internal enum UndoPutBackVerdict
 
     /// <summary>The old value could not be written, or the step could not be closed: nothing written over the file.</summary>
     CouldNotPutBack,
+
+    /// <summary>
+    /// The step was settled as made while the alert was open (a change's hold
+    /// ran recovery, review 1 of W8c-1, LOW 4): the new value is saved and on
+    /// the list, nothing is written, and nothing is said.
+    /// </summary>
+    WasMade,
 }
 
 /// <summary>
@@ -148,7 +155,8 @@ internal sealed partial class UndoDoor
     /// old value), recovery's rolled-back trail line left, and the staged
     /// leftovers tidied keeping only copies. A member at neither value, or
     /// unreadable, refuses and writes nothing. A step closed meanwhile is never
-    /// swapped: put back only when its file already holds every old value.
+    /// swapped: closed as made, it was made (<see cref="UndoPutBackVerdict.WasMade"/>);
+    /// otherwise put back only when its file already holds every old value.
     /// Never in shadow, which never writes into a working folder.
     /// </summary>
     internal UndoPutBackVerdict PutBackAtOnce(long seq)
@@ -172,6 +180,8 @@ internal sealed partial class UndoDoor
         UndoOpState StateNow(UndoOp edit) => UndoCheck.StateOf(edit, UndoCurrent.Read(FullPath(root, edit.Path!)));
         if (!record.IsInFlight)
         {
+            // Closed as made meanwhile: re-judged, as JudgeAtOnce says a closed step.
+            if (record.State == UndoStepState.Done) return UndoPutBackVerdict.WasMade;
             foreach (UndoOp op in step.Ops)
             {
                 if (op.Kind == UndoOp.EditJson && StateNow(op) != UndoOpState.Before) return UndoPutBackVerdict.CouldNotPutBack;
