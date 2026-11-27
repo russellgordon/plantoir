@@ -37,6 +37,7 @@ public sealed class UndoRelinkTests : IDisposable
     {
         try { Directory.Delete(_root, recursive: true); } catch { }
         try { Directory.Delete(_outside, recursive: true); } catch { }
+        try { Directory.Delete(ListFolder, recursive: true); } catch { }
     }
 
     private sealed record LaidRelink(UndoOp Op, string OldText, string NewText);
@@ -989,5 +990,333 @@ public sealed class UndoRelinkTests : IDisposable
         Assert.Equal(laid.OldText, LinkText(Day(4)));
         Assert.False(StandsAnything(Day(5)));
         Assert.Empty(StagedLeft());
+    }
+
+    // ---- Recorded by UndoActionStep (21b5; the mac's U4b3 relink-4, JournaledStepTests) ----
+
+    private readonly List<UndoTrailLine> _trail = [];
+
+    /// <summary>The list a recorded step goes to: beside the root, never inside the working folder, never outside's.</summary>
+    private string ListFolder => _root.TrimEnd(Path.DirectorySeparatorChar) + "-list";
+
+    /// <summary>The root as a working folder: its launcher and the course's settings, so a step can be named in it.</summary>
+    private void AWorkingFolder()
+    {
+        File.WriteAllText(Path.Combine(_root, Plantoir.Core.Models.Workspace.MarkerLauncher), "");
+        WritePage("courses/TST1O/course_config.json", "{\"course_code\":\"TST1O\"}");
+    }
+
+    private UndoForThisProcess StepList() => new(ListFolder, UndoMode.Shadow, _trail.Add);
+
+    private UndoActionStep StepIn(UndoForThisProcess list, string? workingFolder, UndoSeams? seams = null) =>
+        new(new UndoStepMaker("sheet", "insertClass"), workingFolder, "TST1O", 1, undo: list, plainSeams: seams);
+
+    /// <summary>What the working folder holds but the list's own files under courses/.internal: a link by its text, a file by its bytes.</summary>
+    private string CourseNow()
+    {
+        var said = new StringBuilder();
+        foreach (string entry in Directory.EnumerateFileSystemEntries(_root, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+        {
+            string relative = Path.GetRelativePath(_root, entry).Replace('\\', '/');
+            if (UndoOp.PartInside("courses/.internal", relative) is not null) continue;
+            said.Append(relative).Append(' ');
+            said.Append(UndoLinks.Look(entry) switch
+            {
+                UndoLinks.What.Link => "link " + new FileInfo(entry).LinkTarget,
+                UndoLinks.What.File => "file " + Convert.ToHexString(File.ReadAllBytes(entry)),
+                UndoLinks.What.Folder => "folder",
+                UndoLinks.What what => what.ToString(),
+            }).Append('\n');
+        }
+        return said.ToString();
+    }
+
+    /// <summary>Each step's ops, oldest first, as the list's begins hold them.</summary>
+    private List<JsonArray> StepsOnTheList()
+    {
+        var steps = new List<JsonArray>();
+        if (!Directory.Exists(ListFolder)) return steps;
+        foreach (string segment in Directory.EnumerateFiles(ListFolder, "journal-*.jsonl").Order(StringComparer.Ordinal))
+        {
+            foreach (string line in File.ReadAllLines(segment))
+            {
+                if (JsonNode.Parse(line) is JsonObject read && (string?)read["event"] == "begin") steps.Add(read["step"]!["ops"]!.AsArray());
+            }
+        }
+        return steps;
+    }
+
+    private static List<UndoOp> ReadOpsOf(JsonArray ops)
+    {
+        var read = new List<UndoOp>();
+        foreach (JsonNode? op in ops) read.Add(UndoLineOps.Read(op!.AsObject()));
+        return read;
+    }
+
+    /// <summary>Undo, then Redo, through the list: each gives the course exactly as it was on that side.</summary>
+    private void UndoAndRedoExactly(UndoForThisProcess list, string before, string after)
+    {
+        Assert.Equal(UndoOutcomeKind.Undone, list.Door().Undo().Kind);
+        Assert.Equal(before, CourseNow());
+        Assert.Equal(UndoOutcomeKind.Redone, list.Door().Redo().Kind);
+        Assert.Equal(after, CourseNow());
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>
+    /// A relink alone (the mac's testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone):
+    /// one op holding both texts' shas and no linkSha, both texts in the list
+    /// by name byte for byte, the new link holding exactly the new text and
+    /// nothing at the old; Undo and Redo exact; nothing outside touched.
+    /// </summary>
+    [SymbolicLinkTheory]
+    [InlineData("inside")]
+    [InlineData("outToAFile")]
+    [InlineData("outToNothing")]
+    public void ARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone(string leads)
+    {
+        LaidRelink laid = LayARelink(leads);
+        AWorkingFolder();
+        string before = CourseNow();
+        string outside = OutsideNow();
+        UndoForThisProcess list = StepList();
+        UndoActionStep step = StepIn(list, _root);
+
+        Assert.Equal(UndoRelinkPlanned.Relinked, step.RelinkLink(Full(Day(4)), Full(Day(5)), laid.NewText));
+        step.Make();
+
+        JsonObject op = Assert.Single(Assert.Single(StepsOnTheList()))!.AsObject();
+        string oldSha = UndoCheck.Sha(Bytes(laid.OldText));
+        string newSha = UndoCheck.Sha(Bytes(laid.NewText));
+        Assert.Equal("move", (string?)op["kind"]);
+        Assert.Equal(Day(4), (string?)op["from"]);
+        Assert.Equal(Day(5), (string?)op["to"]);
+        Assert.Equal(oldSha, (string?)op["linkShaBefore"]);
+        Assert.Equal(newSha, (string?)op["linkShaAfter"]);
+        Assert.Null(op["linkSha"]);
+        Assert.Equal([oldSha, newSha], op["blobs"]!.AsArray().Select(name => (string?)name));
+        Assert.Equal(Bytes(laid.OldText), list.Journal.Blob(oldSha));
+        Assert.Equal(Bytes(laid.NewText), list.Journal.Blob(newSha));
+        Assert.Equal(laid.NewText, LinkText(Day(5)));
+        Assert.False(StandsAnything(Day(4)));
+        Assert.Empty(_trail);
+        string after = CourseNow();
+
+        UndoAndRedoExactly(list, before, after);
+        Assert.Equal(outside, OutsideNow());
+        CheckTheOutsideBytes(leads);
+    }
+
+    /// <summary>Insert Class's own shape: Day 4's link relinked to Day 5, Day 3's page written at Day 4 and removed, a new Day 3.</summary>
+    private void PlanInsertClassBeforeDay3(UndoActionStep step, UndoRelinkPlanned answered)
+    {
+        Assert.Equal(answered, step.RelinkLink(Full(Day(4)), Full(Day(5)), "Unit 1, Day 4.md"));
+        Assert.False(step.Exists(Full(Day(4))), "the place the relink leaves reads as free");
+        step.Write(Full(Day(4)), "Three, retitled.\n");
+        step.Remove(Full(Day(3)));
+        step.Write(Full(Day(3)), "New.\n");
+    }
+
+    /// <summary>Insert Class's own shape (the mac's testARelinkWhoseOldPlaceIsFilledInTheSameStepIsOneStep): one step, one handover, Undo and Redo exact.</summary>
+    [SymbolicLinkFact]
+    public void ARelinkWhoseOldPlaceIsFilledInTheSameStepIsOneStep()
+    {
+        WritePage(Day(3), "Three.\n");
+        LayLink(Day(4), "Unit 1, Day 3.md");
+        AWorkingFolder();
+        string before = CourseNow();
+        UndoForThisProcess list = StepList();
+        UndoActionStep step = StepIn(list, _root);
+
+        PlanInsertClassBeforeDay3(step, UndoRelinkPlanned.Relinked);
+        step.Make();
+
+        List<UndoOp> ops = ReadOpsOf(Assert.Single(StepsOnTheList()));
+        UndoHandover handover = Assert.Single(UndoOp.Handovers(ops));
+        Assert.True(UndoStep.WholeOpsStandAlone(ops));
+        Assert.Equal("Unit 1, Day 4.md", LinkText(Day(5)));
+        Assert.Equal(UndoLinks.What.File, UndoLinks.Look(Full(Day(4))));
+        Assert.Equal("Three, retitled.\n", File.ReadAllText(Full(Day(4))));
+        Assert.Equal("New.\n", File.ReadAllText(Full(Day(3))));
+        Assert.Empty(_trail);
+
+        Assert.Equal(Day(4), handover.Place);
+        UndoAndRedoExactly(list, before, CourseNow());
+    }
+
+    /// <summary>Two relinks in a row, Day 3 to Day 4 planned before Day 4 to Day 5, each with its own new text (the mac's testTwoRelinksInARowAreOneStep): one step, exact both ways.</summary>
+    [SymbolicLinkFact]
+    public void TwoRelinksInARowAreOneStep()
+    {
+        LayLink(Day(3), "../../elsewhere/three.md");
+        LayLink(Day(4), "../../elsewhere/four.md");
+        AWorkingFolder();
+        string before = CourseNow();
+        UndoForThisProcess list = StepList();
+        UndoActionStep step = StepIn(list, _root);
+
+        Assert.Equal(UndoRelinkPlanned.Relinked, step.RelinkLink(Full(Day(3)), Full(Day(4)), "../../elsewhere/four.md"));
+        Assert.Equal(UndoRelinkPlanned.Relinked, step.RelinkLink(Full(Day(4)), Full(Day(5)), "../../elsewhere/five.md"));
+        step.Make();
+
+        List<UndoOp> ops = ReadOpsOf(Assert.Single(StepsOnTheList()));
+        Assert.Equal(2, ops.Count);
+        Assert.Single(UndoOp.Handovers(ops));
+        Assert.Equal("../../elsewhere/five.md", LinkText(Day(5)));
+        Assert.Equal("../../elsewhere/four.md", LinkText(Day(4)));
+        Assert.False(StandsAnything(Day(3)));
+
+        UndoAndRedoExactly(list, before, CourseNow());
+    }
+
+    /// <summary>
+    /// A write at a relink's new name would be a write through a link whose
+    /// text the step changes (the mac's testAWriteAtARelinksNewNameIsRefusedBeforeAnythingChanges):
+    /// by text, by the bytes it was planned from, or planned before the
+    /// relink, the step is refused cannotTellNow, the folder unchanged and
+    /// nothing on the list.
+    /// </summary>
+    [SymbolicLinkTheory]
+    [InlineData("byText")]
+    [InlineData("byReadBytes")]
+    [InlineData("beforeTheRelink")]
+    public void AWriteAtARelinksNewNameIsRefusedBeforeAnythingChanges(string planned)
+    {
+        string target = Path.Combine(_outside, "Unit 1, Day 3.md");
+        File.WriteAllText(target, "Outside three.\n");
+        LayLink(Day(4), target);
+        AWorkingFolder();
+        string before = CourseNow();
+        UndoForThisProcess list = StepList();
+        UndoActionStep step = StepIn(list, _root);
+        string newText = Path.Combine(_outside, "Unit 1, Day 4.md");
+
+        UndoStepRefusedException refused;
+        if (planned == "beforeTheRelink")
+        {
+            step.Write(Full(Day(5)), "Through.\n");
+            refused = Assert.Throws<UndoStepRefusedException>(() => step.RelinkLink(Full(Day(4)), Full(Day(5)), newText));
+        }
+        else
+        {
+            Assert.Equal(UndoRelinkPlanned.Relinked, step.RelinkLink(Full(Day(4)), Full(Day(5)), newText));
+            refused = planned == "byText"
+                ? Assert.Throws<UndoStepRefusedException>(() => step.Write(Full(Day(5)), "Through.\n"))
+                : Assert.Throws<UndoStepRefusedException>(() => step.WriteBytes(Full(Day(5)), Bytes("Through.\n"), File.ReadAllBytes(target)));
+        }
+
+        Assert.Equal(UndoRefusalKind.CannotTellNow, refused.Refusal.Kind);
+        Assert.Equal(before, CourseNow());
+        Assert.Equal("Outside three.\n", File.ReadAllText(target));
+        Assert.Empty(StepsOnTheList());
+    }
+
+    /// <summary>
+    /// The list refusing the relink's NEW text (its blob's folder a file, so
+    /// it cannot be made) with the switch off (the mac's
+    /// testARelinkWhoseNewTextTheListRefusesGoesAheadUnrecorded): one line
+    /// saying it went ahead, nothing on the list, and the relink made as the
+    /// door would have made it.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void ARelinkWhoseNewTextTheListRefusesGoesAheadUnrecorded()
+    {
+        const string oldText = "Unit 1, Day 3.md";
+        const string newText = "Unit 1, Day 4.md";
+        LayLink(Day(4), oldText);
+        AWorkingFolder();
+        UndoForThisProcess list = StepList();
+        string oldFolder = Path.GetDirectoryName(list.Journal.BlobPath(UndoCheck.Sha(Bytes(oldText))))!;
+        string newFolder = Path.GetDirectoryName(list.Journal.BlobPath(UndoCheck.Sha(Bytes(newText))))!;
+        Assert.NotEqual(oldFolder, newFolder);
+        Directory.CreateDirectory(Path.GetDirectoryName(newFolder)!);
+        File.WriteAllText(newFolder, "Not a folder.\n");
+        UndoActionStep step = StepIn(list, _root);
+
+        Assert.Equal(UndoRelinkPlanned.Relinked, step.RelinkLink(Full(Day(4)), Full(Day(5)), newText));
+        step.Make();
+
+        UndoTrailLine line = Assert.Single(_trail);
+        Assert.Equal(Plantoir.Core.Scripting.ActivityTrail.Event.UndoCouldNotRecordAStep, line.Event);
+        Assert.EndsWith("The change went ahead (the list is not in use yet).", line.Words);
+        Assert.Empty(StepsOnTheList());
+        Assert.Null(list.Journal.Blob(UndoCheck.Sha(Bytes(newText))));
+        Assert.Equal(newText, LinkText(Day(5)));
+        Assert.False(StandsAnything(Day(4)));
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>
+    /// Insert Class's own shape where this PC cannot make a link (the seam;
+    /// Russell's Q2, 21b1a): answered copied, the end tree 21b1a's (a plain
+    /// copy of the lesson at Day 5, the link set aside as itself), and Undo
+    /// puts the link back at Day 4 exactly.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void WhereNoLinkCanBeMadeTheLessonIsCopiedAndUndoPutsTheLinkBack()
+    {
+        WritePage(Day(3), "Three.\n");
+        LayLink(Day(4), "Unit 1, Day 3.md");
+        AWorkingFolder();
+        string before = CourseNow();
+        UndoForThisProcess list = StepList();
+        UndoActionStep step = StepIn(list, _root, new UndoSeams { CanMakeALinkAnswers = false });
+
+        PlanInsertClassBeforeDay3(step, UndoRelinkPlanned.Copied);
+        step.Make();
+
+        Assert.Equal([Path.GetFullPath(Full(Day(5)))], step.CopiedInsteadOfLinks);
+        Assert.Equal(UndoLinks.What.File, UndoLinks.Look(Full(Day(5))));
+        Assert.Equal("Three.\n", File.ReadAllText(Full(Day(5))));
+        Assert.Equal("Unit 1, Day 3.md", LinkText(Section + "/.Unit 1, Day 4.md.link-kept-by-undo"));
+        Assert.Equal("Three, retitled.\n", File.ReadAllText(Full(Day(4))));
+        Assert.Equal("New.\n", File.ReadAllText(Full(Day(3))));
+        string after = CourseNow();
+
+        Assert.Equal(UndoOutcomeKind.Undone, list.Door().Undo().Kind);
+        Assert.Equal(before, CourseNow());
+        Assert.Equal("Unit 1, Day 3.md", LinkText(Day(4)));
+        Assert.Equal(UndoOutcomeKind.Redone, list.Door().Redo().Kind);
+        Assert.Equal(after, CourseNow());
+    }
+
+    /// <summary>A place that is not a link, or none at all, plans nothing and says so; a text unchanged is the link's plain move.</summary>
+    [SymbolicLinkFact]
+    public void ARelinkOfNoLinkPlansNothingAndOfTheSameTextIsAPlainMove()
+    {
+        WritePage(Day(3), "Three.\n");
+        LayLink(Day(4), "Unit 1, Day 3.md");
+        AWorkingFolder();
+        UndoActionStep step = StepIn(StepList(), _root);
+
+        Assert.Equal(UndoRelinkPlanned.NotPlanned, step.RelinkLink(Full(Day(3)), Full(Day(6)), "Unit 1, Day 2.md"));
+        Assert.Equal(UndoRelinkPlanned.NotPlanned, step.RelinkLink(Full(Day(7)), Full(Day(8)), "Unit 1, Day 2.md"));
+        Assert.False(step.ChangesAnything);
+        Assert.Equal(UndoRelinkPlanned.Moved, step.RelinkLink(Full(Day(4)), Full(Day(5)), "Unit 1, Day 3.md"));
+        step.Make();
+
+        JsonObject op = Assert.Single(Assert.Single(StepsOnTheList()))!.AsObject();
+        Assert.Equal(UndoCheck.Sha(Bytes("Unit 1, Day 3.md")), (string?)op["linkSha"]);
+        Assert.Null(op["linkShaBefore"]);
+        Assert.Equal("Unit 1, Day 3.md", LinkText(Day(5)));
+    }
+
+    /// <summary>
+    /// The text a relink writes (the director's reading of 21b1's parked
+    /// point, one function, <see cref="UndoLinks.TextToWrite"/>): a text whose
+    /// last path part alone changes keeps the rest as stored, byte for byte,
+    /// forward slashes included; any other text Windows writes has
+    /// backslashes, so the system opens it.
+    /// </summary>
+    [Theory]
+    [InlineData("Unit 1, Day 3.md", "Unit 1, Day 4.md", "Unit 1, Day 4.md")]
+    [InlineData("../library/Day 3.md", "../library/Day 4.md", "../library/Day 4.md")]
+    [InlineData("../library/Day 3.md", "..\\library\\Day 4.md", "../library/Day 4.md")]
+    [InlineData("..\\library\\Day 3.md", "../library/Day 4.md", "..\\library\\Day 4.md")]
+    [InlineData("../library/Day 3.md", "../shared/Day 4.md", "..\\shared\\Day 4.md")]
+    [InlineData("Unit 1, Day 3.md", "../library/Day 4.md", "..\\library\\Day 4.md")]
+    public void ALinkTextIsKeptAsStoredWhenOnlyItsLastPartChanges(string textNow, string wanted, string written)
+    {
+        Assert.Equal(written, UndoLinks.TextToWrite(textNow, wanted));
     }
 }

@@ -31,6 +31,14 @@ internal sealed record UndoMemberChange(IReadOnlyList<string> KeyPath, UndoJson?
 }
 
 /// <summary>
+/// What <see cref="UndoActionStep.RelinkLink"/> planned (#899 W8b-21b5): the
+/// link moved with a new text, moved as itself (the text unchanged), a copy of
+/// its lesson where this PC cannot make a link (Russell's Q2, 21b1a), or
+/// nothing (no link there, or its text cannot be read now).
+/// </summary>
+internal enum UndoRelinkPlanned { Relinked, Moved, Copied, NotPlanned }
+
+/// <summary>
 /// A daily action's step that the door refused (#899 W7a; the mac's
 /// <c>JournaledStepError.refused</c>): NOTHING of it was written. An
 /// <see cref="IOException"/>, so a caller that said "Nothing was changed: …"
@@ -363,6 +371,8 @@ internal sealed class UndoActionStep
         }
         _folderMoves.Add((from, to, null, linkSha));
     }
+
+    internal UndoRelinkPlanned RelinkLink(string fromFull, string toFull, string textAfter) => throw new NotImplementedException();
 
     /// <summary>
     /// The full path of each copy <see cref="CopyTheLessonInsteadOfALink"/>

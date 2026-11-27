@@ -713,6 +713,8 @@ internal static class UndoLinks
     /// <param name="seams">A test's answer (<see cref="UndoSeams.CanMakeALinkAnswers"/>) in place of the probe.</param>
     internal static bool CanMakeALink(UndoSeams? seams = null) => seams?.CanMakeALinkAnswers ?? ThisProcessCanMakeALink.Value;
 
+    internal static string TextToWrite(string textNow, string wanted) => throw new NotImplementedException();
+
     /// <summary>
     /// Makes a file's symbolic link under a dot name in <paramref name="folder"/>,
     /// to a dot name beside it that is never made, then removes it: true only
