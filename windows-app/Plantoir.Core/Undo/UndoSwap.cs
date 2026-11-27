@@ -1442,9 +1442,15 @@ internal static class UndoSwap
     /// place holds a file with the same bytes (the new content never went in,
     /// or it was put back). One that differs from its place, whose place is
     /// gone, or that cannot be read now, is kept (the mac's isACopyOfItsPlace).
+    /// Both sides are read as recovery judges a place
+    /// (<see cref="UndoCurrent.ReadWithoutFollowingALink"/>, the mac's lstat
+    /// <c>UndoItem.read</c>): a link at the place is never a copy, whatever it
+    /// leads to, so a kept original is never removed as a copy of a shared
+    /// file a link reaches (review 2 of window D, MEDIUM 1).
     /// </summary>
     internal static bool IsACopyOfItsPlace(string kept, string place) =>
-        UndoCurrent.Read(kept) is UndoCurrent.Bytes keptBytes && UndoCurrent.Read(place) is UndoCurrent.Bytes there
+        UndoCurrent.ReadWithoutFollowingALink(kept) is UndoCurrent.Bytes keptBytes
+        && UndoCurrent.ReadWithoutFollowingALink(place) is UndoCurrent.Bytes there
         && keptBytes.Content.AsSpan().SequenceEqual(there.Content);
 
     /// <summary>Whether a kept original's bytes hash to one of these.</summary>

@@ -207,6 +207,50 @@ public sealed class UndoKeptPageUnderAVisibleNameTests
         Assert.Equal(new List<string> { Path.GetFileName(keptFive) }, said[couldNot].Kept?.ToList());
     }
 
+    /// <summary>
+    /// Review 2 of window D, MEDIUM 1: a step removed Day 3's page and died;
+    /// then a link in Windows' own form (backslashes) was made at Day 3,
+    /// leading to a shared library file that holds the same bytes as the
+    /// kept original. A link at the place is never a copy (the mac's
+    /// <c>isACopyOfItsPlace</c> reads both sides by lstat, <c>UndoItem.read</c>),
+    /// so the tidy never removes the only kept original, and the page is kept
+    /// as <c>Unit 1, Day 3 (kept by Undo).md</c> with its line; the link and
+    /// the file it leads to are untouched. MUST FAIL with
+    /// <see cref="UndoSwap.IsACopyOfItsPlace"/> reading the place through the link.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void ALinkAtThePlaceLeadingToTheSameBytesIsNeverACopySoThePageIsKeptVisibly()
+    {
+        using var scribe = new UndoScribe();
+        const string LibraryPage = "courses/TST1O/library/Day 3.md";
+        scribe.WritePage("A", PagePath, Three);
+        scribe.WritePage("A", LibraryPage, Three);
+        long seq = AStepThatDied(scribe, scribe.OpsFor(PagePath, Three, null));
+        // As the step left it: Day 3's page under its kept name; then a link
+        // at Day 3 to the library file, which holds the same bytes.
+        string page = scribe.FullPath("A", PagePath);
+        string keptThree = UndoSwap.BesidePath(page, $"{seq}-apply", "orig");
+        File.Move(page, keptThree);
+        File.CreateSymbolicLink(page, "..\\library\\Day 3.md");
+        lock (scribe.TrailLines) scribe.TrailLines.Clear();
+
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(page));
+        Assert.False(UndoSwap.IsACopyOfItsPlace(keptThree, page), "a link at the place was called a copy");
+
+        UndoRecoveryRun run = scribe.Door().Recover();
+
+        Assert.False(run.StoppedByATest);
+        Assert.Equal(Three, scribe.Page("A", FirstVisible));
+        Assert.False(File.Exists(keptThree), "the removed page is still hidden");
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(page));
+        Assert.Equal("..\\library\\Day 3.md", new FileInfo(page).LinkTarget);
+        Assert.Equal(Three, scribe.Page("A", LibraryPage));
+        List<UndoTrailLine> said;
+        lock (scribe.TrailLines) said = scribe.TrailLines.ToList();
+        UndoTrailLine kept = Assert.Single(said, line => ActivityTrail.KeyFor(line.Event) == TheEvent);
+        Assert.Equal($"the undo list keeps the page {PagePath}, removed or moved away by a change that stopped, as {FirstVisible}, because something else now holds {PagePath}", kept.Words);
+    }
+
     /// <summary>One naming function: a folder's words after its whole name, a page's before its extension.</summary>
     [Fact]
     public void TheFolderAndThePageAreNamedByOneFunction()

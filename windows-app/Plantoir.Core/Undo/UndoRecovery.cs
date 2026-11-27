@@ -82,6 +82,11 @@ internal static class UndoTrail
     /// <c>foundAFolderSetAsideLine</c>). Written just before the rename, so it
     /// says what is being done.
     /// </summary>
+    internal static string FoundAFolderSetAsideWords(string place, string? keptAs, string changes) =>
+        keptAs is not null
+            ? $"the undo list keeps the folder {place}, set aside by a change that stopped, as {keptAs}, because something else now holds {place}"
+            : $"the undo list puts the folder {place} back in its place; it changed while a change that stopped had set it aside ({changes})";
+
     /// <summary>
     /// <c>the undo list keeps the page courses/ICS3U/section1/Unit 1, Day 3.md,
     /// removed or moved away by a change that stopped, as courses/ICS3U/section1/Unit 1,
@@ -91,11 +96,6 @@ internal static class UndoTrail
     /// </summary>
     internal static string KeptAPageWords(string place, string keptAs) =>
         $"the undo list keeps the page {place}, removed or moved away by a change that stopped, as {keptAs}, because something else now holds {place}";
-
-    internal static string FoundAFolderSetAsideWords(string place, string? keptAs, string changes) =>
-        keptAs is not null
-            ? $"the undo list keeps the folder {place}, set aside by a change that stopped, as {keptAs}, because something else now holds {place}"
-            : $"the undo list puts the folder {place} back in its place; it changed while a change that stopped had set it aside ({changes})";
 
     /// <summary><c>… , found 1 file changed by hand since, and cleared the list</c>.</summary>
     internal static string InterruptedWords(UndoPhase phase, int putBack, int inTheWay) =>
