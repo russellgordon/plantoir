@@ -1839,9 +1839,7 @@ public sealed partial class SidebarPane : UserControl
         if (Workspace.WorkspacePath is { } folder
             && CourseActivity.IsPreviewingOrPublishing(folder, item.CourseCode))
         {
-            await ShowError($"{item.CourseCode} is busy right now",
-                "Restoring replaces the course's folders and files, and a preview or deploy " +
-                "of this course is still using them. Try again when it finishes.");
+            await ShowError(CourseRestorer.BusyTitle(item.CourseCode), CourseRestorer.BusyMessage);
             return nothing;
         }
         // An assistant's hold, in its own words (#468): a Claude or Codex
@@ -1971,14 +1969,11 @@ public sealed partial class SidebarPane : UserControl
         try
         {
             // Even a restore has an undo: the current version is archived
-            // (and stays in place) before the backup's contents move in.
-            string? archivedFirst = null;
-            if (Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode) is { } current)
-                archivedFirst = CourseArchiver.ArchiveCourseWithoutRemoving(current, Workspace.CoursesDirectory());
-            CourseRestorer.RestoreBackup(item, Workspace.CoursesDirectory());
-            // Once it has happened, never for a refused one (step 0 of v2.0.0).
-            ActivityTrail.Note(ActivityTrail.Event.CourseRestoredFromABackup,
-                CourseRestorer.RestoredTrailLine(item, archivedFirst, Workspace.CoursesDirectory()));
+            // (and stays in place) before the backup's contents move in; the
+            // trail line once it has happened, never for a refused one (step
+            // 0 of v2.0.0). The one restore Get Ready's Restore Course runs too.
+            CourseRestorer.RestoreWholeCourse(item, Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode),
+                Workspace.CoursesDirectory());
             Workspace.Reload();
             Workspace.Selection = new SidebarSelection.CourseItem(item.CourseCode);
             _window.ApplyState();
@@ -2201,8 +2196,41 @@ public sealed partial class SidebarPane : UserControl
     {
         if (Workspace.WorkspacePath is not { } folder) return;
         string? said = await StartOfYearDialog.OfferAsync(folder, course, section, ShowDialogSafelyAsync,
-                                                          () => TheFolderMovedUnderThisConfirmation(folder));
+                                                          () => TheFolderMovedUnderThisConfirmation(folder),
+                                                          RestoreCourseAnswers(folder, course.Code));
         await SayAfterStartOfYear(said);
+    }
+
+    /// <summary>
+    /// What Get Ready's Restore Course needs of this window (#899 W8c-2b, the
+    /// mac's <c>StartOfYearPreparation.restoreCourse</c>): every running
+    /// preview of the course stopped in its window, each stop awaited; the
+    /// same <see cref="RestoreWholeCourse"/> Restore from Backup… runs; and
+    /// each stopped preview started again through its window.
+    /// </summary>
+    internal StartOfYearRestoreAnswers RestoreCourseAnswers(string folder, string courseCode)
+    {
+        List<PreviewLeases.Lease> PreviewsOfTheCourse() => PreviewLeases.Active
+            .Where(lease => WorkingFolder.IsTheSame(lease.FolderPath, folder)
+                            && string.Equals(lease.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        return new StartOfYearRestoreAnswers(
+            StopEveryPreviewOfTheCourse: async () =>
+            {
+                var stopped = new List<int>();
+                foreach (var lease in PreviewsOfTheCourse())
+                {
+                    if (App.WindowFor(lease.FolderPath) is not { } main) continue;
+                    await main.StopPreviewForAsync(lease.FolderPath, lease.CourseCode, lease.SectionNumber);
+                    stopped.Add(lease.SectionNumber);
+                }
+                return stopped;
+            },
+            RestoreWholeCourse: RestoreWholeCourse,
+            SectionsOfTheCourseNow: () => Workspace.Courses.FirstOrDefault(c => c.Code == courseCode)?.Configuration.SectionNumbers
+                                          ?? new List<int>(),
+            IsPreviewing: section => PreviewsOfTheCourse().Any(lease => lease.SectionNumber == section),
+            StartPreview: section => App.WindowFor(folder)?.ShowPreviewFor(courseCode, section));
     }
 
     /// <summary>"Undo Getting Ready for the Start of the Year…".</summary>

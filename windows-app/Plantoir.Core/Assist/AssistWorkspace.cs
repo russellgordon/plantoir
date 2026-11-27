@@ -5192,6 +5192,39 @@ public sealed partial class AssistWorkspace
     /// <summary>A test's seams for the door every step of this workspace goes through (a put-back that fails, a kill point); none in the app.</summary>
     internal UndoSeams? UndoSeams { get; init; }
 
+#if DEBUG
+    /// <summary>
+    /// A UI test's (#899 W8c-2b): every step of this workspace stops part way
+    /// as <c>startOfYear.stoppedPartWayCases</c>' first case's <c>door</c>
+    /// says, a real holder on the second file as it is swapped in and the
+    /// first file's put-back refused. The holder is let go as the put-back is
+    /// tried, so nothing stays held. Set only by the app's
+    /// <c>--start-of-year-stops-part-way-for-tests</c>, which exists only in a
+    /// Debug build: compiled out of a Release build, so no teacher reaches it.
+    /// </summary>
+    public bool StopsPartWayForUiTests
+    {
+        init
+        {
+            if (!value) return;
+            FileStream? holder = null;
+            UndoSeams = new UndoSeams
+            {
+                BeforeEachSwap = (index, fullPath) =>
+                {
+                    if (index == 1) holder ??= new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                },
+                PutBackFailsAt = index =>
+                {
+                    holder?.Dispose();
+                    holder = null;
+                    return index == 0;
+                },
+            };
+        }
+    }
+#endif
+
     /// <summary>
     /// The step an action is planning through, or null (#899 W7a): while one
     /// is set, the planners (<see cref="PlanPublish"/>, <see cref="IndexChangeFor"/>,

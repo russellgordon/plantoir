@@ -68,6 +68,30 @@ public static class CourseRestorer
     /// refreshes on its own. Unpacked and verified BEFORE anything is
     /// touched, so an unreadable zip can never leave an emptied folder.
     /// </summary>
+    /// <summary>The whole-course restore's busy refusal: its title, while a preview or deploy of the course uses its folders.</summary>
+    public static string BusyTitle(string courseCode) => $"{courseCode} is busy right now";
+
+    /// <summary>The whole-course restore's busy refusal: what it says under <see cref="BusyTitle"/>.</summary>
+    public const string BusyMessage =
+        "Restoring replaces the course's folders and files, and a preview or deploy " +
+        "of this course is still using them. Try again when it finishes.";
+
+    /// <summary>
+    /// The whole-course restore Restore from Backup… and Get Ready's Restore
+    /// Course both run (#899 W8c-2b; never a second restore): the course as it
+    /// is now archived first and left in place, then <see cref="RestoreBackup"/>,
+    /// then the trail line, once it has happened. Throws as they do.
+    /// </summary>
+    public static void RestoreWholeCourse(BackupItem item, Course? current, string coursesDirectory)
+    {
+        string? archivedFirst = null;
+        if (current is not null)
+            archivedFirst = CourseArchiver.ArchiveCourseWithoutRemoving(current, coursesDirectory);
+        RestoreBackup(item, coursesDirectory);
+        ActivityTrail.Note(ActivityTrail.Event.CourseRestoredFromABackup,
+            RestoredTrailLine(item, archivedFirst, coursesDirectory));
+    }
+
     public static void RestoreBackup(BackupItem item, string coursesDirectory)
     {
         string destination = Path.Combine(coursesDirectory, item.CourseCode);

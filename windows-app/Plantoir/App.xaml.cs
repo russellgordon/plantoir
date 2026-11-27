@@ -194,6 +194,10 @@ public partial class App : Application
         testFeed = ArgumentAfter(Environment.GetCommandLineArgs(), args.Arguments ?? "", "--update-feed-for-tests");
         testKey = ArgumentAfter(Environment.GetCommandLineArgs(), args.Arguments ?? "", "--update-key-for-tests");
         testFirstLook = ArgumentAfter(Environment.GetCommandLineArgs(), args.Arguments ?? "", "--update-first-look-for-tests");
+        // #899 W8c-2b: Get Ready's Go stops part way, so a UI test can drive the restore offer.
+        if (Environment.GetCommandLineArgs().Contains("--start-of-year-stops-part-way-for-tests")
+            || (args.Arguments ?? "").Contains("--start-of-year-stops-part-way-for-tests", StringComparison.Ordinal))
+            Views.StartOfYearDialog.StopsPartWayForUiTests = true;
 #endif
         bool feedForTests = testFeed.Length > 0 && testKey.Length > 0;
         if (feedForTests) LogDiagnostic($"update feed for tests: {testFeed}");
