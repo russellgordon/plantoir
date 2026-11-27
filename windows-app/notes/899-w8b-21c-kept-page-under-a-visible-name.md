@@ -88,3 +88,41 @@ The first suspect was wrong: nothing deleted Day 3's hidden original, and no pag
 
 - Nothing parked; no `contracts/` or `mac-app/` change.
 - For W8b piece 22: the door's plan and the swap still read a page through a link (above).
+
+## Review 2 fixes
+
+Findings `vm-tools/briefs/2026-11-27-899-w8b-window-d-review-2.md` (of 84c7f53be..02bac1c34). Same branch, on db430aa41 (21a6 landed on top); `git merge origin/dev` up to date before proving and before handing back. Tests first 2bcd3e527; product bf5c5dab5.
+
+### MEDIUM 1 done: a link at the place is never a copy
+
+- `UndoSwap.IsACopyOfItsPlace` now reads BOTH sides with `UndoCurrent.ReadWithoutFollowingALink`, the one no-follow read recovery's `FileStates` already uses (21c2), so "a link at the place" is `NotAFile` and never a copy, as the mac's `isACopyOfItsPlace` (`UndoCheck.swift` 2113, `UndoItem.read`, lstat). No second copy check: every caller goes through this function.
+- Test `UndoKeptPageUnderAVisibleNameTests.ALinkAtThePlaceLeadingToTheSameBytesIsNeverACopySoThePageIsKeptVisibly`, the review's case: a step that removed Day 3 (`Three.`) died, its kept original beside the place; a Windows-form link (`..\library\Day 3.md`) is made at Day 3 to a library file holding `Three.`; live recovery keeps the page as `Unit 1, Day 3 (kept by Undo).md` with its one trail line, the hidden original gone (renamed, not removed), the link and the library file untouched. RED at the tests-first commit (run w8b-d-review-2-a, `Assert.False` "a link at the place was called a copy"), green after.
+- Callers whose verdict changes: `KeepPagesWhosePlaceIsTaken` and the `keepingOnlyCopies` tidy (`TidyLeftovers`, every recovery arm, the journal's and the door's) now keep a kept original beside a link. The U3c plain tidy, `TidyPlainLeftoversOfTheGone` (UndoSwap.cs about 1215), changes the same way: a gone process's `-orig` beside a target that is now a link is kept, not removed as a copy of the link's target. That matches the mac, whose plain tidy (`JournaledWrite.swift` 1540) calls the same lstat `isACopyOfItsPlace`; the mac's 2318 (the `keepingOnlyCopies` tidy) likewise. The direction is the safe one: a hidden file kept, never a page lost.
+- The door's plan and the swap still read a page through a link (21c2's split), for piece 22.
+
+### Lows
+
+- LOW 3 done: `KeptAPageWords`' summary moved onto its own method; `FoundAFolderSetAsideWords` has its own back.
+- LOW 4 done: must-fail row 2 (the `CannotLook` arm removed, so a place that cannot be looked at is taken as taken) turns `APlaceThatCannotBeReadLeavesThePageHiddenAndSilent` RED, so its "MUST FAIL" sentence stays and is now proved.
+- LOW 1 checked, no new test: 21a6 journals the FILE's path for a write at a link's new place, never the link's place. `UndoActionStepLinkTests.ALinkMovedOverARemovedPageHandsItsPlaceToANewPageInOneStepUndoneAndRedoneExactly` pins the op places as `[library/Day 2.md, Day 4, Day 3 -> Day 4, Day 3, Day 5]` (the date written lands at `library/Day 2.md`; Day 4's op is the plain page's removal before the link moves on), both link forms; 21a6's must-fail row 4 (the redirect removed) turns it RED. Piece 22's "one rule for reading a place" is for its brief (director).
+- LOW 2 (documentation 12) left to the director, as told.
+- LOW 5 left: the same on the mac (`renameToAVisibleName` says the line before the rename), no fix asked.
+
+### The one skipped test in the `~Undo` run
+
+`Plantoir.Tests.UndoWebsiteContractTests.ARecordFolderThatDeniesListingCannotTell` (`[DenyBitesFact]`): over SSH the PC's account carries an administrator's token, which passes over a deny ACE, so a folder that denies listing cannot be laid on the disk there; the attribute's probe sees that and skips by name. `Proposed_ARecordFolderThatCannotBeListedCannotTell` covers the same case through the listing seam. Confirmed from run w8b-21a6-a's `test.log` and again in this run (1 skipped).
+
+### Must-fail (`vm-tools/guest/899-w8b-window-d-review-2-mustfail.json`)
+
+1. `IsACopyOfItsPlace` reads the place with `UndoCurrent.Read` (through the link): RED, the new test ("a link at the place was called a copy").
+2. the `CannotLook` arm removed: RED, `APlaceThatCannotBeReadLeavesThePageHiddenAndSilent` (`Assert.False() Failure`).
+
+RED 2 of 2.
+
+### Run
+
+- w8b-d-review-2-a (PC, ref bf5c5dab5, red ref 2bcd3e527): red 1 of 9 (`UndoKeptPageUnderAVisibleNameTests`, the new test only); both builds 0 errors; **1471 of 1472 passed, 1 skipped** (`~Plantoir.Tests.Undo`, `NamedGapLedgerTests`, `ActivityTrailWiringTests`, `ContractTests.SharedRules_ActivityTrailEvents_Exist`); must-fail RED 2 of 2; restored 1471 of 1472; HEAD-AFTER same, status clean; lock released by the run that took it.
+
+### Self-check
+
+No `contracts/` or `mac-app/` change; no timed waits; one function per rule (`UndoCurrent.ReadWithoutFollowingALink` for reading a place without following a link, `UndoLinks.Look` for the link test); no held row or key changed; no run left going, no lock held.
