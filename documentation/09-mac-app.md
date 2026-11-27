@@ -23640,14 +23640,12 @@ only through a link OUTSIDE the working folder is re-pointed straight at the
 page's new name, the link outside untouched; a link reaching a class page the
 plan leaves is moved as itself, its text kept. Nothing is written through any
 of them, no title and no date (writing this class's date through the link is
-what gave Day 3 the wrong date in review B's probe). Two arrangements are the
-exception, refused before anything changes ("cannot tell now";
-`firstLinkThatCannotBeMoved`), refusals added in U4b3 until the door can
-change a link's text where it stands, which it cannot do yet: a link reaching
-a renamed page only through a link INSIDE the working folder that is not a
-class page of this section (Russell's
-ruling: that link is re-pointed where it stands), and a class the plan only
-re-dates whose link reaches a renamed page.
+what gave Day 3 the wrong date in review B's probe). Nothing is refused
+for where a link leads (mac-2): a link reaching a renamed page only through a
+link INSIDE the working folder that is not a class page of this section is
+renamed as itself and that in-between link is re-pointed where it stands
+(Russell's ruling), and a class the plan only re-dates whose link reaches a
+renamed page is re-pointed where it stands by the same rules.
 A later class whose link leads NOWHERE is never refused (Russell, 2026-11-26:
 "Why would it refuse? Why does it care where a later class links to?", then
 "Never refuse"; this reverses the review round's fix 3): the link is moved as
@@ -23861,8 +23859,8 @@ the four cases in "U4b3: linked-class-page-moves-its-link" above). It walks
 each later class that is a link once, on the disk as it stands, before
 anything is planned (`classPagePlaces`, `reachOfALinkedClass`), and the same
 answer decides the rename (relink, plain link move, or the page's own write
-and remove), the date (none for a link to a class page) and the one refusal
-left. The page below a re-pointed link fills the place the link leaves with a
+and remove), the date (none for a link to a class page) and, since mac-2, who is
+re-pointed where it stands (nothing is refused for where a link leads). The page below a re-pointed link fills the place the link leaves with a
 write and a removal, the shape relink-4 proved (a write at a relinked link's
 old name is a new file, never through the link). Six `stackCases` rows
 ("U4b3 relink-5, …", calls `makeRoomWithALaterClassLinkedToAClassItRenames`
@@ -23871,11 +23869,7 @@ and `makeRoomWithALaterClassLinkedToALinkedClass`, the call
 key `laterLinks`) replace the refusal row, held for Windows under
 `Reason899W8bLinkedClassPage`. Known limits, not built yet: an EARLIER class's
 link to a page Insert Class renames keeps its text and then leads to the page
-now at that name (ruled 2026-11-26: it will be re-pointed); the same-place
-relink of an in-between link (a link INSIDE the working folder that is not a
-class page, which a later class reaches through; ruling 6) needs a relink
-whose `from` and `to` are one place, which the door does not read yet, so the
-two arrangements refused above stay refused until then; two later classes
+now at that name (ruled 2026-11-26: it will be re-pointed; mac-3); two later classes
 linked to one shared lesson keep the last date written (ruled: it will keep
 the first class's date); a renamed page's rename that cannot be done (its new
 name taken) leaves a link re-pointed at that new name.
@@ -23954,6 +23948,27 @@ only the one-place test of a relink where the link stands compares bytes.
 rule by state. Known and left for mac-2: the two-place relink's pre-clean
 removes only the step's own links and leaves anything else under its staged
 name hidden (see the notes' "For mac-2").
+
+### mac-2: Insert Class re-points an in-between link where it stands
+
+`ClassInsertionPlanner.apply` no longer refuses for where a later class's link
+leads (`firstLinkThatCannotBeMoved` and its refusal block are gone). A renamed
+class reaching a renamed class page only through a link inside the working
+folder that is not a class page is moved as itself (`moveLink`, its text
+kept), and the in-between link is re-pointed where it stands
+(`rePointWhereItStands`: mac-1's `relinkLink(hop, to: hop, textAfter:)`, the
+hop's text with only its last path part replaced, planned once however many
+classes reach it; only the folders above the hop are tidied, as tidying a path
+holding `..` follows the link itself). A class the plan only re-dates (a
+numbered course) whose link reaches a renamed page is re-pointed where it
+stands after the rename loop: its own text, the hop inside, or its own link
+straight at the page's new place when the hop is outside. Riding: the
+two-place relink's pre-clean settles its staged name by the one rule (kept
+visible and said, never given back onto the relink's destination); after the
+exchange an item that cannot be settled is exchanged back unread, or, if that
+is refused too, the refusal names the hidden name; the async kill tables
+gather their faults and assert once. Contract rows for Windows are not added
+here (see the notes, "Left for the next piece").
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
