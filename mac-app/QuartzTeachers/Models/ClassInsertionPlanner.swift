@@ -367,7 +367,7 @@ enum ClassInsertionPlanner {
         var renamed: [String: String] = [:]
         // The in-between links inside the working folder already re-pointed
         // where they stand (mac-2): each once, however many classes reach it.
-        var hopsRePointed: [ResolvedFile] = []
+        var hopsRePointed: [HopEntry] = []
         for rename in plan.renames {
             // A later class that is a link leading to nothing is still a
             // class: its link is renamed as any other (Russell, 2026-11-26:
@@ -851,22 +851,24 @@ enum ClassInsertionPlanner {
     /// mac-2 (#899, ruling 6 of U4b3): re-points the in-between link at
     /// `hop` (inside the working folder, not a class page) where it stands,
     /// its own text with only the last path part replaced by `newPlace`'s
-    /// file name, planned once however many classes reach it (`done` holds
-    /// the hops already planned, each by its own `lstat` identity, as
-    /// `reachOfALinkedClass` judges every hop: two spellings of one link,
-    /// by letter case or through a linked folder, are one hop; review 1 of
-    /// mac-2, LOW 2). False when its text cannot be read now or the step
-    /// will not take the relink.
-    static func rePointWhereItStands(_ hopAsReached: URL, at newPlace: URL, in step: JournaledStep, done: inout [ResolvedFile]) -> Bool {
+    /// file name, planned once however many classes reach it. `done` holds
+    /// the hops already planned, each by the DIRECTORY ENTRY it is
+    /// (`HopEntry`: its folder's identity and its name as that folder holds
+    /// it), because the exchange re-points one entry: two spellings of one
+    /// entry, by letter case or through a linked folder, are one hop
+    /// (review 1 of mac-2, LOW 2), and two names of one hard-linked link are
+    /// two (review 2 of mac-2, LOW 1). False when its text cannot be read
+    /// now or the step will not take the relink.
+    static func rePointWhereItStands(_ hopAsReached: URL, at newPlace: URL, in step: JournaledStep, done: inout [HopEntry]) -> Bool {
         // Only the folders above are tidied (`..` taken out there): the
         // link itself is never followed, as tidying a whole path holding
         // `..` would follow it to the page it leads to.
         let hop: URL = hopAsReached.deletingLastPathComponent().standardizedFileURL
             .appendingPathComponent(hopAsReached.lastPathComponent)
-        guard let hopIdentity = ResolvedFile.ofThePlace(at: hop) else {
+        guard let entry = HopEntry.of(hop) else {
             return false
         }
-        if done.contains(hopIdentity) {
+        if done.contains(entry) {
             return true
         }
         guard let textAfter = textAfterTheMove(of: hop, reach: .aRenamedPageByItsOwnText(newName: newPlace.lastPathComponent)) else {
@@ -875,7 +877,7 @@ enum ClassInsertionPlanner {
         if !step.relinkLink(hop, to: hop, textAfter: textAfter) {
             return false
         }
-        done.append(hopIdentity)
+        done.append(entry)
         return true
     }
 
@@ -1538,6 +1540,54 @@ struct ClassPagePlace {
     let identity: ResolvedFile
 
     let newPlace: URL?
+}
+
+/// One directory entry, as the exchange that re-points a link sees it: the
+/// folder that holds it (by its identity, reached through any linked
+/// folder) and its name as that folder holds it (review 2 of mac-2, LOW 1).
+/// Two spellings of one entry (letter case, a linked folder) are one entry;
+/// two names of one hard-linked link are two.
+struct HopEntry: Equatable {
+
+    // MARK: - Stored properties
+
+    let folder: ResolvedFile
+
+    let name: String
+
+    // MARK: - Functions
+
+    /// The entry at `url` (the entry itself never followed), or nil when
+    /// nothing is there or its folder cannot be listed.
+    static func of(_ url: URL) -> HopEntry? {
+        guard let itself = ResolvedFile.ofThePlace(at: url) else {
+            return nil
+        }
+        let folderURL: URL = url.deletingLastPathComponent()
+        guard let folder = ResolvedFile.throughLinks(at: folderURL),
+              let names = try? FileManager.default.contentsOfDirectory(atPath: folderURL.path) else {
+            return nil
+        }
+        let asReached: String = url.lastPathComponent
+        // The name byte for byte, when the folder holds it so.
+        for name in names where name == asReached {
+            return HopEntry(folder: folder, name: name)
+        }
+        // Otherwise the entry of this item the name was another spelling
+        // of (letter case, Unicode form), as the volume matched it.
+        let folded: String = HopEntry.folded(asReached)
+        for name in names where HopEntry.folded(name) == folded {
+            if ResolvedFile.ofThePlace(at: folderURL.appendingPathComponent(name)) == itself {
+                return HopEntry(folder: folder, name: name)
+            }
+        }
+        return nil
+    }
+
+    /// A name with letter case and Unicode form set aside.
+    private static func folded(_ name: String) -> String {
+        return name.precomposedStringWithCanonicalMapping.lowercased()
+    }
 }
 
 /// A file by its device and inode: one file under every name and every

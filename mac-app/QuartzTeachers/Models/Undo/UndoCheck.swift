@@ -2062,7 +2062,8 @@ nonisolated enum UndoSwap {
             // it stands at its place again as the other program left it, and
             // the swap's own link, now under the staged name, goes by its
             // text. Only if that too is refused does the item stay there,
-            // and the refusal then names the hidden name.
+            // and the refusal then names the VISIBLE place (review 1 of
+            // mac-2, LOW 1); recovery's tidy moves it again by the one rule.
             if !backRefused && UndoSwap.linkHolds(place, newText) && UndoSwap.exchange(stagedURL, place) == 0 {
                 _ = UndoSwap.removeAStagedLink(stagedURL, holdingOneOf: [newText])
                 return .changedUnderTheSwap
@@ -2110,10 +2111,13 @@ nonisolated enum UndoSwap {
     /// exchange is refused, that link is taken out by its text and the item
     /// renamed back exclusively); otherwise it is kept under the first free
     /// visible name beside the place, `<name> (kept by Undo)`, told first
-    /// through `tellingFirst`. Nothing of the teacher's is deleted by name,
-    /// and nothing is left under the hidden name unless it cannot be read
-    /// or moved just now (`.cannotReadNow`, `.couldNotMove`, for a later
-    /// try). A rename back refused because the place filled meanwhile goes
+    /// through `tellingFirst`. Nothing of the teacher's is deleted by name.
+    /// Whose an item is is decided by `lstat` alone (review 2 of mac-2,
+    /// MEDIUM): a link goes by its text; anything else is the teacher's
+    /// unread, whether or not it can be read or listed. Nothing is left
+    /// under the hidden name unless it cannot be MOVED just now
+    /// (`.couldNotMove`), or a link's text or the place cannot be read
+    /// (`.cannotReadNow`), each for a later try. A rename back refused because the place filled meanwhile goes
     /// to the visible name. A caller whose place was never the item's
     /// (the two-place relink's pre-clean, mac-2) passes `givingBack` false:
     /// kept visible, never renamed onto the place. Review 3, MEDIUM: the caller hands over the
@@ -2131,11 +2135,25 @@ nonisolated enum UndoSwap {
     ) -> StagedNameSettled {
         let stagedIsALink: Bool = UndoSwap.isALink(stagedURL)
         if !stagedIsALink {
-            let there: UndoTreeReading = UndoTreeReading.read(at: stagedURL)
-            if there == .absent {
-                return .free
+            // Review 2 of mac-2, MEDIUM: whose it is is decided by `lstat`
+            // alone, never by its contents. The step stages only links, so
+            // anything there that is not a link is the teacher's, whatever
+            // it is and whether or not it can be read or listed: it is
+            // never read here, and never left "for a later try" because it
+            // cannot be read. Only a refused MOVE leaves it.
+            var information: stat = stat()
+            let found: Int32 = stagedURL.withUnsafeFileSystemRepresentation { path in
+                guard let path else {
+                    return -1
+                }
+                return lstat(path, &information)
             }
-            if there == .cannotRead {
+            if found != 0 {
+                if errno == ENOENT || errno == ENOTDIR {
+                    return .free
+                }
+                // The folder above cannot be searched just now: nothing can
+                // be known of the name, so a later try looks again.
                 return .cannotReadNow
             }
         } else {
