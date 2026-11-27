@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Models;
 
@@ -321,36 +322,56 @@ public static class SpecialFolderRenamer
     /// nothing. Since #580 (the mac's #506) the folder is not left empty: it
     /// gets the two pages a folder made with the course gets, its
     /// <c>index.md</c> and a <c>_DUPLICATE ME.md</c> (<see cref="FolderScaffold"/>),
-    /// written only into a folder this call has just made, never into one
-    /// already on disk and never over a file. <see cref="FolderScaffold.Outcome.FoldersCreated"/>
+    /// written only into a folder this call makes, never into one already on
+    /// disk. The folders and their pages are ONE step, all or none
+    /// (<see cref="FolderScaffold.PlanPages"/>). <see cref="FolderScaffold.Outcome.FoldersCreated"/>
     /// is 0 when nothing was made.
     /// </summary>
     /// <param name="template">The bundled template's text (<see cref="FolderScaffold.ReadTemplate"/>); null leaves it out.</param>
     /// <param name="curriculumPageNames">
-    /// Asked AFTER the folders are made, as the mac's <c>createFoldersOnDisk</c> reads
-    /// it: the file names at the top of the course's primary curriculum folder, or null.
+    /// Asked once the folders to make are known and before the step is planned, as
+    /// the mac's <c>createFoldersOnDisk</c> reads it since U4a (#899 W8-13): the file
+    /// names at the top of the course's primary curriculum folder, or null.
     /// </param>
     /// <param name="created">The <c>created</c> stamp, in the wizard's form; null is now.</param>
     public static FolderScaffold.Outcome CreateFoldersOnDisk(string name, FolderScope scope, string courseDirectory,
         IReadOnlyList<int> sectionNumbers, string? template = null, Func<IReadOnlyList<string>?>? curriculumPageNames = null,
         string? created = null)
+        => CreateFoldersOnDisk(name, scope, courseDirectory, sectionNumbers, template, curriculumPageNames, created, null, null);
+
+    /// <param name="undo">The list, mode and trail: this process's by default, a test's own in a test.</param>
+    /// <param name="door">A test's door over <paramref name="undo"/>; the list's own by default.</param>
+    internal static FolderScaffold.Outcome CreateFoldersOnDisk(string name, FolderScope scope, string courseDirectory,
+        IReadOnlyList<int> sectionNumbers, string? template, Func<IReadOnlyList<string>?>? curriculumPageNames,
+        string? created, UndoForThisProcess? undo, UndoDoor? door)
     {
+        // Re-adding a name whose folder is already there is the common case
+        // and is not worth a word.
         var newFolders = new List<string>();
         foreach (var (place, _) in FolderLocations(name, scope, courseDirectory, sectionNumbers))
         {
-            try
-            {
-                if (Directory.Exists(place) || File.Exists(place)) continue;
-                Directory.CreateDirectory(place);
-                newFolders.Add(place);
-            }
-            catch (Exception) { }
+            if (Directory.Exists(place) || File.Exists(place)) continue;
+            newFolders.Add(place);
         }
         if (newFolders.Count == 0) return new FolderScaffold.Outcome();
         var pages = FolderScaffold.Pages(name, scope, sectionNumbers, curriculumPageNames?.Invoke(),
             created ?? SectionAdder.Timestamp(DateTimeOffset.Now), template);
-        return FolderScaffold.WritePages(pages, newFolders, courseDirectory);
+        // ONE step (#899 W8-13; the mac's U4a): each folder made whole with
+        // its two pages, as one createTree, all of them or none. The folder
+        // list's own change is Save's, in Save's step. A failure makes
+        // nothing, and the outcome says no folder was made.
+        var step = new UndoActionStep(new UndoStepMaker("sheet", AddFolderActionKey),
+            HowITeachSettingsRow.WorkingFolderOf(courseDirectory),
+            Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(courseDirectory))),
+            section: null, holds: "course", undo: undo, door: door);
+        var outcome = FolderScaffold.PlanPages(pages, newFolders, courseDirectory, step);
+        try { step.Make(); }
+        catch (Exception) { return new FolderScaffold.Outcome(); }
+        return outcome;
     }
+
+    /// <summary><c>undo-action-steps.json</c> → <c>addFolder</c>'s action key.</summary>
+    internal const string AddFolderActionKey = "addFolder";
 
     // ---- The configuration keys a rename carries across -----------------------
 

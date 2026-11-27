@@ -1,5 +1,6 @@
 using Plantoir.Core.Assist;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Models;
 
@@ -73,10 +74,35 @@ public static class ReferenceCourseUpkeep
         if (before == startingYear) return null;
         if (ReferenceCourse.ShelfTrouble(shown, startingYear, ReferenceCourse.Shelf(allCourses, today), ignoringFolder: course.Code) is { } trouble)
             return trouble;
+        return WriteSchoolYear(course, startingYear, today);
+    }
+
+    /// <summary>
+    /// The sheet's write (the mac's <c>SetSchoolYearSheet.write</c>): ONE step
+    /// on the list (#899 W8-11, U4a), one <c>editJSON</c> on
+    /// <c>reference_school_year</c> in the course's <c>course_config.json</c>,
+    /// made by <c>sheet</c>, held by the course, all or none
+    /// (<see cref="CourseConfiguration.WriteMemberAsOneStep"/>). A choice that
+    /// changes nothing writes nothing, makes no step and leaves no line. A
+    /// write that did not go in answers
+    /// <see cref="ReferenceCourse.CouldNotSetSchoolYear"/>, this copy then
+    /// following the file.
+    /// </summary>
+    /// <param name="undo">The list, mode and trail: this process's by default, a test's own in a test.</param>
+    /// <param name="door">A test's door over <paramref name="undo"/>; the list's own by default.</param>
+    internal static string? WriteSchoolYear(Course course, int? startingYear, DateOnly today,
+                                            UndoForThisProcess? undo = null, UndoDoor? door = null)
+    {
+        string shown = ReferenceCourse.ShownCode(course);
+        int? before = SchoolYear.Read(course.Configuration.StoredReferenceSchoolYear, today);
+        string? workingFolder = HowITeachSettingsRow.WorkingFolderOf(course.DirectoryPath);
+        bool changed;
         try
         {
             course.Configuration.SetReferenceSchoolYear(startingYear);
-            course.Configuration.Write(course.ConfigFilePath);
+            changed = course.Configuration.WriteMemberAsOneStep(course.ConfigFilePath, "reference_school_year",
+                () => new UndoActionStep(new UndoStepMaker("sheet", "setSchoolYear"), workingFolder, course.Code,
+                                         section: null, holds: "course", undo: undo, door: door));
         }
         catch
         {
@@ -85,6 +111,7 @@ public static class ReferenceCourseUpkeep
             try { if (!course.Configuration.RevertToFile(course.ConfigFilePath)) course.Configuration.DiscardChanges(); } catch { }
             return ReferenceCourse.CouldNotSetSchoolYear(shown);
         }
+        if (!changed) return null;
         ActivityTrail.Note(ActivityTrail.Event.ReferenceCourseSchoolYearChanged,
             $"filed {shown} ({course.Code}) under {SchoolYear.Name(startingYear)} — it was {SchoolYear.Name(before)}");
         return null;

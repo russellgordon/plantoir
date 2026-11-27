@@ -107,7 +107,8 @@ public static class HowITeachSettingsRow
     }
 
     /// <summary>The folder holding <c>courses\</c> above a course's folder, or null when the course is not inside one.</summary>
-    private static string? WorkingFolderOf(string courseDirectory)
+    /// <summary>The working folder above a course folder (the folder holding <c>courses\</c>), or null when the course is not inside one.</summary>
+    internal static string? WorkingFolderOf(string courseDirectory)
     {
         string? coursesFolder = Path.GetDirectoryName(Path.GetFullPath(courseDirectory).TrimEnd(Path.DirectorySeparatorChar));
         if (coursesFolder is null || !string.Equals(Path.GetFileName(coursesFolder), "courses", StringComparison.OrdinalIgnoreCase))

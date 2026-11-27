@@ -241,19 +241,6 @@ public class FolderScaffoldContractTests : IDisposable
     }
 
     [Fact]
-    public void APageAlreadyThereIsNeverWrittenOver()
-    {
-        string dir = NewCourseDirectory();
-        string folder = Path.Combine(dir, "Labs");
-        Directory.CreateDirectory(folder);
-        File.WriteAllText(Path.Combine(folder, "index.md"), "mine");
-        var pages = FolderScaffold.Pages("Labs", FolderScope.Shared, new[] { 1 }, null, "now", Template());
-        var outcome = FolderScaffold.WritePages(pages, new[] { folder }, dir);
-        Assert.Equal(new FolderScaffold.Outcome(1, 0, 1), outcome);
-        Assert.Equal("mine", File.ReadAllText(Path.Combine(folder, "index.md")));
-    }
-
-    [Fact]
     public void WithNoExpectationPagesTheCurriculumConnectionGoes()
     {
         string dir = NewCourseDirectory();
@@ -283,18 +270,22 @@ public class FolderScaffoldContractTests : IDisposable
         Assert.StartsWith("---\ntitle: \"'Tis the Season\"\n", File.ReadAllText(Path.Combine(dir, "'Tis the Season", "index.md")));
     }
 
-    /// <summary>The curriculum folder is read after the folder is made, in the mac's order.</summary>
+    /// <summary>
+    /// The curriculum folder is read before the step that makes the folder is
+    /// planned, in the mac's order since U4a (#899 W8-13): the folder and its
+    /// pages are one step, so nothing is on disk until it is made.
+    /// </summary>
     [Fact]
-    public void TheCurriculumIsReadAfterTheFolderIsMade()
+    public void TheCurriculumIsReadBeforeTheFolderIsMade()
     {
         string dir = NewCourseDirectory();
-        bool existedWhenAsked = false;
+        bool existedWhenAsked = true;
         SpecialFolderRenamer.CreateFoldersOnDisk("Curriculum", FolderScope.Shared, dir, new[] { 1 }, Template(), () =>
         {
             existedWhenAsked = Directory.Exists(Path.Combine(dir, "Curriculum"));
             return FolderScaffold.TopLevelFileNames(dir, "Curriculum");
         });
-        Assert.True(existedWhenAsked);
+        Assert.False(existedWhenAsked);
         Assert.DoesNotContain("Curriculum connection", File.ReadAllText(Path.Combine(dir, "Curriculum", "_DUPLICATE ME.md")));
     }
 

@@ -18,8 +18,11 @@ namespace Plantoir.Tests;
 /// undo, redo, hand edits by <c>path</c> and notes as in the seeded traces;
 /// <c>afterUndoingAll</c> and <c>final</c> by path. The front page is
 /// re-derived as the app does (<see cref="UndoSectionFrontPage"/>: a course
-/// with no settings is left alone). A recorded step with <c>moves</c>,
-/// <c>members</c> or <c>trees</c> is held by name in the ledger.
+/// with no settings is left alone). A recorded step with <c>members</c> is
+/// made as its recorded <c>editJSON</c> ops (#899 W8-11); one with
+/// <c>trees</c> is made by its Windows action, each folder hashed by its
+/// listing (#899 W8-13); one with <c>moves</c> or <c>folderMoves</c> is held
+/// by name in the ledger.
 /// </summary>
 public sealed class UndoActionTraceContractTests
 {
@@ -66,7 +69,13 @@ public sealed class UndoActionTraceContractTests
         JsonElement trace = UndoContract.Traces.RootElement.GetProperty("actionTraces").EnumerateArray()
             .Single(candidate => candidate.GetProperty("name").GetString() == name);
         JsonElement recorded = RecordedStep(trace.GetProperty("step").GetString()!);
-        foreach (string unmade in new[] { "moves", "members", "trees" })
+        // A step with members is made as its recorded editJSON ops (#899
+        // W8-11). Rename folder's steps hold members AND folderMoves: the
+        // guard names folderMoves, so they still stop here rather than run
+        // with no folder move made.
+        // A step with trees (Add folder) is made by its Windows action since
+        // W8-13, each folder hashed by its listing.
+        foreach (string unmade in new[] { "moves", "folderMoves" })
         {
             if (recorded.TryGetProperty(unmade, out _))
                 Assert.Fail($"{name}: a step this replay does not make yet ({unmade})");
@@ -80,6 +89,12 @@ public sealed class UndoActionTraceContractTests
             string path = file.GetProperty("path").GetString()!;
             paths.Add(path);
             scribe.WritePage("A", path, Bytes(file.GetProperty("before")));
+        }
+        // Each folder a step makes is judged by its path, hashed by its
+        // listing, and absent before the action (#899 W8-13).
+        if (recorded.TryGetProperty("trees", out JsonElement trees))
+        {
+            foreach (JsonElement tree in trees.EnumerateArray()) paths.Add(tree.GetProperty("path").GetString()!);
         }
         // A converted step's action is the REAL Windows action on the mac's
         // fixture (#899 W7b1), so each trace judges what Windows wrote; the
@@ -124,7 +139,9 @@ public sealed class UndoActionTraceContractTests
                     }
                     else
                     {
-                        UndoOutcome outcome = Door().Perform(Draft(scribe, recorded));
+                        UndoOutcome outcome = recorded.TryGetProperty("members", out _)
+                            ? Door().Perform(MembersDraft(scribe, recorded))
+                            : Door().Perform(Draft(scribe, recorded));
                         made = (outcome.Word, outcome.Seq);
                     }
                     Assert.True(call.GetProperty("expect").GetString() == made.Word, $"{where}: came to {made.Word}");
@@ -148,6 +165,10 @@ public sealed class UndoActionTraceContractTests
                         recordedOrder.Add(file.GetProperty("path").GetString()!);
                     }
                     if (measured.OwnFile is { } ownPath) recordedOrder.Add(ownPath.Path);
+                    if (recorded.TryGetProperty("trees", out JsonElement madeTrees))
+                    {
+                        foreach (JsonElement tree in madeTrees.EnumerateArray()) recordedOrder.Add(tree.GetProperty("path").GetString()!);
+                    }
                     Assert.True(recordedOrder.SequenceEqual(LastBeginsFilePaths(scribe)),
                                 $"{where}: files in the order {string.Join(" | ", LastBeginsFilePaths(scribe))}");
                     break;
@@ -172,6 +193,12 @@ public sealed class UndoActionTraceContractTests
                 {
                     string path = call.GetProperty("path").GetString()!;
                     string kind = call.GetProperty("kind").GetString()!;
+                    if (kind == "deletePage" && Directory.Exists(scribe.FullPath("A", path)))
+                    {
+                        // A folder the step made, removed by hand (#899 W8-13).
+                        Directory.Delete(scribe.FullPath("A", path), recursive: true);
+                        break;
+                    }
                     if (scribe.Page("A", path) is null) break;
                     if (kind == "deletePage")
                     {
@@ -242,6 +269,55 @@ public sealed class UndoActionTraceContractTests
         };
     }
 
+    /// <summary>
+    /// A recorded step with <c>members</c> as its action hands it to the door
+    /// (#899 W8-11; the mac's <c>JournaledStep.makeAsOps</c>): each member as
+    /// the recorded <c>editJSON</c> op, its key path, before and after (no
+    /// before or after where the member was absent), in the recorded order,
+    /// then its recompute ops, through the door that takes every kind. Never
+    /// the file worked out by the door's line rule.
+    /// </summary>
+    private static UndoOpsDraft MembersDraft(UndoScribe scribe, JsonElement recorded)
+    {
+        var ops = new JsonArray();
+        foreach (JsonElement member in recorded.GetProperty("members").EnumerateArray())
+        {
+            var op = new JsonObject
+            {
+                ["kind"] = UndoOp.EditJson,
+                ["path"] = member.GetProperty("path").GetString(),
+                ["keyPath"] = JsonNode.Parse(member.GetProperty("keyPath").GetRawText()),
+            };
+            if (member.TryGetProperty("before", out JsonElement before)) op["before"] = JsonNode.Parse(before.GetRawText());
+            if (member.TryGetProperty("after", out JsonElement after)) op["after"] = JsonNode.Parse(after.GetRawText());
+            ops.Add(op);
+        }
+        foreach (JsonElement recompute in recorded.GetProperty("recomputes").EnumerateArray())
+        {
+            ops.Add(new JsonObject
+            {
+                ["kind"] = UndoOp.Recompute,
+                ["maintainer"] = recompute.GetProperty("maintainer").GetString(),
+                ["path"] = recompute.GetProperty("path").GetString(),
+                ["section"] = recompute.GetProperty("section").GetInt64(),
+            });
+        }
+        return new UndoOpsDraft
+        {
+            ActionKey = recorded.GetProperty("action").GetString()!,
+            ActionArguments = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["pageCount"] = recorded.GetProperty("files").GetArrayLength().ToString(System.Globalization.CultureInfo.InvariantCulture),
+            },
+            MadeBy = recorded.GetProperty("madeBy").GetString()!,
+            WorkingFolder = scribe.FullPath("A", ""),
+            Course = "ICS3U",
+            Class = "A",
+            Holds = "course",
+            Ops = ops,
+        };
+    }
+
     /// <summary>How the newest step on the list closed (its last line's event, <c>applied</c> when it went in) and its number; empty when the list holds no step.</summary>
     private static (string Word, long? Seq) NewestClosing(UndoScribe scribe)
     {
@@ -304,6 +380,12 @@ public sealed class UndoActionTraceContractTests
         var hashes = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (string path in paths)
         {
+            // A folder is hashed by its listing (undo-traces.json, U4b2-12).
+            if (Directory.Exists(scribe.FullPath("A", path)))
+            {
+                hashes[path] = UndoTreeReading.Read(scribe.FullPath("A", path)).ListingSha;
+                continue;
+            }
             byte[]? bytes = scribe.Page("A", path);
             hashes[path] = bytes is null ? null : UndoCheck.Sha(bytes);
         }
