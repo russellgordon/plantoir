@@ -613,7 +613,7 @@ internal sealed class UndoDoor
             // holds the same: the second review of U3c, MEDIUM).
             try
             {
-                UndoSwap.TidyLeftovers(record.Step, root, UndoRecovery.AsideListings(record.Step, root), null,
+                UndoSwap.TidyLeftovers(record.Step, root, _trail, UndoRecovery.AsideListings(record.Step, root), null,
                                        keepingOnlyCopies: true, keepingCopiesHolding: notTaken.KeptOriginalsHolding);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }

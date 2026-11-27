@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Plantoir.Core.Scripting;
 using Plantoir.Core.Undo;
 
 namespace Plantoir.Tests;
@@ -531,7 +532,7 @@ public sealed class UndoRelinkTests : IDisposable
         File.CreateSymbolicLink(staged, laid.NewText);
         Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(staged));
 
-        Assert.True(UndoSwap.TidyLeftovers(StepOf(laid.Op), _root));
+        Assert.True(UndoSwap.TidyLeftovers(StepOf(laid.Op), _root, null));
 
         Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
         Assert.Equal("Three.\n", File.ReadAllText(Full(Day(3))));
@@ -562,7 +563,7 @@ public sealed class UndoRelinkTests : IDisposable
         if (place == "taken") WritePage(Day(5), "Five.\n");
         var said = new List<string>();
 
-        UndoSwap.TidyLeftovers(step, _root, onKeptVisibly: (at, kept) => said.Add(Path.GetFileName(at) + " -> " + Path.GetFileName(kept)));
+        UndoSwap.TidyLeftovers(step, _root, line => said.Add(line.Event + ": " + line.Words));
 
         Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
         string visible = Full(Section + "/Unit 1, Day 5 (kept by Undo).md");
@@ -572,7 +573,9 @@ public sealed class UndoRelinkTests : IDisposable
         if (place == "taken")
         {
             Assert.Equal("Five.\n", File.ReadAllText(Full(Day(5))));
-            Assert.Equal(["Unit 1, Day 5.md -> Unit 1, Day 5 (kept by Undo).md"], said);
+            string line = Assert.Single(said);
+            Assert.StartsWith(ActivityTrail.Event.UndoKeptAPageUnderAVisibleName + ": the undo list keeps the page ", line);
+            Assert.Contains("Unit 1, Day 5 (kept by Undo).md, because something else now holds ", line);
         }
         Assert.Empty(StagedLeft());
     }
@@ -596,7 +599,7 @@ public sealed class UndoRelinkTests : IDisposable
         string staged = UndoSwap.BesidePath(Full(Day(5)), "1-apply", "new");
         File.WriteAllText(staged, "Someone's.\n");
 
-        UndoSwap.TidyLeftovers(StepOf(second, laid.Op), _root);
+        UndoSwap.TidyLeftovers(StepOf(second, laid.Op), _root, null);
 
         Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
         Assert.Equal("Someone's.\n", File.ReadAllText(Full(Day(5))));
@@ -618,7 +621,7 @@ public sealed class UndoRelinkTests : IDisposable
         File.WriteAllText(staged, "New.\n");
         var said = new List<string>();
 
-        UndoSwap.TidyLeftovers(StepOf(laid.Op, newPage), _root, onKeptVisibly: (at, kept) => said.Add(Path.GetFileName(kept)));
+        UndoSwap.TidyLeftovers(StepOf(laid.Op, newPage), _root, line => said.Add(line.Words));
 
         Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
         Assert.Empty(said);
@@ -655,7 +658,7 @@ public sealed class UndoRelinkTests : IDisposable
         if (place == "taken") WritePage(Day(5), "Five.\n");
         var said = new List<string>();
 
-        UndoSwap.TidyLeftovers(StepOf(pageMove, laid.Op), _root, onKeptVisibly: (at, kept) => said.Add(Path.GetFileName(kept)));
+        UndoSwap.TidyLeftovers(StepOf(pageMove, laid.Op), _root, line => said.Add(line.Event + ": " + line.Words));
 
         Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
         string keptName = item == "a page" ? "Unit 1, Day 5 (kept by Undo).md" : "Unit 1, Day 5.md (kept by Undo)";
@@ -665,7 +668,9 @@ public sealed class UndoRelinkTests : IDisposable
         if (place == "taken")
         {
             Assert.Equal("Five.\n", File.ReadAllText(Full(Day(5))));
-            Assert.Equal([keptName], said);
+            string line = Assert.Single(said);
+            Assert.StartsWith(ActivityTrail.Event.UndoKeptAPageUnderAVisibleName + ": ", line);
+            Assert.Contains(keptName + ", because something else now holds ", line);
         }
         else Assert.Empty(said);
         Assert.Empty(StagedLeft());

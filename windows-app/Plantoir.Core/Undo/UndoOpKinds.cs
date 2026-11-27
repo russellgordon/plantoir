@@ -699,6 +699,18 @@ internal static class UndoLinks
         return attributes.HasFlag(FileAttributes.Directory) ? What.Folder : What.File;
     }
 
+    /// <summary>
+    /// Whether the item at <paramref name="fullPath"/> is a link (<see cref="Look(string)"/>)
+    /// made as a folder's link, never followed (window E review 1, LOW 3): the
+    /// kind a link made in its place keeps.
+    /// </summary>
+    internal static bool IsAFolderLink(string fullPath)
+    {
+        if (Look(fullPath) != What.Link) return false;
+        try { return File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+    }
+
     private static readonly Lazy<bool> ThisProcessCanMakeALink = new(() => CanMakeALinkIn(UndoJournalLocation.Folder));
 
     /// <summary>
@@ -733,20 +745,40 @@ internal static class UndoLinks
         return wanted.Replace('/', '\\');
     }
 
+    /// <summary>The probe's own fixed name in the Undo list's folder (window E review 1, LOW 2).</summary>
+    internal const string ProbeName = ".can-make-a-link";
+
     /// <summary>
-    /// Makes a file's symbolic link under a dot name in <paramref name="folder"/>,
-    /// to a dot name beside it that is never made, then removes it: true only
-    /// when it was both made and removed.
+    /// Makes a file's symbolic link under the probe's fixed dot name
+    /// (<see cref="ProbeName"/>) in <paramref name="folder"/>, to a dot name
+    /// beside it that is never made, then removes it: true only when it was
+    /// both made and removed. A probe link a killed process left under that
+    /// name is removed first, as the link itself (window E review 1, LOW 2);
+    /// anything there that is not a link is left as it is. Where the fixed
+    /// name is taken (that item, or another process probing in the same
+    /// instant), the probe is made once more under a name of this process's
+    /// own.
     /// </summary>
     internal static bool CanMakeALinkIn(string folder)
     {
-        string probe = Path.Combine(folder, ".can-make-a-link-" + Environment.ProcessId + "-" + Guid.NewGuid().ToString("N"));
-        try
+        string fixedProbe = Path.Combine(folder, ProbeName);
+        if (Look(fixedProbe) == What.Link) UndoSwap.RemoveALink(fixedProbe);
+        string ownProbe = Path.Combine(folder, ProbeName + "-" + Environment.ProcessId + "-" + Guid.NewGuid().ToString("N"));
+        string probe = Look(fixedProbe) == What.Nothing ? fixedProbe : ownProbe;
+        while (true)
         {
-            Directory.CreateDirectory(folder);
-            File.CreateSymbolicLink(probe, ".can-make-a-link-target");
+            try
+            {
+                Directory.CreateDirectory(folder);
+                File.CreateSymbolicLink(probe, ".can-make-a-link-target");
+                break;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                if (probe == ownProbe || Look(fixedProbe) == What.Nothing) return false;
+                probe = ownProbe;
+            }
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
         try { File.Delete(probe); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
         return Look(probe) == What.Nothing;

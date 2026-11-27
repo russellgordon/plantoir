@@ -655,9 +655,8 @@ internal static class UndoRecovery
                 // Nothing will put a closed step's page back: a kept original
                 // that differs from its page is the only copy of what it held,
                 // and stays (the mac's U3c).
-                allGone = UndoSwap.TidyLeftovers(closedStep, root, AsideListings(closedStep, root),
-                                                 found => NoteAnAsideFolder(found, closedStep, root, journal, trail), keepingOnlyCopies: true,
-                                                 onKeptVisibly: KeptVisibly(closedStep, root, trail));
+                allGone = UndoSwap.TidyLeftovers(closedStep, root, trail, AsideListings(closedStep, root),
+                                                 found => NoteAnAsideFolder(found, closedStep, root, journal, trail), keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { allGone = false; }
             if (allGone && pagesNamed) journal.Memory.NoteTidied(key);
@@ -1248,7 +1247,7 @@ internal static class UndoRecovery
     /// kept a page under a visible name", naming the place and the visible
     /// name, written just before the rename.
     /// </summary>
-    private static Action<string, string>? KeptVisibly(UndoStep step, string root, Action<UndoTrailLine>? trail) =>
+    internal static Action<string, string>? KeptVisibly(UndoStep step, string root, Action<UndoTrailLine>? trail) =>
         trail is null
             ? null
             : (place, keptAs) => trail(new UndoTrailLine(ActivityTrail.Event.UndoKeptAPageUnderAVisibleName, step.Course, step.Section,
@@ -1442,9 +1441,8 @@ internal static class UndoRecovery
             // beside it, never deleted (W6).
             try
             {
-                UndoSwap.TidyLeftovers(step, root, AsideListings(step, root),
-                                       found => NoteAnAsideFolder(found, step, root, journal, trail), keepingOnlyCopies: true,
-                                       onKeptVisibly: KeptVisibly(step, root, trail));
+                UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root),
+                                       found => NoteAnAsideFolder(found, step, root, journal, trail), keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
             if (seams?.Stops("afterRecoveryTidied") == true) return SettleAnswer.Halted;
@@ -1584,7 +1582,7 @@ internal static class UndoRecovery
                         // change rolled back leaves the list.
                         try
                         {
-                            UndoSwap.TidyLeftovers(step, root, AsideListings(step, root), null,
+                            UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null,
                                                    keepingOnlyCopies: true, unlessTheListHolds: ListHolds(step, root, journal));
                         }
                         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
@@ -1626,7 +1624,7 @@ internal static class UndoRecovery
                         // Said after the tidy, so it names what is on the disk.
                         try
                         {
-                            UndoSwap.TidyLeftovers(step, root, AsideListings(step, root), null, keepingOnlyCopies: true);
+                            UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null, keepingOnlyCopies: true);
                         }
                         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
                         // A page the step removed or moved away whose place is now
@@ -1681,7 +1679,7 @@ internal static class UndoRecovery
             // page and named on the trail (the third review of U3a, LOW 1).
             try
             {
-                UndoSwap.TidyLeftovers(step, root, AsideListings(step, root), null, keepingOnlyCopies: true,
+                UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null, keepingOnlyCopies: true,
                                        unlessTheListHolds: ListHolds(step, root, journal), keepingCopiesHolding: keptNotTaken);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
@@ -1701,10 +1699,12 @@ internal static class UndoRecovery
             // until the switch flips. Nothing took effect, so every staged
             // file is the journal's own; a kept original that differs from
             // its page still stays (W7a, the harness's w7-publish-kill,
-            // shadow beforeSwap@0). Nothing on the trail, as shadow writes none.
+            // shadow beforeSwap@0). Nothing else on the trail, as shadow writes
+            // none; only a teacher's item kept under a visible name is said, as
+            // by every tidy (window E review 1, LOW 1).
             try
             {
-                UndoSwap.TidyLeftovers(step, root, AsideListings(step, root), null, keepingOnlyCopies: true);
+                UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null, keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
         }
