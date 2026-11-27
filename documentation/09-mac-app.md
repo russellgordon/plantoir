@@ -23833,6 +23833,27 @@ that side's text, so the op stands where its swap began and is then judged
 as any other; a plan never does this, since a link at the other name may be
 the teacher's (seven `recoveryCases` rows, key `withARelink`).
 
+The recovery rule as built (reviews D, E, F and G). Recovery removes at most
+ONE link for the whole step, and only when the folder reads as a point
+inside one relink's swap. The link moves of the step, plain ones (`linkSha`)
+included, are read in the work's swap order (index order going forward,
+reversed for an Undo). A relink passes when both of its links stand, each
+holding its own side's text, every link move before it holds its end text at
+its end side, and every link move after it holds its start text at its start
+side; of the relinks that pass, the last one's just-made link is removed, and
+none when none passes. A plain link move is a constraint only: its swap is
+one rename, so only a relink can be the one in flight. The journal writes no
+line inside a step, so the rule rests on the folder and the swap order, never
+on per-op progress. `UndoRelinkTests.testChainedLinkMovesKilledAtEveryStopPointLoseNoLink`
+runs two and three chained relinks and a plain link move chained to a relink
+either way round, at every stop point, going forward, Undo and Redo (101
+kills, none loses a link); with plain moves left out of the reading, 9 of the
+40 move-chained kills lose a link. Two `recoveryCases` rows (`chainedThree`,
+`thenAMove`) and the Python model pin it, held for Windows under
+`Reason899W8RelinkedLink`. Review G, by probes of five more shapes (145
+kills), found no counter-example. Standing gap, narrowed and not closed: a
+third party making an identical link at the other name during the downtime.
+
 ### U4b3 relink-5: Insert Class re-points a linked class
 
 Insert Class is the relinking move's first caller (`ClassInsertionPlanner.apply`,
@@ -23848,10 +23869,16 @@ old name is a new file, never through the link). Six `stackCases` rows
 and `makeRoomWithALaterClassLinkedToALinkedClass`, the call
 `makeRoomWithALaterClassLinkedToAnEarlierClass` turned round from a refusal,
 key `laterLinks`) replace the refusal row, held for Windows under
-`Reason899W8bLinkedClassPage`. Known limits, not built: an EARLIER class's
+`Reason899W8bLinkedClassPage`. Known limits, not built yet: an EARLIER class's
 link to a page Insert Class renames keeps its text and then leads to the page
-now at that name; a renamed page's rename that cannot be done (its new name
-taken) leaves a link re-pointed at that new name.
+now at that name (ruled 2026-11-26: it will be re-pointed); the same-place
+relink of an in-between link (a link INSIDE the working folder that is not a
+class page, which a later class reaches through; ruling 6) needs a relink
+whose `from` and `to` are one place, which the door does not read yet, so the
+two arrangements refused above stay refused until then; two later classes
+linked to one shared lesson keep the last date written (ruled: it will keep
+the first class's date); a renamed page's rename that cannot be done (its new
+name taken) leaves a link re-pointed at that new name.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

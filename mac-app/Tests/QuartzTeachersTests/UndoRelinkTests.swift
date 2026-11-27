@@ -474,7 +474,7 @@ final class UndoRelinkTests: XCTestCase {
     /// recovery every link of the step is exactly as before or exactly as
     /// after, nothing staged is left, and the step is settled on the side
     /// its links show. MUST FAIL with review D's rule (one look along the
-    /// chain) and with plain link moves left out of the reading (8 of the
+    /// chain) and with plain link moves left out of the reading (9 of the
     /// 40 move-chained kills).
     func testChainedLinkMovesKilledAtEveryStopPointLoseNoLink() async throws {
         var reached: Int = 0

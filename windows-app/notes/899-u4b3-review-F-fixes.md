@@ -5,7 +5,7 @@ Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from 57afa8408. `origi
 ## For PROGRESS
 
 - Review F's MEDIUM, for relinks: recovery of a killed step removes a relink's just-made link only when the folder reads as a point INSIDE that relink's swap. Two and three chained relinks killed at every stop point the door has, going forward, Undo and Redo, lose no link (61 kills, 0 lost; 20 of them lost a link at 57afa8408).
-- **Counter-example found, as the brief said to stop for:** a plain link move (`linkSha`) chained to a relink in one step still loses a link at 8 of its 40 kills under the rule as briefed. Details and a scratch-proven extension under "For the director". Not built.
+- **Counter-example found, as the brief said to stop for:** a plain link move (`linkSha`) chained to a relink in one step still loses a link at 9 of its 40 kills under the rule as briefed (reviewer G reproduced 9 in 70 runs of 70; the 8 first written here came from a run that could not be reproduced). Details under "For the director". The extension was adopted and built in this round (follow-up above).
 - Review F's three lows: done (see "Lows").
 
 ## Follow-up: the director's ruling (adopted, 2026-11-26, night)
@@ -18,7 +18,7 @@ The director ruled to adopt the extension proposed under "For the director" belo
   - `aMoveThenARelinkIntoItsPlace`: apply at `afterBegin` and `beforeSwap(0)`; undo at `beforeUndone`; redo at `afterRedoing` and `beforeSwap(0)`;
   - `aRelinkThenAMoveIntoItsPlace`: apply at `beforeApplied`; undo at `afterUndoing` and `beforeSwap(0)`; redo at `beforeRedone`.
 
-  The earlier run of the same rule showed 8: `aMoveThenARelinkIntoItsPlace-apply-beforeSwap(0)` passed there. That one difference between two runs of one rule is not explained. The folder at that point reads the same as at `afterBegin`.
+  The true figure is 9: the kill `aMoveThenARelinkIntoItsPlace-apply-beforeSwap(0)` is RED every time (reviewer G, 70 runs of 70). An earlier run showed 8 because that kill passed in it; that run could not be reproduced, most likely a binary that was not the source believed.
 - **Python.** `test_chained_link_moves_killed_at_every_point_lose_no_link` replaces the relinks-only test and adds both move shapes: 54 model kills. With the old model rule it fails 5 move-shape subtests. 41 tests OK.
 - **Contract.** One new `recoveryCases` row, `withARelink: thenAMove` (call `relinkThenMoveALinkIntoItsPlace`, files read on Day 4 to Day 6), step at `beforeApplied`: done, files after. The Mac replay now has 85 rows.
   - The row fails with the old rule in both the Swift replay and the Python model.
@@ -31,14 +31,14 @@ The director ruled to adopt the extension proposed under "For the director" belo
 
 ## The rule as built (Swift `UndoRecovery.removeTheLinksJustMade` and `isTheOneInFlight`; Python `remove_the_links_just_made`)
 
-- The relinking ops are read in the work's own swap order: index order for an apply or a Redo, reversed for an Undo.
+- The link moves are read in the work's own swap order: index order for an apply or a Redo, reversed for an Undo.
 - A relink passes when:
   - both of its links stand, each holding its own side's text;
-  - every relink BEFORE it holds its end text at its end side (`to` going forward, `from` for an Undo);
-  - every relink AFTER it holds its start text at its start side (`from` going forward, `to` for an Undo).
+  - every link move BEFORE it, a plain one included, holds its end text at its end side (`to` going forward, `from` for an Undo);
+  - every link move AFTER it, a plain one included, holds its start text at its start side (`from` going forward, `to` for an Undo).
 - Of the relinks that pass, the LAST one's just-made link (`to` going forward, `from` for an Undo) is removed, once re-read holding that side's text. When none passes, nothing is removed.
+- Plain link moves are constraints only: only a relink can be the one in flight, because a plain move's swap is one rename.
 - No per-op journal lines (the director's decision).
-- Plain link moves are not read by the rule. That is where the counter-example comes from.
 
 ## Tests
 
@@ -50,13 +50,13 @@ The director ruled to adopt the extension proposed under "For the director" belo
     - nothing staged is left;
     - the step is settled on the side its links show (`done` when they read as after; `failed` or `rolledBack` for an apply, `undone` for an Undo or a Redo, when they read as before).
 - `testTwoLinksSwappedInOneStepAreRefusedWithNothingChanged`: a swap (Day 4's link relinked into Day 5 and Day 5's into Day 4) is refused by the door before anything changes, so no kill inside it can be reached. That is why the swap is not in the kill table.
-- The two plain-link-move shapes are laid in the same file (`ChainShape.aMoveThenARelinkIntoItsPlace`, `.aRelinkThenAMoveIntoItsPlace`) but are left out of `shapesTheRuleHolds`, so the test does not run them. The comment there says why and points here.
+- The two plain-link-move shapes (`ChainShape.aMoveThenARelinkIntoItsPlace`, `.aRelinkThenAMoveIntoItsPlace`) are run by the same test (`ChainShape.allCases`, 101 kills), as the follow-up above says.
 - Python: `test_chained_relinks_killed_at_every_point_lose_no_link` runs the model on the two-link and three-link shapes: before each swap, inside each, and after the last, going forward and back. That is 34 model kills, never interrupted, and every link before or after.
 - Contract, two new `recoveryCases` rows (84 on the Mac replay, from 82):
   - `chained` step at `beforeApplied`: done, files after.
   - The new `withARelink: chainedThree` (call `relinkThreeChainedLinks`, files read on Day 4 to Day 7) step at `beforeSwap:0`: failed, files before. `recoveryCasesHow` says what `chainedThree` is.
   - Both rows are held for Windows under `Reason899W8RelinkedLink`, names byte for byte, one each.
-- The plain-move shape has no contract row. Its rule is not decided (see "For the director"), and a row would pin behaviour that loses a link.
+- The plain-move shape has the contract row `withARelink: thenAMove`, added with the adopted rule (see the follow-up above).
 
 ## Must-fail log
 
@@ -70,7 +70,7 @@ The director ruled to adopt the extension proposed under "For the director" belo
    - `undo.rule.recovery` says "at most one link for the whole step" and gives the passing rule.
    - The `Reason899W8RelinkedLink` sentence in `NamedGapLedger.cs` says the same.
    - The `chained` part of `recoveryCasesHow` now points at `undo.rule.recovery` instead of repeating the old pass-over clause.
-   - The contract sentence says plainly that a plain link move is not read by this.
+   - The contract sentence says plainly that a plain link move is read as a constraint and is never the one in flight.
 2. **Claims cut to what the kill table proves.**
    - The doc comment on `removeTheLinksJustMade` names the test and its shapes. It says a step chaining a plain link move to a relink still loses a link at some stop points.
    - These notes claim only the 61 kills.
@@ -85,7 +85,7 @@ The director ruled to adopt the extension proposed under "For the director" belo
 
 ## For the director
 
-**The counter-example.** The rule as briefed considers relinks only. A plain link move chained to a relink in the same step (the move's place is the relink's place) still loses a link at 8 of 40 kills.
+**The counter-example.** The rule as briefed considers relinks only. A plain link move chained to a relink in the same step (the move's place is the relink's place) still loses a link at 9 of 40 kills.
 
 - **`aMoveThenARelinkIntoItsPlace`.** Day 5's link (`Unit 1, Day 2.md`) is moved plainly to Day 6, then Day 4's link is relinked into Day 5, `Unit 1, Day 1.md` becoming `Unit 1, Day 2.md`.
   - Killed at `afterBegin`, nothing has moved. The relink reads "both standing": Day 4 holds its old text, and Day 5 holds the move's untouched link, whose text is the relink's new one. No other RELINK constrains it, so recovery removes Day 5's link.
@@ -96,7 +96,7 @@ The director ruled to adopt the extension proposed under "For the director" belo
   - The same loss happens in the Undo at `afterUndoing` and `beforeSwap(0)`, and in the Redo at `beforeRedone`.
 - Whether Insert Class can make either shape is not established. Review F could not build one, because a link to a page the plan renames is always a relink. Two later-class links holding the same text, or a link whose text equals a renamed neighbour's new name, would be the way in.
 
-**A scratch-proven extension. Not committed, since the brief said to stop here.** Read every link move, plain ones included, as a constraint, but let only a relink be a candidate:
+**The extension, scratch-proven first and then adopted and built (follow-up above).** Read every link move, plain ones included, as a constraint, but let only a relink be a candidate:
 - in `removeTheLinksJustMade`, take ops with `isALinksMove`, using `linkShaBefore ?? linkSha` and `linkShaAfter ?? linkSha` as a plain move's texts;
 - in `isTheOneInFlight`, return false for an op whose two texts are equal (a plain move: a relink's two texts always differ, `opKinds.move`).
 
@@ -115,15 +115,14 @@ Still open, unchanged:
 
 ## For documentation 12
 
-Windows' recovery of a step holding relinking moves removes at most one link:
-- Read the relinks in the work's swap order: index order for an apply or a Redo, reversed for an Undo.
+Windows' recovery of a step holding link moves removes at most one link:
+- Read the link moves in the work's swap order: index order for an apply or a Redo, reversed for an Undo.
+- A link is removed only when every link move before it holds its end state and every link move after it holds its start state. Plain moves are constraints; only a relink can be the one in flight.
 - A relink passes when:
   - both of its links stand, each holding its own text;
-  - every relink before it holds its end text at its end side (`to` going forward, `from` for an Undo);
-  - every relink after it holds its start text at its start side.
+  - every link move before it (plain ones included) holds its end text at its end side (`to` going forward, `from` for an Undo);
+  - every link move after it (plain ones included) holds its start text at its start side.
 - Remove the just-made link (`to` going forward, `from` for an Undo) of the LAST relink that passes. Remove nothing when none passes.
-
-Pending the director's ruling above, plain link moves may join the before/after reading as constraints.
 
 ## Self-check
 

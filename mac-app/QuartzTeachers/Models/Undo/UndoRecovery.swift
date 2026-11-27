@@ -946,10 +946,10 @@ nonisolated enum UndoRecovery {
     /// when the folder reads as a point INSIDE one relink's swap. The ops
     /// are read in the work's own swap order (index order going forward,
     /// the reverse for an Undo). An op passes when it stands both ways,
-    /// every relink before it holds its end text at its end side (`to`
-    /// going forward, `from` for an Undo) and every relink after it holds
-    /// its start text at its start side: the ops before it done, the ops
-    /// after it untouched, it alone in flight. Of the ops that pass, the
+    /// every link move before it, a plain one included, holds its end text
+    /// at its end side (`to` going forward, `from` for an Undo) and every
+    /// link move after it holds its start text at its start side: the ops
+    /// before it done, the ops after it untouched, it alone in flight. Of the ops that pass, the
     /// last one's just-made link is removed; when none passes, nothing is.
     /// In a chain each relink's end holds the text the next one's start
     /// held, so "both standing" alone also describes a relink already
@@ -961,7 +961,7 @@ nonisolated enum UndoRecovery {
     /// that order, a plain one (`linkSha`) as a constraint only: it holds
     /// its end or start text like a relink, but is never the one in
     /// flight, since its swap is one rename (review F: chained to a relink
-    /// and left out, it lost a link at 8 of 40 kills). What is proven is
+    /// and left out, it lost a link at 9 of 40 kills). What is proven is
     /// what `UndoRelinkTests.testChainedLinkMovesKilledAtEveryStopPointLoseNoLink`
     /// runs: two and three chained relinks and a plain link move chained to
     /// a relink either way round, at every stop point, forward, Undo and

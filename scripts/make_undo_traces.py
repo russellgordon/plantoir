@@ -1475,9 +1475,9 @@ def remove_the_links_just_made(ops, pages, started_from_before):
     Review F of U4b3, MEDIUM: at most ONE link is removed, and only when
     the folder reads as a point INSIDE one relink's swap. In the work's
     swap order (index order going forward, reversed for an Undo), a move
-    passes when it stands both ways, every relink before it holds its end
-    text at its end side and every relink after it holds its start text at
-    its start side; of the moves that pass, the last one's just-made link
+    passes when it stands both ways, every link move before it holds its end
+    text at its end side and every link move after it holds its start text
+    at its start side; of the moves that pass, the last one's just-made link
     is removed, and none when no move passes. Every link move is read, a
     plain one (linkSha, one text at both sides) as a constraint only: its
     swap is one rename, so it is never the one in flight."""
