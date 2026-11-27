@@ -669,4 +669,20 @@ final class DateKeyByTheTargetsPlaceTests: XCTestCase {
         let after: String = try String(contentsOf: chain.file, encoding: .utf8)
         XCTAssertTrue(after.contains("createdSection1: 2026-09-18T"), "Day 5's day: \(after)")
     }
+
+    /// Review 2, LOW 2: a shared lesson a numbered class is a link to, also
+    /// named by Key Links, keeps that class's day; the year-round step does
+    /// not move it to the first day. MUST FAIL with the year-round step's
+    /// `isOneOf` guard removed (`SectionReDatePlanner.plan`).
+    func testReDateYearRoundStepLeavesALessonANumberedClassOwns() throws {
+        let made = try makeCourse()
+        let file: URL = try linkClasses(["Unit 1, Day 2"], toASharedLesson: sharedLesson(section1: "2026-09-20"), in: made)
+        try "---\ntitle: Key Links\npublish: true\n---\n\n- [[Shared]]\n"
+            .write(to: made.course.directoryURL.appendingPathComponent("section1/Key Links.md"), atomically: true, encoding: .utf8)
+
+        try reDate(in: made)
+
+        let after: String = try String(contentsOf: file, encoding: .utf8)
+        XCTAssertTrue(after.contains("createdSection1: 2026-09-10T"), "Day 2's day, not the first day: \(after)")
+    }
 }
