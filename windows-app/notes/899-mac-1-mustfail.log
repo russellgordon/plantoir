@@ -13,3 +13,19 @@ M5 run-m1-mf-M5: the one place freed in JournaledStep.refusesAWrite (no refusal 
    RED, 5 failures: testAWriteAtTheOnePlaceRefusesTheStepBeforeAnythingChanges (write, writeNew, remove: no cannotTellNow).
 M6 run-m1-mf6 (Python): the one-place case taken out of make_undo_traces.move_state.
    RED: test_check_cases ('changedSince' != 'canUndo', != 'alreadyBack' on the mac-1 rows), test_recovery_cases_with_a_relink (both inPlace step rows).
+
+Fix round one (review 1), RED 7 of 7.
+F-A run-f1-mf-A: UndoOp.isOnePathByteForByte as `first == second` (canonical equivalence).
+   RED, 4 failures: testTheSamePlaceInAnotherUnicodeNormalisationIsNotARelinkWhereItStands (3), UndoJournalContractTests.testCheckCases (the normalisation row).
+F-B run-f1-mf-B: .refusedByTheVolume mapped to fileIsInUse again.
+   RED, 1 failure: testAVolumeThatRefusesTheExchangeIsRefusedWithATrueReason.
+F-C run-f1-mf-C: tidyLeftovers' rule taken out (a staged link removed whatever text it holds).
+   RED, 1 failure: testRecoveryLeavesAStagedLinkHoldingAnotherText.
+F-D run-f1-mf-D: relinkLink's look back at writes planned earlier taken out.
+   RED, 5 failures: testAWritePlannedAtTheOnePlaceBeforeTheRelinkRefusesTheStep (write, writeNew, remove).
+F-E run-f1-mf-E: the rename back after a refused exchange back taken out.
+   RED, 4 failures: testThePlaceChangedUnderTheSwapIsGivenBackEvenWhenTheExchangeBackFails (backFails true).
+F-P1 run-f1-mf-P1 (Python): part_inside without NFC.
+   RED: test_check_cases on the normalisation row.
+F-P2 run-f1-mf-P2 (Python): settle_what_was_set_aside not called.
+   RED: test_recovery_cases_with_a_relink on the two relinkSetAside rows.
