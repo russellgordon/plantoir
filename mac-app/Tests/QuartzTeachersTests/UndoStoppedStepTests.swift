@@ -551,6 +551,151 @@ final class UndoStoppedStepTests: XCTestCase {
             .appendingPathComponent("undo-stopped-\(unique)", isDirectory: true)
         UndoJournalLocation.folderOverride = listFolder
     }
+
+    // MARK: - The sweep's follow-up: Rename folder in Course Settings
+
+    /// The course with a per-section folder, `Labs`, that no section has on
+    /// disk: renaming it moves no folder and relinks no page, so its step is
+    /// the settings file alone, a one-file step the door judges at once.
+    func courseWithAFolderNoSectionHas() throws -> Course {
+        let course: Course = try courseIn2026()
+        let data: Data = try Data(contentsOf: course.configFileURL)
+        var settings: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        settings["per_section_folders"] = ["All Classes", "Tasks", "Labs"]
+        try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys]).write(to: course.configFileURL)
+        try course.configuration.replaceWithTheFile(url: course.configFileURL)
+        return course
+    }
+
+    func perSectionFoldersOnDisk(_ course: Course) throws -> [String] {
+        let data: Data = try Data(contentsOf: course.configFileURL)
+        let settings: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        return settings["per_section_folders"] as? [String] ?? []
+    }
+
+    /// `stopTheSwapPartWay`, for the rename of `Labs` to `Lab Work`: what
+    /// goes in is the whole new name, the old name, a third name another
+    /// program wrote, half the bytes, or an unreadable file.
+    func stopTheRenamePartWay(holding: StoppedWith) {
+        UndoKillPoints.beforeTheRename = { _, place in
+            let kept: Data = (try? Data(contentsOf: place)) ?? Data()
+            var edited: Data = kept
+            edited.append(contentsOf: Array(" ".utf8))
+            try? edited.write(to: place)
+            let parent: URL = place.deletingLastPathComponent()
+            let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: parent.path)) ?? []
+            for name in names where name.hasSuffix("-new") {
+                let staged: URL = parent.appendingPathComponent(name)
+                let text: String = (try? String(contentsOf: staged, encoding: .utf8)) ?? ""
+                switch holding {
+                case .theNewValue:
+                    break
+                case .theOldValue:
+                    try? Data(text.replacingOccurrences(of: "Lab Work", with: "Labs").utf8).write(to: staged)
+                case .aThirdValue:
+                    try? Data(text.replacingOccurrences(of: "Lab Work", with: "Workshop").utf8).write(to: staged)
+                case .halfWritten:
+                    let bytes: Data = Data(text.utf8)
+                    try? bytes.prefix(bytes.count / 2).write(to: staged)
+                case .unreadable:
+                    chmod(staged.path, 0o000)
+                }
+            }
+        }
+        UndoKillPoints.putBackFailsAt = { _ in true }
+    }
+
+    /// The sweep's MEDIUM: a rename of a folder no section has, stopped
+    /// part way with the file unreadable, is offered back with the same
+    /// alert as the other settings, its name "folder name" and its old value
+    /// the folder's old name; never "nothing was changed" with the step left
+    /// in flight. Put It Back writes the old name back and closes the step.
+    /// MUST FAIL before the follow-up, which said "was not renamed, and
+    /// nothing was changed" here.
+    func testARenameOfAFolderNoSectionHasThatCannotFinishOffersPutItBack() async throws {
+        let course: Course = try courseWithAFolderNoSectionHas()
+        stopTheRenamePartWay(holding: .unreadable)
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Labs", to: "Lab Work", scope: .perSection)
+        clearTheStop()
+        chmod(course.configFileURL.path, 0o644)
+        guard case .couldNotFinish(let offer) = result else {
+            return XCTFail("not offered: \(result)")
+        }
+        XCTAssertEqual(offer.setting, "folder name")
+        XCTAssertEqual(offer.valueBefore, "Labs")
+        XCTAssertEqual(ReferenceWording.settingCouldNotBeChanged(setting: offer.setting), "The folder name could not be changed.")
+        XCTAssertEqual(offer.informativeText, "Plantoir can put it back to Labs.")
+        XCTAssertEqual(try inFlightCount(), 1, "left in flight for the offer")
+        XCTAssertTrue(ActivityTrail.store.activityText(includingPrompts: true).contains("stopped part way, offered to put back"), "no trail line for the offer")
+
+        XCTAssertNil(CourseSettingsView.answerARenameOffer(.putItBack, to: offer, course: course))
+
+        XCTAssertEqual(try inFlightCount(), 0)
+        XCTAssertTrue(try perSectionFoldersOnDisk(course).contains("Labs"))
+        XCTAssertFalse(try perSectionFoldersOnDisk(course).contains("Lab Work"))
+        XCTAssertTrue(course.configuration.perSectionFolders.contains("Labs"))
+        XCTAssertNil(SetSchoolYearSheet.write(2025, to: course, on: day), "the next change was refused")
+    }
+
+    /// Not Now leaves the step in flight for the next launch, and the trail
+    /// says so (the sweep's LOW A4: a stop somebody will be asked about).
+    func testNotNowOnARenameLeavesTheStepAndATrailLine() async throws {
+        let course: Course = try courseWithAFolderNoSectionHas()
+        stopTheRenamePartWay(holding: .unreadable)
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Labs", to: "Lab Work", scope: .perSection)
+        clearTheStop()
+        chmod(course.configFileURL.path, 0o644)
+        guard case .couldNotFinish(let offer) = result else {
+            return XCTFail("not offered: \(result)")
+        }
+        XCTAssertNil(CourseSettingsView.answerARenameOffer(.notNow, to: offer, course: course))
+        XCTAssertEqual(try inFlightCount(), 1)
+        XCTAssertTrue(ActivityTrail.store.activityText(includingPrompts: true).contains("Not Now"), "no trail line for Not Now")
+    }
+
+    /// The other three outcomes of the same rename: the new name finished
+    /// silently as any rename; the old name and a third name each said by
+    /// the existing true "was not renamed, and nothing was changed", with
+    /// no offer and nothing left in flight.
+    func testARenameOfAFolderNoSectionHasStoppedPartWayIsJudgedByContent() async throws {
+        let rows: [StoppedWith] = [.theNewValue, .theOldValue, .aThirdValue, .halfWritten]
+        for holding in rows {
+            freshFolders()
+            let course: Course = try courseWithAFolderNoSectionHas()
+            stopTheRenamePartWay(holding: holding)
+            let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Labs", to: "Lab Work", scope: .perSection)
+            clearTheStop()
+            XCTAssertEqual(try inFlightCount(), 0, "\(holding): left in flight")
+            switch result {
+            case .renamed:
+                XCTAssertEqual(holding, .theNewValue, "\(holding): said as renamed")
+                XCTAssertTrue(try perSectionFoldersOnDisk(course).contains("Lab Work"), "\(holding)")
+            case .failed(let said):
+                XCTAssertNotEqual(holding, .theNewValue, "\(holding): \(said)")
+                XCTAssertTrue(said.hasPrefix("“Labs” was not renamed, and nothing was changed"), "\(holding): \(said)")
+                XCTAssertFalse(said.contains("course_config"), "\(holding): names the file: \(said)")
+            case .couldNotFinish:
+                XCTFail("\(holding): offered a Put It Back that could not succeed")
+            }
+        }
+    }
+
+    /// The sweep's LOW A4: Set School Year leaves a trail line when it
+    /// offers Put It Back, and one for each answer.
+    func testSetSchoolYearsOfferAndItsAnswerLeaveTrailLines() throws {
+        let course: Course = try courseIn2026()
+        stopTheSwapPartWay(holding: .unreadable)
+        let result: SettingWriteResult = SetSchoolYearSheet.writeJudged(2027, to: course, on: day)
+        clearTheStop()
+        chmod(course.configFileURL.path, 0o644)
+        guard case .couldNotFinish(let seq) = result else {
+            return XCTFail("not offered: \(result)")
+        }
+        XCTAssertTrue(ActivityTrail.store.activityText(includingPrompts: true).contains("school year for ICS3U could not be changed"), "no line for the offer")
+        let offer: SettingPutBackOffer = SettingPutBackOffer(seq: seq, setting: "school year", valueBefore: "2026–27")
+        XCTAssertNil(SetSchoolYearSheet.answer(.putItBack, to: offer, course: course))
+        XCTAssertTrue(ActivityTrail.store.activityText(includingPrompts: true).contains("Put It Back"), "no line for Put It Back")
+    }
 }
 
 /// The sheet's offer, held where a test's binding can read and clear it.
