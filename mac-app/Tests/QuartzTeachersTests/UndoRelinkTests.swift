@@ -76,7 +76,7 @@ final class UndoRelinkTests: XCTestCase {
     /// Going forward the link at Day 4 is replaced by one at Day 5 holding
     /// exactly the new text; going back, the old link with the old text
     /// byte for byte. Whatever either text names, inside or out, a file or
-    /// nothing, is never read, written or made.
+    /// nothing, is never written or made.
     func testARelinkGoesForwardAndBackHoldingEachSidesOwnText() throws {
         for leads in Leads.allCases {
             let laid: LaidRelink = try layARelink(named: "there-and-back", leads: leads)
@@ -303,7 +303,7 @@ final class UndoRelinkTests: XCTestCase {
     /// A step holding a relinking move, made through the door with both
     /// texts, then undone and redone through the list: each side holds its
     /// own text byte for byte each time, and whatever the texts name,
-    /// inside or out, a file or nothing, is never read, written or made.
+    /// inside or out, a file or nothing, is never written or made.
     func testARelinkStepIsMadeUndoneAndRedoneThroughTheList() throws {
         for leads in Leads.allCases {
             let laid: LaidRelink = try layARelink(named: "through-the-list-\(leads)", leads: leads)
@@ -389,7 +389,7 @@ final class UndoRelinkTests: XCTestCase {
     /// `notReadable`, before anything changes): after recovery every class page is
     /// whole before or whole after, the link at one name only holding that
     /// side's text, nothing staged left anywhere under the root, and
-    /// nothing outside read, written or made. MUST FAIL with recovery's
+    /// nothing outside written or made. MUST FAIL with recovery's
     /// removal of the link just made skipped (M1) or taken from the
     /// source's name instead (M2).
     func testARelinkKilledAtAnyMomentIsWholeAfterRecovery() async throws {
@@ -494,17 +494,23 @@ final class UndoRelinkTests: XCTestCase {
     /// new page written at the relink's `from` (`aNewClassWrittenAtTheRelinksFrom`)
     /// leaves nothing kept under a visible name and no empty day; MUST FAIL
     /// with every staged name beside a relink's place judged by the one
-    /// rule (6 of its 20 kills, F-J).
+    /// rule (7 of its 20 kills, every run, F-J; each failing kill is
+    /// gathered and asserted once at the end, review 4 of mac-1, LOW).
     func testChainedLinkMovesKilledAtEveryStopPointLoseNoLink() async throws {
         var reached: Int = 0
         var expected: Int = 0
+        var faults: [String] = []
         for shape in ChainShape.allCases {
             let swaps: Int = shape == .threeChainedRelinks ? 3 : 2
             let relinks: Int = shape == .twoChainedRelinks || shape == .threeChainedRelinks ? swaps : 1
             for work in RelinkWork.allCases {
                 for point in everyStopPoint(swaps: swaps) {
-                    if try await killAChain(shape, work, at: point) {
+                    let killed: (reached: Bool, faults: [String]) = try await killAChain(shape, work, at: point)
+                    if killed.reached {
                         reached += 1
+                    }
+                    for fault in killed.faults {
+                        faults.append(fault)
                     }
                 }
                 // An apply: afterBegin, each swap, both halves of each
@@ -514,7 +520,17 @@ final class UndoRelinkTests: XCTestCase {
                 expected += work == .apply ? 2 + swaps + 2 * relinks : 3 + swaps + 2 * relinks
             }
         }
-        XCTAssertEqual(reached, expected)
+        // Every failing kill gathered and asserted ONCE, on the main actor
+        // (review 4 of mac-1, LOW): XCTest dropped some failures recorded
+        // after an `await`, so a count read from its summary was not the
+        // code's. One fault line per failing kill.
+        let reachedCount: Int = reached
+        let expectedCount: Int = expected
+        let failing: [String] = faults
+        await MainActor.run {
+            XCTAssertEqual(reachedCount, expectedCount)
+            XCTAssertEqual(failing, [], "\(failing.count) failing kills")
+        }
     }
 
     /// A swap of two links (Day 4 and Day 5, each relinked into the
@@ -547,9 +563,10 @@ final class UndoRelinkTests: XCTestCase {
         XCTAssertEqual(stagedLeft(under: root), [])
     }
 
-    /// Returns whether the kill point was reached (and so tested).
-    @discardableResult
-    func killAChain(_ shape: ChainShape, _ work: RelinkWork, at point: UndoKillPoint) async throws -> Bool {
+    /// Returns whether the kill point was reached (and so tested), and one
+    /// line per thing found wrong after recovery, gathered rather than
+    /// asserted after the `await` (review 4 of mac-1, LOW).
+    func killAChain(_ shape: ChainShape, _ work: RelinkWork, at point: UndoKillPoint) async throws -> (reached: Bool, faults: [String]) {
         let label: String = "\(shape)-\(work)-\(point)"
         let made: LaidChain = try layAChain(shape, named: "killed-" + label)
         let twin: LaidChain = try layAChain(shape, named: "twin-" + label)
@@ -590,26 +607,37 @@ final class UndoRelinkTests: XCTestCase {
         }
         UndoKillPoints.hook = nil
         if !reachedIt {
-            return false
+            return (reached: false, faults: [])
         }
+        var faults: [String] = []
 
         let survivor: UndoJournal = UndoJournal(folderURL: made.journalFolder)
         await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in root }, places: places)
         let links: [String?] = linksOn(made.days, root: root)
-        XCTAssertTrue(links == linksBefore || links == linksAfter, "\(label): links \(links)")
-        XCTAssertEqual(stagedLeft(under: root), [], label)
+        if links != linksBefore && links != linksAfter {
+            faults.append("\(label): links \(links)")
+        }
+        let staged: [String] = stagedLeft(under: root)
+        if !staged.isEmpty {
+            faults.append("\(label): staged \(staged)")
+        }
         // Undo's own staged items are never the teacher's: nothing is ever
         // kept under a visible name for them (review 3 of mac-1, MEDIUM).
-        XCTAssertEqual(keptLeft(under: root), [], label)
+        let kept: [String] = keptLeft(under: root)
+        if !kept.isEmpty {
+            faults.append("\(label): kept \(kept)")
+        }
         if shape == .aNewClassWrittenAtTheRelinksFrom {
             // Whole after: the new class page at Day 4, never an empty day;
             // whole before: Day 4's link, and nothing else there.
             let dayFour: URL = root.appendingPathComponent(section + "Unit 1, Day 4.md")
             if links == linksAfter {
                 let held: Data? = try? Data(contentsOf: dayFour)
-                XCTAssertEqual(held, Data(newClassText.utf8), "\(label): Day 4 is not the new class page")
-            } else {
-                XCTAssertTrue(UndoSwap.isALink(dayFour), label)
+                if held != Data(newClassText.utf8) {
+                    faults.append("\(label): Day 4 is not the new class page")
+                }
+            } else if !UndoSwap.isALink(dayFour) {
+                faults.append("\(label): Day 4 is not the link")
             }
         }
         let phase: UndoStepPhase? = try survivor.read().records[1]?.phase
@@ -624,8 +652,10 @@ final class UndoRelinkTests: XCTestCase {
         if let found = phase {
             settledThere = settledPhases.contains(found)
         }
-        XCTAssertTrue(settledThere, "\(label): phase \(String(describing: phase))")
-        return true
+        if !settledThere {
+            faults.append("\(label): phase \(String(describing: phase))")
+        }
+        return (reached: true, faults: faults)
     }
 
     /// The links on these class days, each its text or nil.
@@ -1072,7 +1102,7 @@ final class UndoRelinkTests: XCTestCase {
             XCTAssertEqual(try journal.read().records.count, 1, "\(leads)")
             XCTAssertEqual(try pagesBesideTheLink(laid.root), pagesBefore, "\(leads)")
             XCTAssertEqual(stagedLeft(under: laid.root), [], "\(leads)")
-            XCTAssertEqual(try outsideNow(), outsideBefore, "\(leads): something outside was read, written or made")
+            XCTAssertEqual(try outsideNow(), outsideBefore, "\(leads): something outside was written or made")
             JournaledStep.modeOverride = nil
             UndoJournalLocation.folderOverride = nil
         }
@@ -1542,16 +1572,30 @@ final class UndoRelinkTests: XCTestCase {
         XCTAssertEqual(said, [section + "Unit 1, Day 4.md -> " + section + "Unit 1, Day 4 (kept by Undo).md"])
     }
 
-    /// Runs `body` with the kept-page trail line caught: each line said as
-    /// `<place> -> <kept as>`, in order.
+    /// Runs `body` with the kept-item trail line caught (mac-2: "undo kept
+    /// an item found where a link was being changed"): each line said as
+    /// `<place> -> <kept as>`, in order. The kept-page and kept-folder
+    /// lines are caught too, each said as `untrue: …`, as nothing of the
+    /// change removed, moved or set the item aside (the day27b-2 sweep,
+    /// finding 1). MUST FAIL with a relink's keep said on either.
     func withTheKeptPageLine(_ body: () throws -> Void) throws -> [String] {
         var said: [String] = []
-        let hookBefore = UndoTrailHook.keptAPageLine
-        UndoTrailHook.keptAPageLine = { _, _, place, keptAs in
+        let itemBefore = UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine
+        let pageBefore = UndoTrailHook.keptAPageLine
+        let folderBefore = UndoTrailHook.foundAFolderSetAsideLine
+        UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = { _, _, place, keptAs in
             said.append(place + " -> " + keptAs)
         }
+        UndoTrailHook.keptAPageLine = { _, _, place, keptAs in
+            said.append("untrue: " + place + " -> " + keptAs)
+        }
+        UndoTrailHook.foundAFolderSetAsideLine = { _, _, place, _, keptAs, _ in
+            said.append("untrue: " + place + " -> " + (keptAs ?? ""))
+        }
         defer {
-            UndoTrailHook.keptAPageLine = hookBefore
+            UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = itemBefore
+            UndoTrailHook.keptAPageLine = pageBefore
+            UndoTrailHook.foundAFolderSetAsideLine = folderBefore
         }
         try body()
         return said
@@ -1597,26 +1641,38 @@ final class UndoRelinkTests: XCTestCase {
         XCTAssertEqual(said, [section + "Unit 1, Day 4.md -> " + section + "Unit 1, Day 4 (kept by Undo).md"])
     }
 
-    /// Review 3 of mac-1, LOW 3: an item under the staged name that cannot
-    /// be read just now refuses the relink "cannot tell now", never "could
-    /// not write" (which is said only for a refused move); the item and the
-    /// link are left as they are. MUST FAIL with every pre-clean `notNow`
-    /// read as a refused move (F-M).
-    func testAnUnreadableItemUnderTheStagedNameIsCannotTellNow() throws {
+    /// Review 3 of mac-1, LOW 3, as review 2 of mac-2 (MEDIUM) settles it:
+    /// an item under the staged name that is not a link is the teacher's
+    /// WITHOUT being read (the step stages only links), so one that cannot
+    /// be read just now (a folder no one may list) is never left hidden and
+    /// never refuses the relink: it is kept under a visible name beside the
+    /// place, said first, and the relink is made. MUST FAIL with a non-link
+    /// read before it is judged (F-N).
+    func testAnUnreadableItemUnderTheStagedNameIsKeptVisibleAndSaid() throws {
         let laid: LaidRelink = try layARelinkWhereItStands(named: "unreadable-staged", leads: .inside)
         let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 4.md")
         let stagedURL: URL = UndoSwap.besideURL(for: place, label: "1-apply", role: "new")
         let folder: URL = stagedURL.appendingPathComponent("inside", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: stagedURL.path)
+        let keptPath: String = section + "Unit 1, Day 4.md (kept by Undo)"
         defer {
             try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stagedURL.path)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: laid.root.appendingPathComponent(keptPath).path)
         }
         XCTAssertEqual(UndoTreeReading.read(at: stagedURL), .cannotRead, "the item is not unreadable here")
         let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
-        let result: UndoSwapResult = UndoSwap.swap(forward, label: "1-apply", root: laid.root)
-        XCTAssertEqual(result, .refused(.cannotTellNow(path: section + "Unit 1, Day 4.md")))
-        XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: laid.root), laid.oldText)
+        let said: [String] = try withTheKeptPageLine {
+            let result: UndoSwapResult = UndoSwap.swap(
+                forward, label: "1-apply", root: laid.root,
+                tellingKept: UndoRecovery.tellingWhatIsKept(course: "TST1O", section: 1, root: laid.root)
+            )
+            XCTAssertEqual(result, .swapped)
+        }
+        XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: laid.root), laid.newText, "the relink made")
+        XCTAssertTrue(UndoSwap.isAFolder(laid.root.appendingPathComponent(keptPath)), "the teacher's folder kept visible")
+        XCTAssertFalse(standsAnything(section + ".Unit 1, Day 4.md.plantoir-undo-1-apply-new", root: laid.root), "nothing hidden")
+        XCTAssertEqual(said, [section + "Unit 1, Day 4.md -> " + keptPath])
     }
 
     /// A step for the course the laid folder holds.
@@ -1628,15 +1684,327 @@ final class UndoRelinkTests: XCTestCase {
     }
 
     /// Every page in section 1 but the link itself, by name: what nothing
-    /// may write through the link. The files outside are never opened here
-    /// (their access times are `outsideNow`'s), only by
-    /// `checkTheOutsideBytes` at the end.
+    /// may write through the link. The files outside are never opened here,
+    /// only by `outsideNow` and `checkTheOutsideBytes`.
     func pagesBesideTheLink(_ root: URL) throws -> [String: String] {
         var found: [String: String] = [:]
         for (name, held) in try classPagesNow(root) where name != "Unit 1, Day 4.md" {
             found[name] = held
         }
         return found
+    }
+
+    // MARK: - The lows riding with mac-2
+
+    /// The day27b-2 sweep, finding 1: the line said when an item that was
+    /// not Plantoir's is kept where a link was being changed is the
+    /// contract's own (`activityTrail.mustRecord`, "undo kept an item found
+    /// where a link was being changed"), and says nothing of a change that
+    /// stopped or of anything removed, moved or set aside.
+    func testTheKeptItemLineIsTheContractsAndTrueOnTheLivePath() throws {
+        let rules: [String: Any] = try UndoContractReplay.contract("shared-rules.json")
+        let trail: [String: Any] = rules["activityTrail"] as? [String: Any] ?? [:]
+        var example: String? = nil
+        for row in trail["mustRecord"] as? [[String: Any]] ?? [] {
+            if row["event"] as? String == ActivityTrail.Event.undoKeptAnItemFoundWhereALinkWasChanged.rawValue {
+                example = row["line"] as? String
+            }
+        }
+        let line: String = UndoTrail.keptAnItemFoundWhereALinkWasChangedLine(
+            course: "ICS3U", section: 1,
+            place: "courses/ICS3U/section1/Unit 1, Day 4.md",
+            keptAs: "courses/ICS3U/section1/Unit 1, Day 4 (kept by Undo).md"
+        )
+        XCTAssertEqual(line, example)
+        for untrue in ["stopped", "removed", "moved away", "set aside", "staged", "exchange", "journal"] {
+            XCTAssertFalse(line.contains(untrue), "\(untrue): \(line)")
+        }
+    }
+
+    /// The day27b-2 sweep, point 3: a volume that refuses the exchange is
+    /// refused `couldNotWrite`, and the reason said for it is true: never
+    /// "the disk may be full" alone, as the disk is not full. MUST FAIL
+    /// with the old clause ("nothing could be written beside … (the disk
+    /// may be full)").
+    func testAVolumeThatRefusesTheExchangeIsSaidTruly() throws {
+        let laid: LaidRelink = try layARelinkWhereItStands(named: "refused-exchange-said", leads: .inside)
+        let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 4.md")
+        let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
+        UndoKillPoints.relinkRenameInFails = { url in
+            return url.standardizedFileURL.path == place.standardizedFileURL.path
+        }
+        let result: UndoSwapResult = UndoSwap.swap(forward, label: "1-apply", root: laid.root)
+        UndoKillPoints.relinkRenameInFails = nil
+        guard case .refused(let refusal) = result else {
+            return XCTFail("not refused: \(result)")
+        }
+        let line: String = UndoTrail.leftNewestLine(course: "ICS3U", section: 1, isUndo: true, refusal: refusal)
+        XCTAssertTrue(
+            line.contains("because " + section + "Unit 1, Day 4.md could not be changed in its folder, which may be full or may not allow the change."),
+            line
+        )
+        XCTAssertFalse(line.contains("nothing could be written beside"), line)
+        XCTAssertFalse(line.contains("(the disk may be full)"), line)
+    }
+
+    /// Review 3 of mac-1, LOW 5: a teacher's file under the TWO-place
+    /// relink's own staged name (`-new` beside `to`). The pre-clean follows
+    /// the one rule: the file is kept under a visible name beside `to`, said
+    /// first, and the relink is made; never left hidden with an untrue "in
+    /// use". MUST FAIL with the pre-clean's result ignored.
+    func testATeachersFileUnderTheTwoPlaceRelinksStagedNameIsKeptVisibleAndSaid() throws {
+        let laid: LaidRelink = try layARelink(named: "two-place-pre-clean", leads: .inside)
+        let to: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 5.md")
+        let stagedURL: URL = UndoSwap.besideURL(for: to, label: "1-apply", role: "new")
+        try Data("The teacher's own.\n".utf8).write(to: stagedURL)
+        let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
+        let said: [String] = try withTheKeptPageLine {
+            let result: UndoSwapResult = UndoSwap.swap(
+                forward, label: "1-apply", root: laid.root,
+                tellingKept: UndoRecovery.tellingWhatIsKept(course: "TST1O", section: 1, root: laid.root)
+            )
+            XCTAssertEqual(result, .swapped)
+        }
+        XCTAssertEqual(linkText(section + "Unit 1, Day 5.md", root: laid.root), laid.newText, "the relink made")
+        XCTAssertFalse(standsAnything(section + "Unit 1, Day 4.md", root: laid.root))
+        XCTAssertEqual(try? text(section + "Unit 1, Day 5 (kept by Undo).md", root: laid.root), "The teacher's own.\n")
+        XCTAssertEqual(stagedLeft(under: laid.root), [])
+        XCTAssertEqual(said, [section + "Unit 1, Day 5.md -> " + section + "Unit 1, Day 5 (kept by Undo).md"])
+    }
+
+    /// Review 4 of mac-1, LOW: the place changed under the swap to an item
+    /// that cannot be read (a folder no one may list). After the exchange
+    /// it is not ours whatever it holds, so it is exchanged back unread:
+    /// it stands at its place again, nothing is left under the staged name,
+    /// refused changed since. MUST FAIL with the item left hidden and the
+    /// refusal naming only the place.
+    func testAnUnreadableItemFoundAtThePlaceAfterTheExchangeIsGivenBack() throws {
+        let laid: LaidRelink = try layARelinkWhereItStands(named: "unreadable-after", leads: .inside)
+        let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 4.md")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: place.path)
+            let stagedURL: URL = UndoSwap.besideURL(for: place, label: "1-apply", role: "new")
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stagedURL.path)
+        }
+        let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
+        UndoKillPoints.hook = { reached in
+            if reached == .relinkStaged(0) {
+                _ = UndoSwap.removeALink(at: place)
+                try? FileManager.default.createDirectory(at: place.appendingPathComponent("inside"), withIntermediateDirectories: true)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: place.path)
+            }
+            return false
+        }
+        let result: UndoSwapResult = UndoSwap.swap(forward, label: "1-apply", root: laid.root)
+        UndoKillPoints.hook = nil
+        XCTAssertEqual(result, .refused(.changedSince(firstPath: section + "Unit 1, Day 4.md", others: 0)))
+        XCTAssertTrue(UndoSwap.isAFolder(place), "the other program's folder at its place")
+        XCTAssertEqual(stagedLeft(under: laid.root), [])
+    }
+
+    /// The same with the exchange back refused too. The item is the
+    /// teacher's without being read (it is not a link), so it is given
+    /// back by the one rule: the swap's own link is taken out of the place
+    /// by its text and the item renamed back, refused changed since, and
+    /// nothing is left under the hidden name (review 2 of mac-2, MEDIUM).
+    /// MUST FAIL with a non-link read before it is judged (F-N).
+    func testAnItemThatCannotGoBackByTheExchangeIsGivenBackUnread() throws {
+        try checkAnItemThatCannotGoBack(live: false)
+        try checkAnItemThatCannotGoBack(live: true)
+    }
+
+    func checkAnItemThatCannotGoBack(live: Bool) throws {
+        let laid: LaidRelink = try layARelinkWhereItStands(named: "unreadable-stays-\(live)", leads: .inside)
+        let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 4.md")
+        let stagedURL: URL = UndoSwap.besideURL(for: place, label: "1-apply", role: "new")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: place.path)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stagedURL.path)
+        }
+        let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
+        UndoKillPoints.hook = { reached in
+            if reached == .relinkStaged(0) {
+                _ = UndoSwap.removeALink(at: place)
+                try? FileManager.default.createDirectory(at: place.appendingPathComponent("inside"), withIntermediateDirectories: true)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: place.path)
+            }
+            return false
+        }
+        UndoKillPoints.relinkExchangeBackFails = { _ in
+            return true
+        }
+        let visiblePlace: String = section + "Unit 1, Day 4.md"
+        if live {
+            let blobs: [Data] = [Data(laid.oldText.utf8), Data(laid.newText.utf8)]
+            let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [laid.op], blobs: blobs, root: laid.root, action: "insertClass")
+            let outcome: JournaledWriteOutcome = JournaledWrite.perform(ops: draft, in: laid.journal, mode: .live, places: UndoMemoryPlaces())
+            UndoKillPoints.hook = nil
+            UndoKillPoints.relinkExchangeBackFails = nil
+            XCTAssertEqual(outcome, .refused(.changedSince(firstPath: visiblePlace, others: 0)), "live")
+        } else {
+            let result: UndoSwapResult = UndoSwap.swap(forward, label: "1-apply", root: laid.root)
+            UndoKillPoints.hook = nil
+            UndoKillPoints.relinkExchangeBackFails = nil
+            XCTAssertEqual(result, .refused(.changedSince(firstPath: visiblePlace, others: 0)))
+        }
+        XCTAssertTrue(UndoSwap.isAFolder(place), "the teacher's folder at its place: \(live)")
+        XCTAssertFalse(standsAnything(section + ".Unit 1, Day 4.md.plantoir-undo-1-apply-new", root: laid.root), "nothing hidden: \(live)")
+    }
+
+    /// Review 2 of mac-2, MEDIUM: a kill just after the exchange, once the
+    /// place had been replaced by a teacher's item no one may read (a
+    /// folder no one may list; a file no one may read). Recovery's tidy
+    /// judges the item under the relink's staged name by `lstat` alone: it
+    /// is not a link, so it is the teacher's, and it is kept under a
+    /// visible name beside the place (which holds the step's link) and
+    /// said; nothing waits under the hidden name for a later try. MUST
+    /// FAIL with a non-link read before it is judged (F-N).
+    func testRecoverySettlesAnUnreadableItemUnderTheStagedNameVisiblyAndSaysSo() async throws {
+        var faults: [String] = []
+        for kind in ["folder", "file"] {
+            let laid: LaidRelink = try layARelinkWhereItStands(named: "unreadable-recovered-\(kind)", leads: .inside)
+            let root: URL = laid.root
+            let place: URL = root.appendingPathComponent(section + "Unit 1, Day 4.md")
+            let stagedURL: URL = UndoSwap.besideURL(for: place, label: "1-apply", role: "new")
+            var keptPath: String = section + "Unit 1, Day 4 (kept by Undo).md"
+            if kind == "folder" {
+                keptPath = section + "Unit 1, Day 4.md (kept by Undo)"
+            }
+            let keptURL: URL = root.appendingPathComponent(keptPath)
+            defer {
+                try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stagedURL.path)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: keptURL.path)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: place.path)
+            }
+            let journalFolder: URL = root.deletingLastPathComponent().appendingPathComponent("undo", isDirectory: true)
+            let draft: UndoOpsDraft = UndoContractKinds.draft(
+                ops: [laid.op], blobs: [Data(laid.oldText.utf8), Data(laid.newText.utf8)], root: root, action: "insertClass"
+            )
+            let places: UndoMemoryPlaces = UndoMemoryPlaces()
+            let dying: UndoJournal = UndoJournal(
+                folderURL: journalFolder,
+                process: UndoContractReplay.goneProcess,
+                processIsAlive: { process in process.pid != 2_000_000_001 }
+            )
+            UndoKillPoints.hook = { reached in
+                if reached == .relinkStaged(0) {
+                    _ = UndoSwap.removeALink(at: place)
+                    if kind == "file" {
+                        try? Data("The teacher's own.\n".utf8).write(to: place)
+                    } else {
+                        try? FileManager.default.createDirectory(at: place.appendingPathComponent("inside"), withIntermediateDirectories: true)
+                    }
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: place.path)
+                }
+                return reached == .relinkSwapped(0)
+            }
+            _ = JournaledWrite.perform(ops: draft, in: dying, mode: .live, places: places)
+            UndoKillPoints.hook = nil
+            if kind == "folder" && UndoTreeReading.read(at: stagedURL) != .cannotRead {
+                faults.append("\(kind): the folder under the staged name can be listed here")
+            }
+            if kind == "file" && (!standsAnything(section + ".Unit 1, Day 4.md.plantoir-undo-1-apply-new", root: root)
+                || FileManager.default.isReadableFile(atPath: stagedURL.path)) {
+                faults.append("\(kind): no unreadable file under the staged name here")
+            }
+            var said: [String] = []
+            let itemBefore = UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine
+            UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = { _, _, placeSaid, keptAs in
+                said.append(placeSaid + " -> " + keptAs)
+            }
+            let survivor: UndoJournal = UndoJournal(folderURL: journalFolder)
+            await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in root }, places: places)
+            UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = itemBefore
+            if linkText(section + "Unit 1, Day 4.md", root: root) != laid.newText {
+                faults.append("\(kind): the step's link is not at the place")
+            }
+            if standsAnything(section + ".Unit 1, Day 4.md.plantoir-undo-1-apply-new", root: root) {
+                faults.append("\(kind): left under the hidden name")
+            }
+            if !standsAnything(keptPath, root: root) {
+                faults.append("\(kind): not kept under \(keptPath)")
+            }
+            if said != [section + "Unit 1, Day 4.md -> " + keptPath] {
+                faults.append("\(kind): said \(said)")
+            }
+        }
+        let failing: [String] = faults
+        await MainActor.run {
+            XCTAssertEqual(failing, [])
+        }
+    }
+
+    /// The director's shape from Windows' kill table: a teacher's own page
+    /// under a TWO-place relink's own staged name beside Day 5, a place
+    /// only link moves name (Day 5's link moves on to Day 6 and Day 4's is
+    /// relinked into Day 5). Made live, and killed before each swap and
+    /// recovered: the page is never deleted; it is kept under a visible
+    /// name and said (or given back), and nothing is left staged.
+    func testATeachersPageUnderAChainedRelinksStagedNameIsNeverDeleted() async throws {
+        let teachers: String = "The teacher's own page.\n"
+        var points: [UndoKillPoint?] = [nil]
+        for index in 0..<2 {
+            points.append(.beforeSwap(index))
+        }
+        var faults: [String] = []
+        for point in points {
+            var label: String = "live"
+            if let point {
+                label = "\(point)"
+            }
+            let laid: LaidChain = try layAChain(.twoChainedRelinks, named: "teachers-page-" + label)
+            let dayFive: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 5.md")
+            try Data(teachers.utf8).write(to: UndoSwap.besideURL(for: dayFive, label: "1-apply", role: "new"))
+            let journal: UndoJournal = UndoJournal(
+                folderURL: laid.journalFolder,
+                process: UndoContractReplay.goneProcess,
+                processIsAlive: { process in process.pid != 2_000_000_001 }
+            )
+            var said: [String] = []
+            let hookBefore = UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine
+            UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = { _, _, place, keptAs in
+                said.append(place + " -> " + keptAs)
+            }
+            if let point {
+                UndoKillPoints.hook = { reached in
+                    return reached == point
+                }
+            }
+            let outcome: JournaledWriteOutcome = JournaledWrite.perform(ops: laid.draft, in: journal, mode: .live, places: UndoMemoryPlaces())
+            UndoKillPoints.hook = nil
+            if point == nil && outcome != .applied(seq: 1) {
+                faults.append("\(label): \(outcome)")
+            }
+            if point != nil {
+                let root: URL = laid.root
+                await UndoRecovery.recoverAndRederive(
+                    UndoJournal(folderURL: laid.journalFolder), resolveRoot: { _ in root }, places: UndoMemoryPlaces()
+                )
+            }
+            UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = hookBefore
+            var visibleHolders: [String] = []
+            let asFound: String = "file " + Data(teachers.utf8).base64EncodedString()
+            for (name, held) in try classPagesNow(laid.root) where held == asFound && !name.hasPrefix(".") {
+                visibleHolders.append(name)
+            }
+            if visibleHolders.isEmpty {
+                faults.append("\(label): the teacher's page is gone")
+            }
+            if !stagedLeft(under: laid.root).isEmpty {
+                faults.append("\(label): staged \(stagedLeft(under: laid.root))")
+            }
+            var keptOnes: Int = 0
+            for name in visibleHolders where name.contains("(kept by Undo)") {
+                keptOnes += 1
+            }
+            if keptOnes != said.count {
+                faults.append("\(label): kept \(visibleHolders), said \(said)")
+            }
+        }
+        let failing: [String] = faults
+        await MainActor.run {
+            XCTAssertEqual(failing, [])
+        }
     }
 
     // MARK: - Helpers
@@ -1733,17 +2101,19 @@ final class UndoRelinkTests: XCTestCase {
         return try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
     }
 
-    /// Every file in the folder outside, by name, with its access and
-    /// modification times, read with `lstat` only (this look never opens
-    /// them, so any change of time is the swap's): nothing made there, and
-    /// nothing there read or written.
+    /// Every file in the folder outside, by name, with its modification
+    /// time, size and the SHA-256 of its bytes: nothing made there and
+    /// nothing written there. Never its access time (#1054): a scanner on
+    /// another Mac reads the files and moves it, which says nothing about
+    /// the swap; reading the bytes here moves it too, and is harmless.
     func outsideNow() throws -> [String: String] {
         var found: [String: String] = [:]
         for name in try FileManager.default.contentsOfDirectory(atPath: outside.path) {
             let url: URL = outside.appendingPathComponent(name)
             var information: stat = stat()
             XCTAssertEqual(lstat(url.path, &information), 0)
-            found[name] = "\(information.st_atimespec.tv_sec).\(information.st_atimespec.tv_nsec) \(information.st_mtimespec.tv_sec).\(information.st_mtimespec.tv_nsec)"
+            found[name] = "\(information.st_mtimespec.tv_sec).\(information.st_mtimespec.tv_nsec) \(information.st_size) "
+                + (UndoHash.sha256(ofOptional: try? Data(contentsOf: url)) ?? "unreadable")
         }
         return found
     }

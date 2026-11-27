@@ -887,7 +887,7 @@ nonisolated enum UndoContractKinds {
     @MainActor
     static func makeRoomWithALaterClassThatIsALink(
         root: URL, journal: UndoJournal, places: UndoMemoryPlaces, linkedToDay1: Bool = false, broken: Bool = false,
-        day4LinkedToDay3: Bool = false, day3Plain: Bool = false
+        day4LinkedToDay3: Bool = false, day3Plain: Bool = false, throughAHopInside: Bool = false
     ) throws -> String {
         // U4b3 part 2: Unit 1, Day 1 to Day 3 in section 1, Day 3 a link
         // to a file elsewhere in the course; room for one class at Day
@@ -913,6 +913,15 @@ nonisolated enum UndoContractKinds {
             let day3: URL = root.appendingPathComponent(linkedPageDay(3))
             try FileManager.default.removeItem(at: day3)
             try UndoContractReplay.write(linkedPageText(day: 3, date: linkedPageDates[2]), to: linkedPageDay(3), in: root)
+        }
+        if throughAHopInside && !somethingIsAt(linkedPageDay(4), in: root) {
+            // mac-2's `makeRoomWithALaterClassLinkedThroughALinkInside`: Day
+            // 4 a link to `hopLinkPath`, a link inside the working folder
+            // that is not a class page, holding `hopLinkBefore` (Day 3's
+            // page, which the plan renames): Day 4 is renamed as itself and
+            // the hop re-pointed where it stands.
+            try layALink(hopLinkPath, leadingTo: hopLinkBefore, root: root)
+            try layALink(linkedPageDay(4), leadingTo: hopLinkFromDay4, root: root)
         }
         if day4LinkedToDay3 && !somethingIsAt(linkedPageDay(4), in: root) {
             // Relink-5: Day 4 a link holding `Unit 1, Day 3.md`, a class page
@@ -1040,6 +1049,26 @@ nonisolated enum UndoContractKinds {
             file = "gone"
         }
         return place + ", " + target + ", " + file
+    }
+
+    /// mac-2: the in-between link of
+    /// `makeRoomWithALaterClassLinkedThroughALinkInside`, the text Day 4
+    /// holds to reach it, and the text it holds before the step.
+    static let hopLinkPath: String = "courses/TST1O/elsewhere/hop.md"
+    static let hopLinkFromDay4: String = "../../elsewhere/hop.md"
+    static let hopLinkBefore: String = "../section1/All Classes/Unit 1, Day 3.md"
+
+    /// mac-2's `hopLink`: the text the link at `hopLinkPath` holds,
+    /// `notALink` when something that is not a link is there, `nothing`
+    /// when nothing is.
+    static func hopLink(in root: URL) -> String {
+        if let bytes = UndoTreeReading.linkTarget(at: root.appendingPathComponent(hopLinkPath)), let written = UndoText.decode(bytes) {
+            return written
+        }
+        if somethingIsAt(hopLinkPath, in: root) {
+            return "notALink"
+        }
+        return "nothing"
     }
 
     /// Relink-5's `laterLinks`: Unit 1, Day 1, Day 3, Day 4 and Day 5 in

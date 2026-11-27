@@ -23640,14 +23640,12 @@ only through a link OUTSIDE the working folder is re-pointed straight at the
 page's new name, the link outside untouched; a link reaching a class page the
 plan leaves is moved as itself, its text kept. Nothing is written through any
 of them, no title and no date (writing this class's date through the link is
-what gave Day 3 the wrong date in review B's probe). Two arrangements are the
-exception, refused before anything changes ("cannot tell now";
-`firstLinkThatCannotBeMoved`), refusals added in U4b3 until the door can
-change a link's text where it stands, which it cannot do yet: a link reaching
-a renamed page only through a link INSIDE the working folder that is not a
-class page of this section (Russell's
-ruling: that link is re-pointed where it stands), and a class the plan only
-re-dates whose link reaches a renamed page.
+what gave Day 3 the wrong date in review B's probe). Nothing is refused
+for where a link leads (mac-2): a link reaching a renamed page only through a
+link INSIDE the working folder that is not a class page of this section is
+renamed as itself and that in-between link is re-pointed where it stands
+(Russell's ruling), and a class the plan only re-dates whose link reaches a
+renamed page is re-pointed where it stands by the same rules.
 A later class whose link leads NOWHERE is never refused (Russell, 2026-11-26:
 "Why would it refuse? Why does it care where a later class links to?", then
 "Never refuse"; this reverses the review round's fix 3): the link is moved as
@@ -23861,8 +23859,8 @@ the four cases in "U4b3: linked-class-page-moves-its-link" above). It walks
 each later class that is a link once, on the disk as it stands, before
 anything is planned (`classPagePlaces`, `reachOfALinkedClass`), and the same
 answer decides the rename (relink, plain link move, or the page's own write
-and remove), the date (none for a link to a class page) and the one refusal
-left. The page below a re-pointed link fills the place the link leaves with a
+and remove), the date (none for a link to a class page) and, since mac-2, who is
+re-pointed where it stands (nothing is refused for where a link leads). The page below a re-pointed link fills the place the link leaves with a
 write and a removal, the shape relink-4 proved (a write at a relinked link's
 old name is a new file, never through the link). Six `stackCases` rows
 ("U4b3 relink-5, …", calls `makeRoomWithALaterClassLinkedToAClassItRenames`
@@ -23871,11 +23869,7 @@ and `makeRoomWithALaterClassLinkedToALinkedClass`, the call
 key `laterLinks`) replace the refusal row, held for Windows under
 `Reason899W8bLinkedClassPage`. Known limits, not built yet: an EARLIER class's
 link to a page Insert Class renames keeps its text and then leads to the page
-now at that name (ruled 2026-11-26: it will be re-pointed); the same-place
-relink of an in-between link (a link INSIDE the working folder that is not a
-class page, which a later class reaches through; ruling 6) needs a relink
-whose `from` and `to` are one place, which the door does not read yet, so the
-two arrangements refused above stay refused until then; two later classes
+now at that name (ruled 2026-11-26: it will be re-pointed; mac-3); two later classes
 linked to one shared lesson keep the last date written (ruled: it will keep
 the first class's date); a renamed page's rename that cannot be done (its new
 name taken) leaves a link re-pointed at that new name.
@@ -23933,8 +23927,9 @@ the other way). It no longer catches every staged name beside a relink's
 place: in Insert Class's shape (a new page written at the relink's `from`)
 the write's staged page and its kept original had been read as the
 teacher's, kept as `Unit 1, Day 4 (kept by Undo).md` and reported as a kept
-page. The live swap now says the kept-page or kept-folder line wherever it
-keeps an item visible (`tellingKept`, threaded through `UndoSwap.swap`); a
+page. The live swap now says the line 'undo kept an item found where a link
+was being changed' (mac-2; it said the kept-page or kept-folder line until
+the day27b-2 sweep) wherever it keeps an item visible (`tellingKept`, threaded through `UndoSwap.swap`); a
 rename back refused because the place filled meanwhile keeps the item
 visible rather than hidden; and an item that cannot be read refuses
 `cannotTellNow`, only a refused move `couldNotWrite`.
@@ -23943,7 +23938,7 @@ Review 2 and the pass after it (final behaviour). One function,
 a relink's staged name: an item there is removed only when it is a link
 holding one of the step's texts; anything else is the teacher's, renamed back
 when the place is empty, otherwise kept under `<name> (kept by Undo)` with the
-kept-page or kept-folder line said first. In the live swap only, a teacher's
+line 'undo kept an item found where a link was being changed' said first. In the live swap only, a teacher's
 item is exchanged back while the place holds the swap's own new link; a
 recovery tidy never takes a step's link out (it cannot tell which way a
 stopped exchange went), so the place keeps the swap's link and the item is
@@ -23954,6 +23949,52 @@ only the one-place test of a relink where the link stands compares bytes.
 rule by state. Known and left for mac-2: the two-place relink's pre-clean
 removes only the step's own links and leaves anything else under its staged
 name hidden (see the notes' "For mac-2").
+
+### mac-2: Insert Class re-points an in-between link where it stands
+
+`ClassInsertionPlanner.apply` no longer refuses for where a later class's link
+leads (`firstLinkThatCannotBeMoved` and its refusal block are gone). A renamed
+class reaching a renamed class page only through a link inside the working
+folder that is not a class page is moved as itself (`moveLink`, its text
+kept), and the in-between link is re-pointed where it stands
+(`rePointWhereItStands`: mac-1's `relinkLink(hop, to: hop, textAfter:)`, the
+hop's text with only its last path part replaced, planned once however many
+classes reach it; only the folders above the hop are tidied, as tidying a path
+holding `..` follows the link itself). A class the plan only re-dates (a
+numbered course) whose link reaches a renamed page is re-pointed where it
+stands after the rename loop: its own text, the hop inside, or its own link
+straight at the page's new place when the hop is outside. Riding: the
+two-place relink's pre-clean settles its staged name by the one rule (kept
+visible and said, never given back onto the relink's destination); after the
+exchange an item that cannot be settled is exchanged back unread, or, if that
+is refused too, the step is left part way at the visible place (`notPutBack`,
+in flight for recovery; never a hidden name in what a teacher reads, never
+"nothing was changed"); the async kill tables gather their faults and assert
+once. Whose an item under a relink's own staged name is is decided by
+`lstat` alone, never by its contents (review 2 of mac-2): a link goes by its
+text (`readlink`); anything else is the teacher's, whether or not it can be
+read or listed, because the step stages only links. So the pre-clean, the
+live settle after the exchange and recovery's tidy always settle it: given
+back when its place is free (or holds only the step's own link), else kept
+under `<name> (kept by Undo)` and said by the kept-item line. Nothing waits
+under the hidden name because it cannot be read; only a refused MOVE leaves
+it there, the step then in flight (a later Undo or Redo is refused naming the
+visible place, the list kept), and the next recovery moves it again. "Cannot
+tell now" is left only for a link whose text or a place that cannot be read.
+The hops already planned are compared as directory entries (`HopEntry`: the
+folder's identity and the name as that folder holds it), because the exchange
+re-points one entry: two spellings of one hop (letter case, a linked folder)
+re-point it once, and two names of one hard-linked link (`ln -P`, one inode)
+are each re-pointed. What
+landed in the contract: three `undo.stackCases` rows ("mac-2, Insert Class
+with a later class linked through a link inside the working folder: …"), the
+replay call `makeRoomWithALaterClassLinkedThroughALinkInside` and the key
+`hopLink` (in `stackCasesHow` and the Python model), the trail event "undo
+kept an item found where a link was being changed", and the left-part-way
+line's new `couldNotWrite` clause; all held on Windows by exact name. Still
+left: contract rows for the three re-date-only shapes (a numbered course's
+plan in the replay and the Python model), written for Windows in the piece's
+notes.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

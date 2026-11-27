@@ -299,23 +299,22 @@ nonisolated enum UndoRecovery {
         return UndoStepLinks(texts: texts, relinks: relinks, onKept: UndoRecovery.tellingWhatIsKept(course: step.course, section: step.section, root: root))
     }
 
-    /// The trail line said just before a teacher's item found under a
-    /// relink's staged name is kept under a visible name beside its place:
-    /// the kept-page line, or the kept-folder line for a folder. Said by
-    /// recovery's tidies and by a live swap alike (review 3 of mac-1,
-    /// LOW 1).
+    /// The trail line said just before an item found under a relink's
+    /// staged name, not Plantoir's, is kept under a visible name beside its
+    /// place: "undo kept an item found where a link was being changed", for
+    /// a page, a folder or a link alike. Said by recovery's tidies and by a
+    /// live swap alike (review 3 of mac-1, LOW 1). Never the kept-page or
+    /// kept-folder line, which say a change that stopped removed, moved or
+    /// set the item aside: here none did, and on the live path no change
+    /// stopped (mac-2; the day27b-2 sweep, finding 1).
     static func tellingWhatIsKept(
         course: String?, section: Int?, root: URL
     ) -> (_ place: URL, _ foundAt: URL, _ keptAs: URL, _ isAFolder: Bool) -> Void {
         let courseCode: String = course ?? ""
-        return { place, foundAt, keptAs, isAFolder in
+        return { place, _, keptAs, _ in
             let placeInside: String = UndoRecovery.insideTheFolder(place, root: root)
             let keptInside: String = UndoRecovery.insideTheFolder(keptAs, root: root)
-            if isAFolder {
-                UndoTrailHook.foundAFolderSetAsideLine?(courseCode, section, placeInside, foundAt.lastPathComponent, keptInside, "")
-            } else {
-                UndoTrailHook.keptAPageLine?(courseCode, section, placeInside, keptInside)
-            }
+            UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine?(courseCode, section, placeInside, keptInside)
         }
     }
 
