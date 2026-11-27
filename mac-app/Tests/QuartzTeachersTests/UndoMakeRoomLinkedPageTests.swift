@@ -788,6 +788,37 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         }
     }
 
+    /// Review 2 of mac-2, LOW 1: two names of ONE hard-linked symbolic link
+    /// (`elsewhere/a.md` and `elsewhere/b.md`, one inode, link count 2) are
+    /// two directory entries, and the exchange re-points one entry only, so
+    /// each is a hop of its own: both are re-pointed where they stand, and
+    /// neither class is left leading to the wrong lesson. MUST FAIL with the
+    /// hops told apart by the link's identity alone (F-H).
+    func testTwoNamesOfOneHardLinkedLinkAreTwoHops() throws {
+        let made = try makeCourse()
+        let first: URL = made.course.directoryURL.appendingPathComponent("elsewhere/a.md")
+        let second: URL = made.course.directoryURL.appendingPathComponent("elsewhere/b.md")
+        try FileManager.default.createSymbolicLink(atPath: first.path, withDestinationPath: "../section1/All Classes/Unit 1, Day 2.md")
+        let linked: Int32 = linkat(AT_FDCWD, first.path, AT_FDCWD, second.path, 0)
+        XCTAssertEqual(linked, 0, "the link is not hard-linked here")
+        XCTAssertEqual(ResolvedFile.ofThePlace(at: first), ResolvedFile.ofThePlace(at: second), "not one link under two names")
+        try replaceWithALink("Unit 1, Day 3", holding: "../../elsewhere/a.md", in: made)
+        try replaceWithALink("Unit 1, Day 4", holding: "../../elsewhere/b.md", in: made)
+        let before: [String: String] = everything(under: made)
+
+        let result = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(result.steps, 1)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: first.path), "../section1/All Classes/Unit 1, Day 3.md")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: second.path), "../section1/All Classes/Unit 1, Day 3.md")
+        var relinksWhereTheyStand: Int = 0
+        for op in try newestOps() where op.isARelinkWhereItStands {
+            relinksWhereTheyStand += 1
+        }
+        XCTAssertEqual(relinksWhereTheyStand, 2, "each name a hop of its own")
+        try checkUndoAndRedoAreExact(made, before: before)
+    }
+
     /// The day27b-2 sweep, point 3: Insert Class on a volume that refuses
     /// the one exchange the in-between link's re-point needs is refused
     /// `couldNotWrite` naming the in-between link, nothing changed and no
