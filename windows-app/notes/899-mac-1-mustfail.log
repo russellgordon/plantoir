@@ -1,0 +1,15 @@
+mac-1 (#899) must-fail, RED 6 of 6. Each sabotage applied by script, built, run, the file restored with git checkout (git status clean after each).
+
+M1 run-m1-mf-M1: the exception removed from UndoOp.shapeIsKnown (placesOverlap && !isCaseOnlyMove only).
+   RED, 41 failures: testARelinkWhereTheLinkStandsIsReadableOnlyAsAMoveCarryingThePair (shapeIsKnown false), ...IsMadeThroughJournaledStepUndoneAndRedone (refused notReadable), ...KilledInsideItsSwapIsWholeAfterRecovery, testTheLinkChangedByHandBetweenPlanAndMakeIsRefused (notReadable, not changedSince).
+M2 run-m1-mf-M2: the one-place judgement removed from UndoCheck.wholeState (the place read for `from` by the old text and for `to` by the new: neither both ways).
+   RED, 45 failures: testARelinkWhereTheLinkStandsIsJudgedAtTheOnePlace ("neither" is not "before" / "after"), ...GoesForwardAndBack (changedSince), ...ALaterFailure..., ...IsMadeThroughJournaledStep..., ...KilledInsideItsSwap...
+M3 run-m1-mf-M3: RENAME_EXCL put back in UndoSwap.exchange (every make fails).
+   RED, 41 failures: ...GoesForwardAndBack (refused fileIsInUse), ...ALaterFailure..., ...IsMadeThroughJournaledStep..., ...KilledInsideItsSwap... (relinkSwapped never reached).
+M4 run-m1-mf-M4c: the staged tidy skipped for staged links in UndoSwap.tidyLeftovers.
+   RED, 62 failures: ...KilledInsideItsSwapIsWholeAfterRecovery (a `.Unit 1, Day 4.md.plantoir-undo-1-apply-new` left), and relink-3's two kill tests.
+   (First tries, kept for the record: run-m1-mf-M4 skipped only the new content rule, and run-m1-mf-M4b skipped only tidyStagedFiles; both GREEN, because recovery's other tidies remove staged items by name; see the notes, "For the director".)
+M5 run-m1-mf-M5: the one place freed in JournaledStep.refusesAWrite (no refusal at a relink's `to` when it is also its `from`).
+   RED, 5 failures: testAWriteAtTheOnePlaceRefusesTheStepBeforeAnythingChanges (write, writeNew, remove: no cannotTellNow).
+M6 run-m1-mf6 (Python): the one-place case taken out of make_undo_traces.move_state.
+   RED: test_check_cases ('changedSince' != 'canUndo', != 'alreadyBack' on the mac-1 rows), test_recovery_cases_with_a_relink (both inPlace step rows).
