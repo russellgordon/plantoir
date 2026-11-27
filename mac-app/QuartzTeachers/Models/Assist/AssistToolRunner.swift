@@ -3242,7 +3242,7 @@ final class AssistToolRunner {
         }
 
         let previewCanBeRebuilt: Bool = whatBlocksABuild(of: course) == nil
-        _ = await stopThePreviewBeforeWriting(for: course, sectionNumber: sectionNumber)
+        let previewWasStopped: Bool = await stopThePreviewBeforeWriting(for: course, sectionNumber: sectionNumber)
 
         let change: AssistChange
         var leftAlone: [String] = []
@@ -3263,6 +3263,13 @@ final class AssistToolRunner {
                 ActivityTrail.startOfYearNotDoneLine(source: source, reason: "writeFailed"),
                 course: course.code, section: sectionNumber
             )
+            // Nothing was written, so nothing to rebuild: the preview the
+            // write stopped is started again, as the sheet starts it after
+            // a refusal (`controller.startPreview()`).
+            if previewWasStopped, let window = sectionWindow(for: course, sectionNumber: sectionNumber),
+               !window.isPreviewRunning() {
+                window.startPreview()
+            }
             return AssistToolOutcome.refused(
                 StartOfYearWording.writeFailed(backup: backupURL.lastPathComponent)
             )
