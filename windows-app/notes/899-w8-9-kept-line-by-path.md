@@ -8,6 +8,7 @@ Branch `issue/899-w8-9-kept-line-by-path`, from `origin/dev` 4f228c923 (that is 
 - Names, pages and the course prefix are compared by ONE function, `UndoTrail.SameSpelling`: Unicode form C, then ordinal. Capitals differ.
 - The U4b2-4 stack case passes on Windows; `Reason899W4cKeptLineByPath` and its row are gone from the ledger. The stack replay learned the key `keptWhatItReplacedSays` and the calls `wholeFileStepOnTwoPagesNamedIndex`, `firstIndexAfterContentGoneAndCannotBeStored`, `secondIndexBeforeContentGoneAndCannotBeStored`, `keepTheOriginalOfTheSecondIndex`.
 - New test class `UndoKeptLineByPathTests` (9 facts).
+- **One addition beyond the brief, needed for the row to pass:** `UndoRecovery.StoreWhatTheOtherDirectionNeeds` (the mac's `storeWhatTheOtherDirectionNeeds`), called by the door under the lock before the swap: a page put back FROM THE LIST whose outgoing bytes the other direction needs and the list lacks has them stored, or, when the list takes no new file, kept beside the page by the swap (`OutgoingOf`), and the other direction is made from that kept file. Documentation 12's "The lows fixed with U4a that W4c and W7 copy", item 4, reads as built by W4c, and W8-10's brief says so, but on Windows only a page put back from a kept original had its outgoing bytes stored (`StoreWhatKeptOriginalsGive`, uses only). Measured on the PC (run `899-w8-9-a`): with the replay's calls and key taught, the U4b2-4 case said only “Section 2/Classes/index.md” and dropped the first page's after bytes, which were in neither the list nor beside the page (an only copy deleted). Item 5 (thinning kept copies to one per content) is NOT built here.
 
 ## For documentation 12
 
@@ -21,11 +22,18 @@ Branch `issue/899-w8-9-kept-line-by-path`, from `origin/dev` 4f228c923 (that is 
 
 ## Must-fail lines
 
-(filled from the PC run; see "Runs")
+`vm-tools/guest/899-w8-9-mustfail.json`, run `899-w8-9-b` at 296c78e4d from a clean committed tree, each sabotage alone, restored with `git checkout`: **5 RED of 5**, then 270 of 270 passed restored, `git status` empty, HEAD unchanged.
+
+1. Kept files keyed by bare name again (`UndoDoor.SayWhatItKept`): RED, 5 failed (the four door facts of `UndoKeptLineByPathTests` and the U4b2-4 stack case).
+2. "From what was kept beside it" said of every page (`UndoTrail.KeptWhatItReplacedWords`): RED, 9 failed.
+3. An ordinal compare without form C (`UndoTrail.SameSpelling`): RED, 1 failed (`NamesAreComparedInNormalizationFormCThenOrdinally`).
+4. The trail payload turned into paths (`namesOfTheKept`): RED, 3 failed (the payload asserts).
+5. The outgoing bytes of a page put back from the list never stored nor kept (the door's `notStored` merge): RED, 5 failed (the stack case and the door facts).
 
 ## Runs
 
-(filled from the PC run)
+- `899-w8-9-a` (PC, 9fc5ba277, classes and must-fail): both builds 0 errors; 265 of 270, the four door facts and the U4b2-4 case failing: the first page, put back from the list, had its outgoing bytes neither stored nor kept, so the line never named it (see "For PROGRESS"). This is the run that found the missing item 4.
+- `899-w8-9-b` (PC, 296c78e4d, classes and must-fail): both builds 0 errors; **270 of 270 passed** (`UndoKeptLineByPathTests` 9, `UndoTrailWordsContractTests` 5, `UndoStackContractTests` 130, `UndoDoorTests` 14, `UndoRecoveryTests` 21, `NamedGapLedgerTests` 8, `UndoWriterScanTests` 5, `UndoOpKindsContractTests` 78); must-fail 5 RED of 5; lock taken and released by this run; nothing left running.
 
 ## Riding lows
 
@@ -52,8 +60,8 @@ W8 COMMON:
 
 ## Left for the next piece
 
-Nothing.
+- W8-10: item 5 of "The lows fixed with U4a" (thin a step's kept copies beside a page to one per content; the mac's `removeSupersededKeptCopies`) is not built on Windows (grep of `windows-app` for "Superseded": none). Its brief assumes W4c built it.
 
 ## For the director
 
-Nothing parked.
+- W8-10's brief says W4c built items 4 and 5 of "The lows fixed with U4a that W4c and W7 copy". Item 4 was not built for a page put back from the list; this piece builds it (`UndoRecovery.StoreWhatTheOtherDirectionNeeds`, must-fail row 5), because the U4b2-4 row cannot pass without it and a held row failing at the line's assertion would not stop at an accepted gap. Item 5 (thinning) is still not built: W8-10's "thinning off" must-fail has nothing to sabotage until it is. W8-10 should start from this branch's merge. Documentation 12's item 4/5 wording ("W4c and W7 copy") should say which piece built each.
