@@ -143,16 +143,34 @@ public sealed class UndoRelinkTests : IDisposable
         return found;
     }
 
-    /// <summary>What the outside folder holds: each file's name, bytes and times, and nothing more made there.</summary>
+    /// <summary>
+    /// What the outside folder holds, read without opening any file there (an
+    /// open would itself move the access time): each entry's name, length,
+    /// write and access times, and nothing more made there. The bytes are
+    /// checked once, at the end (<see cref="CheckTheOutsideBytes"/>).
+    /// </summary>
     private string OutsideNow()
     {
         var said = new StringBuilder();
         foreach (string file in Directory.EnumerateFileSystemEntries(_outside).Order(StringComparer.Ordinal))
         {
-            said.Append(Path.GetFileName(file)).Append(' ').Append(Convert.ToHexString(File.ReadAllBytes(file)))
-                .Append(' ').Append(File.GetLastWriteTimeUtc(file).Ticks).Append(' ').Append(File.GetLastAccessTimeUtc(file).Ticks).Append('\n');
+            var info = new FileInfo(file);
+            said.Append(info.Name).Append(' ').Append(info.Length).Append(' ').Append(info.LastWriteTimeUtc.Ticks)
+                .Append(' ').Append(info.LastAccessTimeUtc.Ticks).Append('\n');
         }
         return said.ToString();
+    }
+
+    /// <summary>The outside files hold what they were laid with, byte for byte.</summary>
+    private void CheckTheOutsideBytes(string leads)
+    {
+        if (leads != "outToAFile")
+        {
+            Assert.Empty(Directory.EnumerateFileSystemEntries(_outside));
+            return;
+        }
+        Assert.Equal("Outside three.\n", File.ReadAllText(Path.Combine(_outside, "Day 3.md")));
+        Assert.Equal("Outside four.\n", File.ReadAllText(Path.Combine(_outside, "Day 4.md")));
     }
 
     /// <summary>What the section holds: each entry, a link by its text, a file by its bytes, a folder as one.</summary>
@@ -277,6 +295,7 @@ public sealed class UndoRelinkTests : IDisposable
         Assert.Empty(StagedLeft());
         Assert.Equal(outsideBefore, OutsideNow());
         Assert.Equal(insideBefore, File.Exists(Full(Day(3))) ? File.ReadAllBytes(Full(Day(3))) : null);
+        CheckTheOutsideBytes(leads);
     }
 
     /// <summary>A side holding the OTHER side's text, a plain file, a folder or nothing where the content should be is changed since, both ways, and nothing changes.</summary>
