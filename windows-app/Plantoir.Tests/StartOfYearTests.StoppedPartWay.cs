@@ -336,7 +336,7 @@ public partial class StartOfYearTests
     public void TheOfferIsAnsweredOnceAndAPreviewIsStartedAgainOnce()
     {
         var stop = StopPartWay();
-        var recorder = new AnswersRecorder(this);
+        var recorder = new AnswersRecorder(this, sectionsAfter: [1, 2]);
         recorder.Previewing.Add(1);
         recorder.Previewing.Add(2);
         var offer = new StartOfYearRestoreOffer(stop, () => false);

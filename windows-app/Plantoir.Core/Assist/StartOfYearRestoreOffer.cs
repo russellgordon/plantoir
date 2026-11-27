@@ -45,6 +45,7 @@ public sealed class StartOfYearRestoreOffer
 
     private readonly Func<bool> _aDeployOfTheCourseRuns;
     private bool _answered;
+    private bool _restoreChosen;
     private bool _restoreRan;
 
     // ---- Computed properties ---------------------------------------------------------
@@ -86,6 +87,7 @@ public sealed class StartOfYearRestoreOffer
         if (_answered) return RestoreCoursePress.AlreadyAnswered;
         if (_aDeployOfTheCourseRuns()) return RestoreCoursePress.HeldBackByADeploy;
         _answered = true;
+        _restoreChosen = true;
         return RestoreCoursePress.Closes;
     }
 
@@ -102,11 +104,11 @@ public sealed class StartOfYearRestoreOffer
     /// the course is stopped, the whole-course restore runs with the backup Go
     /// made, and each stopped preview is started again once, if the course as
     /// restored still has that section and it is not already running. Runs
-    /// once, and only after <see cref="RestoreCourseIsPressed"/> closed the offer.
+    /// once, and only when <see cref="RestoreCourseIsPressed"/> answered the offer (never after Leave As It Is).
     /// </summary>
     public async Task RestoreCourseAsync(StartOfYearRestoreAnswers answers)
     {
-        if (!_answered || _restoreRan) return;
+        if (!_restoreChosen || _restoreRan) return;
         _restoreRan = true;
         IReadOnlyList<int> stopped = await answers.StopEveryPreviewOfTheCourse();
         await answers.RestoreWholeCourse(Stop.Backup);
