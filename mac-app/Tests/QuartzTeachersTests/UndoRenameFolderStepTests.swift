@@ -995,7 +995,6 @@ final class UndoRenameFolderStepTests: XCTestCase {
             if let listingSha = op.listingSha {
                 line += " listing " + listingSha
             }
-            line += op.linkSha == nil ? "" : " link"
             opLines.append(line)
         }
         XCTAssertEqual(opLines, [

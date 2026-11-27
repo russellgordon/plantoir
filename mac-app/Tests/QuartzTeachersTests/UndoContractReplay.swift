@@ -598,11 +598,6 @@ nonisolated enum UndoContractReplay {
                 given["sha"] = UndoHash.sha256(of: Data(text.utf8))
                 given["contentText"] = nil
             }
-            if let target = string(given["linkTarget"]) {
-                // U4b2-14: a link's move, judged by the bytes it holds.
-                given["linkSha"] = UndoHash.sha256(of: Data(target.utf8))
-                given["linkTarget"] = nil
-            }
             if let tree = given["listing"] as? [String: Any] {
                 let made: UndoTreeListing = listing(from: tree)
                 given["listingSha"] = made.sha
@@ -803,7 +798,6 @@ nonisolated enum UndoContractReplay {
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
         "movedFolder", "caseOnlyFolder", "refusalNamed", "keptWhatItReplacedSays", "madeFolder", "foldersInside",
-        "linkedFolder",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1439,9 +1433,6 @@ nonisolated enum UndoContractReplay {
             }
             if let wanted = string(testCase["foldersInside"]), UndoContractKinds.foldersInside(in: root) != wanted {
                 failures.append("stackCases '\(name)': the folders inside the moved folder are \(UndoContractKinds.foldersInside(in: root)), not \(wanted)")
-            }
-            if let wanted = string(testCase["linkedFolder"]), UndoContractKinds.linkedFolder(in: root) != wanted {
-                failures.append("stackCases '\(name)': the moved link is \(UndoContractKinds.linkedFolder(in: root)), not \(wanted)")
             }
             if let wanted = int(testCase["keptWhatItReplacedLines"]), keptWhatItReplacedLines != wanted {
                 failures.append("stackCases '\(name)': \(keptWhatItReplacedLines) 'undo kept what it replaced' lines, not \(wanted)")

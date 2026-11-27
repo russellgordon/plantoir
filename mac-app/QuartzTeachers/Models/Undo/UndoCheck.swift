@@ -1188,8 +1188,7 @@ nonisolated enum UndoSwap {
                 // a tidy could not remove, or one an outgoing page rests on):
                 // the part-two review's M1.
                 var leftOut: [String: UndoItem] = ownFilesInside(from)
-                // A link's move reads nothing through the link (U4b2-14).
-                if op.linkSha == nil, let seq = UndoSwap.stepSeq(ofLabel: label) {
+                if let seq = UndoSwap.stepSeq(ofLabel: label) {
                     for (inside, item) in UndoSwap.stepsOwnFilesInside(from, seq: seq) {
                         leftOut[inside] = item
                     }

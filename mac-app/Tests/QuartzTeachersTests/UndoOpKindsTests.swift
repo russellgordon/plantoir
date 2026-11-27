@@ -750,56 +750,6 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("a.md")), Data("kept\n".utf8))
     }
 
-    /// U4b2-14: a `move` whose item is a symbolic link reads the link
-    /// itself, by the bytes it holds, and never what it leads to: a link to
-    /// a folder outside the working folder, behind a folder nobody may
-    /// enter, is the content; so is a link that leads nowhere. Through the
-    /// door the link is moved, undone and redone as itself, the leaf never
-    /// resolved, and the outside never touched. MUST FAIL with the reading
-    /// following the link (`stat` for `lstat`).
-    func testALinkItemIsReadWithoutFollowingIt() throws {
-        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
-        let locked: URL = scratchURL.appendingPathComponent("outside/locked", isDirectory: true)
-        let target: URL = locked.appendingPathComponent("target", isDirectory: true)
-        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
-        try Data("outside\n".utf8).write(to: target.appendingPathComponent("page.md"))
-        let from: String = "courses/TST1O/section1/media"
-        let to: String = "courses/TST1O/section1/renamed"
-        try FileManager.default.createDirectory(
-            at: root.appendingPathComponent(from).deletingLastPathComponent(), withIntermediateDirectories: true
-        )
-        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent(from).path, withDestinationPath: target.path)
-        let nowhere: String = scratchURL.appendingPathComponent("nowhere").path
-        let dangling: URL = root.appendingPathComponent("courses/TST1O/section1/gone")
-        try FileManager.default.createSymbolicLink(atPath: dangling.path, withDestinationPath: nowhere)
-        XCTAssertEqual(chmod(locked.path, 0), 0)
-        defer {
-            _ = chmod(locked.path, 0o755)
-        }
-        let op: UndoOp = UndoOp.moveLink(from: from, to: to, linkSha: UndoHash.sha256(of: Data(target.path.utf8)))
-        XCTAssertTrue(UndoOp.shapeIsKnown(op))
-
-        XCTAssertEqual(UndoMoveSide.read(op, at: root.appendingPathComponent(from)), .holdsTheContent)
-        XCTAssertEqual(UndoMoveSide.read(op, at: root.appendingPathComponent(to)), .free)
-        let leadingNowhere: UndoOp = UndoOp.moveLink(from: "courses/TST1O/section1/gone", to: to, linkSha: UndoHash.sha256(of: Data(nowhere.utf8)))
-        XCTAssertEqual(UndoMoveSide.read(leadingNowhere, at: dangling), .holdsTheContent, "a link is the content, wherever it leads")
-
-        let journal: UndoJournal = UndoJournal(folderURL: scratchURL.appendingPathComponent("undo", isDirectory: true))
-        let places: UndoMemoryPlaces = UndoMemoryPlaces()
-        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [op], blobs: [], root: root, action: "renameFolder")
-        XCTAssertEqual(JournaledWrite.perform(ops: draft, in: journal, mode: .live, places: places), .applied(seq: 1))
-        XCTAssertEqual(UndoTreeReading.linkTarget(at: root.appendingPathComponent(to)), Data(target.path.utf8))
-        XCTAssertEqual(journal.undoNewest(places: places), .undone(seq: 1))
-        XCTAssertEqual(UndoTreeReading.linkTarget(at: root.appendingPathComponent(from)), Data(target.path.utf8))
-        XCTAssertEqual(UndoItem.read(at: root.appendingPathComponent(to)), .absent)
-        XCTAssertEqual(journal.redoNewest(places: places), .redone(seq: 1))
-        XCTAssertEqual(UndoTreeReading.linkTarget(at: root.appendingPathComponent(to)), Data(target.path.utf8))
-
-        XCTAssertEqual(chmod(locked.path, 0o755), 0)
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: target.path), ["page.md"])
-        XCTAssertEqual(try String(contentsOf: target.appendingPathComponent("page.md"), encoding: .utf8), "outside\n")
-    }
-
     /// Review 1 of U4b2-14, MEDIUM 1: the step's own files are never looked
     /// for through a link, so nothing a link leads to is listed, wherever a
     /// plan or a swap asks. FAILED before the guard (the outside's file was

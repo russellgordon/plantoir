@@ -569,11 +569,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     /// the folder's listing (`UndoTreeListing`).
     var listingSha: String?
 
-    /// `move` of a symbolic link (U4b2-14): the SHA-256 of the bytes the
-    /// link holds, its target as written, read with `readlink`. The link
-    /// itself is what moves; what it leads to is never read or touched.
-    var linkSha: String?
-
     /// `external`: what outside the working folder it changed.
     var target: String?
 
@@ -614,7 +609,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         case to
         case sha
         case listingSha
-        case linkSha
         case target
         // Read only to say the op cannot be read: a later piece's meaning.
         case element
@@ -664,7 +658,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         to = UndoLenient.string(container, .to, &readable)
         sha = UndoLenient.string(container, .sha, &readable)
         listingSha = UndoLenient.string(container, .listingSha, &readable)
-        linkSha = UndoLenient.string(container, .linkSha, &readable)
         target = UndoLenient.string(container, .target, &readable)
         // `element` (editJSON) and `heldBy` (removeTree) are the reserved
         // shapes' keys for meanings a later piece settles: an op carrying
@@ -708,7 +701,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         try container.encodeIfPresent(to, forKey: .to)
         try container.encodeIfPresent(sha, forKey: .sha)
         try container.encodeIfPresent(listingSha, forKey: .listingSha)
-        try container.encodeIfPresent(linkSha, forKey: .linkSha)
         try container.encodeIfPresent(target, forKey: .target)
     }
 
@@ -913,16 +905,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         return op
     }
 
-    /// A symbolic link moved as itself (U4b2-14, opKinds.move): judged by
-    /// `linkSha`, the SHA-256 of its target as written.
-    static func moveLink(from: String, to: String, linkSha: String) -> UndoOp {
-        var op: UndoOp = UndoOp(kind: UndoOpKind.move.rawValue, path: nil)
-        op.from = from
-        op.to = to
-        op.linkSha = linkSha
-        return op
-    }
-
     /// `createTree` or `removeTree`: blobs are the listing's and every
     /// file's content, so the tree can be made again.
     static func tree(_ kind: UndoOpKind, path: String, listing: UndoTreeListing) -> UndoOp {
@@ -956,16 +938,11 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         if let sha = op.sha, !UndoOp.isBlobName(sha) {
             return false
         }
-        if let linkSha = op.linkSha, !UndoOp.isBlobName(linkSha) {
-            return false
-        }
         switch kind {
         case .move, .moveApart, .setAside:
             // No `path`: `from` and `to` follow path's rules, differ, and
-            // neither holds the other. Exactly one of a file's `sha`, a
-            // folder's `listingSha` and a link's `linkSha` (U4b2-14): a
-            // reader that knows no `linkSha` finds neither of the other two,
-            // so it cannot read the op rather than misread it.
+            // neither holds the other. Exactly one of a file's `sha` and a
+            // folder's `listingSha`.
             guard op.path == nil, let from = op.from, let to = op.to else {
                 return false
             }
@@ -977,11 +954,7 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             if UndoOp.placesOverlap(from, to) && !op.isCaseOnlyMove {
                 return false
             }
-            var contents: Int = 0
-            for given in [op.sha, op.listingSha, op.linkSha] where given != nil {
-                contents += 1
-            }
-            return contents == 1
+            return (op.sha != nil) != (op.listingSha != nil)
         case .external:
             guard op.path == nil, let target = op.target else {
                 return false
@@ -1051,12 +1024,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     /// comparison, without regard to case (U4b2-9).
     static func moveCarries(_ move: UndoOp, _ edit: UndoOp) -> Bool {
         guard move.knownKind == .move, let from = move.from, let to = move.to, let path = edit.path else {
-            return false
-        }
-        // A link's move carries nothing (U4b2-14, review 1, MEDIUM 1): a
-        // link is neither a file nor a folder the move moved, so an edit
-        // under its `to` breaks opKinds.wholeOps and the step is unreadable.
-        if move.linkSha != nil {
             return false
         }
         switch edit.knownKind {

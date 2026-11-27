@@ -1017,9 +1017,6 @@ def move_state(op, at_from, at_to, listed_as=None):
             return "free"
         if "sha" in op:
             return "holds" if reading == ("file", op["sha"]) else "else"
-        if "linkSha" in op:
-            # U4b2-14: a link moved as itself, judged by its target.
-            return "holds" if reading == ("link", op["linkSha"]) else "else"
         return "holds" if reading == ("tree", op["listingSha"]) else "else"
     source, destination = side(at_from), side(at_to)
     if source == "free" and destination == "holds":
@@ -1261,9 +1258,6 @@ def move_carries(move, edit):
     the old one (U4b, opKinds.wholeOps). At or inside `to` is part_inside,
     without regard to case (U4b2-9)."""
     if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
-        return False
-    if "linkSha" in move:
-        # A link's move carries nothing (review 1 of U4b2-14).
         return False
     if part_inside(move["to"], edit["path"]) is None:
         return False

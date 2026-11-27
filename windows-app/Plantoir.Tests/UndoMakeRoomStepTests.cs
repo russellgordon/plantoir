@@ -274,9 +274,10 @@ public sealed class UndoMakeRoomStepTests : IDisposable
     /// changes. Windows writes the step plainly, as Make Room always wrote it:
     /// a plain copy at the new name, the link itself removed (and a page the
     /// chain writes where it stood is a plain file), the file it led to never
-    /// touched, and no step recorded. #1055's W1 brings the Mac's refusal to
-    /// Windows and retires this test; until then it holds the difference by
-    /// name (it took the place of the ledger's
+    /// touched, and no step recorded. The two platforms differ here by
+    /// Russell's rule on #1055 (no link code beyond reading and writing
+    /// through a link); this test holds the difference by name (it took the
+    /// place of the ledger's
     /// Reason899W7b2MakeRoomLinkedPage row when Make Room was converted), and
     /// it reads the clause: once the contract no longer states both sides, it
     /// fails, so the difference never outlives its requirement. For a link to
@@ -289,7 +290,7 @@ public sealed class UndoMakeRoomStepTests : IDisposable
     public void ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges(bool insideTheWorkingFolder)
     {
         string clause = UndoContract.Undo.GetProperty("rule").GetProperty("shadow").GetString()!;
-        const string settle = "undo.rule.shadow no longer states the linked-page difference this test holds: settle it (#1055 W1) and change this test to the contract's one rule";
+        const string settle = "undo.rule.shadow no longer states the linked-page difference this test holds: settle it (#1055) and change this test to the contract's one rule";
         Assert.True(clause.Contains("never follows the link and is refused before anything changes", StringComparison.Ordinal), settle + " (the mac's refusal is gone)");
         Assert.True(clause.Contains("saving a plain copy at the new name and deleting the link itself, the linked file left untouched", StringComparison.Ordinal), settle + " (Windows' plain copy is gone)");
         Assert.True(clause.Contains("held by name in UndoMakeRoomStepTests." + nameof(ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges), StringComparison.Ordinal),
