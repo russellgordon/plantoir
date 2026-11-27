@@ -808,6 +808,11 @@ class AnOwnedLessonStaysUnderItsClass(unittest.TestCase):
     firstClassKeepsASharedLessonCasesLayout`)."""
 
     def setUp(self):
+        # My Progress reads its words from the contract; natively the
+        # toolchain's default is the container's /opt/contracts, so point it
+        # at the repository's own, as `_load` does (test_my_progress.py did
+        # this at import; here no other test may have run first).
+        _load()
         self.folder = Path(tempfile.mkdtemp())
         self.course = self.folder / "courses" / "TEST"
         self.content = self.folder / "content"
