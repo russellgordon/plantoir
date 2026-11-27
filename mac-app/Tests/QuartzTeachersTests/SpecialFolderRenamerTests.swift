@@ -876,10 +876,9 @@ final class SpecialFolderRenamerTests: XCTestCase {
         XCTAssertFalse(ending.sentence.contains("was not renamed"), ending.sentence)
     }
 
-    /// A link at the new name is this rename's folder only where this run
-    /// moved a link there (review 1, L3). MUST FAIL with a link counted as
-    /// a folder.
-    func testALinkAtTheNewNameIsNotTheRenamedFolderUnlessALinkWasMoved() throws {
+    /// A link at the new name is never this rename's folder (review 1, L3).
+    /// MUST FAIL with a link counted as a folder.
+    func testALinkAtTheNewNameIsNotTheRenamedFolder() throws {
         let course: URL = temporaryDirectory.appendingPathComponent("courses/ICS3U")
         let elsewhere: URL = temporaryDirectory.appendingPathComponent("elsewhere")
         try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
@@ -893,15 +892,6 @@ final class SpecialFolderRenamerTests: XCTestCase {
             planned: [], earlierRecord: record
         )
         XCTAssertEqual(recordedOnly.places, [], "a link was named as the renamed folder")
-
-        let movedALink: FolderRenamePlan.Move = FolderRenamePlan.Move(
-            from: course.appendingPathComponent("Concepts"), to: place, listingSha: "", isALink: true
-        )
-        let moved: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
-            renaming: "Concepts", to: "Ideas", scope: .shared, courseDirectory: course, sectionNumbers: [],
-            planned: [movedALink], earlierRecord: nil
-        )
-        XCTAssertEqual(moved.places, ["Ideas"])
     }
 
     // MARK: - U4b2-6: a record that does not say what it moved
@@ -964,7 +954,7 @@ final class SpecialFolderRenamerTests: XCTestCase {
         )
         let move: FolderRenamePlan.Move = FolderRenamePlan.Move(
             from: course.appendingPathComponent("section2/Tasks"),
-            to: course.appendingPathComponent("section2/Assessments"), listingSha: "", isALink: false
+            to: course.appendingPathComponent("section2/Assessments"), listingSha: ""
         )
 
         claim.renameIsStarting(moving: [move], sectionNumbers: [1, 2])

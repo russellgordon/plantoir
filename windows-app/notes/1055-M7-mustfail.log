@@ -1,0 +1,6 @@
+#1055 M7 must-fail, 2026-11-27
+Mutant (never committed): foldersAtTheirNewName counts a link at the new name as the renamed folder (case .link: result.places.append(inside)).
+Run: SpecialFolderRenamerTests alone, through xlock.sh.
+/Users/russellgordon/plantoir/wt-1055-M7/mac-app/Tests/QuartzTeachersTests/SpecialFolderRenamerTests.swift:894: error: -[QuartzTeachersTests.SpecialFolderRenamerTests testALinkAtTheNewNameIsNotTheRenamedFolder] : XCTAssertEqual failed: ("["Ideas"]") is not equal to ("[]") - a link was named as the renamed folder
+	 Executed 51 tests, with 1 failure (0 unexpected) in 0.517 (0.524) seconds
+Reverted byte for byte (git diff of SpecialFolderRenamer.swift back to the M7 change only).
