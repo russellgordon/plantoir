@@ -2015,7 +2015,28 @@ class ContractCaseTests(unittest.TestCase):
             journal = json.load(handle)["undoJournal"]
         events = set(journal["events"])
         self.assertEqual(events, {"begin", "applied", "rolledBack", "interrupted", "undoing", "undone",
-                                  "redoing", "redone", "failed", "dropped", "pruned", "cleared", "note"})
+                                  "redoing", "redone", "failed", "dropped", "pruned", "cleared", "note",
+                                  "filesReplacedByARestore"})
+
+    def test_files_replaced_by_a_restore_folds_as_the_contracts_row_says(self):
+        with open(REPO / "contracts" / "file-formats.json", encoding="utf-8") as handle:
+            moves = json.load(handle)["undoJournal"]["folding"]["moves"]
+        rows = [row for row in moves if row["on"] == "filesReplacedByARestore"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["from"], "in flight (begun, undoing, redoing)")
+        self.assertEqual(rows[0]["to"], "(no move: its paths join the step's files set aside)")
+        model = traces.Model()
+        in_flight = model.begin([])
+        model.files_replaced_by_a_restore(in_flight, ["courses/ICS3U/a.md"])
+        model.files_replaced_by_a_restore(in_flight, ["courses/ICS3U/a.md", "courses/ICS3U/b.md"])
+        step = model.find(in_flight)
+        self.assertEqual(step["phase"], "begun")
+        self.assertEqual(step["setAside"], ["courses/ICS3U/a.md", "courses/ICS3U/b.md"])
+        model.finish(in_flight)
+        # Not in flight: "anything else" -> ignored.
+        model.files_replaced_by_a_restore(in_flight, ["courses/ICS3U/c.md"])
+        self.assertEqual(step["phase"], "done")
+        self.assertEqual(step["setAside"], ["courses/ICS3U/a.md", "courses/ICS3U/b.md"])
 
 
 class ContractFileReadabilityTests(unittest.TestCase):

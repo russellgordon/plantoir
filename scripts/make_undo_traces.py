@@ -2148,12 +2148,25 @@ class Model:
         seq = self.highest
         self.steps.append({"seq": seq, "ops": ops, "phase": "begun",
                            "made": None if no_time else (self.clock if made is None else made),
-                           "readable": readable, "clearedInFlight": False, "dead": dead})
+                           "readable": readable, "clearedInFlight": False, "dead": dead,
+                           "setAside": []})
         self.write_line()
         return seq
 
     def note(self):
         """A neutral line: every reader passes over it."""
+        self.write_line()
+
+    def files_replaced_by_a_restore(self, seq, paths):
+        """A `filesReplacedByARestore` line (#899, file-formats.json ->
+        undoJournal.folding.moves): a step in flight has no move, its paths
+        join the files set aside, each once; a step not in flight ignores
+        it, as any event that does not follow."""
+        step = self.find(seq)
+        if step is not None and step["phase"] == "begun":
+            for path in paths:
+                if path not in step["setAside"]:
+                    step["setAside"].append(path)
         self.write_line()
 
     def finish(self, seq, phase="done"):
