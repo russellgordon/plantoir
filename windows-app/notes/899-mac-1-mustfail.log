@@ -1,0 +1,49 @@
+mac-1 (#899) must-fail, RED 6 of 6. Each sabotage applied by script, built, run, the file restored with git checkout (git status clean after each).
+
+M1 run-m1-mf-M1: the exception removed from UndoOp.shapeIsKnown (placesOverlap && !isCaseOnlyMove only).
+   RED, 41 failures: testARelinkWhereTheLinkStandsIsReadableOnlyAsAMoveCarryingThePair (shapeIsKnown false), ...IsMadeThroughJournaledStepUndoneAndRedone (refused notReadable), ...KilledInsideItsSwapIsWholeAfterRecovery, testTheLinkChangedByHandBetweenPlanAndMakeIsRefused (notReadable, not changedSince).
+M2 run-m1-mf-M2: the one-place judgement removed from UndoCheck.wholeState (the place read for `from` by the old text and for `to` by the new: neither both ways).
+   RED, 45 failures: testARelinkWhereTheLinkStandsIsJudgedAtTheOnePlace ("neither" is not "before" / "after"), ...GoesForwardAndBack (changedSince), ...ALaterFailure..., ...IsMadeThroughJournaledStep..., ...KilledInsideItsSwap...
+M3 run-m1-mf-M3: RENAME_EXCL put back in UndoSwap.exchange (every make fails).
+   RED, 41 failures: ...GoesForwardAndBack (refused fileIsInUse), ...ALaterFailure..., ...IsMadeThroughJournaledStep..., ...KilledInsideItsSwap... (relinkSwapped never reached).
+M4 run-m1-mf-M4c: the staged tidy skipped for staged links in UndoSwap.tidyLeftovers.
+   RED, 62 failures: ...KilledInsideItsSwapIsWholeAfterRecovery (a `.Unit 1, Day 4.md.plantoir-undo-1-apply-new` left), and relink-3's two kill tests.
+   (First tries, kept for the record: run-m1-mf-M4 skipped only the new content rule, and run-m1-mf-M4b skipped only tidyStagedFiles; both GREEN, because recovery's other tidies remove staged items by name; see the notes, "For the director".)
+M5 run-m1-mf-M5: the one place freed in JournaledStep.refusesAWrite (no refusal at a relink's `to` when it is also its `from`).
+   RED, 5 failures: testAWriteAtTheOnePlaceRefusesTheStepBeforeAnythingChanges (write, writeNew, remove: no cannotTellNow).
+M6 run-m1-mf6 (Python): the one-place case taken out of make_undo_traces.move_state.
+   RED: test_check_cases ('changedSince' != 'canUndo', != 'alreadyBack' on the mac-1 rows), test_recovery_cases_with_a_relink (both inPlace step rows).
+
+Fix round one (review 1), RED 7 of 7.
+F-A run-f1-mf-A: UndoOp.isOnePathByteForByte as `first == second` (canonical equivalence).
+   RED, 4 failures: testTheSamePlaceInAnotherUnicodeNormalisationIsNotARelinkWhereItStands (3), UndoJournalContractTests.testCheckCases (the normalisation row).
+F-B run-f1-mf-B: .refusedByTheVolume mapped to fileIsInUse again.
+   RED, 1 failure: testAVolumeThatRefusesTheExchangeIsRefusedWithATrueReason.
+F-C run-f1-mf-C: tidyLeftovers' rule taken out (a staged link removed whatever text it holds).
+   RED, 1 failure: testRecoveryLeavesAStagedLinkHoldingAnotherText.
+F-D run-f1-mf-D: relinkLink's look back at writes planned earlier taken out.
+   RED, 5 failures: testAWritePlannedAtTheOnePlaceBeforeTheRelinkRefusesTheStep (write, writeNew, remove).
+F-E run-f1-mf-E: the rename back after a refused exchange back taken out.
+   RED, 4 failures: testThePlaceChangedUnderTheSwapIsGivenBackEvenWhenTheExchangeBackFails (backFails true).
+F-P1 run-f1-mf-P1 (Python): part_inside without NFC.
+   RED: test_check_cases on the normalisation row.
+F-P2 run-f1-mf-P2 (Python): settle_what_was_set_aside not called.
+   RED: test_recovery_cases_with_a_relink on the two relinkSetAside rows.
+
+Fix round two (review 2), RED 2 of 2.
+F-G run-f2-mf-G: the one rule's block in UndoSwap.tidyLeftovers switched off (`if false, ...`): the relink staged name tidied by removeStaged as before.
+   RED, 3 failures: testAKillAfterTheExchangeOnceThePlaceChangedGivesTheTeachersItemBack (the teacher's file deleted), testRecoveryLeavesAStagedLinkHoldingAnotherText (left hidden).
+F-H run-f2-mf-H: settleUnderARelinksStagedName never keeps under a visible name (returns .notNow before the rename).
+   RED, 6 failures: case (a) file and folder, case (b) (the older save left under the staged name), and the third-text test.
+Each restored with git checkout; git status clean of Swift after each.
+
+## Fix round three
+F-I (Mac): UndoOp.isCaseOnlyMove compares the lowercased names as UTF-8 bytes (from.lowercased().utf8.elementsEqual(to.lowercased().utf8)) instead of Swift ==. RED: UndoJournalContractTests.testCheckCases, checkCases 'mac-1, a rename that changes both case and Unicode normalisation in the last part (école decomposed to École composed): a capitalisation-only move, as the step left it' (undo read other than canUndo). Log .dd/run-f3-mf-I.log, 19 tests, 1 failure. Restored with git checkout (UndoFormat.swift then held only the comment change, re-applied).
+F-P3 (Python): settle_what_was_set_aside with round two's by-stop-point rule (the item set aside overwrites any place unless it is the start link). RED: RelinkRecoveryByStateTests.test_a_third_item_at_the_place_keeps_the_teachers_item_visible. Restored from a copy, cmp equal.
+F-P4 (Python, seen before the fix): is_case_only_move without NFC. RED: test_check_cases on the case-and-normalisation row (read notReadable).
+
+## Fix round four
+F-J (Mac): tidyLeftovers judges by the one rule every staged name whose place is any relink's from or to (review 3's present branch, the old relinkPlaces test) instead of the relink's own name. RED: UndoRelinkTests.testChainedLinkMovesKilledAtEveryStopPointLoseNoLink, row aNewClassWrittenAtTheRelinksFrom: 5 of its 20 kills leave 'Unit 1, Day 4 (kept by Undo).md' (apply beforeSwap(0); redo beforeSwap(0), relinkStaged(0), relinkRenamedIn(0); undo relinkRenamedIn(1)). Log .dd/run-f4-mf-J.log. The tests-first run before the fix (run-f4-red2) showed 6 of 20 (the set varies by run). Restored from a copy, cmp equal.
+F-K (Mac): relinkWhereItStands' tellingFirst says nothing (the live keep unsaid). RED: testASecondWriteAtThePlaceInsideTheSwapLeavesTheNewestSaveAtThePlace (said [] not the kept-page line). Log .dd/run-f4-mf-K.log. Restored, cmp equal.
+F-L (Mac): settle returns couldNotMove when the rename back is refused (left hidden). RED: testARenameBackRefusedKeepsTheTeachersItemVisibleAndSaid, 4 failures (refused couldNotWrite; no kept copy; the item left under the staged name; nothing said). Log .dd/run-f4-mf-L.log. Restored, cmp equal.
+F-M (Mac): the pre-clean reads cannotReadNow as a refused move (refusedByTheVolume). RED: testAnUnreadableItemUnderTheStagedNameIsCannotTellNow (couldNotWrite, not cannotTellNow). Log .dd/run-f4-mf-M.log. Restored, cmp equal.

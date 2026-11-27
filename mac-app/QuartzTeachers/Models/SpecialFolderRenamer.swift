@@ -293,8 +293,8 @@ enum SpecialFolderRenamer {
     /// name, that this rename moves or an earlier run of it moved: what a
     /// later part-way ending may call "still called" the new name.
     /// `mayHaveMoved` (U4b2-6) is every place an earlier run's record that
-    /// did not say what it moved (one Windows or an older build wrote) may
-    /// have moved: a later ending says it cannot tell whether those are this
+    /// did not say what it moved (a released Windows build or an older Mac
+    /// build wrote) may have moved: a later ending says it cannot tell whether those are this
     /// rename's, and never names them as still called the new name. Each is
     /// an array of strings, left out when empty.
     nonisolated static func recordRenameStarting(

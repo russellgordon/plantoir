@@ -1679,7 +1679,7 @@ nonisolated enum UndoContractReplay {
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
         "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored", "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
-        "withAHandedOverPlace", "handedOver", "withARelink",
+        "withAHandedOverPlace", "handedOver", "withARelink", "platform",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1692,9 +1692,20 @@ nonisolated enum UndoContractReplay {
             UndoKillPoints.fileInUseAtSwap = nil
         }
         for testCase in cases {
-            number += 1
             let name: String = string(testCase["name"]) ?? "?"
             failures += unknownKeys(in: testCase, allowed: recoveryKeys, list: "recoveryCases", name: name)
+            // A row marked for one platform's own mechanism (recoveryCasesHow,
+            // mac-1's fix round): Windows' kill states are not the Mac's.
+            if let platform = string(testCase["platform"]) {
+                if platform == "windows" {
+                    continue
+                }
+                if platform != "mac" {
+                    failures.append("recoveryCases '\(name)': platform '\(platform)' is neither mac nor windows")
+                    continue
+                }
+            }
+            number += 1
             let place: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "recovery-\(number)")
             let root: URL = place.root
             let first: String = "courses/TST1O/Section 1/Classes/A.md"
@@ -1784,6 +1795,7 @@ nonisolated enum UndoContractReplay {
                 "chained": "relinkTwoChainedLinks",
                 "chainedThree": "relinkThreeChainedLinks",
                 "thenAMove": "relinkThenMoveALinkIntoItsPlace",
+                "inPlace": "relinkALinkWhereItStands",
             ]
             var handedOverCall: String? = nil
             var handedOverBefore: String = ""
@@ -2411,7 +2423,7 @@ nonisolated enum UndoContractReplay {
                 failures.append("recoveryCases '\(name)': recovery left a staged file beside a page")
             }
         }
-        return (cases: cases.count, failures: failures)
+        return (cases: number, failures: failures)
     }
 
     static func killPoint(named name: String) -> UndoKillPoint {
@@ -2423,6 +2435,9 @@ nonisolated enum UndoContractReplay {
         }
         if name.hasPrefix("relinkRenamedIn:") {
             return .relinkRenamedIn(Int(name.dropFirst("relinkRenamedIn:".count)) ?? 0)
+        }
+        if name.hasPrefix("relinkSwapped:") {
+            return .relinkSwapped(Int(name.dropFirst("relinkSwapped:".count)) ?? 0)
         }
         switch name {
         case "afterBegin":

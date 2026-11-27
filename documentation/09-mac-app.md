@@ -23880,6 +23880,65 @@ linked to one shared lesson keep the last date written (ruled: it will keep
 the first class's date); a renamed page's rename that cannot be done (its new
 name taken) leaves a link re-pointed at that new name.
 
+### mac-1: a relink where the link stands
+
+The door now reads, judges, swaps and recovers a relinking move whose `from`
+and `to` are one path byte for byte (`opKinds.move`'s second exception;
+`UndoOp.isARelinkWhereItStands`): the link's text is changed where it
+stands. It is readable only as a `move` carrying `linkShaBefore` and
+`linkShaAfter` and nothing else (never a `moveApart` or a `setAside`, never
+with `linkSha` beside the pair), and is judged at its one place with `lstat`
+and `readlink`: the old text is before, the new text after, anything else
+changed since, an unreadable place cannot tell. `UndoSwap.relinkWhereItStands`
+stages the new link under the `-new` name beside the place, exchanges the two
+in one `renamex_np(RENAME_SWAP)` (measured on APFS: both names must exist, and
+the two trade places), then re-reads what came out: the old text is removed,
+anything else is exchanged back and refused, so nothing of the teacher's is
+lost. There is never a moment with both links at the place, so
+`relinkRenamedIn` does not arise; the new stop point `relinkSwapped(N)` is the
+moment after the exchange. Recovery judges the place as any op and removes a
+staged link by the text it holds (one of the step's texts, both in the list).
+The place is never handed over (`handsOverAsAMove` is false for it), and in
+`JournaledStep` `relinkLink(p, to: p, textAfter:)` plans it with no place
+freed: a write planned at `p` refuses the step before anything changes.
+Nothing calls it yet but the tests: Insert Class's in-between link (ruling 6)
+and an earlier class's link (the evening's ruling 3) are mac-2 and mac-3.
+
+Fix round one (review 1). The same-place test compares UTF-8 bytes through one
+function, `UndoOp.isOnePathByteForByte`, everywhere it is asked (Swift's `==`
+is Unicode canonical equivalence, so `Café` composed in `from` and decomposed
+in `to` had read as one path; now its places overlap and it is not readable).
+The contract states the swap's GUARANTEE in platform-neutral words (exactly one
+link at the place holding the whole before or after text at every kill
+moment, nothing staged left, a teacher's item that appears there never
+destroyed or hidden) and names each platform's mechanism: the Mac's exchange,
+and Windows' four exclusive renames (stage, set aside, rename in, re-read),
+NTFS having no exchange and a replace destroying what it replaces; a
+`recoveryCases` row only one mechanism reaches carries `platform`. A volume
+that refuses `RENAME_SWAP` is refused `couldNotWrite` (nothing moved), never
+`fileIsInUse`, with no fallback. A place found changed under the swap is given
+back (exchanged back, or the swap's own link taken out and the item renamed
+back) and refused changed since. Every tidy removes a staged link only by the
+text it holds, and a write planned at `p` refuses the step whether it was
+planned before the relink or after it.
+
+Fix round four (review 3). The one rule for what stands under a relink's
+staged name (review 2: only a link holding one of the step's texts is
+removed; anything else is the teacher's, given back or kept visible) is
+handed the EXACT name it may judge, `UndoStepLinks.ownStagedNames(label:)`:
+the relink's own `-new` name for the direction the label moves (beside the
+one place for a relink where the link stands; beside `to` for an apply or
+redo of a two-place relink, beside `from` for its Undo; a `-recover` label
+the other way). It no longer catches every staged name beside a relink's
+place: in Insert Class's shape (a new page written at the relink's `from`)
+the write's staged page and its kept original had been read as the
+teacher's, kept as `Unit 1, Day 4 (kept by Undo).md` and reported as a kept
+page. The live swap now says the kept-page or kept-folder line wherever it
+keeps an item visible (`tellingKept`, threaded through `UndoSwap.swap`); a
+rename back refused because the place filled meanwhile keeps the item
+visible rather than hidden; and an item that cannot be read refuses
+`cannotTellNow`, only a refused move `couldNotWrite`.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
