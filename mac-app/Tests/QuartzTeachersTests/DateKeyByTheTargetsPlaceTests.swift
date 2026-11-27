@@ -30,11 +30,17 @@ final class DateKeyByTheTargetsPlaceTests: XCTestCase {
 
     /// One course, one section, six remembered meeting days, and Unit 1,
     /// Day 1 to Day 3 as plain pages on the first three.
-    func makeCourse() throws -> (root: URL, course: Course, classes: URL) {
+    /// `insideAFolder` puts the working folder one level down, so a case can
+    /// hold a file outside the working folder (the contract's cases).
+    func makeCourse(insideAFolder: Bool = false) throws -> (root: URL, course: Course, classes: URL) {
         let root: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("date-key-\(UUID().uuidString)", isDirectory: true)
         folders.append(root)
-        let courseURL: URL = root.appendingPathComponent("courses/ICS3U", isDirectory: true)
+        var workingFolder: URL = root
+        if insideAFolder {
+            workingFolder = root.appendingPathComponent("work", isDirectory: true)
+        }
+        let courseURL: URL = workingFolder.appendingPathComponent("courses/ICS3U", isDirectory: true)
         let classes: URL = courseURL.appendingPathComponent("section1/All Classes", isDirectory: true)
         try FileManager.default.createDirectory(at: classes, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(
@@ -200,9 +206,12 @@ final class DateKeyByTheTargetsPlaceTests: XCTestCase {
         let section: [String: Any] = try XCTUnwrap(all["datingPagesAClassBrings"] as? [String: Any])
         let keys: [String: Any] = try XCTUnwrap(section["frontmatterKey"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(keys["linkedClassPageCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 5)
+        XCTAssertGreaterThanOrEqual(cases.count, 9)
         for entry in cases {
-            let made = try makeCourse()
+            // The course is `<working folder>/courses/ICS3U`, and the working
+            // folder has a parent of its own, where a case's file outside
+            // the working folder goes (`../../../`).
+            let made = try makeCourse(insideAFolder: true)
             let name: String = (entry["name"] as? String) ?? "?"
             let sectionNumber: Int = (entry["section"] as? Int) ?? 1
             let courseURL: URL = made.course.directoryURL
@@ -377,5 +386,177 @@ final class DateKeyByTheTargetsPlaceTests: XCTestCase {
         _ = try makeRoom(atDay: 2, in: made)
 
         XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), laid)
+    }
+
+    // MARK: - Tests: fix round one
+
+    /// Review 1, MEDIUM 1: Unit 1, Day 2 is a link to Unit 1, Day 3's own
+    /// page. Day 3 owns its own date; Day 2 writes nothing through its
+    /// link. MUST FAIL on ffda0ce59, which judged Day 2 "first" and wrote
+    /// the 10th into Day 3's page.
+    func testReDateKeepsALinkedToClassOnItsOwnDay() async throws {
+        let made = try makeCourse()
+        let dayTwo: URL = made.classes.appendingPathComponent("Unit 1, Day 2.md")
+        try FileManager.default.removeItem(at: dayTwo)
+        try FileManager.default.createSymbolicLink(atPath: dayTwo.path, withDestinationPath: "Unit 1, Day 3.md")
+        let dayThree: URL = made.classes.appendingPathComponent("Unit 1, Day 3.md")
+        let laid: String = try String(contentsOf: dayThree, encoding: .utf8)
+        let before: [String: String] = everything(under: made)
+
+        try reDate(in: made)
+
+        XCTAssertEqual(try String(contentsOf: dayThree, encoding: .utf8), laid, "Day 3 stays on the 14th")
+        XCTAssertEqual(everything(under: made), before, "nothing else is written either")
+    }
+
+    /// Review 1, MEDIUM 1: the same link, room made at Day 1. Day 3 (now
+    /// Day 4) moves to the 16th, its own page dated by its own move. MUST
+    /// FAIL on ffda0ce59, which skipped it as "not first" (the 14th).
+    func testInsertClassMovesALinkedToClassOwnDate() async throws {
+        let made = try makeCourse()
+        let dayTwo: URL = made.classes.appendingPathComponent("Unit 1, Day 2.md")
+        try FileManager.default.removeItem(at: dayTwo)
+        try FileManager.default.createSymbolicLink(atPath: dayTwo.path, withDestinationPath: "Unit 1, Day 3.md")
+        let before: [String: String] = everything(under: made)
+
+        _ = try makeRoom(atDay: 1, in: made)
+
+        let dayFour: URL = made.classes.appendingPathComponent("Unit 1, Day 4.md")
+        let after: String = try String(contentsOf: dayFour, encoding: .utf8)
+        XCTAssertTrue(after.contains("created: 2026-09-16T"), "the shifted class moves to the 16th: \(after)")
+        try await checkUndoReturns(before, in: made)
+    }
+
+    /// Review 1, MEDIUM 2: Day 2 is a link to a shared lesson and Day 3, a
+    /// plain page, brings that lesson by a wiki link. Re-date leaves the
+    /// lesson on Day 2's day. MUST FAIL on ffda0ce59, where Re-date's "what
+    /// each class brings" step wrote Day 3's day over it.
+    func testReDateKeepsTheFirstClassesDateWhenALaterClassBringsTheLesson() throws {
+        let made = try makeCourse()
+        let file: URL = try linkClasses(["Unit 1, Day 2"], toASharedLesson: sharedLesson(section1: "2026-09-20"), in: made)
+        let dayThree: URL = made.classes.appendingPathComponent("Unit 1, Day 3.md")
+        try "---\ntitle: Unit 1, Day 3\npublish: true\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nReview [[Shared]]\n"
+            .write(to: dayThree, atomically: true, encoding: .utf8)
+
+        try reDate(in: made)
+
+        let after: String = try String(contentsOf: file, encoding: .utf8)
+        XCTAssertTrue(after.contains("createdSection1: 2026-09-10T"), "Day 2's day: \(after)")
+        XCTAssertEqual(dateOfClass("Unit 1, Day 2", in: made), CalendarDay(text: "2026-09-10"))
+    }
+
+    /// Review 1, MEDIUM 2, the publishing path: publishing Day 3, which
+    /// brings the lesson Day 2 IS, does not date it to Day 3's day. MUST
+    /// FAIL on ffda0ce59.
+    func testPublishingALaterClassLeavesTheLessonAnEarlierClassIs() throws {
+        let made = try makeCourse()
+        let laid: String = "---\ntitle: Shared lesson\npublish: false\ncreatedSection1: 2026-09-10T07:00:00.000-0400\n---\n\nShared.\n"
+        let file: URL = try linkClasses(["Unit 1, Day 2"], toASharedLesson: laid, in: made)
+        let dayThree: URL = made.classes.appendingPathComponent("Unit 1, Day 3.md")
+        try "---\ntitle: Unit 1, Day 3\npublish: false\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nReview [[Shared]]\n"
+            .write(to: dayThree, atomically: true, encoding: .utf8)
+
+        let graph: AssistSectionGraph = AssistSectionGraph.read(forSection: 1, in: made.course, workspaceURL: nil)
+        let plan: AssistPublishPlan = AssistPublishPlanner.planPublishing(
+            titles: ["Unit 1, Day 3"], onOrAfter: nil, before: nil, graph: graph,
+            classPages: ClassPages.list(forSection: 1, in: made.course), forSection: 1, in: made.course
+        )
+        for move in plan.dateMoves {
+            XCTAssertNotEqual(move.page.fileURL.lastPathComponent, "Shared.md", "no date move for the lesson Day 2 is")
+        }
+        _ = try AssistPublishPlanner.apply(plan, forSection: 1, in: made.course)
+
+        XCTAssertTrue(try String(contentsOf: file, encoding: .utf8).contains("createdSection1: 2026-09-10T"))
+    }
+
+    /// Review 1, LOW 1: publishing a class that brings a page which is a
+    /// link in the section's folder to a course-level page dates it under
+    /// `createdSection1`. MUST FAIL with `AssistPublishPlanner.planWrites`
+    /// put back to the link's own place (`edit.isSectionLocal`).
+    func testPublishingDatesALinkedPageItBringsUnderTheSectionsLine() throws {
+        let made = try makeCourse()
+        let courseURL: URL = made.course.directoryURL
+        let real: URL = courseURL.appendingPathComponent("elsewhere/Shared notes.md")
+        try "---\ntitle: Shared notes\npublish: false\ncreatedSection1: 2026-09-01T07:00:00.000-0400\n---\n\nNotes.\n"
+            .write(to: real, atomically: true, encoding: .utf8)
+        let link: URL = courseURL.appendingPathComponent("section1/Notes.md")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "../elsewhere/Shared notes.md")
+        let dayThree: URL = made.classes.appendingPathComponent("Unit 1, Day 3.md")
+        try "---\ntitle: Unit 1, Day 3\npublish: false\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nSee [[Notes]]\n"
+            .write(to: dayThree, atomically: true, encoding: .utf8)
+
+        let graph: AssistSectionGraph = AssistSectionGraph.read(forSection: 1, in: made.course, workspaceURL: nil)
+        let plan: AssistPublishPlan = AssistPublishPlanner.planPublishing(
+            titles: ["Unit 1, Day 3"], onOrAfter: nil, before: nil, graph: graph,
+            classPages: ClassPages.list(forSection: 1, in: made.course), forSection: 1, in: made.course
+        )
+        _ = try AssistPublishPlanner.apply(plan, forSection: 1, in: made.course)
+
+        let after: String = try String(contentsOf: real, encoding: .utf8)
+        XCTAssertTrue(after.contains("createdSection1: 2026-09-14T"), "this section's line: \(after)")
+        XCTAssertFalse(after.contains("\ncreated:"), "no plain created through the link: \(after)")
+    }
+
+    /// Review 1, MEDIUM 3: a later class linked to the same lesson as an
+    /// earlier one, past the last date, is neither moved nor hidden, so the
+    /// plan does not count it among the classes that go on the last day as
+    /// drafts. MUST FAIL on ffda0ce59, which counted it.
+    func testReDateDoesNotCountALaterLinkedClassAsADraftOnTheLastDay() throws {
+        let made = try makeCourse()
+        try SectionTimetableStore.applyRememberTimetable(
+            try SectionTimetableStore.planRememberTimetable(
+                dates: ["2026-09-08", "2026-09-10"], source: "timetable.xlsx, block H", forSection: 1, in: made.course
+            )
+        )
+        try linkClasses(["Unit 1, Day 1", "Unit 1, Day 3"], toASharedLesson: sharedLesson(section1: "2026-09-08"), in: made)
+
+        let plan: SectionReDatePlan = try SectionReDatePlanner.plan(forSection: 1, in: made.course, workspaceURL: nil)
+
+        XCTAssertEqual(plan.overflowing, 0, "Day 3 stays as it is, on Day 1's lesson and date")
+        for move in plan.moves {
+            XCTAssertNotEqual(move.title, "Unit 1, Day 3")
+        }
+    }
+
+    /// The counterpart: a plain class past the last date is counted, moved
+    /// to the last day and hidden, as before.
+    func testReDateCountsAPlainClassPastTheLastDate() throws {
+        let made = try makeCourse()
+        try SectionTimetableStore.applyRememberTimetable(
+            try SectionTimetableStore.planRememberTimetable(
+                dates: ["2026-09-08", "2026-09-10"], source: "timetable.xlsx, block H", forSection: 1, in: made.course
+            )
+        )
+
+        let plan: SectionReDatePlan = try SectionReDatePlanner.plan(forSection: 1, in: made.course, workspaceURL: nil)
+
+        XCTAssertEqual(plan.overflowing, 1)
+        var dayThreeHidden: Bool = false
+        for move in plan.moves where move.title == "Unit 1, Day 3" {
+            dayThreeHidden = move.unpublishes
+        }
+        XCTAssertTrue(dayThreeHidden)
+    }
+
+    /// Review 1, LOW 5: a class page that links into a folder of the
+    /// section which is itself a link to a course-level folder is dated by
+    /// the place of the file it really is. MUST FAIL on ffda0ce59, which
+    /// judged it by the link's spelling (plain `created`).
+    func testALinkThroughALinkedFolderIsDatedByTheFilesRealPlace() throws {
+        let made = try makeCourse()
+        let courseURL: URL = made.course.directoryURL
+        try FileManager.default.createDirectory(
+            at: courseURL.appendingPathComponent("Shared", isDirectory: true), withIntermediateDirectories: true
+        )
+        try sharedLesson(section1: "2026-09-14").write(
+            to: courseURL.appendingPathComponent("Shared/Lesson.md"), atomically: true, encoding: .utf8
+        )
+        try FileManager.default.createSymbolicLink(
+            atPath: courseURL.appendingPathComponent("section1/Lessons").path, withDestinationPath: "../Shared"
+        )
+        let place: URL = made.classes.appendingPathComponent("Unit 1, Day 4.md")
+        try FileManager.default.createSymbolicLink(atPath: place.path, withDestinationPath: "../Lessons/Lesson.md")
+
+        XCTAssertEqual(ClassPages.dateKey(ofPageAt: place, forSection: 1, in: made.course), "createdSection1")
     }
 }
