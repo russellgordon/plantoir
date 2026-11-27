@@ -25,6 +25,10 @@ struct CourseSettingsView: View {
 
     @State var isShowingFoldersHelp: Bool = false
 
+    /// A Save that stopped part way and could not be finished at once: the
+    /// alert offering to put it back (#899, fix round one).
+    @State var putBackOffer: SettingPutBackOffer?
+
     /// The renames this page owns, one per folder list that renames
     /// (#899 U4b2-8): halted while they only plan when the page goes away.
     @State var renames: CourseSettingsRenames = CourseSettingsRenames()
@@ -449,6 +453,11 @@ struct CourseSettingsView: View {
             }
             .padding(12)
         }
+        .settingPutBackAlert(offer: $putBackOffer) { answer, shown in
+            if answer == .putItBack, let refused = CourseSettingsView.putBack(shown, course: course) {
+                saveProblem = refused
+            }
+        }
         .sheet(isPresented: $isShowingFoldersHelp) {
             SpecialFoldersHelpView(course: course)
         }
@@ -813,6 +822,9 @@ struct CourseSettingsView: View {
             saveProblem = holdingProblem.sentence
             return
         }
+        // The file's bytes before this Save: which settings a Save that
+        // cannot finish would put back, and what they held (#899).
+        let bytesBefore: Data? = try? Data(contentsOf: course.configFileURL)
         do {
             // What the file hid BEFORE this Save, for the trail — read from
             // the file, not this copy, because the file is what the site was
@@ -861,10 +873,61 @@ struct CourseSettingsView: View {
                 try? await Task.sleep(for: .seconds(3))
                 didJustSave = false
             }
+        } catch JournaledStepError.couldNotFinish(let seq, _) {
+            // Stopped part way and could not be finished at once: offered
+            // to be put back, never a sentence naming the file (#899).
+            putBackOffer = CourseSettingsView.putBackOffer(
+                seq: seq, before: bytesBefore ?? Data(), wanted: course.configuration.values
+            )
+            ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — stopped part way, offered to put back")
         } catch {
             saveProblem = "Could not save: \(error.localizedDescription)"
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
         }
+    }
+
+    /// The settings a teacher can be offered back one at a time, by their
+    /// key in `course_config.json`, with the name the alert says (#899, fix
+    /// round one). #986 adds each field here as it comes to save as it
+    /// changes; a Save that changed anything else, or several settings,
+    /// offers the course settings back together.
+    static let settingsNamedOneAtATime: [String: String] = [
+        "course_name": "course name",
+    ]
+
+    /// The offer for a Save that stopped part way: one setting by its own
+    /// name and old value when exactly one changed and it is named in
+    /// `settingsNamedOneAtATime` with a value a teacher can read; otherwise
+    /// the course settings, put back as they were.
+    static func putBackOffer(seq: Int, before: Data, wanted: [String: Any]) -> SettingPutBackOffer {
+        let together: SettingPutBackOffer = SettingPutBackOffer(seq: seq, setting: "course settings", valueBefore: nil)
+        guard let found = CourseConfiguration.memberChanges(from: before, to: wanted),
+              found.changes.count == 1,
+              let key = found.changes[0].keyPath.first,
+              let name = settingsNamedOneAtATime[key],
+              case .string(let text)? = found.changes[0].before else {
+            return together
+        }
+        let shown: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if shown.isEmpty {
+            return together
+        }
+        return SettingPutBackOffer(seq: seq, setting: name, valueBefore: shown)
+    }
+
+    /// Put It Back for a Save: the old values written back through the door
+    /// as recovery would, the step closed, the settings in memory read from
+    /// the file again; the save's own failure sentence, with no file name,
+    /// when that fails too.
+    static func putBack(_ offer: SettingPutBackOffer, course: Course) -> String? {
+        let verdict: UndoPutBackVerdict = UndoStoppedStep.putBackAtOnce(
+            seq: offer.seq, in: UndoJournalLocation.standardJournal()
+        )
+        try? course.configuration.replaceWithTheFile(url: course.configFileURL)
+        if verdict == .putBack {
+            return nil
+        }
+        return "Could not save: " + JournaledStepError.notMade.localizedDescription
     }
 
     /// The working folder this course lives in — the folder a preview's
