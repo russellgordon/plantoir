@@ -419,9 +419,10 @@ internal static class UndoRecovery
         // beside its pages like a live one, so one closed interrupted would
         // otherwise leave its dot-files in the course until the switch flips.
         // Shadow removes only the journal's own staged FILES of a step whose
-        // every op changes a file in place, never a folder set aside (the
-        // mac's tidyClosedSteps(onlyStepsOfFiles:)), and keeps a kept
-        // original that differs from its page.
+        // every op changes a file in place or moves a file or folder whole
+        // (ChangesOnlyFilesAndMoves, since W8-7), never a folder set aside or
+        // made (the mac's tidyClosedSteps(onlyStepsOfFiles:)), and keeps a
+        // kept original that differs from its page.
         TidyClosedSteps(writer, journal, trail, onlyStepsOfFiles: mode == UndoMode.Shadow);
         return new UndoRecoveryRun(settled, StoppedByATest: false, left);
     }
