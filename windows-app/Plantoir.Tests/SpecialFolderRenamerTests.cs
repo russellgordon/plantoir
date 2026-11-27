@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
@@ -649,5 +650,264 @@ public class SpecialFolderRenamerTests : IDisposable
         string trail = Trail();
         Assert.Contains("renamed the folder Tasks to Assessments in ICS3U, but could not tidy the note kept while a folder rename is unfinished (", trail);
         Assert.DoesNotContain("did not rename", trail);
+    }
+
+    // ------------------------------- a rename stopped part way says what the disk shows (#899 W8b-18b)
+
+    /// <summary><c>shared-rules.json</c> → <c>undo.wording.&lt;key&gt;</c>, read by key.</summary>
+    private static string Wording(string key) =>
+        ContractLoader.LoadJson("shared-rules.json")["undo"]!["wording"]![key]!.ToString();
+
+    /// <summary>The contract's sentence with its places filled and <c>{said}</c> left off: what a sentence must start with.</summary>
+    private static string Before(string sentence) => sentence.Substring(0, sentence.IndexOf("{said}", StringComparison.Ordinal));
+
+    private string InCourse(string relative) => Path.Combine(RecordCourse, relative.Replace('/', Path.DirectorySeparatorChar));
+
+    [Fact]
+    public void TheRenameSentencesAreTheContractsOwnByKey()
+    {
+        Assert.Equal(Wording("renameFolderNothingWasChanged"), SpecialNames.RenameFolderNothingWasChanged);
+        Assert.Equal(Wording("renameFolderStoppedPartWay"), SpecialNames.RenameFolderStoppedPartWay);
+        Assert.Equal(Wording("renameFolderRenamedOnlyInPart"), SpecialNames.RenameFolderRenamedOnlyInPart);
+        Assert.Equal(Wording("renameFolderMayBeRenamedInPart"), SpecialNames.RenameFolderMayBeRenamedInPart);
+    }
+
+    [Fact]
+    public void EachSentenceIsTheContractsWithItsPlaceholdersFilled()
+    {
+        Assert.Equal(Wording("renameFolderNothingWasChanged").Replace("{old}", "Tasks").Replace("{said}", "S."),
+                     SpecialFolderRenamer.NothingWasChanged("Tasks", "S."));
+
+        var none = new SpecialFolderRenamer.LeftAtTheNewName();
+        var stopped = SpecialFolderRenamer.PartWayEnding("Tasks", "Assessments", "ICS3U", FolderScope.PerSection, none, 1, "S.");
+        Assert.Equal(Wording("renameFolderStoppedPartWay").Replace("{old}", "Tasks").Replace("{said}", "S."), stopped.Sentence);
+        Assert.Equal("did not rename the folder Tasks to Assessments in ICS3U, and could not put everything back (per_section_folders, 1 file kept beside its page)",
+                     stopped.Line);
+
+        var some = new SpecialFolderRenamer.LeftAtTheNewName();
+        some.Places.Add("section1/Assessments");
+        some.Places.Add("section2/Assessments");
+        some.Unreadable.Add("section3/Assessments (Access is denied.)");
+        some.CannotTell.Add("section3/Assessments");
+        some.CannotTellWhose.Add("section4/Assessments");
+        some.CannotTell.Add("section4/Assessments");
+        var part = SpecialFolderRenamer.PartWayEnding("Tasks", "Assessments", "ICS3U", FolderScope.PerSection, some, 2, "S.");
+        Assert.Equal(Wording("renameFolderRenamedOnlyInPart").Replace("{old}", "Tasks").Replace("{new}", "Assessments")
+                         .Replace("{places}", "“section1/Assessments”, “section2/Assessments”").Replace("{said}", "S."),
+                     part.Sentence);
+        Assert.Equal("renamed the folder Tasks to Assessments in ICS3U only in part, and could not put everything back (per_section_folders, "
+                     + "still called Assessments: section1/Assessments, section2/Assessments; 2 files kept beside their pages"
+                     + "; could not tell whether these are at the new name: section3/Assessments (Access is denied.)"
+                     + "; could not tell whether this rename moved these: section4/Assessments)",
+                     part.Line);
+
+        var maybe = new SpecialFolderRenamer.LeftAtTheNewName();
+        maybe.Unreadable.Add("section3/Assessments (Access is denied.)");
+        maybe.CannotTell.Add("section3/Assessments");
+        maybe.CannotTellWhose.Add("section4/Assessments");
+        maybe.CannotTell.Add("section4/Assessments");
+        var may = SpecialFolderRenamer.PartWayEnding("Tasks", "Assessments", "ICS3U", FolderScope.Shared, maybe, 0, "S.");
+        Assert.Equal(Wording("renameFolderMayBeRenamedInPart").Replace("{old}", "Tasks").Replace("{new}", "Assessments")
+                         .Replace("{places}", "“section3/Assessments”, “section4/Assessments”").Replace("{said}", "S."),
+                     may.Sentence);
+        Assert.Equal("may have renamed the folder Tasks to Assessments in ICS3U only in part, and could not put everything back (shared_folders, "
+                     + "0 files kept beside their pages; could not tell whether these are at the new name: section3/Assessments (Access is denied.)"
+                     + "; could not tell whether this rename moved these: section4/Assessments)",
+                     may.Line);
+    }
+
+    /// <summary>A refusal that changed nothing is said in the contract's words around the door's reason.</summary>
+    [Fact]
+    public void ARefusalThatChangedNothingSaysRenameFolderNothingWasChanged()
+    {
+        TheRecordCourse();
+
+        var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(
+            () => RenameAsTheSheetDoes(seams: new UndoSeams { StagingWriteFailsAt = index => index == 1 }));
+
+        string lead = Before(Wording("renameFolderNothingWasChanged").Replace("{old}", "Tasks"));
+        Assert.StartsWith(lead, refused.Message, StringComparison.Ordinal);
+        Assert.True(refused.Message.Length > lead.Length, "the door's reason follows");
+    }
+
+    /// <summary>
+    /// Section 2's old place is taken while the step swaps (a folder made
+    /// there), so its move back fails and it stays at the new name; section
+    /// 1 goes back. Only section 2 is named, on the sheet and the trail.
+    /// </summary>
+    [Fact]
+    public void AFolderLeftAtTheNewNameIsNamedAndTheRenameSaysOnlyInPart()
+    {
+        TheRecordCourse();
+        File.SetAttributes(InCourse("section1/index.md"), FileAttributes.ReadOnly);
+        var seams = new UndoSeams
+        {
+            BeforeEachSwap = (_, path) =>
+            {
+                if (path.EndsWith("index.md", StringComparison.OrdinalIgnoreCase)) Directory.CreateDirectory(InCourse("section2/Tasks"));
+            },
+        };
+
+        var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(() => RenameAsTheSheetDoes(seams: seams));
+
+        Assert.True(Directory.Exists(InCourse("section2/Assessments")), "section 2 stayed at the new name");
+        Assert.False(Directory.Exists(InCourse("section1/Assessments")), "section 1 went back");
+        Assert.StartsWith(Before(Wording("renameFolderRenamedOnlyInPart").Replace("{old}", "Tasks").Replace("{new}", "Assessments")
+                                     .Replace("{places}", "“section2/Assessments”")),
+                          refused.Message, StringComparison.Ordinal);
+        Assert.Contains("renamed the folder Tasks to Assessments in ICS3U only in part, and could not put everything back (per_section_folders, "
+                        + "still called Assessments: section2/Assessments; ", Trail());
+        Assert.True(File.Exists(RecordPath), "a part-way rename keeps its record");
+    }
+
+    /// <summary>Every folder back at its old name, a page's put-back failed: "did not rename", the kept file counted.</summary>
+    [Fact]
+    public void EveryFolderBackButAPageKeptSaysDidNotRename()
+    {
+        TheRecordCourse();
+        File.SetAttributes(InCourse("section1/index.md"), FileAttributes.ReadOnly);
+
+        var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(
+            () => RenameAsTheSheetDoes(seams: new UndoSeams { PutBackFailsAt = _ => true }));
+
+        Assert.True(Directory.Exists(InCourse("section1/Tasks")));
+        Assert.True(Directory.Exists(InCourse("section2/Tasks")));
+        Assert.StartsWith(Before(Wording("renameFolderStoppedPartWay").Replace("{old}", "Tasks")), refused.Message, StringComparison.Ordinal);
+        Assert.Contains("did not rename the folder Tasks to Assessments in ICS3U, and could not put everything back (per_section_folders, ", Trail());
+        Assert.Contains(" kept beside ", Trail());
+    }
+
+    /// <summary>
+    /// A finish of a rename whose record (as a released Windows wrote it)
+    /// does not say what it moved: the folders at the new name may be its,
+    /// never named, and the sheet says "may have been renamed only in part".
+    /// </summary>
+    [Fact]
+    public void AFinishWhoseRecordDoesNotSayWhatItMovedSaysMayHaveBeenRenamedInPart()
+    {
+        TheRecordCourse();
+        Directory.Move(InCourse("section1/Tasks"), InCourse("section1/Assessments"));
+        Directory.Move(InCourse("section2/Tasks"), InCourse("section2/Assessments"));
+        byte[] earlier = RecordOf("Tasks", "Assessments", "per_section");
+        LayTheRecord(earlier);
+        File.SetAttributes(InCourse("section1/index.md"), FileAttributes.ReadOnly);
+
+        var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(
+            () => RenameAsTheSheetDoes(finishing: true, seams: new UndoSeams { PutBackFailsAt = _ => true }));
+
+        Assert.StartsWith(Before(Wording("renameFolderMayBeRenamedInPart").Replace("{old}", "Tasks").Replace("{new}", "Assessments")
+                                     .Replace("{places}", "“section1/Assessments”, “section2/Assessments”")),
+                          refused.Message, StringComparison.Ordinal);
+        string trail = Trail();
+        Assert.Contains("may have renamed the folder Tasks to Assessments in ICS3U only in part, and could not put everything back (per_section_folders, ", trail);
+        Assert.Contains("; could not tell whether this rename moved these: section1/Assessments, section2/Assessments)", trail);
+        Assert.DoesNotContain("still called", trail);
+        Assert.Equal(earlier, File.ReadAllBytes(RecordPath));
+    }
+
+    /// <summary>A finish refused with nothing changed keeps the record it was finishing, byte for byte (17's owner).</summary>
+    [Fact]
+    public void ARefusedFinishKeepsItsRecord()
+    {
+        TheRecordCourse();
+        Directory.Move(InCourse("section1/Tasks"), InCourse("section1/Assessments"));
+        Directory.Move(InCourse("section2/Tasks"), InCourse("section2/Assessments"));
+        byte[] earlier = RecordOf("Tasks", "Assessments", "per_section");
+        LayTheRecord(earlier);
+
+        var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(
+            () => RenameAsTheSheetDoes(finishing: true, seams: new UndoSeams { StagingWriteFailsAt = index => index == 1 }));
+
+        Assert.StartsWith(Before(Wording("renameFolderNothingWasChanged").Replace("{old}", "Tasks")), refused.Message, StringComparison.Ordinal);
+        Assert.Equal(earlier, File.ReadAllBytes(RecordPath));
+    }
+
+    private static SpecialFolderRenamer.RenameRecordNote NoteOf(params string[] moved) =>
+        new("Tasks", "Assessments", "per_section", moved, new List<string>());
+
+    /// <summary>A folder at the new name that no move of this run and no record names is never counted: the disk alone does not make it this rename's.</summary>
+    [Fact]
+    public void AFolderAtTheNewNameThatDoesNotBelongIsNeverNamed()
+    {
+        Directory.CreateDirectory(InCourse("section1/Assessments"));
+        Directory.CreateDirectory(InCourse("section2/Assessments"));
+
+        var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
+                                                              new[] { (InCourse("section2/Assessments"), false) }, null);
+
+        Assert.Equal(new[] { "section2/Assessments" }, left.Places);
+        Assert.Empty(left.CannotTell);
+    }
+
+    /// <summary>A place the earlier record of this rename says it moved belongs, and shows as a folder.</summary>
+    [Fact]
+    public void APlaceTheEarlierRecordMovedIsNamed()
+    {
+        Directory.CreateDirectory(InCourse("section1/Assessments"));
+        Directory.CreateDirectory(InCourse("section2/Assessments"));
+
+        var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
+                                                              Array.Empty<(string, bool)>(), NoteOf("section1/Assessments"));
+
+        Assert.Equal(new[] { "section1/Assessments" }, left.Places);
+        Assert.Empty(left.CannotTell);
+    }
+
+    /// <summary>A link at the new name is named only where this run moved a link there; any other is cannot-tell, never named.</summary>
+    [Fact]
+    public void ALinkThisRunDidNotMoveIsCannotTellNeverNamed()
+    {
+        string library = Path.Combine(_root, "library");
+        Directory.CreateDirectory(library);
+        UndoKindsForTheCases.MakeAJunction(InCourse("section1/Assessments"), library);
+        Directory.CreateDirectory(InCourse("section2/Assessments"));
+
+        var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
+                                                              new[] { (InCourse("section1/Assessments"), false) },
+                                                              NoteOf("section1/Assessments", "section2/Assessments"));
+        Assert.Equal(new[] { "section2/Assessments" }, left.Places);
+        Assert.Equal(new[] { "section1/Assessments" }, left.CannotTellWhose);
+        Assert.Equal(new[] { "section1/Assessments" }, left.CannotTell);
+
+        var moved = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
+                                                               new[] { (InCourse("section1/Assessments"), true) }, null);
+        Assert.Equal(new[] { "section1/Assessments" }, moved.Places);
+        Assert.Empty(moved.CannotTell);
+    }
+
+    /// <summary>A capitalisation-only rename counts a place only when the folder's listing shows the new spelling.</summary>
+    [Fact]
+    public void ACapitalisationOnlyRenameIsNamedOnlyWhereTheListingShowsTheNewSpelling()
+    {
+        Directory.CreateDirectory(InCourse("section1/tasks"));
+        Directory.CreateDirectory(InCourse("section2/Tasks"));
+
+        var left = SpecialFolderRenamer.FoldersAtTheirNewName("tasks", "Tasks", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
+                                                              new[] { (InCourse("section1/Tasks"), false), (InCourse("section2/Tasks"), false) }, null);
+
+        Assert.Equal(new[] { "section2/Tasks" }, left.Places);
+        Assert.Empty(left.CannotTell);
+    }
+
+    /// <summary>A check that fails for any reason but "no such file" is told with the system's reason, never read as absent.</summary>
+    [Fact]
+    public void AnUnreadableCheckIsToldWithItsReasonNeverReadAsAbsent()
+    {
+        Directory.CreateDirectory(InCourse("section1/Assessments"));
+        Directory.CreateDirectory(InCourse("section2/Assessments"));
+        string refused = InCourse("section1/Assessments");
+        SpecialFolderRenamer.LookingAtAPlaceFails = path =>
+            string.Equals(Path.GetFullPath(path), Path.GetFullPath(refused), StringComparison.OrdinalIgnoreCase) ? "Access to the path is denied." : null;
+        try
+        {
+            var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
+                                                                  new[] { (InCourse("section1/Assessments"), false), (InCourse("section2/Assessments"), false) }, null);
+
+            Assert.Equal(new[] { "section2/Assessments" }, left.Places);
+            Assert.Equal(new[] { "section1/Assessments (Access to the path is denied.)" }, left.Unreadable);
+            Assert.Equal(new[] { "section1/Assessments" }, left.CannotTell);
+            Assert.Empty(left.CannotTellWhose);
+        }
+        finally { SpecialFolderRenamer.LookingAtAPlaceFails = null; }
     }
 }

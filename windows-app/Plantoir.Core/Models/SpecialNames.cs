@@ -212,6 +212,12 @@ public static class SpecialNames
     public const string RenameDone =
         "“{old}” is now “{new}”.";
 
+    /// <summary>STUB (tests first, #899 W8b-18b).</summary>
+    public const string RenameFolderNothingWasChanged = "";
+    public const string RenameFolderStoppedPartWay = "";
+    public const string RenameFolderRenamedOnlyInPart = "";
+    public const string RenameFolderMayBeRenamedInPart = "";
+
     public const string RenameRelinkedOne =
         "One page had links pointing into it, and they now point at the new name.";
 

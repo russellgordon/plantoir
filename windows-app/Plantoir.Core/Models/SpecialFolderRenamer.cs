@@ -622,8 +622,15 @@ public static class SpecialFolderRenamer
     /// ignores capitals: not listed is nothing there, a listing that fails is
     /// <see cref="UndoLinks.What.CannotLook"/>.
     /// </summary>
-    internal static UndoLinks.What WhatIsAt(string path, bool spelledExactly)
+    internal static UndoLinks.What WhatIsAt(string path, bool spelledExactly) => WhatIsAt(path, spelledExactly, out _);
+
+    /// <summary>STUB (tests first, #899 W8b-18b).</summary>
+    internal static Func<string, string?>? LookingAtAPlaceFails;
+
+    /// <summary>STUB (tests first, #899 W8b-18b).</summary>
+    internal static UndoLinks.What WhatIsAt(string path, bool spelledExactly, out string? said)
     {
+        said = null;
         var what = UndoLinks.Look(path);
         if (!spelledExactly || what == UndoLinks.What.Nothing || what == UndoLinks.What.CannotLook) return what;
         string name = Path.GetFileName(path);
@@ -635,6 +642,29 @@ public static class SpecialFolderRenamer
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return UndoLinks.What.CannotLook; }
     }
+
+    // ---- A rename stopped part way (#899 W8b-18b) ---------------------------------
+
+    /// <summary>STUB (tests first).</summary>
+    internal sealed class LeftAtTheNewName
+    {
+        internal List<string> Places { get; } = new();
+        internal List<string> Unreadable { get; } = new();
+        internal List<string> CannotTellWhose { get; } = new();
+        internal List<string> CannotTell { get; } = new();
+    }
+
+    /// <summary>STUB (tests first).</summary>
+    internal static LeftAtTheNewName FoldersAtTheirNewName(string oldName, string newName, FolderScope scope, string courseDirectory,
+                                                          IReadOnlyList<int> sectionNumbers, IReadOnlyList<(string To, bool IsALink)> planned,
+                                                          RenameRecordNote? earlierRecord) => new();
+
+    /// <summary>STUB (tests first).</summary>
+    internal static (string Line, string Sentence) PartWayEnding(string oldName, string newName, string course, FolderScope scope,
+                                                                 LeftAtTheNewName left, int keptBeside, string said) => ("", said);
+
+    /// <summary>STUB (tests first).</summary>
+    internal static string NothingWasChanged(string oldName, string said) => said;
 
     /// <summary>What the teacher is told afterwards: what moved, and what else changed.</summary>
     public static string DoneMessage(string oldName, string newName, int relinked)
