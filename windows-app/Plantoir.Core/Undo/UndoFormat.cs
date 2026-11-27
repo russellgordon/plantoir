@@ -95,6 +95,59 @@ internal sealed record UndoOp
     /// </summary>
     internal string? LinkSha { get; init; }
 
+    /// <summary>
+    /// A RELINKING move (#899 W8b-21b1; the mac's U4b3 relink-1): the SHA-256
+    /// of the text the link holds at <c>from</c> (<see cref="LinkShaBefore"/>)
+    /// and of the text a new link holds at <c>to</c> (<see cref="LinkShaAfter"/>),
+    /// both texts in <see cref="Blobs"/> (an Undo needs the old, a Redo the
+    /// new), never beside <see cref="Sha"/>, <see cref="ListingSha"/> or
+    /// <see cref="LinkSha"/>. Built in memory only until 21b2 reads it.
+    /// </summary>
+    internal string? LinkShaBefore { get; init; }
+
+    /// <summary>See <see cref="LinkShaBefore"/>: the text the link holds at <c>to</c>.</summary>
+    internal string? LinkShaAfter { get; init; }
+
+    /// <summary>
+    /// Whether the op is a link's move: a plain one (<see cref="LinkSha"/>, the
+    /// same text on both sides) or a relinking one (<see cref="LinkShaBefore"/>
+    /// and <see cref="LinkShaAfter"/>). The ONE test every "is this a link's
+    /// move" site asks (the mac's <c>isALinksMove</c>), never <c>LinkSha</c>
+    /// alone, or a relink would be read through, judged leading out, or carry
+    /// edits.
+    /// </summary>
+    internal bool IsALinksMove => LinkSha is not null;
+
+    /// <summary>Whether the op is a relinking move: a link's move that changes the text the link holds (the mac's <c>isARelink</c>).</summary>
+    internal bool IsARelink => LinkShaBefore is not null;
+
+    /// <summary>
+    /// The SHA-256 of the text a link's move holds at <c>from</c>
+    /// (<paramref name="isAtFrom"/>) or at <c>to</c>: <see cref="LinkSha"/> on
+    /// both sides of a plain one, each side's own for a relink; null for any
+    /// other op (the mac's <c>linkText(isAtFrom:)</c>).
+    /// </summary>
+    internal string? LinkText(bool isAtFrom) => LinkSha ?? (isAtFrom ? LinkShaBefore : LinkShaAfter);
+
+    /// <summary>
+    /// A symbolic link moved and given a new text in one op (the mac's
+    /// <c>UndoOp.relinkLink</c>): judged at <c>from</c> by
+    /// <paramref name="linkShaBefore"/> and at <c>to</c> by
+    /// <paramref name="linkShaAfter"/>, both texts kept as blobs. Swapped as:
+    /// a new link made beside <c>to</c>, renamed in without replacing, the old
+    /// one removed once re-read (<c>UndoSwap.RelinkLink</c>).
+    /// </summary>
+    internal static UndoOp RelinkLink(string from, string to, string linkShaBefore, string linkShaAfter) => new()
+    {
+        Kind = Move,
+        Readable = true,
+        From = from,
+        To = to,
+        LinkShaBefore = linkShaBefore,
+        LinkShaAfter = linkShaAfter,
+        Blobs = [linkShaBefore, linkShaAfter],
+    };
+
     /// <summary><c>external</c>: what outside every working folder it changed (<c>preference:&lt;name&gt;</c>).</summary>
     internal string? Target { get; init; }
 

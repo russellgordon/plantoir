@@ -115,6 +115,12 @@ internal sealed class UndoSeams
     /// <summary>Called with the two full paths of every rename the swap makes, before it is tried (a test counts a capitalisation-only rename's renames, #899 W8-5).</summary>
     internal Action<string, string>? EachRename { get; init; }
 
+    /// <summary>A test's: called with the destination just before a relink's new link is renamed in; true makes the rename fail, as a place taken in that instant would (the mac's <c>relinkRenameInFails</c>, #899 W8b-21b1).</summary>
+    internal Func<string, bool>? RelinkRenameInFails { get; init; }
+
+    /// <summary>A test's: what making a link at this full path answers instead of the system (a Win32 error, 0 to make it), so a PC without the privilege (1314) can be met anywhere (#899 W8b-21b1).</summary>
+    internal Func<string, int>? MakingALinkAnswers { get; init; }
+
     /// <summary>The POSIX-semantics rename answers "not supported" (87), as on a network share, so every swap takes the fallback (M5).</summary>
     internal bool PosixRenameIsNotSupported { get; init; }
 
@@ -1229,6 +1235,20 @@ internal static class UndoSwap
         catch (InvalidOperationException) { return false; }
         catch (System.ComponentModel.Win32Exception) { return true; }
     }
+
+    /// <summary>
+    /// Whether <paramref name="fullPath"/> is a link (<see cref="UndoLinks.Look"/>)
+    /// holding exactly <paramref name="text"/>, read as stored and never
+    /// followed (the mac's <c>linkHolds</c>): compared byte for byte, as
+    /// <see cref="UndoLinks.LinkSha"/> hashes it.
+    /// </summary>
+    internal static bool LinkHolds(string fullPath, byte[] text) =>
+        UndoLinks.Look(fullPath) == UndoLinks.What.Link
+        && string.Equals(UndoLinks.LinkSha(fullPath), UndoCheck.Sha(text), StringComparison.Ordinal);
+
+    /// <summary>Removes the link at <paramref name="fullPath"/> itself, opened as the reparse point, never what it leads to (the mac's <c>removeALink</c>); false when no link is there or it would not go.</summary>
+    internal static bool RemoveALink(string fullPath) =>
+        UndoLinks.Look(fullPath) == UndoLinks.What.Link && UndoStagedFile.RemoveByName(fullPath);
 
     /// <summary><c>.&lt;name&gt;.plantoir-undo-&lt;label&gt;-&lt;role&gt;</c> in the target's own folder: a dot file, so Obsidian and the website builder pass over it.</summary>
     internal static string BesidePath(string target, string label, string role) =>
