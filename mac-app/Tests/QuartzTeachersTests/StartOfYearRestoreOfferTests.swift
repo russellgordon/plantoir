@@ -263,6 +263,102 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         XCTAssertEqual(preview.events, ["stop-begins", "stop-ends", "start"])
     }
 
+    // MARK: - Through the assistant
+
+    /// `startOfYear.assistantStoppedPartWayCases`, run from the JSON, through
+    /// the built-in assistant and over MCP: one reply, one function.
+    func testAssistantStoppedPartWayCasesAsTheContractSays() async throws {
+        let rules: [String: Any] = try StartOfYearTests.rules("startOfYear")
+        let wording: [String: String] = try XCTUnwrap(rules["wording"] as? [String: String])
+        let cases: [[String: Any]] = try XCTUnwrap(rules["assistantStoppedPartWayCases"] as? [[String: Any]])
+        let plainYear: [String: Any] = try XCTUnwrap((rules["cases"] as? [[String: Any]])?.first)
+        let layout: [[String: Any]] = try XCTUnwrap(plainYear["pages"] as? [[String: Any]])
+        let planned: [String] = try XCTUnwrap(plainYear["expectDraft"] as? [String])
+        XCTAssertGreaterThanOrEqual(cases.count, 2)
+        let surfaces: [AssistToolRunner.Surface] = [.local, .mcp]
+
+        for testCase in cases {
+            for surface in surfaces {
+                let name: String = try XCTUnwrap(testCase["name"] as? String) + " (\(surface))"
+                let made = try AssistFixture.makeRunner(surface: surface)
+                defer { try? FileManager.default.removeItem(at: made.root) }
+                let urls: [String: URL] = try StartOfYearTests.layOut(layout, in: made.course)
+
+                let shown: AssistToolOutcome = await made.runner.run(call: StartOfYearTests.call(
+                    "plan_prepare_for_start_of_year", ["course": "ICS3U", "section": 1]
+                ))
+                let code: String = try XCTUnwrap(StartOfYearPlanner.planCode(in: shown.detail), name)
+                let rebuildsBefore: Int = made.siteWork.previewRebuilds
+
+                let door: [String: Int] = try XCTUnwrap(testCase["door"] as? [String: Int])
+                let heldOpen: Int? = door["fileInUseAtSwap"]
+                let cannotPutBack: Int? = door["putBackFailsAt"]
+                UndoKillPoints.fileInUseAtSwap = { (index: Int) -> Bool in
+                    return index == heldOpen
+                }
+                UndoKillPoints.putBackFailsAt = { (index: Int) -> Bool in
+                    return index == cannotPutBack
+                }
+                let reply: AssistToolOutcome = await made.runner.run(call: StartOfYearTests.call(
+                    "prepare_for_start_of_year", ["course": "ICS3U", "section": 1, "planCode": code]
+                ))
+                UndoKillPoints.fileInUseAtSwap = nil
+                UndoKillPoints.putBackFailsAt = nil
+
+                var inDraft: Int = 0
+                for title in planned {
+                    let url: URL = try XCTUnwrap(urls[title], "\(name): \(title) was not laid out")
+                    let text: String = try String(contentsOf: url, encoding: .utf8)
+                    if PageVisibilityReader.answer(in: text, forSection: 1) == .hidden {
+                        inDraft += 1
+                    }
+                }
+                XCTAssertEqual(inDraft, testCase["expectInDraft"] as? Int, "\(name): pages in draft afterwards")
+                XCTAssertFalse(reply.summary.contains(UndoSwap.stagedMarker), "\(name) names a hidden file: \(reply.summary)")
+                XCTAssertFalse(reply.detail.contains(UndoSwap.stagedMarker), "\(name) names a hidden file: \(reply.detail)")
+                let rebuilt: Bool = made.siteWork.previewRebuilds > rebuildsBefore
+                XCTAssertEqual(rebuilt, testCase["expectPreviewRebuilt"] as? Bool, "\(name): the preview")
+
+                let expect: String = try XCTUnwrap(testCase["expect"] as? String)
+                if expect == "writeFailed" {
+                    let before: String = try XCTUnwrap(wording["writeFailed"]?.components(separatedBy: "{backup}").first)
+                    XCTAssertTrue(reply.summary.hasPrefix(before), "\(name): \(reply.summary)")
+                    continue
+                }
+                XCTAssertEqual(expect, "stoppedPartWay")
+                let backup: String = try Self.backupNamed(in: reply.summary, name: name)
+                let partWay: String = try XCTUnwrap(wording["stoppedPartWay"])
+                    .replacingOccurrences(of: "{section}", with: "1")
+                    .replacingOccurrences(of: "{course}", with: made.course.displayCode)
+                let offer: String = try XCTUnwrap(wording["restoreOfferThroughTheAssistant"])
+                    .replacingOccurrences(of: "{backup}", with: backup)
+                    .replacingOccurrences(of: "{course}", with: made.course.displayCode)
+                XCTAssertEqual(reply.summary, partWay + " " + offer, name)
+                XCTAssertTrue(reply.detail.hasPrefix(reply.summary + "\n\n"), "\(name): \(reply.detail)")
+                let planText: String = shown.detail.components(separatedBy: "\n\nPlan code:").first ?? shown.detail
+                XCTAssertTrue(reply.detail.contains(planText), "\(name): the reply keeps the plan: \(reply.detail)")
+                XCTAssertTrue(StartOfYearTests.trail().contains("offered the backup " + backup), StartOfYearTests.trail())
+                XCTAssertFalse(StartOfYearTests.trail().contains("(writeFailed)"), "\(name): \(StartOfYearTests.trail())")
+            }
+        }
+    }
+
+    /// The offer through the assistant names the menu item as the menu
+    /// titles it.
+    func testTheAssistantsOfferNamesTheMenuItemAsItIsTitled() {
+        let offer: String = StartOfYearWording.restoreOfferThroughTheAssistant(course: "SNC1W", backup: "SNC1W_backup_x.zip")
+        XCTAssertTrue(offer.contains("Choose " + CourseMenu.restoreFromBackupMenuItem + " "), offer)
+        XCTAssertEqual(CourseMenu.restoreFromBackupMenuItem, "Restore from Backup…")
+    }
+
+    /// The backup's name between the curly quotes of a sentence.
+    static func backupNamed(in sentence: String, name: String) throws -> String {
+        let opening: Range<String.Index> = try XCTUnwrap(sentence.range(of: "“"), "\(name): no backup named: \(sentence)")
+        let rest: Substring = sentence[opening.upperBound...]
+        let closing: Range<Substring.Index> = try XCTUnwrap(rest.range(of: "”"), "\(name): \(sentence)")
+        return String(rest[..<closing.lowerBound])
+    }
+
     /// The trail line after a part-way stop (review 1, LOW 2).
     func testTheStoppedPartWayLineCountsWhatWasKept() {
         let none: String = ActivityTrail.startOfYearStoppedPartWayLine(source: "app", keptCount: 0, backupFileName: "B.zip")

@@ -290,6 +290,7 @@ final class StartOfYearTests: XCTestCase {
             "writeFailed": StartOfYearWording.writeFailed(backup: "{backup}"),
             "stoppedPartWay": StartOfYearWording.stoppedPartWay(course: "{course}", section: "{section}"),
             "restoreOffer": StartOfYearWording.restoreOffer(course: "{course}", backup: "{backup}"),
+            "restoreOfferThroughTheAssistant": StartOfYearWording.restoreOfferThroughTheAssistant(course: "{course}", backup: "{backup}"),
             "leaveAsItIsButton": StartOfYearWording.leaveAsItIsButton,
             "restoreCourseButton": StartOfYearWording.restoreCourseButton,
             "noFirstClass": StartOfYearWording.noFirstClass(course: "{course}", section: "{section}", noun: "{noun}"),
