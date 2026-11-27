@@ -239,7 +239,7 @@ public partial class StartOfYearTests
                     Calls.Add("restore");
                     Restored.Add(item);
                     var workspace = new AssistWorkspace(folder, new FakeLauncher(), undo: new UndoHistory());
-                    CourseRestorer.RestoreWholeCourse(item, workspace.Course(item.CourseCode), Workspace.CoursesDirectory(folder));
+                    CourseRestorer.RestoreWholeCourse(item, workspace.Course(item.CourseCode), Plantoir.Core.Models.Workspace.CoursesDirectory(folder));
                     return Task.CompletedTask;
                 },
                 SectionsOfTheCourseNow: () => sectionsAfter ?? new AssistWorkspace(folder, new FakeLauncher(), undo: new UndoHistory()).Course(Code).Configuration.SectionNumbers,
