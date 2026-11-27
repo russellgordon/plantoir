@@ -128,6 +128,25 @@ public sealed class UndoFormatTests
         Assert.Equal(2, offered.Head?.Seq);
     }
 
+    /// <summary>
+    /// #1055 (no relinking move): a move carrying <c>linkShaBefore</c> and
+    /// <c>linkShaAfter</c>, the shape W8b-21b2 made readable, is a barrier
+    /// again, as on the mac after M4: a move holds exactly one of
+    /// <c>sha</c>, <c>listingSha</c> and <c>linkSha</c>, and this one holds none.
+    /// </summary>
+    [Fact]
+    public void AStepWithARelinkingMoveIsUnreadable()
+    {
+        string before = UndoCheck.Sha(Encoding.UTF8.GetBytes("Unit 1, Day 3.md"));
+        string after = UndoCheck.Sha(Encoding.UTF8.GetBytes("Unit 1, Day 4.md"));
+        string op = "{\"kind\":\"move\",\"from\":\"a.md\",\"to\":\"b.md\",\"linkShaBefore\":\"" + before
+            + "\",\"linkShaAfter\":\"" + after + "\",\"blobs\":[\"" + before + "\",\"" + after + "\"]}";
+        UndoFolded folded = Fold(Begin(1), Applied(1), Begin(2, op), Applied(2));
+        Assert.Equal(UndoStepState.Done, folded.Steps[2].State);
+        Assert.False(folded.Steps[2].Readable);
+        Assert.Equal(UndoAnswerKind.NotAvailable, Offer(folded).Undo.Kind);
+    }
+
     [Theory]
     [InlineData(",\"holds\":\"workingFolder\"")]
     [InlineData(",\"holds\":3")]
