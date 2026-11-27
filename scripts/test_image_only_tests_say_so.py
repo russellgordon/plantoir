@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-The shared tests that need python-frontmatter say so on a Mac, and fail
-everywhere else (#907).
+The shared tests that need python-frontmatter, or Pillow, say so on a Mac,
+and fail everywhere else (#907).
 
 `verify.sh` runs these files in the image, where python-frontmatter and PyYAML
 are installed. Run directly with a Mac's own Python, which has neither, they
@@ -13,6 +13,15 @@ module it prints one line naming the module and `verify.sh`, and exits 77, a
 code a caller can tell from a failure (1). On any other platform the block
 does nothing, so in the image and in Windows' PythonToolchainTests, whose
 fetched runtime carries the modules, a missing module stays a failure.
+
+Since #1052 (2026-11-27) a second module has a block of its own: Pillow, for
+`test_grove_colours.py`, which imports `social_card.py`. `verify.sh`'s
+discovery ran it on the host, and on the second Mac, whose Python has no
+Pillow, it failed on import while this Mac, whose Python has it, passed. The
+Pillow block is the frontmatter block with its module changed and no
+`--site` mode; every file that needs one module carries the identical block
+for that module, and the rules below read which module from the block's
+`import <module> as _...` line.
 
 How each reads it:
 
@@ -108,19 +117,22 @@ def host_runs(names: list) -> list:
             found.append((script, folder, name, shlex.split(arguments)))
     return found
 
-# Put in front of the child's imports: frontmatter and yaml cannot be found.
+# Put in front of the child's imports: frontmatter, yaml and PIL cannot be found.
 WITHOUT_THE_MODULES = textwrap.dedent("""
     import sys
     class _NotHere:
         def find_spec(self, name, path=None, target=None):
-            if name.split(".")[0] in ("frontmatter", "yaml"):
+            if name.split(".")[0] in ("frontmatter", "yaml", "PIL"):
                 raise ModuleNotFoundError(f"No module named {name!r}", name=name)
             return None
     sys.meta_path.insert(0, _NotHere())
     for _name in list(sys.modules):
-        if _name.split(".")[0] in ("frontmatter", "yaml"):
+        if _name.split(".")[0] in ("frontmatter", "yaml", "PIL"):
             del sys.modules[_name]
 """)
+
+# The module a block asks for: its `import <module> as _<anything>` line.
+BLOCK_MODULE = re.compile(r"^\s+import ([A-Za-z_][A-Za-z0-9_]*) as _[a-z_]+  # noqa: F401$", re.MULTILINE)
 
 
 def the_block(text: str) -> str:
@@ -128,9 +140,20 @@ def the_block(text: str) -> str:
     return text[start:text.index(END, start) + len(END)]
 
 
+def module_of(block: str) -> str:
+    modules = BLOCK_MODULE.findall(block)
+    if len(modules) != 1:
+        raise AssertionError(f"a block must import exactly one module, found {modules}")
+    return modules[0]
+
+
+def module_of_file(name: str) -> str:
+    return module_of(the_block((SCRIPTS / name).read_text(encoding="utf-8")))
+
+
 def run_without_the_modules(name: str, arguments: tuple = ()) -> subprocess.CompletedProcess:
     """The file run directly, as `python3 <file> <arguments>` would run it,
-    with frontmatter and yaml hidden from it."""
+    with frontmatter, yaml and PIL hidden from it."""
     program = WITHOUT_THE_MODULES + textwrap.dedent(f"""
         import runpy
         sys.argv = {[str(SCRIPTS / name)] + list(arguments)!r}
@@ -141,8 +164,8 @@ def run_without_the_modules(name: str, arguments: tuple = ()) -> subprocess.Comp
                           timeout=300, cwd=SCRIPTS)
 
 
-def the_line(name: str) -> str:
-    return (f"{name}: needs the module frontmatter, which this Python does not have; "
+def the_line(name: str, module: str = "frontmatter") -> str:
+    return (f"{name}: needs the module {module}, which this Python does not have; "
             f"verify.sh runs it in the image, where it is installed (exit 77)")
 
 
@@ -166,12 +189,12 @@ class ImageOnlyTestsSaySoTests(unittest.TestCase):
             answer = run_without_the_modules(name)
             if name in carrying:
                 self.assertEqual(answer.returncode, MISSING_MODULE_EXIT, name + answer.stdout + answer.stderr)
-                self.assertEqual(answer.stdout.strip(), the_line(name))
+                self.assertEqual(answer.stdout.strip(), the_line(name, module_of_file(name)))
             elif answer.returncode != 0:
                 last_lines = answer.stderr.strip().splitlines()
                 last_line = last_lines[-1] if last_lines else "(nothing on stderr)"
                 unsaid.append(f"{name} (exit {answer.returncode}: {last_line})")
-        self.assertEqual(unsaid, [], "these fail on a Mac's own Python with frontmatter and yaml hidden, "
+        self.assertEqual(unsaid, [], "these fail on a Mac's own Python with frontmatter, yaml and PIL hidden, "
                                      "and do not carry the block; the reason may be something else, so read "
                                      "the last line of each")
 
@@ -194,45 +217,60 @@ class ImageOnlyTestsSaySoTests(unittest.TestCase):
                                     timeout=120, cwd=folder)
             said = f"{script}: python3 scripts/{name} {' '.join(arguments)}: exit {answer.returncode}, {answer.stdout}{answer.stderr}"
             self.assertNotEqual(answer.returncode, MISSING_MODULE_EXIT, said)
-            self.assertNotIn(the_line(name), answer.stdout, said)
+            self.assertNotIn(the_line(name, module_of_file(name)), answer.stdout, said)
             checked.append(name)
         self.assertGreaterEqual(len(checked), 1, "the rule no longer finds verify.sh's host run of test_page_sources.py")
 
     def test_every_file_opens_with_the_same_block_before_its_imports(self):
-        blocks = set()
+        # One block per module: every file that needs frontmatter carries the
+        # same block, every file that needs PIL the same block (#1052).
+        blocks_by_module = {}
         for name in files_with_the_block():
             text = (SCRIPTS / name).read_text(encoding="utf-8")
             self.assertIn(START, text, f"{name} has no runs-in-the-image block")
-            blocks.add(the_block(text))
+            block = the_block(text)
+            blocks_by_module.setdefault(module_of(block), set()).add(block)
             block_line = text[:text.index(START)].count("\n") + 1
             for node in ast.parse(text).body:
                 if isinstance(node, (ast.Import, ast.ImportFrom)):
                     self.assertGreater(node.lineno, block_line, f"{name} imports at line {node.lineno}, before the block")
                     break
-        self.assertEqual(len(blocks), 1, "the blocks differ from file to file")
+        for module, blocks in blocks_by_module.items():
+            self.assertEqual(len(blocks), 1, f"the blocks for {module} differ from file to file")
+        self.assertIn("frontmatter", blocks_by_module, "no file carries the frontmatter block")
+        self.assertIn("PIL", blocks_by_module, "no file carries the Pillow block (test_grove_colours.py, #1052)")
 
-    def run_the_block(self, platform: str) -> subprocess.CompletedProcess:
-        block = the_block((SCRIPTS / files_with_the_block()[0]).read_text(encoding="utf-8"))
+    def every_block(self) -> dict:
+        """One block per module, as {module: block}."""
+        found = {}
+        for name in files_with_the_block():
+            block = the_block((SCRIPTS / name).read_text(encoding="utf-8"))
+            found.setdefault(module_of(block), block)
+        return found
+
+    def run_the_block(self, platform: str, module: str, block: str) -> subprocess.CompletedProcess:
         program = (WITHOUT_THE_MODULES + f"sys.platform = {platform!r}\n" + f"sys.argv = ['test_example.py']\n"
-                   + block + "print('the block let the file go on')\nimport frontmatter\n")
+                   + block + f"print('the block let the file go on')\nimport {module}\n")
         return subprocess.run([sys.executable, "-B", "-c", program], capture_output=True, text=True, timeout=60)
 
     def test_on_a_mac_the_block_says_which_module_in_one_line_and_exits_77(self):
-        answer = self.run_the_block("darwin")
-        self.assertEqual(answer.returncode, MISSING_MODULE_EXIT, answer.stderr)
-        lines = answer.stdout.strip().splitlines()
-        self.assertEqual(len(lines), 1, answer.stdout)
-        self.assertIn("test_example.py", lines[0])
-        self.assertIn("frontmatter", lines[0])
-        self.assertIn("verify.sh", lines[0])
-        self.assertEqual(answer.stderr.strip(), "")
+        for module, block in self.every_block().items():
+            answer = self.run_the_block("darwin", module, block)
+            self.assertEqual(answer.returncode, MISSING_MODULE_EXIT, module + answer.stderr)
+            lines = answer.stdout.strip().splitlines()
+            self.assertEqual(len(lines), 1, answer.stdout)
+            self.assertIn("test_example.py", lines[0])
+            self.assertIn(module, lines[0])
+            self.assertIn("verify.sh", lines[0])
+            self.assertEqual(answer.stderr.strip(), "")
 
     def test_anywhere_else_a_missing_module_stays_a_failure(self):
-        for platform in ("win32", "linux"):
-            answer = self.run_the_block(platform)
-            self.assertIn("the block let the file go on", answer.stdout, platform)
-            self.assertIn("ModuleNotFoundError", answer.stderr, platform)
-            self.assertNotIn(answer.returncode, (0, MISSING_MODULE_EXIT), platform)
+        for module, block in self.every_block().items():
+            for platform in ("win32", "linux"):
+                answer = self.run_the_block(platform, module, block)
+                self.assertIn("the block let the file go on", answer.stdout, module + " " + platform)
+                self.assertIn("ModuleNotFoundError", answer.stderr, module + " " + platform)
+                self.assertNotIn(answer.returncode, (0, MISSING_MODULE_EXIT), module + " " + platform)
 
     def test_a_real_file_run_directly_without_the_module(self):
         # On this computer, as it is: 77 and the one line on a Mac, a

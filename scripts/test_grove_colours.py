@@ -19,6 +19,22 @@ the one shipped file that has to hold it.
 Pure Python with no shell, so Windows' PythonToolchainTests runs it as well.
 """
 
+# ---- runs in the image (#907) ----
+# verify.sh runs this file's tests in the image, where Pillow is installed
+# (social_card.py, which this file imports, draws the sharing card with it).
+# Run directly on a Mac whose Python lacks it, it says so in one line and
+# exits 77, so a caller can tell it from a failure (1). Anywhere else, the
+# image and Windows' fetched runtime included, a missing module stays the
+# failure it is.
+import sys as _sys
+if _sys.platform == "darwin":
+    try:
+        import PIL as _pillow  # noqa: F401
+    except ModuleNotFoundError as _missing:
+        print(f"{_sys.argv[0].replace(chr(92), '/').rsplit('/', 1)[-1]}: needs the module {_missing.name}, which this Python does not have; verify.sh runs it in the image, where it is installed (exit 77)")
+        _sys.exit(77)
+# ---- end of runs in the image ----
+
 import json
 import sys
 import unittest
