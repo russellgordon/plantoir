@@ -219,29 +219,25 @@ public sealed class UndoActionStepFolderMoveTests : IDisposable
     }
 
     /// <summary>
-    /// A folder carrying a reparse point that is NOT a link (as a OneDrive
-    /// folder does) is the teacher's own folder: moved like any other, never
-    /// refused as a link. Empty: measured on the PC, a file cannot be made
-    /// inside a folder carrying this tag without the filter that owns it
-    /// ("The file cannot be accessed by the system").
+    /// A folder gone before the plan is refused <c>cannotTellNow</c> by the
+    /// one link test (<see cref="UndoLinks.Look"/>, which answers Nothing),
+    /// never an exception of the file system's, and nothing changes.
+    /// (A folder with a reparse point that is not a link, as OneDrive's, is
+    /// not testable on the PC: measured in run w8b-15a-c, a folder carrying
+    /// tag 0x80000013 without its filter cannot be listed or hold a file.)
     /// </summary>
-    [ReparsePointFact]
-    public void AFolderWithAReparsePointThatIsNotALinkIsMovedLikeAnyOther()
+    [Fact]
+    public void AFolderGoneBeforeThePlanIsRefusedCannotTellNowAndNothingChanges()
     {
         ACourse();
-        Directory.CreateDirectory(Full(Notes));
-        Assert.Null(UndoReparsePoints.MakeOnAFolder(Full(Notes), UndoReparsePoints.NotALink, new byte[16]));
-        Assert.True(File.GetAttributes(Full(Notes)).HasFlag(FileAttributes.ReparsePoint));
-        Assert.Equal(UndoLinks.What.Folder, UndoLinks.Look(Full(Notes)));
+        SortedDictionary<string, string?> before = Tree();
         UndoActionStep step = Step(List());
 
-        step.MoveFolder(Full(Notes), Full(Zeta));
-        step.Make();
+        var refused = Assert.Throws<UndoStepRefusedException>(() => step.MoveFolder(Full(Notes), Full(Zeta)));
 
-        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(Notes)));
-        Assert.Equal(UndoLinks.What.Folder, UndoLinks.Look(Full(Zeta)));
-        JsonNode? move = Assert.Single(Begins()[0]["step"]!["ops"]!.AsArray());
-        Assert.Equal(Notes, (string?)move!["from"]);
+        Assert.Equal(UndoRefusalKind.CannotTellNow, refused.Refusal.Kind);
+        Assert.Equal(before, Tree());
+        Assert.Empty(Begins());
     }
 
     [Fact]
