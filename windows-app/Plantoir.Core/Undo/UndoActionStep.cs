@@ -752,10 +752,6 @@ internal sealed class UndoActionStep
             blobs.AddRange(treeBlobs);
         }
         foreach (JsonObject recompute in recomputes) ops.Add(recompute);
-        // Every handed-over place left before it is filled (W8b-21a6; the
-        // mac's makeAsOps, U4b3 door-6): a removal a link moves onto goes
-        // before that move, and the move before a new page where it was.
-        ops = InHandingOverOrder(ops);
         var draft = new UndoOpsDraft
         {
             ActionKey = _maker.ActionKey,
@@ -892,8 +888,6 @@ internal sealed class UndoActionStep
     private void WritePlainlyQuietly()
     {
         var targets = new List<UndoSwapTarget>();
-        // Each target's ops, its places spelled one way, to order them by.
-        var targetOps = new List<IReadOnlyList<UndoOp>>();
         // Each folder moved first, by the swap's own rename (MoveFileEx,
         // never replacing, its listing judged again just before), never
         // Directory.Move (W8b-15a); a link the same way, as itself, judged by
@@ -905,7 +899,6 @@ internal sealed class UndoActionStep
             string to = Slashed(toFull);
             UndoOp move = UndoLineOps.Read(FolderMoveOp(from, to, listingSha, linkSha));
             targets.Add(new UndoSwapTarget(toFull, to, null, null) { Change = new UndoSwapChange.MoveHere(fromFull, from, move) });
-            targetOps.Add([move]);
         }
         foreach (string path in _order)
         {
@@ -915,7 +908,6 @@ internal sealed class UndoActionStep
             if (!string.Equals(PlaceOnDiskNow(path), path, StringComparison.OrdinalIgnoreCase))
             {
                 targets.Add(new UndoSwapTarget(path, Slashed(path), _before[path], _after[path]) { StagesAtItsTurn = true });
-                targetOps.Add([WholeFileOp(Slashed(path), _before[path], _after[path])]);
                 continue;
             }
             // A link is written through, as File.WriteAllText wrote it: the
@@ -931,16 +923,11 @@ internal sealed class UndoActionStep
             // Named by its full path: no working folder is there to name it
             // inside, and the refusal's sentence checks the page it names.
             targets.Add(new UndoSwapTarget(place, place, _before[path], _after[path]));
-            targetOps.Add([WholeFileOp(Slashed(place), _before[path], _after[path])]);
         }
         foreach ((string full, UndoTreeListing listing, Dictionary<string, byte[]> contents) in _trees)
         {
             targets.Add(new UndoSwapTarget(full, full, null, null) { Change = new UndoSwapChange.MakeTree(listing, contents) });
-            targetOps.Add([]);
         }
-        // The one handing-over order (W8b-21a6; the mac's writePlainly):
-        // files and folders alone hand no place over, so this keeps their order.
-        targets = InHandingOverOrder(targets, targetOps);
         HashSet<string> keptBefore = KeptOriginalsNow();
         switch (UndoSwap.Swap(targets, UndoSwap.PlainLabel(), null, _plainSeams))
         {
@@ -952,87 +939,6 @@ internal sealed class UndoActionStep
                 throw new UndoStepRefusedException(new UndoRefusal(UndoRefusalKind.CouldNotWrite), "stopped by a test");
         }
         RederiveTheFrontPages();
-    }
-
-    /// <summary>A file's change as one <c>writeFile</c> op at <paramref name="path"/>, to order the plain write's targets by (the mac's <c>wholeFileOp</c>).</summary>
-    private static UndoOp WholeFileOp(string path, byte[]? before, byte[]? after)
-    {
-        var op = new JsonObject { ["kind"] = UndoOp.WriteFile, ["path"] = path };
-        if (before is not null) op["beforeSha"] = UndoCheck.Sha(before);
-        if (after is not null) op["afterSha"] = UndoCheck.Sha(after);
-        return UndoLineOps.Read(op);
-    }
-
-    /// <summary>A step's ops in handing-over order (<see cref="InHandingOverOrder{T}"/>), each op an item of its own.</summary>
-    private static JsonArray InHandingOverOrder(JsonArray ops)
-    {
-        var nodes = new List<JsonNode>();
-        var opsOf = new List<IReadOnlyList<UndoOp>>();
-        foreach (JsonNode? node in ops)
-        {
-            nodes.Add(node!.DeepClone());
-            opsOf.Add([UndoLineOps.Read(node.AsObject())]);
-        }
-        var ordered = new JsonArray();
-        foreach (JsonNode node in InHandingOverOrder(nodes, opsOf)) ordered.Add(node);
-        return ordered;
-    }
-
-    /// <summary>
-    /// The items of a step in an order where every handed-over place is left
-    /// before it is filled (#899 W8b-21a6; the mac's
-    /// <c>JournaledStep.inHandingOverOrder</c>, U4b3 door-6, the door-4 rule):
-    /// an item that fills a place goes straight after a later item that
-    /// leaves it, until none is left before its filler, by the one
-    /// leaver/filler definition the door's finder uses
-    /// (<see cref="UndoOp.Handovers"/>: <see cref="UndoOp.PlaceLeftBy"/>,
-    /// <see cref="UndoOp.PlaceFilledBy"/>, <see cref="UndoOp.HandsOverAsAMove"/>,
-    /// <see cref="UndoOp.PartInside"/>). <paramref name="opsOf"/> holds each
-    /// item's ops, its places spelled one way. A step with no such pair keeps
-    /// its order exactly.
-    /// </summary>
-    internal static List<T> InHandingOverOrder<T>(IReadOnlyList<T> items, IReadOnlyList<IReadOnlyList<UndoOp>> opsOf)
-    {
-        var order = new List<int>();
-        for (int index = 0; index < items.Count; index++) order.Add(index);
-        // Each pass moves one filler; a step whose places go round in a
-        // circle stops here, and the door refuses it.
-        int passesLeft = items.Count * items.Count;
-        bool movedOne = true;
-        while (movedOne && passesLeft > 0)
-        {
-            movedOne = false;
-            passesLeft--;
-            for (int position = 0; position < order.Count && !movedOne; position++)
-            {
-                if (LaterLeaver(opsOf[order[position]], position, order, opsOf) is not { } leaverPosition) continue;
-                int filler = order[position];
-                order.RemoveAt(position);
-                order.Insert(leaverPosition, filler);
-                movedOne = true;
-            }
-        }
-        var ordered = new List<T>();
-        foreach (int index in order) ordered.Add(items[index]);
-        return ordered;
-    }
-
-    /// <summary>The position after <paramref name="position"/> of the first item with an op that leaves a place one of <paramref name="fillerOps"/> fills, one of the pair a handing-over move; null when there is none (the mac's <c>laterLeaver</c>).</summary>
-    private static int? LaterLeaver(IReadOnlyList<UndoOp> fillerOps, int position, List<int> order, IReadOnlyList<IReadOnlyList<UndoOp>> opsOf)
-    {
-        foreach (UndoOp filler in fillerOps)
-        {
-            if (UndoOp.PlaceFilledBy(filler) is not { } filled) continue;
-            for (int later = position + 1; later < order.Count; later++)
-            {
-                foreach (UndoOp leaver in opsOf[order[later]])
-                {
-                    if (UndoOp.PlaceLeftBy(leaver) is not { } left || UndoOp.PartInside(left, filled) is not "") continue;
-                    if (UndoOp.HandsOverAsAMove(leaver) || UndoOp.HandsOverAsAMove(filler)) return later;
-                }
-            }
-        }
-        return null;
     }
 
     /// <summary>The trail line, written once what became of the change is known (the mac's <c>UndoTrailHook.couldNotRecord</c>).</summary>
