@@ -1031,11 +1031,9 @@ class ContractCaseTests(unittest.TestCase):
         if call == "forgetTheMaintainer":
             model.maintainer_registered = False
             return None
-        if call in ("moveALinkToAFolder", "renameAPerSectionFolderThatIsALink"):
+        if call == "moveALinkToAFolder":
             # U4b2-14: a link to a folder elsewhere in the course, moved as
-            # itself and judged by its target. U4b2-15: Rename folder's plan
-            # of a per-section folder that is that link makes the same step
-            # (stackCasesHow); the plan itself is the Swift replay's to check.
+            # itself and judged by its target.
             if pages.get(self.LINK_FROM) is None and pages.get(self.LINK_TO) is None:
                 for name, text in self.LIBRARY_FILES.items():
                     pages[self.LIBRARY + "/" + name] = text
@@ -1305,7 +1303,7 @@ class ContractCaseTests(unittest.TestCase):
                   "linkItsNewFolderOutside", "moveAFolderWithAFileMadeInANewFolderInside", "addAFolderInsideTheMadeFolder",
                   "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt",
                   "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt", "finderRecordsAWindowInTheMadeFolder",
-                  "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
+                  "moveALinkToAFolder", "stepEditingInsideALinksMove",
                   "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
                   "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace")
 

@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # U4b2-15: a-linked-section-folder-is-renamed (#899)
 
 Branch `issue/899-u4b2-15-a-linked-section-folder-is-renamed`, from piece 14's pushed head c64e741ef (holds `dev` 811c956ce, pieces 9, 10, 14). `origin/dev` merged before proving and again before hand-back: both "Already up to date" (`dev` still 811c956ce), so no merge commit. (Merged on 2026-11-26 in `night25/integration-7`, 69b247fd5, with U4b2-11 to U4b2-15. "For PROGRESS" and "For documentation 12" are folded into `windows-app/PROGRESS.md` and documentation 12.)
