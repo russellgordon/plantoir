@@ -14,8 +14,10 @@ namespace Plantoir.Tests;
 /// followed; both links standing is neither state. It is swapped as: a new
 /// link holding the destination's text made under the staged <c>-new</c> name
 /// beside the destination, renamed in without replacing, then the old link
-/// removed only once re-read holding the source's text. Inert: the op is
-/// built in memory, and from the journal it is still not readable (21b2).
+/// removed only once re-read holding the source's text. Read from the journal
+/// (21b2, the mac's relink-2): the pair is ONE content form beside
+/// <c>sha</c>, <c>listingSha</c> and <c>linkSha</c>, readable only in its one
+/// shape (<see cref="ARelinkOfAnyOtherShapeIsNotReadable"/>).
 /// </summary>
 public sealed class UndoRelinkTests : IDisposable
 {
@@ -531,19 +533,115 @@ public sealed class UndoRelinkTests : IDisposable
         Assert.Equal("Three.\n", File.ReadAllText(Full(Day(3))));
     }
 
-    /// <summary>Inert: a relink from the journal (linkShaBefore and linkShaAfter, no sha, listingSha or linkSha) is still not readable until 21b2.</summary>
-    [Fact]
-    public void ARelinkFromTheJournalIsStillUnreadable()
+    // MARK: Readable (21b2; the mac's relink-2, UndoFormat.relinkShapeIsKnown)
+
+    private static readonly string OldTextSha = UndoCheck.Sha(Bytes("Unit 1, Day 3.md"));
+    private static readonly string NewTextSha = UndoCheck.Sha(Bytes("Unit 1, Day 4.md"));
+
+    /// <summary>A relink as the journal holds it, Day 4's link moved to Day 5 with a new text; <paramref name="change"/> alters it first.</summary>
+    private static UndoOp ReadARelink(Action<JsonObject>? change = null)
     {
-        string before = UndoCheck.Sha(Bytes("Unit 1, Day 3.md")), after = UndoCheck.Sha(Bytes("Unit 1, Day 4.md"));
         var json = new JsonObject
         {
             ["kind"] = "move", ["from"] = Day(4), ["to"] = Day(5),
-            ["linkShaBefore"] = before, ["linkShaAfter"] = after, ["blobs"] = new JsonArray(before, after),
+            ["linkShaBefore"] = OldTextSha, ["linkShaAfter"] = NewTextSha, ["blobs"] = new JsonArray(OldTextSha, NewTextSha),
         };
+        change?.Invoke(json);
         using JsonDocument document = JsonDocument.Parse(json.ToJsonString());
-        UndoOp read = UndoFormat.ReadOp(document.RootElement);
-        Assert.False(read.Readable);
+        return UndoFormat.ReadOp(document.RootElement);
+    }
+
+    /// <summary>A relink from the journal is readable: the pair is ONE content form, read as the factory builds it.</summary>
+    [Fact]
+    public void ARelinkFromTheJournalIsReadable()
+    {
+        UndoOp read = ReadARelink();
+        Assert.True(read.Readable);
+        Assert.True(read.IsARelink);
+        Assert.True(read.IsALinksMove);
         Assert.Null(read.LinkSha);
+        Assert.Equal(OldTextSha, read.LinkShaBefore);
+        Assert.Equal(NewTextSha, read.LinkShaAfter);
+        Assert.Equal(OldTextSha, read.LinkText(isAtFrom: true));
+        Assert.Equal(NewTextSha, read.LinkText(isAtFrom: false));
+        Assert.Equal(new[] { OldTextSha, NewTextSha }, read.Blobs.OrderBy(name => name == OldTextSha ? 0 : 1));
+    }
+
+    /// <summary>Each barrier of the relink's shape (opKinds.move): any other shape is one this version cannot read.</summary>
+    [Theory]
+    [InlineData("the two texts the same")]
+    [InlineData("one text missing from blobs")]
+    [InlineData("a third blob beside the two")]
+    [InlineData("linkShaBefore alone")]
+    [InlineData("linkShaAfter alone")]
+    [InlineData("linkSha beside the pair")]
+    [InlineData("sha beside the pair")]
+    [InlineData("a text that is not a blob name")]
+    [InlineData("the pair on a moveApart")]
+    [InlineData("the pair on a capitalisation-only move")]
+    [InlineData("the pair on a move to its own place")]
+    public void ARelinkOfAnyOtherShapeIsNotReadable(string barrier)
+    {
+        UndoOp read = ReadARelink(json =>
+        {
+            switch (barrier)
+            {
+                case "the two texts the same":
+                    json["linkShaAfter"] = OldTextSha;
+                    json["blobs"] = new JsonArray(OldTextSha);
+                    break;
+                case "one text missing from blobs":
+                    json["blobs"] = new JsonArray(OldTextSha);
+                    break;
+                case "a third blob beside the two":
+                    json["blobs"] = new JsonArray(OldTextSha, NewTextSha, UndoCheck.Sha(Bytes("Unit 1, Day 2.md")));
+                    break;
+                case "linkShaBefore alone":
+                    json.Remove("linkShaAfter");
+                    json["blobs"] = new JsonArray(OldTextSha);
+                    break;
+                case "linkShaAfter alone":
+                    json.Remove("linkShaBefore");
+                    json["blobs"] = new JsonArray(NewTextSha);
+                    break;
+                case "linkSha beside the pair":
+                    // No shared row (relink-2's "For the director" 1, option a): this is Windows' pin. A reader
+                    // that knew linkSha but not the pair would otherwise Redo a plain link's move with the OLD text.
+                    json["linkSha"] = OldTextSha;
+                    break;
+                case "sha beside the pair":
+                    json["sha"] = OldTextSha;
+                    break;
+                case "a text that is not a blob name":
+                    json["linkShaAfter"] = "Unit 1, Day 4.md";
+                    json["blobs"] = new JsonArray(OldTextSha, "Unit 1, Day 4.md");
+                    break;
+                case "the pair on a moveApart":
+                    json["kind"] = "moveApart";
+                    break;
+                case "the pair on a capitalisation-only move":
+                    json["to"] = Section + "/unit 1, day 4.md";
+                    break;
+                case "the pair on a move to its own place":
+                    json["to"] = Day(4);
+                    break;
+            }
+        });
+        Assert.False(read.Readable, barrier);
+    }
+
+    /// <summary>The capitalisation-only barrier is the relink's own: the same rename with a plain link's linkSha IS readable.</summary>
+    [Fact]
+    public void APlainLinksCapitalisationOnlyMoveIsStillReadable()
+    {
+        UndoOp read = ReadARelink(json =>
+        {
+            json.Remove("linkShaBefore");
+            json.Remove("linkShaAfter");
+            json.Remove("blobs");
+            json["linkSha"] = OldTextSha;
+            json["to"] = Section + "/unit 1, day 4.md";
+        });
+        Assert.True(read.Readable);
     }
 }
