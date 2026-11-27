@@ -35,7 +35,8 @@ Restored 348 of 348, HEAD-AFTER same, status clean.
 ## Runs
 
 - w8b-21b1a-a (PC, ref c4574263b, red ref aee39138c; lock taken 08:06 after the director's integration run, released by its own run): **red 7 of 7** at the tests-first commit (every `UndoLinkCopyTests` test, `NotImplementedException` from the inert stubs, and the riding low's test, "Value is not the exact type", `Bytes` for `CannotReadNow`); both builds 0 errors; **348 of 348 passed** (`UndoLinkCopyTests`, `UndoRelinkTests`, `UndoHandedOverPlaceTests`, `UndoActionStepTests`, `UndoActionStepLinkTests`, `UndoKeptPageUnderAVisibleNameTests`, `NamedGapLedgerTests`, `UndoWriterScanTests`, `UndoOpKindsContractTests`, `UndoStackContractTests`); must-fail RED 4 of 4; restored 348 of 348.
-- `origin/dev` moved to 454ef4c6f (day27b integration-1) after that run: merged in (60f80972a), and the classes run again as w8b-21b1a-b (below).
+- `origin/dev` moved to 454ef4c6f (day27b integration-1) after that run: merged in (60f80972a), and the classes run again as w8b-21b1a-b.
+- w8b-21b1a-b (PC, ref b0f863e49, the merged head): both builds 0 errors; **349 of 349 passed** (the same classes; the merge brought one test); lock taken and released by its own run.
 
 ## Ledger
 
