@@ -149,26 +149,123 @@ internal static class UndoTrail
     /// not keep a copy of all it needs for this change, so what it could not
     /// keep stays beside the page, and the next Undo or Redo of this change
     /// uses it. What “A.md” held a moment before is kept beside it as the
-    /// hidden file “…”.</c> (the mac's <c>keptWhatItReplacedLine</c>).
+    /// hidden file “…”.</c> (the mac's <c>keptWhatItReplacedLine</c>, U4b2-4).
+    /// Each kept file is given by its path in the working folder
+    /// (<c>&lt;page's folder&gt;/&lt;hidden name&gt;</c>; a bare hidden name
+    /// stands for a page at the top of the working folder), so two pages with
+    /// one name in two folders are two pages. A page is said to come "from
+    /// what was kept beside it" only when its path is in
+    /// <paramref name="putBackFromAKeptOriginal"/> (null: every page named
+    /// was). A named page whose file name another page of the step shares
+    /// (<paramref name="pagesOfTheStep"/>, every op's path, named here or not)
+    /// is named by its path inside <c>courses/&lt;course&gt;/</c>, or by its
+    /// path in the working folder when it is outside that or the step has no
+    /// course. The hidden file is always its bare name. Names and prefixes are
+    /// compared by <see cref="SameSpelling"/>.
     /// </summary>
-    internal static string KeptWhatItReplacedWords(bool isUndo, IReadOnlyList<string> keptOfWhatItHeld, IReadOnlyList<string> keptOfWhatItHoldsNow)
+    internal static string KeptWhatItReplacedWords(bool isUndo, IReadOnlyList<string> keptOfWhatItHeld, IReadOnlyList<string> keptOfWhatItHoldsNow,
+                                                   string? course = null, IReadOnlyList<string>? putBackFromAKeptOriginal = null,
+                                                   IReadOnlyList<string>? pagesOfTheStep = null)
     {
-        var places = new List<string>();
+        var pages = new List<string>();
         foreach (string kept in keptOfWhatItHeld.Concat(keptOfWhatItHoldsNow))
         {
-            string place = PlaceOfKept(kept);
-            if (!places.Contains(place)) places.Add(place);
+            string page = PageOfKept(kept);
+            if (!ContainsSpelling(pages, page)) pages.Add(page);
+        }
+        var pagesThatCouldBeMistaken = new List<string>(pages);
+        foreach (string page in pagesOfTheStep ?? [])
+        {
+            if (!ContainsSpelling(pagesThatCouldBeMistaken, page)) pagesThatCouldBeMistaken.Add(page);
+        }
+        var fromTheList = new List<string>();
+        var fromKept = new List<string>();
+        foreach (string page in pages)
+        {
+            string named = NameOnTheLine(page, pagesThatCouldBeMistaken, course);
+            if (putBackFromAKeptOriginal is null || ContainsSpelling(putBackFromAKeptOriginal, page)) fromKept.Add(named);
+            else fromTheList.Add(named);
         }
         string which = isUndo ? "Undo" : "Redo";
-        string what = places.Count == 0 ? "a page" : string.Join(", ", places);
         var line = new System.Text.StringBuilder();
-        line.Append($"{which} put back {what} from what was kept beside it, but the list could not keep a copy of all it needs for this change, ");
+        if (pages.Count == 0) line.Append($"{which} put back a page");
+        else if (fromKept.Count == 0) line.Append($"{which} put back {string.Join(", ", fromTheList)}");
+        else if (fromTheList.Count == 0) line.Append($"{which} put back {string.Join(", ", fromKept)} from what was kept beside it");
+        else line.Append($"{which} put back {string.Join(", ", fromTheList)}, and put back {string.Join(", ", fromKept)} from what was kept beside it");
+        line.Append(", but the list could not keep a copy of all it needs for this change, ");
         line.Append("so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it.");
         foreach (string kept in keptOfWhatItHeld)
-            line.Append($" What {PlaceOfKept(kept)} held a moment before is kept beside it as the hidden file {Quoted(kept)}.");
+            line.Append($" What {NameOnTheLine(PageOfKept(kept), pagesThatCouldBeMistaken, course)} held a moment before is kept beside it as the hidden file {Quoted(HiddenNameOf(kept))}.");
         foreach (string kept in keptOfWhatItHoldsNow)
-            line.Append($" What {PlaceOfKept(kept)} holds now is kept beside it as the hidden file {Quoted(kept)}.");
+            line.Append($" What {NameOnTheLine(PageOfKept(kept), pagesThatCouldBeMistaken, course)} holds now is kept beside it as the hidden file {Quoted(HiddenNameOf(kept))}.");
         return line.ToString();
+    }
+
+    /// <summary>
+    /// Whether two names or paths are spelled the same: in Unicode
+    /// normalization form C, then ordinally (documentation 12, "What W4c and
+    /// W8 owe from U4b2-6", its last bullet; the mac's <c>String ==</c>, which
+    /// treats canonically equivalent forms as equal). Capitals differ:
+    /// <c>Index.md</c> and <c>index.md</c> are two names. The one comparison
+    /// of the kept line's names, pages and course prefix.
+    /// </summary>
+    internal static bool SameSpelling(string first, string second) =>
+        string.Equals(first.Normalize(System.Text.NormalizationForm.FormC), second.Normalize(System.Text.NormalizationForm.FormC), StringComparison.Ordinal);
+
+    private static bool ContainsSpelling(IEnumerable<string> list, string wanted)
+    {
+        foreach (string item in list)
+        {
+            if (SameSpelling(item, wanted)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>The last part of a <c>/</c>-separated path: a kept file's hidden name, or a page's file name.</summary>
+    private static string HiddenNameOf(string path) => path[(path.LastIndexOf('/') + 1)..];
+
+    /// <summary>
+    /// The page a kept file stands beside, by its place in the working
+    /// folder: the kept file's folder plus the name between the hidden name's
+    /// leading dot and its last <c>.plantoir-undo-</c>
+    /// (<c>courses/ICS3U/Section 1/.index.md.plantoir-undo-4-undo-orig</c>
+    /// gives <c>courses/ICS3U/Section 1/index.md</c>; a bare hidden name, the
+    /// page's name alone). The mac's <c>UndoTrail.pageOfKept</c>.
+    /// </summary>
+    internal static string PageOfKept(string kept)
+    {
+        int slash = kept.LastIndexOf('/');
+        string hidden = kept[(slash + 1)..];
+        string pageName = UndoSwap.PlaceOfStagedName(hidden) ?? hidden;
+        return slash < 0 ? pageName : kept[..(slash + 1)] + pageName;
+    }
+
+    /// <summary>
+    /// A page as the kept line names it, quoted: by its file name, or, when
+    /// another of <paramref name="pages"/> has the same file name, by its path
+    /// with <c>courses/&lt;course&gt;/</c> taken off, or its whole path in the
+    /// working folder when it is not under that or there is no course (the
+    /// mac's <c>UndoTrail.nameOnTheLine</c>).
+    /// </summary>
+    private static string NameOnTheLine(string page, IReadOnlyList<string> pages, string? course)
+    {
+        string pageName = HiddenNameOf(page);
+        bool sharesItsName = false;
+        foreach (string other in pages)
+        {
+            if (!SameSpelling(other, page) && SameSpelling(HiddenNameOf(other), pageName)) sharesItsName = true;
+        }
+        if (!sharesItsName) return Quoted(pageName);
+        // The prefix is the first two parts, each compared by SameSpelling;
+        // the rest is kept as the path spells it.
+        if (!string.IsNullOrEmpty(course))
+        {
+            int first = page.IndexOf('/');
+            int second = first < 0 ? -1 : page.IndexOf('/', first + 1);
+            if (second > 0 && SameSpelling(page[..first], "courses") && SameSpelling(page[(first + 1)..second], course))
+                return Quoted(page[(second + 1)..]);
+        }
+        return Quoted(page);
     }
 
     /// <summary>

@@ -595,7 +595,7 @@ internal sealed class UndoDoor
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
         }
         Finish(seq, backward ? "undone" : "redone", null, null);
-        if (!notTaken.IsEmpty && root.Length > 0) SayWhatItKept(record.Step, root, label, notTaken, backward);
+        if (!notTaken.IsEmpty && root.Length > 0) SayWhatItKept(record.Step, root, label, notTaken, backward, uses);
         Rederive(record.Step.Ops, root);
         return new UndoOutcome(backward ? UndoOutcomeKind.Undone : UndoOutcomeKind.Redone, seq);
     }
@@ -608,10 +608,17 @@ internal sealed class UndoDoor
     /// with its true sentence. One line, "undo kept what it replaced", naming
     /// each kept file as it is on the disk now.
     /// </summary>
-    private void SayWhatItKept(UndoStep step, string root, string label, UndoWhatTheListCouldNotTake notTaken, bool backward)
+    private void SayWhatItKept(UndoStep step, string root, string label, UndoWhatTheListCouldNotTake notTaken, bool backward,
+                               IReadOnlyList<UndoKeptOriginalUse> uses)
     {
+        // Each kept file by its path in the working folder (the page's folder,
+        // as the op's path spells it, plus the hidden name), so two pages with
+        // one name in two folders stay two (the mac's U4b2-4). The trail
+        // line's list stays the kept files' bare names, for a reader of the
+        // trail.
         var keptOfWhatItHeld = new List<string>();
         var keptOfWhatItHoldsNow = new List<string>();
+        var namesOfTheKept = new List<string>();
         var pathsOfTheStep = new List<string>();
         foreach (UndoOp op in step.Ops)
         {
@@ -620,19 +627,40 @@ internal sealed class UndoDoor
         foreach (string path in pathsOfTheStep)
         {
             if (!UndoPlaces.StaysInside(root, path)) continue;
-            foreach (string kept in UndoRecovery.KeptOriginalFiles(step, FullPath(root, path)))
+            int slash = path.LastIndexOf('/');
+            foreach (string full in UndoRecovery.KeptOriginalFiles(step, FullPath(root, path)))
             {
-                string name = Path.GetFileName(kept);
-                if (keptOfWhatItHeld.Contains(name) || keptOfWhatItHoldsNow.Contains(name)) continue;
-                if (notTaken.OutgoingOf.Contains(path) && UndoSwap.IsStaged(name, label)) keptOfWhatItHeld.Add(name);
-                else if (UndoSwap.HoldsAnyOf(notTaken.KeptOriginalsHolding, kept)) keptOfWhatItHoldsNow.Add(name);
+                string name = Path.GetFileName(full);
+                string kept = slash < 0 ? name : path[..(slash + 1)] + name;
+                if (AlreadyListed(keptOfWhatItHeld, kept) || AlreadyListed(keptOfWhatItHoldsNow, kept)) continue;
+                if (notTaken.OutgoingOf.Contains(path) && UndoSwap.IsStaged(name, label)) keptOfWhatItHeld.Add(kept);
+                else if (UndoSwap.HoldsAnyOf(notTaken.KeptOriginalsHolding, full)) keptOfWhatItHoldsNow.Add(kept);
                 else continue;
-                UndoSwap.HideAKeptFileLeft(kept);
+                namesOfTheKept.Add(name);
+                UndoSwap.HideAKeptFileLeft(full);
             }
         }
+        // Page by page: "from what was kept beside it" only of a page a use
+        // names, by its path in the working folder (the mac's U4b2-4).
+        var putBackFromAKeptOriginal = new List<string>();
+        foreach (UndoKeptOriginalUse use in uses)
+        {
+            if (!putBackFromAKeptOriginal.Contains(use.Path)) putBackFromAKeptOriginal.Add(use.Path);
+        }
         _trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoKeptWhatItReplaced, step.Course, step.Section,
-                                         UndoTrail.KeptWhatItReplacedWords(backward, keptOfWhatItHeld, keptOfWhatItHoldsNow),
-                                         [.. keptOfWhatItHeld, .. keptOfWhatItHoldsNow]));
+                                         UndoTrail.KeptWhatItReplacedWords(backward, keptOfWhatItHeld, keptOfWhatItHoldsNow,
+                                                                           step.Course, putBackFromAKeptOriginal, pathsOfTheStep),
+                                         namesOfTheKept));
+    }
+
+    /// <summary>A kept file is skipped only when its whole path is listed already, compared as the line compares (<see cref="UndoTrail.SameSpelling"/>).</summary>
+    private static bool AlreadyListed(List<string> listed, string kept)
+    {
+        foreach (string other in listed)
+        {
+            if (UndoTrail.SameSpelling(other, kept)) return true;
+        }
+        return false;
     }
 
     /// <summary>

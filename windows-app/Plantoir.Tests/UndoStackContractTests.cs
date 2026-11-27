@@ -33,6 +33,8 @@ public sealed class UndoStackContractTests
         "caseOnlyFolder",
         // U4b2-14's (W8-6)
         "linkedFolder",
+        // U4b2-4's (W8-9)
+        "keptWhatItReplacedSays",
     };
 
     /// <summary>Every case but those that lay a symbolic link (<see cref="LinkCases"/>).</summary>
@@ -168,6 +170,19 @@ public sealed class UndoStackContractTests
             lock (scribe.TrailLines) said = scribe.TrailLines.Count(line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoKeptWhatItReplaced);
             Assert.Equal(keptLines.GetInt32(), said);
         }
+        if (stackCase.TryGetProperty("keptWhatItReplacedSays", out JsonElement keptSays))
+        {
+            UndoTrailLine? last = null;
+            lock (scribe.TrailLines)
+            {
+                foreach (UndoTrailLine line in scribe.TrailLines)
+                {
+                    if (line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoKeptWhatItReplaced) last = line;
+                }
+            }
+            Assert.NotNull(last);
+            Assert.Equal(keptSays.GetString(), AsTheTrailWritesIt(last!));
+        }
         if (stackCase.TryGetProperty("foreignKeptOriginalUntouched", out JsonElement untouched) && untouched.GetBoolean())
         {
             Assert.NotNull(replay.ForeignKept);
@@ -182,6 +197,20 @@ public sealed class UndoStackContractTests
             Assert.True(keptOriginalLeft && leftover.EndsWith("-orig", StringComparison.Ordinal), "a staged file left behind: " + leftover);
         if (stackCase.TryGetProperty("keptOriginalLeft", out _))
             Assert.Equal(keptOriginalLeft, leftovers.Count > 0);
+    }
+
+    /// <summary>
+    /// A line as the activity trail writes it after its stamp, course and
+    /// section first (<see cref="UndoTrail.ToTheActivityTrail"/>, through
+    /// <see cref="Plantoir.Core.Scripting.ActivityTrail.Place"/>):
+    /// <c>keptWhatItReplacedSays</c> is the whole line.
+    /// </summary>
+    private static string AsTheTrailWritesIt(UndoTrailLine line)
+    {
+        if (string.IsNullOrEmpty(line.Course)) return line.Words;
+        if (line.Section is { } section and >= 0 and <= int.MaxValue)
+            return Plantoir.Core.Scripting.ActivityTrail.Place(line.Course, (int)section) + line.Words;
+        return line.Course + " · " + line.Words;
     }
 
     private static long? NullableSeq(JsonElement element, string key) =>
@@ -223,14 +252,28 @@ public sealed class UndoStackContractTests
         internal (string Relative, byte[] Bytes)? ForeignKept { get; private set; }
 
         /// <summary>The newest step's writeFile op on p1, for the U3c calls.</summary>
-        private (long Seq, UndoOp Op) HeadWriteFileOnP1()
+        private (long Seq, UndoOp Op) HeadWriteFileOnP1() => HeadWriteFileOn(_p1);
+
+        /// <summary>The two pages of <c>wholeFileStepOnTwoPagesNamedIndex</c> (stackCasesHow, U4b2-4).</summary>
+        private static readonly string[] TwoIndexes = ["courses/TST1O/Section 1/Classes/index.md", "courses/TST1O/Section 2/Classes/index.md"];
+
+        /// <summary>The newest step's writeFile op on <paramref name="path"/>.</summary>
+        private (long Seq, UndoOp Op) HeadWriteFileOn(string path)
         {
             UndoFoldedStep head = _scribe.Offer().Head ?? throw new InvalidOperationException("no step on the list");
             foreach (UndoOp op in head.Step.Ops)
             {
-                if (op.Kind == UndoOp.WriteFile && op.Path == _p1) return (head.Seq, op);
+                if (op.Kind == UndoOp.WriteFile && op.Path == path) return (head.Seq, op);
             }
-            throw new InvalidOperationException("no whole-file step on p1");
+            throw new InvalidOperationException("no whole-file step on " + path);
+        }
+
+        /// <summary>One content gone from the list, and the list's folder that held it taking no new file.</summary>
+        private void TakeAwayContent(string sha)
+        {
+            string blob = _scribe.Journal.BlobPath(sha);
+            File.Delete(blob);
+            _denials.FolderTakesNothingNew(Path.GetDirectoryName(blob)!);
         }
 
         /// <summary>Every kept original beside p1, as their relative paths.</summary>
@@ -341,6 +384,37 @@ public sealed class UndoStackContractTests
                     Last = "applied";
                     return;
                 }
+                case "wholeFileStepOnTwoPagesNamedIndex":
+                {
+                    // Two pages named index.md in two sections, each written
+                    // whole by one step of TST1O, section 1 (stackCasesHow, U4b2-4).
+                    var changes = new List<(string Path, byte[]? After)>();
+                    foreach (string page in TwoIndexes)
+                    {
+                        _scribe.WritePage("A", page, Encoding.UTF8.GetBytes($"What {page} held before the step.\n"));
+                        changes.Add((page, Encoding.UTF8.GetBytes($"What the step left in {page}.\n")));
+                    }
+                    long seq = _scribe.Step("A", changes)!.Value;
+                    foreach (UndoOp op in _scribe.Fold().Steps[seq].Step.Ops) Assert.Equal(UndoOp.WriteFile, op.Kind);
+                    Last = "applied";
+                    return;
+                }
+                case "firstIndexAfterContentGoneAndCannotBeStored":
+                    TakeAwayContent(HeadWriteFileOn(TwoIndexes[0]).Op.AfterSha!);
+                    return;
+                case "secondIndexBeforeContentGoneAndCannotBeStored":
+                    TakeAwayContent(HeadWriteFileOn(TwoIndexes[1]).Op.BeforeSha!);
+                    return;
+                case "keepTheOriginalOfTheSecondIndex":
+                {
+                    // What the second page held before, beside it as the newest
+                    // step's kept original. Its content is gone from the list,
+                    // so it is written from what the first call wrote there.
+                    (long seq, _) = HeadWriteFileOn(TwoIndexes[1]);
+                    File.WriteAllBytes(UndoSwap.BesidePath(_scribe.FullPath("A", TwoIndexes[1]), $"{seq}-apply", "orig"),
+                                       Encoding.UTF8.GetBytes($"What {TwoIndexes[1]} held before the step.\n"));
+                    return;
+                }
                 case "removeContent": _scribe.RemoveContent(); return;
                 case "contentCannotBeStored":
                     // The list's content folder, there and taking no new file
@@ -351,10 +425,7 @@ public sealed class UndoStackContractTests
                 {
                     // Only the newest step's content for what p1 held before
                     // is gone, and its folder in the list takes no new file.
-                    (_, UndoOp op) = HeadWriteFileOnP1();
-                    string blob = _scribe.Journal.BlobPath(op.BeforeSha!);
-                    File.Delete(blob);
-                    _denials.FolderTakesNothingNew(Path.GetDirectoryName(blob)!);
+                    TakeAwayContent(HeadWriteFileOnP1().Op.BeforeSha!);
                     return;
                 }
                 case "keepTheOriginal":
