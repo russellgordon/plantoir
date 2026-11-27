@@ -27,7 +27,7 @@ Branch `issue/day27-4-windows-two-failures` from `origin/day27/integration-4` (d
 
 - PC, c940c4fc5 (fixes 1 and 2), `ContractTests.`, `PythonToolchainTests`, `UndoWriterScanTests`, `UndoOpKindsContractTests`, `UndoStackContractTests`: both builds 0 errors, 406 of 406 passed, 13 m 8 s. Every shared Python file passed on Windows, so `test_dates_follow_the_class`, `test_my_progress` and the class-folder reading needed nothing for Windows.
 - PC, b676fda91 (fix 3, test files only), `PythonToolchainTests`: 145 of 146: the moved case ERRORED (no contract folder natively, above). Fixed in the next commit; that file run alone on the PC's runtime Python 19 of 19, `test_links_checklist.py` 8 of 8, `test_my_progress.py` 27 of 27.
-- PC, final head, `PythonToolchainTests`: RUN_C_PLACEHOLDER
+- PC, final head, `PythonToolchainTests`: 435709ced, both builds 0 errors, 146 of 146, 12 m 56 s; lock taken and released by this run.
 
 ## For the director
 
