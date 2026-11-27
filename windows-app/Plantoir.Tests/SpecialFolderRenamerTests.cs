@@ -967,56 +967,40 @@ public class SpecialFolderRenamerTests : IDisposable
         Assert.False(File.Exists(RecordPath), "today: read as none at the start, so put back as none");
     }
 
-    /// <summary>Deny the account a look at <paramref name="folder"/>: its own attributes, and its parent's listing, so neither the look nor the fallback search can see it. Taken away by the returned action.</summary>
-#pragma warning disable CA1416 // the tests run on Windows
-    private static Action DenyALookAt(string folder)
-    {
-        var me = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
-        var target = new DirectoryInfo(folder);
-        var parent = target.Parent!;
-        var onTarget = new System.Security.AccessControl.FileSystemAccessRule(me,
-            System.Security.AccessControl.FileSystemRights.ReadAttributes | System.Security.AccessControl.FileSystemRights.ReadData,
-            System.Security.AccessControl.AccessControlType.Deny);
-        var onParent = new System.Security.AccessControl.FileSystemAccessRule(me,
-            System.Security.AccessControl.FileSystemRights.ReadData, System.Security.AccessControl.AccessControlType.Deny);
-        var targetSecurity = target.GetAccessControl();
-        targetSecurity.AddAccessRule(onTarget);
-        target.SetAccessControl(targetSecurity);
-        var parentSecurity = parent.GetAccessControl();
-        parentSecurity.AddAccessRule(onParent);
-        parent.SetAccessControl(parentSecurity);
-        return () =>
-        {
-            var p = parent.GetAccessControl(); p.RemoveAccessRule(onParent); parent.SetAccessControl(p);
-            var t = target.GetAccessControl(); t.RemoveAccessRule(onTarget); target.SetAccessControl(t);
-        };
-    }
-#pragma warning restore CA1416
+    /// <summary>
+    /// A place under the test's root (under the account folder on the PC) whose
+    /// look the system truly refuses with an I/O error: a name it will not
+    /// take. A deny entry is read past by the PC's account (measured, run
+    /// w8b-wbl-a: the look saw a Folder), so a name the system refuses is the
+    /// look that fails on every machine.
+    /// </summary>
+    private string APlaceTheSystemWillNotLookAt() => InCourse("section1/not|a name");
 
-    /// <summary>LOW 3: the real capture in <c>UndoLinks.Look</c>, on a folder the system truly refuses to look at: a reason is kept, never "nothing there".</summary>
+    /// <summary>LOW 3: the real capture in <c>UndoLinks.Look</c>, on a place the system truly refuses to look at: a reason is kept, never "nothing there".</summary>
     [Fact]
     public void ALookTheSystemRefusesKeepsItsReason()
     {
-        string folder = InCourse("section1/Assessments");
-        Directory.CreateDirectory(folder);
-        Action undeny = DenyALookAt(folder);
-        try
-        {
-            var what = UndoLinks.Look(folder, out string? said);
+        Directory.CreateDirectory(InCourse("section1"));
 
-            Assert.Equal(UndoLinks.What.CannotLook, what);
-            Assert.False(string.IsNullOrWhiteSpace(said), "the system's reason is kept");
-        }
-        finally { undeny(); }
+        var what = UndoLinks.Look(APlaceTheSystemWillNotLookAt(), out string? said);
+
+        Assert.Equal(UndoLinks.What.CannotLook, what);
+        Assert.False(string.IsNullOrWhiteSpace(said), "the system's reason is kept");
     }
 
-    /// <summary>LOW 2: the unreadable clause names the place as the course does and a short reason: no drive, no account folder, no backslash path (the mac's strerror).</summary>
+    /// <summary>LOW 2: the unreadable clause names the place as the course does and the system's short reason, from the real look: no drive, no account folder, no backslash path (the mac's strerror).</summary>
     [Fact]
     public void AnUnreadablePlaceIsToldWithAShortReasonAndNoPath()
     {
         Directory.CreateDirectory(InCourse("section1/Assessments"));
         Directory.CreateDirectory(InCourse("section2/Assessments"));
-        Action undeny = DenyALookAt(InCourse("section1/Assessments"));
+        string refused = InCourse("section1/Assessments");
+        // The seam hands over what the REAL look said at a place it refuses.
+        SpecialFolderRenamer.LookingAtAPlaceFails = path =>
+        {
+            if (!string.Equals(Path.GetFullPath(path), Path.GetFullPath(refused), StringComparison.OrdinalIgnoreCase)) return null;
+            return UndoLinks.Look(APlaceTheSystemWillNotLookAt(), out string? said) == UndoLinks.What.CannotLook ? said : null;
+        };
         try
         {
             var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
@@ -1034,6 +1018,6 @@ public class SpecialFolderRenamerTests : IDisposable
                 Assert.DoesNotContain(_root, said, StringComparison.OrdinalIgnoreCase);
             }
         }
-        finally { undeny(); }
+        finally { SpecialFolderRenamer.LookingAtAPlaceFails = null; }
     }
 }
