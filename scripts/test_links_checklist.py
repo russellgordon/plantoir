@@ -92,7 +92,13 @@ def lay_out(case: dict, course_folder: Path, content_root: Path) -> None:
             published.append(place)
     for source, copied, holds, is_section_page in links_to_make:
         source.parent.mkdir(parents=True, exist_ok=True)
-        source.symlink_to(holds)
+        # The contract writes the link's text with forward slashes. Windows
+        # stores a relative link's text as given and cannot follow one that
+        # holds "/" (reading it fails with Errno 22), so it goes through Path,
+        # which spells it with this system's separator, as a teacher's own
+        # link on that system is spelled. The arrangement is the same on every
+        # system; only the separator differs.
+        source.symlink_to(Path(holds))
         copied.parent.mkdir(parents=True, exist_ok=True)
         copied.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
         build_site.remember_vault_source(copied, source, is_section_page)

@@ -41,11 +41,14 @@ if _sys.platform == "darwin" and _sys.argv[1:2] != ["--site"]:
         _sys.exit(77)
 # ---- end of runs in the image ----
 
+import io
+import json
 import os
 import shutil
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -54,6 +57,7 @@ import build_site
 import class_pages
 import contracts
 import frontmatter
+import my_progress
 import toolchain_paths
 
 
@@ -785,6 +789,77 @@ class DatesFollowTheClassTests(unittest.TestCase):
             content, result = folder.build(section)
             self.assertEqual(result["rewritten"], [], "a second build rewrote pages")
         self.assertEqual(folder.snapshot(), settled, "a second build changed the teacher's files")
+
+
+def _quietly(function, *arguments, **keywords):
+    """`function`'s result, with what it prints kept off the test's output."""
+    said = io.StringIO()
+    with redirect_stdout(said):
+        return function(*arguments, **keywords)
+
+
+class AnOwnedLessonStaysUnderItsClass(unittest.TestCase):
+    """Moved here from test_my_progress.py (day27-4): it needs python-frontmatter
+    for the build's date pass, which test_my_progress.py, stdlib only, cannot
+    have on a Mac's own Python. #1048b review 1, MEDIUM 1: a shared lesson a numbered class owns
+    (Unit 1, Day 2 is a link to it) is grouped under THAT class, not under
+    Other pages and not under an earlier class that only says [[Lesson]]
+    (`class-planning.json` -> `datingPagesAClassBrings.frontmatterKey.
+    firstClassKeepsASharedLessonCasesLayout`)."""
+
+    def setUp(self):
+        # My Progress reads its words from the contract; natively the
+        # toolchain's default is the container's /opt/contracts, so point it
+        # at the repository's own, as `_load` does (test_my_progress.py did
+        # this at import; here no other test may have run first).
+        _load()
+        self.folder = Path(tempfile.mkdtemp())
+        self.course = self.folder / "courses" / "TEST"
+        self.content = self.folder / "content"
+        self.output = self.folder / "output"
+        (self.output / "quartz").mkdir(parents=True)
+
+    def tearDown(self):
+        build_site.forget_vault_sources()
+        build_site.set_class_folders(None)
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def page(self, place: str, teachers_text: str, copy_text: str, is_section_page: bool) -> None:
+        source = self.course / place
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text(teachers_text, encoding="utf-8")
+        relative = place[len("section1/"):] if is_section_page else place
+        copy = self.content / relative
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        copy.write_text(copy_text, encoding="utf-8")
+        build_site.remember_vault_source(copy, source, is_section_page)
+
+    def test_the_lesson_is_grouped_under_the_class_that_owns_it(self):
+        build_site.forget_vault_sources(self.course)
+        build_site.set_class_folders(["All Classes"])
+        criteria = "## Success criteria\n\n- [ ] I can add fractions\n"
+        self.page("Shared/Lesson.md",
+                  "---\ncreatedSection1: 2026-09-10T07:00:00.000+0000\n---\n" + criteria,
+                  "---\ncreated: 2026-09-10T07:00:00.000+0000\n---\n" + criteria, False)
+        day_one = "---\ntitle: Unit 1, Day 1\ncreated: 2026-09-08T07:00:00.000+0000\n---\n[[Lesson]]\n"
+        self.page("section1/All Classes/Unit 1, Day 1.md", day_one, day_one, True)
+        day_two = self.course / "section1" / "All Classes" / "Unit 1, Day 2.md"
+        day_two.symlink_to(Path("../../Shared/Lesson.md"))
+        day_two_copy = self.content / "All Classes" / "Unit 1, Day 2.md"
+        day_two_copy.write_text("---\ncreated: 2026-09-10T07:00:00.000+0000\n---\n" + criteria, encoding="utf-8")
+        build_site.remember_vault_source(day_two_copy, day_two, True)
+
+        dating = _quietly(build_site._date_pages_from_their_classes, self.content, 1, write_back=False)
+        if isinstance(dating, tuple):
+            dating = dating[0]
+        self.assertEqual(dating["first_class_of"].get(self.content / "Shared" / "Lesson.md"), day_two_copy,
+                         "the lesson is not claimed by the class that owns it")
+        _quietly(build_site._prepare_my_progress, self.content, self.output,
+                {"per_section_folders": ["All Classes"]}, 1, "ICS3U", dating,
+                "2026-09-03T09:00:00.000-0400")
+        plan = json.loads((self.output / "quartz" / my_progress.PLAN_FILE).read_text(encoding="utf-8"))
+        self.assertEqual(plan["firstClassOf"].get("Shared/Lesson.md"), "All Classes/Unit 1, Day 2.md")
+        self.assertIn("Shared/Lesson.md", plan["gate"])
 
 
 if __name__ == "__main__":
