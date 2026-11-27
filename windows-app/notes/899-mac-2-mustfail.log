@@ -20,3 +20,8 @@ M4 (the re-date-only loop removed): exit 65, Executed 3 tests, with 6 failures (
 S1 (LOW 2) hop identity keyed by path spelling (ResolvedFile(device: 0, inode: hash of hop.path)): RED UndoMakeRoomLinkedPageTests.testTwoSpellingsOfOneHopRePointItOnce: caught error refused(notReadable, fileName: "") (two ops at one place); testTwoRenamedClassesReachingOneHopRePointItOnce (one spelling) stayed green.
 S2 (LOW 1) the old refusal at the hidden staged name put back: RED UndoRelinkTests.testAnItemThatCannotGoBackAfterTheExchangeIsNamedByTheRefusal, 2 failures (line 1840 swap: refused(cannotTellNow(path: ".../.Unit 1, Day 4.md.plantoir-undo-1-apply-new")) not notPutBack at the visible place; line 1832 live: refused, not leftPartWay).
 RED 2 of 2.
+
+# Fix round two (review 2), 2026-11-27. Both sabotages in one build (disjoint code and tests), run (.dd/run-fix2-mustfail.log), restored by git checkout; `git diff` clean after.
+F-N (MEDIUM) a non-link under a relink's staged name read before it is judged (`.cannotReadNow` when it cannot be read): RED UndoRelinkTests.testAnUnreadableItemUnderTheStagedNameIsKeptVisibleAndSaid (line 1670: refused(cannotTellNow) not swapped), testAnItemThatCannotGoBackByTheExchangeIsGivenBackUnread (line 1849 swap: notPutBack; line 1844 live: leftPartWay), testRecoverySettlesAnUnreadableItemUnderTheStagedNameVisiblyAndSaysSo (line 1934: folder left under the hidden name, not kept, said []).
+F-H (LOW 1) hops keyed by the link's own identity alone: RED UndoMakeRoomLinkedPageTests.testTwoNamesOfOneHardLinkedLinkAreTwoHops (line 812: b.md still holds Day 2; line 818: 1 relink, not 2); testTwoSpellingsOfOneHopRePointItOnce stayed green.
+RED 2 of 2.

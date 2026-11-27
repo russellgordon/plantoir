@@ -23968,11 +23968,24 @@ two-place relink's pre-clean settles its staged name by the one rule (kept
 visible and said, never given back onto the relink's destination); after the
 exchange an item that cannot be settled is exchanged back unread, or, if that
 is refused too, the step is left part way at the visible place (`notPutBack`,
-in flight for recovery, which gives the item back or keeps it under a visible
-name and says so; never a hidden name in what a teacher reads, never "nothing
-was changed"); the async kill tables gather their faults and assert once. The
-hops already planned are compared by their own `lstat` identity, so two
-spellings of one hop (letter case, a linked folder) re-point it once. What
+in flight for recovery; never a hidden name in what a teacher reads, never
+"nothing was changed"); the async kill tables gather their faults and assert
+once. Whose an item under a relink's own staged name is is decided by
+`lstat` alone, never by its contents (review 2 of mac-2): a link goes by its
+text (`readlink`); anything else is the teacher's, whether or not it can be
+read or listed, because the step stages only links. So the pre-clean, the
+live settle after the exchange and recovery's tidy always settle it: given
+back when its place is free (or holds only the step's own link), else kept
+under `<name> (kept by Undo)` and said by the kept-item line. Nothing waits
+under the hidden name because it cannot be read; only a refused MOVE leaves
+it there, the step then in flight (a later Undo or Redo is refused naming the
+visible place, the list kept), and the next recovery moves it again. "Cannot
+tell now" is left only for a link whose text or a place that cannot be read.
+The hops already planned are compared as directory entries (`HopEntry`: the
+folder's identity and the name as that folder holds it), because the exchange
+re-points one entry: two spellings of one hop (letter case, a linked folder)
+re-point it once, and two names of one hard-linked link (`ln -P`, one inode)
+are each re-pointed. What
 landed in the contract: three `undo.stackCases` rows ("mac-2, Insert Class
 with a later class linked through a link inside the working folder: …"), the
 replay call `makeRoomWithALaterClassLinkedThroughALinkInside` and the key
