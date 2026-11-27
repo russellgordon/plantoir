@@ -56,7 +56,6 @@ final class SiteHealthContractTests: XCTestCase {
                     displayTitle: url.deletingPathExtension().lastPathComponent,
                     fileURL: url, relativePath: path,
                     isSectionLocal: path.hasPrefix("section1/"),
-                    dateKey: PageFrontmatter.createdKey(forSection: 1, isSectionLocal: path.hasPrefix("section1/")),
                     isVisibleToStudents: visible, visibilityIsCertain: true, date: nil,
                     linkedTitles: AssistSectionGraph.linkTargets(in: body),
                     classFolderNames: ["All Classes"], pathWithinSection: withinSection

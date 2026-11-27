@@ -21,7 +21,7 @@ enum PageFrontmatter {
     // MARK: - Functions
 
     /// The key carrying this page's date in this section.
-    nonisolated static func createdKey(forSection sectionNumber: Int, isSectionLocal: Bool) -> String {
+    static func createdKey(forSection sectionNumber: Int, isSectionLocal: Bool) -> String {
         return isSectionLocal ? "created" : "createdSection\(sectionNumber)"
     }
 

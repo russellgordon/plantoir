@@ -342,11 +342,8 @@ enum ClassInsertionPlanner {
         let step: JournaledStep = outerStep
             ?? JournaledStep(course: course, section: plan.sectionNumber, maker: maker)
         let folderURL: URL = ClassPages.folderURL(forSection: plan.sectionNumber, in: course)
-        // The section's classes as they stand, before anything is planned:
-        // who comes first among classes that lead to one file (#1048).
-        let classesBefore: [ClassPageSummary] = ClassPages.list(forSection: plan.sectionNumber, in: course)
         let tail: String = ClassPages.siblingTimeAndOffset(
-            from: classesBefore,
+            from: ClassPages.list(forSection: plan.sectionNumber, in: course),
             forSection: plan.sectionNumber
         )
 
@@ -409,11 +406,7 @@ enum ClassInsertionPlanner {
         }
 
         // 3. The dates.
-        // An ordinary class page lives in the section's folder: `created`.
-        // A class that is a link takes the key its FILE's place calls for
-        // (Russell, 2026-11-26): `createdSection<N>` for a course-level
-        // page, every other section's line left as it is
-        // (`ClassPages.dateKey`).
+        let createdKey: String = PageFrontmatter.createdKey(forSection: plan.sectionNumber, isSectionLocal: true)
         var moved: Int = 0
         // Pages whose settings have no place a new date line can go (#186).
         // Named and carried on past: such a page had no date this app could
@@ -436,20 +429,6 @@ enum ClassInsertionPlanner {
                 pageURL = folderURL.appendingPathComponent(move.title + ".md")
             }
             guard step.fileExists(pageURL), let text = step.readText(pageURL) else {
-                continue
-            }
-            // The key from the place of the file the class IS (#1048), the
-            // one rule every reader and writer of a class's date calls.
-            guard let createdKey = ClassPages.dateKey(
-                ofPageAt: move.fileURL, forSection: plan.sectionNumber, in: course
-            ) else {
-                continue
-            }
-            // A shared lesson several classes link to keeps the date of the
-            // FIRST of them (Russell on #899, 2026-11-26): the plan keeps the
-            // classes in order, so the first by the old names is the first
-            // by the new ones, and a later class writes nothing through.
-            if !ClassPages.isTheFirstClassLeadingToItsFile(move.fileURL, among: classesBefore) {
                 continue
             }
             let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
@@ -529,61 +508,6 @@ enum ClassInsertionPlanner {
             message: message, created: created, leftUndoneFromTheMenu: leftUndone.joined(separator: " "),
             wroteSomething: !created.isEmpty || !renamed.isEmpty || moved > 0 || linksRewritten > 0
         )
-    }
-
-    /// Whether the page at `url` is a symbolic link that leads to nothing:
-    /// `lstat` sees the link, `stat` cannot follow it to anything (its
-    /// target, or a link further along, is not there, or the links go
-    /// round). Insert Class renames such a link as itself and writes
-    /// nothing through it (Russell, 2026-11-26).
-    /// Kept for `ClassPages` until #1055 S1.
-    static func isALinkToNothing(_ url: URL) -> Bool {
-        return ResolvedFile.isALink(url) && ResolvedFile.throughLinks(at: url) == nil
-    }
-
-    /// Where the later class at `place` leads, when it is a symbolic link,
-    /// judged hop by hop (review C of U4b3: "check every hop's own identity,
-    /// not just the end"): each hop is the place the link before it names
-    /// (a relative text read against that link's folder), compared by its
-    /// own `lstat` identity, never by name or spelling, with every class
-    /// page of the section as it stands, at most 32 hops. The first class
-    /// page met decides. The link's own place is never counted, so a chain
-    /// that comes round to it leads nowhere (`.elsewhere`).
-    /// Kept for `ClassPages` until #1055 S1.
-    static func reachOfALinkedClass(at place: URL, classPagePlaces: [ClassPagePlace]) -> LinkedClassReach {
-        if !ResolvedFile.isALink(place) {
-            return .elsewhere
-        }
-        let ownPlace: ResolvedFile? = ResolvedFile.ofThePlace(at: place)
-        var here: URL = place
-        var hops: Int = 0
-        while ResolvedFile.isALink(here) && hops < 32 {
-            hops += 1
-            guard let written = try? FileManager.default.destinationOfSymbolicLink(atPath: here.path) else {
-                return .elsewhere
-            }
-            var next: URL = URL(fileURLWithPath: written)
-            if !written.hasPrefix("/") {
-                next = here.deletingLastPathComponent().appendingPathComponent(written)
-            }
-            guard let hop = ResolvedFile.ofThePlace(at: next) else {
-                return .elsewhere
-            }
-            if hop == ownPlace {
-                return .elsewhere
-            }
-            for classPage in classPagePlaces where classPage.identity == hop {
-                guard let newPlace = classPage.newPlace else {
-                    return .aClassPageTheyLeave
-                }
-                if hops == 1 {
-                    return .aRenamedPageByItsOwnText(newName: newPlace.lastPathComponent)
-                }
-                return .aRenamedPageThrough(link: here, newPlace: newPlace)
-            }
-            here = next
-        }
-        return .elsewhere
     }
 
     /// Making room in a numbered course (#267) — a club's "Week 1", "Week 2".
@@ -1207,92 +1131,5 @@ struct PlanProblem: Equatable, Sendable {
             sentences.append(problem.sentence(noun: noun))
         }
         return sentences
-    }
-}
-
-/// Where a later class that is a symbolic link leads, among the class pages
-/// of its own section (#899 U4b3 relink-5): the first class page its hops
-/// reach decides.
-/// Kept for `ClassPages` until #1055 S1.
-enum LinkedClassReach: Equatable {
-    /// Not a link, or a link that reaches no class page of the section at
-    /// any hop: it leads to a file elsewhere, or nowhere.
-    case elsewhere
-    /// It reaches a class page of the section the plan leaves.
-    case aClassPageTheyLeave
-    /// Its own text names a class page the plan renames, to `newName`.
-    case aRenamedPageByItsOwnText(newName: String)
-    /// It reaches a class page the plan renames (to `newPlace`) only
-    /// through `link`, a link that is not a class page and whose own text
-    /// names that page.
-    case aRenamedPageThrough(link: URL, newPlace: URL)
-}
-
-/// One class page of a section as it stands, by its own place's identity,
-/// with its new place when the plan renames it (#899 U4b3 relink-5).
-/// Kept for `ClassPages` until #1055 S1.
-struct ClassPagePlace {
-
-    // MARK: - Stored properties
-
-    let identity: ResolvedFile
-
-    let newPlace: URL?
-}
-
-/// A file by its device and inode: one file under every name and every
-/// link that leads to it (#899 U4b3).
-/// Kept for `ClassPages` until #1055 S1.
-struct ResolvedFile: Equatable {
-
-    // MARK: - Stored properties
-
-    let device: Int64
-
-    let inode: UInt64
-
-    // MARK: - Functions
-
-    /// Whether `url` is itself a symbolic link (`lstat`, never followed).
-    static func isALink(_ url: URL) -> Bool {
-        guard let status = ResolvedFile.status(of: url, followingLinks: false) else {
-            return false
-        }
-        return (status.st_mode & S_IFMT) == S_IFLNK
-    }
-
-    /// Whatever is at `url` itself, a link or a file or a folder, by its
-    /// own `lstat` identity (never followed), or nil when nothing is there.
-    static func ofThePlace(at url: URL) -> ResolvedFile? {
-        guard let status = ResolvedFile.status(of: url, followingLinks: false) else {
-            return nil
-        }
-        return ResolvedFile(device: Int64(status.st_dev), inode: UInt64(status.st_ino))
-    }
-
-    /// What `url` leads to through every link (`stat`), or nil when that
-    /// is not there.
-    static func throughLinks(at url: URL) -> ResolvedFile? {
-        guard let status = ResolvedFile.status(of: url, followingLinks: true) else {
-            return nil
-        }
-        return ResolvedFile(device: Int64(status.st_dev), inode: UInt64(status.st_ino))
-    }
-
-    private static func status(of url: URL, followingLinks: Bool) -> stat? {
-        var status: stat = stat()
-        let result: Int32 = url.withUnsafeFileSystemRepresentation { path in
-            guard let path else {
-                return -1
-            }
-            if followingLinks {
-                return stat(path, &status)
-            }
-            return lstat(path, &status)
-        }
-        if result != 0 {
-            return nil
-        }
-        return status
     }
 }
