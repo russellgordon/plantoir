@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # #899 U4b3 relink-5: Insert Class re-points a later class linked to a class page (Mac)
 
 Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from e7794b6d8 (origin/dev 96a3d2b73 already merged in; origin/dev had not moved when proving). `contracts/` touched: both gates.

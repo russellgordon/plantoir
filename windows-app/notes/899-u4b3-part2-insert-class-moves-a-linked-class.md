@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # U4b3 part 2, halves 7a and 7b (#899): Insert Class moves a linked later class as a link
 
 Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from door-6's head 4b7781ae9. `origin/dev` 461ee3943 was already merged in (by door-5) at both checks (before proving and before hand-back), so no new merge commit. **Touches `contracts/`: both gates; the renamed Windows test is proved only by the Windows gate.** This is half 7a of the order file's split (`2026-11-26-899-u4b3-ORDER.md`, "For the director", point 3).
