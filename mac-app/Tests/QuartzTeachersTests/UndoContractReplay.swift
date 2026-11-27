@@ -1784,6 +1784,7 @@ nonisolated enum UndoContractReplay {
                 "chained": "relinkTwoChainedLinks",
                 "chainedThree": "relinkThreeChainedLinks",
                 "thenAMove": "relinkThenMoveALinkIntoItsPlace",
+                "inPlace": "relinkALinkWhereItStands",
             ]
             var handedOverCall: String? = nil
             var handedOverBefore: String = ""
@@ -2423,6 +2424,9 @@ nonisolated enum UndoContractReplay {
         }
         if name.hasPrefix("relinkRenamedIn:") {
             return .relinkRenamedIn(Int(name.dropFirst("relinkRenamedIn:".count)) ?? 0)
+        }
+        if name.hasPrefix("relinkSwapped:") {
+            return .relinkSwapped(Int(name.dropFirst("relinkSwapped:".count)) ?? 0)
         }
         switch name {
         case "afterBegin":

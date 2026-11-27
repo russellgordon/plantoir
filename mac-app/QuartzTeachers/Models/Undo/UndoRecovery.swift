@@ -258,17 +258,34 @@ nonisolated enum UndoRecovery {
             listHolds = UndoRecovery.listHolds(step, root: root, from: journal)
         }
         var allGone: Bool = true
+        let linkTexts: Set<String> = UndoRecovery.linkTexts(of: step)
         for work in ["apply", "undo", "redo"] {
             if !UndoSwap.tidyLeftovers(
                 label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: nil) },
                 root: root, keepingOnlyCopies: keepingOnlyCopies,
-                unlessTheListHolds: listHolds, keepingCopiesHolding: notInTheList
+                unlessTheListHolds: listHolds, keepingCopiesHolding: notInTheList,
+                linkTextsOfTheStep: linkTexts
             ) {
                 allGone = false
             }
         }
         return allGone
+    }
+
+    /// mac-1: every text a link's move of the step holds on either side
+    /// (`linkSha`, `linkShaBefore`, `linkShaAfter`), by its SHA-256: what a
+    /// staged link the step's swaps made, or exchanged out, may hold.
+    static func linkTexts(of step: UndoStep) -> Set<String> {
+        var texts: Set<String> = []
+        for op in step.ops where op.isALinksMove {
+            for text in [op.linkSha, op.linkShaBefore, op.linkShaAfter] {
+                if let text {
+                    texts.insert(text)
+                }
+            }
+        }
+        return texts
     }
 
     /// Whether a kept original's bytes are exactly what the list gives for
@@ -1026,8 +1043,10 @@ nonisolated enum UndoRecovery {
         let candidate = relinks[index]
         // A plain link move is renamed in one step, never in flight with
         // both links standing; only a relink (two texts, always different,
-        // `opKinds.move`) can be.
-        if candidate.before == candidate.after {
+        // `opKinds.move`) can be. Nor is a relink where the link stands
+        // (mac-1): its swap is one atomic exchange at one place, so two
+        // links never stand for it; it is read as a constraint only.
+        if candidate.before == candidate.after || candidate.from == candidate.to {
             return false
         }
         if candidate.atFrom != .holdsTheContent || candidate.atTo != .holdsTheContent {

@@ -793,6 +793,18 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         return linkShaBefore != nil
     }
 
+    /// Whether the op is a relink where the link stands (mac-1, #899): a
+    /// `move`, never a `moveApart` or a `setAside`, whose `from` and `to`
+    /// are ONE path byte for byte, carrying the relinking pair. The link's
+    /// text is changed at that one place, which it neither leaves nor
+    /// fills (opKinds.move's second exception).
+    var isARelinkWhereItStands: Bool {
+        guard knownKind == .move, isARelink, let from, let to else {
+            return false
+        }
+        return from == to
+    }
+
     /// The SHA-256 of the text a link's move holds at `from` (`isAtFrom`)
     /// or at `to`: `linkSha` on both sides of a plain one, each side's own
     /// for a relinking one. Nil for any other op.
@@ -1079,9 +1091,11 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             if !UndoOp.isSafeRelativePath(from) || !UndoOp.isSafeRelativePath(to) {
                 return false
             }
-            // One exception (U4b): a capitalisation-only rename, the two
-            // spellings one place on a case-insensitive volume.
-            if UndoOp.placesOverlap(from, to) && !op.isCaseOnlyMove {
+            // Two exceptions: a capitalisation-only rename (U4b), the two
+            // spellings one place on a case-insensitive volume, and a relink
+            // where the link stands (mac-1), `from` and `to` one path byte
+            // for byte; the pair's own shape is checked below with the rest.
+            if UndoOp.placesOverlap(from, to) && !op.isCaseOnlyMove && !op.isARelinkWhereItStands {
                 return false
             }
             var contents: Int = 0

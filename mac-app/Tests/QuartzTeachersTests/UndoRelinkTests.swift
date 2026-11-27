@@ -1084,14 +1084,14 @@ final class UndoRelinkTests: XCTestCase {
         XCTAssertTrue(step.relinkLink(link, to: link, textAfter: Data(laid.newText.utf8)))
         XCTAssertTrue(UndoSwap.removeALink(at: link))
         try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "Unit 1, Day 1.md")
-        let before: [String: String] = try folderNow(laid.root)
+        let before: [String: String] = try classPagesNow(laid.root)
         XCTAssertThrowsError(try step.make()) { error in
             guard case JournaledStepError.refused(.changedSince, _) = error else {
                 XCTFail("refused with \(error), not changedSince")
                 return
             }
         }
-        XCTAssertEqual(try folderNow(laid.root), before)
+        XCTAssertEqual(try classPagesNow(laid.root), before)
         XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: laid.root), "Unit 1, Day 1.md")
         XCTAssertEqual(stagedLeft(under: laid.root), [])
         JournaledStep.modeOverride = nil
@@ -1198,15 +1198,14 @@ final class UndoRelinkTests: XCTestCase {
         )
     }
 
-    /// Every page in section 1 but the link itself, by name, and every file
-    /// outside by its bytes: what nothing may write through the link.
+    /// Every page in section 1 but the link itself, by name: what nothing
+    /// may write through the link. The files outside are never opened here
+    /// (their access times are `outsideNow`'s), only by
+    /// `checkTheOutsideBytes` at the end.
     func pagesBesideTheLink(_ root: URL) throws -> [String: String] {
         var found: [String: String] = [:]
         for (name, held) in try classPagesNow(root) where name != "Unit 1, Day 4.md" {
             found[name] = held
-        }
-        for name in try FileManager.default.contentsOfDirectory(atPath: outside.path) {
-            found["outside " + name] = (try Data(contentsOf: outside.appendingPathComponent(name))).base64EncodedString()
         }
         return found
     }

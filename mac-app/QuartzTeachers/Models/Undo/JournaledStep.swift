@@ -422,13 +422,21 @@ nonisolated final class JournaledStep {
     /// write planned at `to` refuses the step before anything changes, as
     /// the link there holds a text the step is changing. False, planning
     /// nothing, when the link cannot be read now. A `textAfter` equal to
-    /// the text now is the link's plain move (`moveLink`).
+    /// the text now is the link's plain move (`moveLink`). With `to` the
+    /// same place as `from` (mac-1) the link is re-pointed where it stands:
+    /// the op names the one place twice, it is never handed over, and a
+    /// write planned there refuses the step before anything changes.
     @discardableResult
     func relinkLink(_ from: URL, to: URL, textAfter: Data) -> Bool {
         guard let textBefore = UndoTreeReading.linkTarget(at: from) else {
             return false
         }
         if textBefore == textAfter {
+            // Where the link stands with its text unchanged there is
+            // nothing to do (mac-1): nothing is planned.
+            if JournaledStep.key(of: from) == JournaledStep.key(of: to) {
+                return true
+            }
             moveLink(from, to: to, linkSha: UndoHash.sha256(of: textBefore))
             return true
         }
@@ -449,6 +457,12 @@ nonisolated final class JournaledStep {
     /// (`relinkLink`).
     static func isARelink(_ planned: PlannedFolderMove) -> Bool {
         return planned.textBefore != nil && planned.textAfter != nil
+    }
+
+    /// Whether a planned relinking move re-points its link where it stands
+    /// (mac-1): `relinkLink(p, to: p, textAfter:)`, one place for both.
+    static func isARelinkWhereItStands(_ planned: PlannedFolderMove) -> Bool {
+        return JournaledStep.isARelink(planned) && JournaledStep.key(of: planned.from) == JournaledStep.key(of: planned.to)
     }
 
     /// The blobs a planned folder move needs in the list: a relinking
@@ -1399,10 +1413,16 @@ nonisolated final class JournaledStep {
     }
 
     /// The planned move of a symbolic link whose `from` is exactly `url`,
-    /// or nil.
+    /// or nil: the place it leaves, handed over. Never a relink where the
+    /// link stands (mac-1): it leaves no place, so its one place is never
+    /// read as free or handed over, and a write there is refused
+    /// (`refusesAWrite`, as at any relink's new name).
     func plannedLinkMove(startingAt url: URL) -> (from: URL, to: URL)? {
         let key: String = JournaledStep.key(of: url)
         for move in plannedFolderMoves where JournaledStep.isALinksMove(move) {
+            if JournaledStep.isARelinkWhereItStands(move) {
+                continue
+            }
             if JournaledStep.key(of: move.from) == key {
                 return (from: move.from, to: move.to)
             }

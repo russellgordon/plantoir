@@ -23880,6 +23880,30 @@ linked to one shared lesson keep the last date written (ruled: it will keep
 the first class's date); a renamed page's rename that cannot be done (its new
 name taken) leaves a link re-pointed at that new name.
 
+### mac-1: a relink where the link stands
+
+The door now reads, judges, swaps and recovers a relinking move whose `from`
+and `to` are one path byte for byte (`opKinds.move`'s second exception;
+`UndoOp.isARelinkWhereItStands`): the link's text is changed where it
+stands. It is readable only as a `move` carrying `linkShaBefore` and
+`linkShaAfter` and nothing else (never a `moveApart` or a `setAside`, never
+with `linkSha` beside the pair), and is judged at its one place with `lstat`
+and `readlink`: the old text is before, the new text after, anything else
+changed since, an unreadable place cannot tell. `UndoSwap.relinkWhereItStands`
+stages the new link under the `-new` name beside the place, exchanges the two
+in one `renamex_np(RENAME_SWAP)` (measured on APFS: both names must exist, and
+the two trade places), then re-reads what came out: the old text is removed,
+anything else is exchanged back and refused, so nothing of the teacher's is
+lost. There is never a moment with both links at the place, so
+`relinkRenamedIn` does not arise; the new stop point `relinkSwapped(N)` is the
+moment after the exchange. Recovery judges the place as any op and removes a
+staged link by the text it holds (one of the step's texts, both in the list).
+The place is never handed over (`handsOverAsAMove` is false for it), and in
+`JournaledStep` `relinkLink(p, to: p, textAfter:)` plans it with no place
+freed: a write planned at `p` refuses the step before anything changes.
+Nothing calls it yet but the tests: Insert Class's in-between link (ruling 6)
+and an earlier class's link (the evening's ruling 3) are mac-2 and mac-3.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

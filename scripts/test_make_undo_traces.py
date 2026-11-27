@@ -515,7 +515,10 @@ def readable_op(op):
     if kind in ("move", "moveApart", "setAside"):
         if "path" in op or not safe_path(op.get("from")) or not safe_path(op.get("to")):
             return False
-        if overlap(op["from"], op["to"]) and not traces.is_case_only_move(op):
+        # Two exceptions: a capitalisation-only rename (U4b), and a relink
+        # where the link stands (mac-1: from and to one path byte for byte,
+        # a move carrying the relinking pair).
+        if overlap(op["from"], op["to"]) and not traces.is_case_only_move(op) and not traces.is_a_relink_in_place(op):
             return False
         # Exactly one content form: sha, listingSha, linkSha (U4b2-14), or
         # the relinking pair linkShaBefore and linkShaAfter counted as ONE
@@ -1854,9 +1857,12 @@ class ContractCaseTests(unittest.TestCase):
         holding a relinking move, killed before a swap or inside the
         relink's (relinkStaged, relinkRenamedIn), going forward or back,
         settles whole: recovery first removes the link the interrupted swap
-        had just made when both stand, then judges by content."""
+        had just made when both stand, then judges by content. mac-1's
+        inPlace rows: a relink where the link stands, stopped with its new
+        link staged (relinkStaged) or just after its one swap
+        (relinkSwapped), settles on the text the place holds."""
         cases = [case for case in shared_undo()["recoveryCases"] if case.get("withARelink")]
-        self.assertEqual(len(cases), 13)
+        self.assertEqual(len(cases), 17)
         phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
                   ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done"}
         old, new = "Unit 1, Day 3.md", "Unit 1, Day 4.md"
@@ -1869,7 +1875,7 @@ class ContractCaseTests(unittest.TestCase):
 
         for case in cases:
             with self.subTest(case["name"]):
-                self.assertIn(case["withARelink"], ("alone", "leavingAHandedOverPlace", "chained", "chainedThree", "thenAMove"))
+                self.assertIn(case["withARelink"], ("alone", "leavingAHandedOverPlace", "chained", "chainedThree", "thenAMove", "inPlace"))
                 days = (3, 4, 5)
                 if case["withARelink"] == "chained":
                     # Review D of U4b3: two relinks that chain, highest first.
@@ -1889,6 +1895,12 @@ class ContractCaseTests(unittest.TestCase):
                     texts = ["Unit 1, Day %d.md" % number for number in range(1, 5)]
                     pages = {self.day(4): ("link", texts[0]), self.day(5): ("link", texts[1]), self.day(6): ("link", texts[2])}
                     ops = [relink(6, 7, texts[2], texts[3]), relink(5, 6, texts[1], texts[2]), relink(4, 5, texts[0], texts[1])]
+                elif case["withARelink"] == "inPlace":
+                    # mac-1: Day 4's link re-pointed where it stands.
+                    pages = {self.day(3): "Three.\n", self.day(4): ("link", old)}
+                    ops = [relink(4, 4, old, "Unit 1, Day 5.md")]
+                    self.assertTrue(traces.is_a_relink_in_place(ops[0]))
+                    self.assertEqual(traces.handovers(ops), [])
                 else:
                     pages = {self.day(3): "Three.\n", self.day(4): ("link", old)}
                     ops = [relink(4, 5, old, new)]

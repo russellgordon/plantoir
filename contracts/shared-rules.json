@@ -50692,6 +50692,213 @@
         "why": "U4b3 relink: an Undo needs the old text and a Redo the new, so both are in blobs (linkShaBefore is the SHA-256 of \"Unit 1, Day 3.md\", linkShaAfter of \"Unit 1, Day 4.md\")."
       },
       {
+        "name": "mac-1, a relink where the link stands: the link holding the new text: as the step left it",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 5.md"
+          },
+          "atTo": {
+            "link": "Unit 1, Day 5.md"
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "mac-1: from and to are one path byte for byte, so the link's text is changed where it stands; the one place is judged by the text it holds, read with lstat and readlink and never followed: the linkShaAfter text is as the step left it."
+      },
+      {
+        "name": "mac-1, a relink where the link stands: the link holding the old text: as before",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 3.md"
+          },
+          "atTo": {
+            "link": "Unit 1, Day 3.md"
+          }
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "mac-1, a relink where the link stands: nothing there: changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "mac-1: the place is never free for this op, which neither leaves it nor fills it."
+      },
+      {
+        "name": "mac-1, a relink where the link stands: a link holding another text: changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 1.md"
+          },
+          "atTo": {
+            "link": "Unit 1, Day 1.md"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "mac-1, a relink where the link stands: a plain file there: changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "text": "Today we start.\n"
+          },
+          "atTo": {
+            "text": "Today we start.\n"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "mac-1, a relink where the link stands: a folder there: changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "folder": true
+          },
+          "atTo": {
+            "folder": true
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "mac-1, a relink where the link stands: the place cannot be read just now: cannot tell",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 3.md",
+            "cannotBeRead": true
+          },
+          "atTo": {
+            "link": "Unit 1, Day 3.md",
+            "cannotBeRead": true
+          }
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "mac-1, a relink where the link stands: as a moveApart: not readable",
+        "op": {
+          "kind": "moveApart",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 5.md"
+          },
+          "atTo": {
+            "link": "Unit 1, Day 5.md"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable",
+        "why": "mac-1: only a move is re-pointed where it stands; a moveApart or a setAside whose from and to overlap is a shape this version cannot read."
+      },
+      {
+        "name": "mac-1, a relink where the link stands: as a setAside: not readable",
+        "op": {
+          "kind": "setAside",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 5.md"
+          },
+          "atTo": {
+            "link": "Unit 1, Day 5.md"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "mac-1, a relink where the link stands: with linkSha beside the pair: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "to": "courses/TST1O/section1/Unit 1, Day 4.md",
+          "linkTargetBefore": "Unit 1, Day 3.md",
+          "linkTargetAfter": "Unit 1, Day 5.md",
+          "linkTarget": "Unit 1, Day 3.md"
+        },
+        "current": {
+          "atFrom": {
+            "link": "Unit 1, Day 5.md"
+          },
+          "atTo": {
+            "link": "Unit 1, Day 5.md"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable",
+        "why": "mac-1: exactly one content form, as for any move; a plain link's move (linkSha) whose from and to are one place is not readable either."
+      },
+      {
         "name": "editJSON: a whole number beyond 2^53 in the file cannot be compared exactly: cannot tell, never a guess",
         "op": {
           "kind": "editJSON",
@@ -50943,7 +51150,7 @@
         "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
       }
     ],
-    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), a link's move as the target the link holds (linkTarget: the op's linkSha is the SHA-256 of its UTF-8 bytes, U4b2-14), a relinking link's move as its two texts (linkTargetBefore, held at `from` before the step, and linkTargetAfter, held at `to` after it: the op's linkShaBefore and linkShaAfter are their SHA-256s, and its blobs both, unless the case gives its own blobs, U4b3 relink), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those; listedAs (U4b2-9, a capitalisation-only move only) is a third spelling of the same place, neither from nor to, that the folder lists the item under: what atTo describes is made at that spelling instead (on a case-insensitive volume one item under a spelling that is neither side's; on a case-sensitive one a third place, so both sides are free). For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed; a link, read with lstat and readlink, which never ask its own permissions, by its folder's taken away). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. A move's sides are judged as the plan judges them, by the pair and by whether each place still stays inside the working folder once the links on the way are resolved (a place that leads out is changed since, both ways; a link's move resolves only the folders above its link, U4b2-14). Places, and the places two ops name, are compared without regard to case, part by part, and so is whether an edit is at or inside a move's `to` (U4b2-9: one comparison for both).",
+    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), a link's move as the target the link holds (linkTarget: the op's linkSha is the SHA-256 of its UTF-8 bytes, U4b2-14), a relinking link's move as its two texts (linkTargetBefore, held at `from` before the step, and linkTargetAfter, held at `to` after it: the op's linkShaBefore and linkShaAfter are their SHA-256s, and its blobs both, unless the case gives its own blobs, U4b3 relink), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those; for a relink where the link stands (mac-1: from and to one path) atFrom and atTo name the one place and are the same; listedAs (U4b2-9, a capitalisation-only move only) is a third spelling of the same place, neither from nor to, that the folder lists the item under: what atTo describes is made at that spelling instead (on a case-insensitive volume one item under a spelling that is neither side's; on a case-sensitive one a third place, so both sides are free). For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed; a link, read with lstat and readlink, which never ask its own permissions, by its folder's taken away). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. A move's sides are judged as the plan judges them, by the pair and by whether each place still stays inside the working folder once the links on the way are resolved (a place that leads out is changed since, both ways; a link's move resolves only the folders above its link, U4b2-14). Places, and the places two ops name, are compared without regard to case, part by part, and so is whether an edit is at or inside a move's `to` (U4b2-9: one comparison for both).",
     "listingCases": [
       {
         "name": "an empty folder: an empty listing",
@@ -54865,9 +55072,46 @@
         "phase": "done",
         "head": 1,
         "why": "The relink stands both ways, since the plain move's link at Day 5 holds its old text, but the move after it no longer holds its start text at Day 4, so the relink is not in flight; a plain link move is read as a constraint, never as the one in flight."
+      },
+      {
+        "name": "mac-1, a relink where the link stands: a step that re-points Day 4's link where it stands dies with the new link made under its staged name and not yet swapped in: the staged link removed, the old text at Day 4, failed",
+        "work": "step",
+        "withARelink": "inPlace",
+        "stopAt": "relinkStaged:0",
+        "files": "before",
+        "phase": "failed",
+        "head": null
+      },
+      {
+        "name": "mac-1, a relink where the link stands: the same step dies just after its one swap, the old link under the staged name and not yet removed: the staged link removed by the text it holds, the new text at Day 4, done",
+        "work": "step",
+        "withARelink": "inPlace",
+        "stopAt": "relinkSwapped:0",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "why": "mac-1: the swap is one atomic exchange at the one place, so there is never a moment with both links standing there (relinkRenamedIn does not arise); the place holds one of the two texts at every moment and is judged as any op."
+      },
+      {
+        "name": "mac-1, a relink where the link stands: the undo of that step dies with the old link made under its staged name and not yet swapped in: the staged link removed, the new text at Day 4, the step done",
+        "work": "undo",
+        "withARelink": "inPlace",
+        "stopAt": "relinkStaged:0",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "mac-1, a relink where the link stands: the same undo dies just after its one swap, the new link under the staged name and not yet removed: the staged link removed by the text it holds, the old text at Day 4, undone",
+        "work": "undo",
+        "withARelink": "inPlace",
+        "stopAt": "relinkSwapped:0",
+        "files": "before",
+        "phase": "undone",
+        "head": null
       }
     ],
-    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one). U2: withAMove makes the step the same two pages through JournaledWrite.perform(ops:) plus a `move` of courses/TST1O/.netlify_sites/section1.json (holding {\"site_id\": \"aaa-111\"}) to section1.previous.json and a `recompute` of the section's front page (sectionFrontPage), the files staged and swapped first, second, then the move (an undo: second, first, then the move); deployBeforeRecovery writes a new marker ({\"site_id\": \"bbb-222\"}) where the move emptied, as a deploy would; markers is what the two marker places then hold (moved, movedBack: only the original place, bothKept), and rederived how many times RECOVERY ran the front page's maintainer: once whenever it settles the step, whichever way (laterPieces.U2). why, when present, says why; it is never compared. withATree: the step also removes courses/TST1O/extra (a.md, sub/b.md: one removeTree, its content in the list) and moves the marker, so it swaps first, second, the folder aside, then the move (an undo: second, first, the move back, then the folder made); folderKept whether the folder is there after recovery. withAPreference: the step also sets the preference undoCasesPreference from a to b (one external op, its place after the pages); preference is its value after recovery. recoveredBy: who recovers: recovery (the default: the app's recovery, which re-derives what it settles), theNextWrite (the next step through the door for ops, which recovers and re-derives first), or anOrdinaryWrite (a step through U1's door, whose recovery inside its lock leaves a step that keeps a file true by a rule in flight, for a recovery that will re-derive it). changeTheFolderSetAside: before recovery a file is saved into the folder the stopped work set aside (under its hidden staged name); keptAside whether a folder is still kept aside after recovery. somethingInItsPlace: before recovery a different folder is made at the place of the folder set aside. visibleNameTaken: before recovery a folder is made at the visible name `courses/TST1O/extra (kept by Undo)` too. keptVisibleAs: the path of the visible name the folder set aside is kept under after recovery (it holds a.md). recoveryStopsAfterTheTidy: the first recovery stops at the kill point afterRecoveryTidied, once it has tidied and before it writes to the list (it must not have recorded the step interrupted), and a second recovery then runs. folderLines: how many 'undo found a folder set aside' trail lines the recoveries wrote. stopAt whileDeletingAFolder: the work stops after a folder it took out has been renamed to its `-gone` name and before its delete ends; halfDeleteTheGoneFolder then removes a.md from that `-gone` folder, as a delete that died part way leaves it. ordinaryWriteOn: first makes that write set the first page's title (the very file the stopped work left), otherwise a third page's; nextWrite is what that write comes to (anotherChangeIsUnderWay: refused, nothing changed). U3c: changeTheKeptOriginal: after the content is removed and before recovery, a line is added to every kept original (`-orig`) the stopped work left beside a page, so its hash no longer matches what the journal recorded; keptOriginalsBeside: the pages beside which a kept original of the step is still on the disk after recovery, and nothing else staged, which is also exactly what the 'undo could not put back a change that stopped' trail line names (when absent, nothing staged may be left). editRacesTheSwap: instead of stopping at stopAt, the step is made while another program appends a line to that page IN PLACE between its swap's re-read and its rename, and putting the original back then fails, so the step answers part way (leftPartWay) and is left in flight; keptOriginalsBeside then also matches what the 'undo kept what a page held' line names. fileInUseAtTheUndo: the final `undo` is made while every swap is still refused as a file in use; leftLines: how many 'undo refused for a change left part way' trail lines that undo wrote. U4b: withAMovedFolder makes the step the same two pages through JournaledWrite.perform(ops:) plus courses/TST1O/media (a.md holding the lines `Intro.`, `Line one: old.` and `End.`; b.md holding `B`) moved to courses/TST1O/renamed and a `replaceText` naming courses/TST1O/renamed/a.md that turns `Line one: old.` into `new`, in that order, so it swaps the folder first, then first, second, then the edit inside (an undo: the edit inside, second, first, then the folder back); movedFolder is what stackCases' movedFolder says after recovery. keptCopyLeftInsideTheFolder: before recovery a file is written inside the folder at its old place under the undo's kept-original name for a.md (`.a.md.plantoir-undo-<seq>-undo-orig`), holding what a.md held before the undo (`Line one: new.`). No staged file or kept original may be left anywhere in the working folder, the moved folder included. U4b2-13: handEdit carried (withAMovedFolder only) changes by hand the page inside the moved folder, a.md wherever its folder is now, setting its line `Line one: …` to `Line one: by hand.` (movedFolder then says byHand); recovery puts back every place not in the way, as it does for two plain pages, and a carried page changed by hand puts its move in the way too, since the folder then holds what neither side of the move recorded. U4b3 door-5: withAHandedOverPlace makes the step, in place of the two pages, one that hands a place over (opKinds.wholeOps' second exception) through JournaledWrite.perform(ops:), as stackCases' call of the same name makes it: afterALinksMove (handAPlaceOverAfterALinksMove: the link courses/TST1O/section1/Unit 1, Day 3.md, leading to ../library/Day 3.md, moved to Unit 1, Day 4.md, then `New.` written at Day 3) or beforeALinksMove (handAPlaceOverBeforeALinksMove: Day 4 written `Three.`, Day 3 (holding `Three.`) removed, the link Day 2 moved to Day 3, then `New.` written at Day 2), swapped in the step's order (an undo: reversed), so beforeSwap:N is before the Nth of those; files then says whether section 1's class pages and the library are exactly as before or after the step (handAPlaceOver's pages, not first and second), handedOver is what stackCases' handedOver says after recovery, and handEdit handedOverPlace writes `Someone else's.` at Day 3 before recovery. Nothing staged may be left anywhere in the working folder. U4b3 kept-original-named: with withAHandedOverPlace, keptVisibleAs is the path of the visible FILE the removed Day 3 page is kept under after recovery, holding `Three.` byte for byte (for a folder it is the folder's, holding a.md); visibleNameTaken makes a file holding `earlier` at courses/TST1O/section1/Unit 1, Day 3 (kept by Undo).md before recovery, which must still hold it after; keptPageLines is how many 'undo kept a page under a visible name' trail lines the recoveries wrote. U4b3 relink-3: withARelink makes the step, in place of the two pages, one holding a relinking move (opKinds.move's linkShaBefore and linkShaAfter) through JournaledWrite.perform(ops:): alone (relinkALink: the link courses/TST1O/section1/Unit 1, Day 4.md, holding `Unit 1, Day 3.md`, beside the page Unit 1, Day 3.md holding `Three.`, moved to Unit 1, Day 5.md holding `Unit 1, Day 4.md`) or leavingAHandedOverPlace (relinkALinkLeavingAHandedOverPlace: that move, then the page Day 3 moved to Day 4, then `New.` written at Day 3), swapped in the step's order (an undo: reversed); the stop points relinkStaged:N (inside the Nth swap, a relinking move's new link made under its staged name and not yet renamed in) and relinkRenamedIn:N (inside it, the new link renamed in and the old one not yet removed, so both links stand) reach inside a relink's swap, where beforeSwap:N never does; files then says whether section 1's class pages Day 3 to Day 5 are exactly as before or after the step (each a page by its text, a link by its text, or nothing). Nothing staged may be left anywhere in the working folder. Review D of U4b3: chained (relinkTwoChainedLinks: the links Day 4, holding `Unit 1, Day 1.md`, and Day 5, holding `Unit 1, Day 2.md`; Day 5's moved to Day 6 holding `Unit 1, Day 3.md`, then Day 4's moved to Day 5 holding `Unit 1, Day 2.md`, as Insert Class makes two later classes in a row that link to class pages it renames), files then read on Day 4 to Day 6; recovery removes at most one link, by the rule undo.rule.recovery gives. Review F of U4b3: chainedThree (relinkThreeChainedLinks: the links Day 4, Day 5 and Day 6, holding `Unit 1, Day 1.md`, `Unit 1, Day 2.md` and `Unit 1, Day 3.md`; Day 6's moved to Day 7 holding `Unit 1, Day 4.md`, then Day 5's to Day 6, then Day 4's to Day 5, each holding the next one's old text), files then read on Day 4 to Day 7. thenAMove (relinkThenMoveALinkIntoItsPlace: the links Day 4 and Day 5, both holding `Unit 1, Day 2.md`; Day 5's relinked to Day 6 holding `Unit 1, Day 3.md`, then Day 4's moved plainly, its text kept, into Day 5), files then read on Day 4 to Day 6.",
+    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one). U2: withAMove makes the step the same two pages through JournaledWrite.perform(ops:) plus a `move` of courses/TST1O/.netlify_sites/section1.json (holding {\"site_id\": \"aaa-111\"}) to section1.previous.json and a `recompute` of the section's front page (sectionFrontPage), the files staged and swapped first, second, then the move (an undo: second, first, then the move); deployBeforeRecovery writes a new marker ({\"site_id\": \"bbb-222\"}) where the move emptied, as a deploy would; markers is what the two marker places then hold (moved, movedBack: only the original place, bothKept), and rederived how many times RECOVERY ran the front page's maintainer: once whenever it settles the step, whichever way (laterPieces.U2). why, when present, says why; it is never compared. withATree: the step also removes courses/TST1O/extra (a.md, sub/b.md: one removeTree, its content in the list) and moves the marker, so it swaps first, second, the folder aside, then the move (an undo: second, first, the move back, then the folder made); folderKept whether the folder is there after recovery. withAPreference: the step also sets the preference undoCasesPreference from a to b (one external op, its place after the pages); preference is its value after recovery. recoveredBy: who recovers: recovery (the default: the app's recovery, which re-derives what it settles), theNextWrite (the next step through the door for ops, which recovers and re-derives first), or anOrdinaryWrite (a step through U1's door, whose recovery inside its lock leaves a step that keeps a file true by a rule in flight, for a recovery that will re-derive it). changeTheFolderSetAside: before recovery a file is saved into the folder the stopped work set aside (under its hidden staged name); keptAside whether a folder is still kept aside after recovery. somethingInItsPlace: before recovery a different folder is made at the place of the folder set aside. visibleNameTaken: before recovery a folder is made at the visible name `courses/TST1O/extra (kept by Undo)` too. keptVisibleAs: the path of the visible name the folder set aside is kept under after recovery (it holds a.md). recoveryStopsAfterTheTidy: the first recovery stops at the kill point afterRecoveryTidied, once it has tidied and before it writes to the list (it must not have recorded the step interrupted), and a second recovery then runs. folderLines: how many 'undo found a folder set aside' trail lines the recoveries wrote. stopAt whileDeletingAFolder: the work stops after a folder it took out has been renamed to its `-gone` name and before its delete ends; halfDeleteTheGoneFolder then removes a.md from that `-gone` folder, as a delete that died part way leaves it. ordinaryWriteOn: first makes that write set the first page's title (the very file the stopped work left), otherwise a third page's; nextWrite is what that write comes to (anotherChangeIsUnderWay: refused, nothing changed). U3c: changeTheKeptOriginal: after the content is removed and before recovery, a line is added to every kept original (`-orig`) the stopped work left beside a page, so its hash no longer matches what the journal recorded; keptOriginalsBeside: the pages beside which a kept original of the step is still on the disk after recovery, and nothing else staged, which is also exactly what the 'undo could not put back a change that stopped' trail line names (when absent, nothing staged may be left). editRacesTheSwap: instead of stopping at stopAt, the step is made while another program appends a line to that page IN PLACE between its swap's re-read and its rename, and putting the original back then fails, so the step answers part way (leftPartWay) and is left in flight; keptOriginalsBeside then also matches what the 'undo kept what a page held' line names. fileInUseAtTheUndo: the final `undo` is made while every swap is still refused as a file in use; leftLines: how many 'undo refused for a change left part way' trail lines that undo wrote. U4b: withAMovedFolder makes the step the same two pages through JournaledWrite.perform(ops:) plus courses/TST1O/media (a.md holding the lines `Intro.`, `Line one: old.` and `End.`; b.md holding `B`) moved to courses/TST1O/renamed and a `replaceText` naming courses/TST1O/renamed/a.md that turns `Line one: old.` into `new`, in that order, so it swaps the folder first, then first, second, then the edit inside (an undo: the edit inside, second, first, then the folder back); movedFolder is what stackCases' movedFolder says after recovery. keptCopyLeftInsideTheFolder: before recovery a file is written inside the folder at its old place under the undo's kept-original name for a.md (`.a.md.plantoir-undo-<seq>-undo-orig`), holding what a.md held before the undo (`Line one: new.`). No staged file or kept original may be left anywhere in the working folder, the moved folder included. U4b2-13: handEdit carried (withAMovedFolder only) changes by hand the page inside the moved folder, a.md wherever its folder is now, setting its line `Line one: …` to `Line one: by hand.` (movedFolder then says byHand); recovery puts back every place not in the way, as it does for two plain pages, and a carried page changed by hand puts its move in the way too, since the folder then holds what neither side of the move recorded. U4b3 door-5: withAHandedOverPlace makes the step, in place of the two pages, one that hands a place over (opKinds.wholeOps' second exception) through JournaledWrite.perform(ops:), as stackCases' call of the same name makes it: afterALinksMove (handAPlaceOverAfterALinksMove: the link courses/TST1O/section1/Unit 1, Day 3.md, leading to ../library/Day 3.md, moved to Unit 1, Day 4.md, then `New.` written at Day 3) or beforeALinksMove (handAPlaceOverBeforeALinksMove: Day 4 written `Three.`, Day 3 (holding `Three.`) removed, the link Day 2 moved to Day 3, then `New.` written at Day 2), swapped in the step's order (an undo: reversed), so beforeSwap:N is before the Nth of those; files then says whether section 1's class pages and the library are exactly as before or after the step (handAPlaceOver's pages, not first and second), handedOver is what stackCases' handedOver says after recovery, and handEdit handedOverPlace writes `Someone else's.` at Day 3 before recovery. Nothing staged may be left anywhere in the working folder. U4b3 kept-original-named: with withAHandedOverPlace, keptVisibleAs is the path of the visible FILE the removed Day 3 page is kept under after recovery, holding `Three.` byte for byte (for a folder it is the folder's, holding a.md); visibleNameTaken makes a file holding `earlier` at courses/TST1O/section1/Unit 1, Day 3 (kept by Undo).md before recovery, which must still hold it after; keptPageLines is how many 'undo kept a page under a visible name' trail lines the recoveries wrote. U4b3 relink-3: withARelink makes the step, in place of the two pages, one holding a relinking move (opKinds.move's linkShaBefore and linkShaAfter) through JournaledWrite.perform(ops:): alone (relinkALink: the link courses/TST1O/section1/Unit 1, Day 4.md, holding `Unit 1, Day 3.md`, beside the page Unit 1, Day 3.md holding `Three.`, moved to Unit 1, Day 5.md holding `Unit 1, Day 4.md`) or leavingAHandedOverPlace (relinkALinkLeavingAHandedOverPlace: that move, then the page Day 3 moved to Day 4, then `New.` written at Day 3), swapped in the step's order (an undo: reversed); the stop points relinkStaged:N (inside the Nth swap, a relinking move's new link made under its staged name and not yet renamed in) and relinkRenamedIn:N (inside it, the new link renamed in and the old one not yet removed, so both links stand) reach inside a relink's swap, where beforeSwap:N never does; files then says whether section 1's class pages Day 3 to Day 5 are exactly as before or after the step (each a page by its text, a link by its text, or nothing). Nothing staged may be left anywhere in the working folder. Review D of U4b3: chained (relinkTwoChainedLinks: the links Day 4, holding `Unit 1, Day 1.md`, and Day 5, holding `Unit 1, Day 2.md`; Day 5's moved to Day 6 holding `Unit 1, Day 3.md`, then Day 4's moved to Day 5 holding `Unit 1, Day 2.md`, as Insert Class makes two later classes in a row that link to class pages it renames), files then read on Day 4 to Day 6; recovery removes at most one link, by the rule undo.rule.recovery gives. Review F of U4b3: chainedThree (relinkThreeChainedLinks: the links Day 4, Day 5 and Day 6, holding `Unit 1, Day 1.md`, `Unit 1, Day 2.md` and `Unit 1, Day 3.md`; Day 6's moved to Day 7 holding `Unit 1, Day 4.md`, then Day 5's to Day 6, then Day 4's to Day 5, each holding the next one's old text), files then read on Day 4 to Day 7. thenAMove (relinkThenMoveALinkIntoItsPlace: the links Day 4 and Day 5, both holding `Unit 1, Day 2.md`; Day 5's relinked to Day 6 holding `Unit 1, Day 3.md`, then Day 4's moved plainly, its text kept, into Day 5), files then read on Day 4 to Day 6. mac-1: inPlace (relinkALinkWhereItStands: the page Unit 1, Day 3.md holding `Three.` and the link Unit 1, Day 4.md holding `Unit 1, Day 3.md`, re-pointed where it stands to hold `Unit 1, Day 5.md`, one move whose from and to are that one place), files then read on Day 3 to Day 5; its swap is one atomic exchange, so relinkRenamedIn does not arise for it, and the stop point relinkSwapped:N (inside the Nth swap, the new link exchanged into the place and the old one under the staged name, not yet removed) reaches the one moment after the exchange.",
     "deployedCases": [
       {
         "name": "never deployed: no fragment, no offer",

@@ -1141,6 +1141,10 @@ nonisolated enum UndoKillPoint: Equatable, Sendable {
     /// U4b3 relink-3: inside the same swap, the new link renamed in and the
     /// old one not yet removed: both links stand.
     case relinkRenamedIn(Int)
+    /// mac-1: inside a relink's swap where the link stands, at target N:
+    /// the new link exchanged into the place in one call, the old one under
+    /// the staged name and not yet removed.
+    case relinkSwapped(Int)
     case beforeApplied
     case afterUndoing
     case beforeUndone
