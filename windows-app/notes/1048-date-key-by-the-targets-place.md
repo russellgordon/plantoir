@@ -43,7 +43,7 @@ Windows must copy the same rule (W8b piece 22 is about to copy Insert Class's): 
 
 ## Runs
 
-- `DateKeyByTheTargetsPlaceTests` 11, `UndoMakeRoomLinkedPageTests` 27, `ClassPlanningContractTests`, `SharedRulesContractTests`, `SiteHealthContractTests`, `PageVisibilityReadingTests`, `FutureDatedClassesTests`, `UndoActionStepsTests` (which writes `contracts/undo-action-steps.json`: unchanged): 206 of 206 passed. Then after merging `origin/dev`, see the last commit.
+- `DateKeyByTheTargetsPlaceTests` 11, `UndoMakeRoomLinkedPageTests` 27, `ClassPlanningContractTests`, `SharedRulesContractTests`, `SiteHealthContractTests`, `PageVisibilityReadingTests`, `FutureDatedClassesTests`, `UndoActionStepsTests` (which writes `contracts/undo-action-steps.json`: unchanged): 206 of 206 passed. After the merge of `origin/dev` (already up to date at bb19ba187), `SectionVerbsTests`, `RollOverFromTheMenuSafetyTests`, `RollOverFromTheMenuTests`, `PublishPlanTableTests`: 43 of 43 passed. In all 249 of 249.
 
 ## Self-check
 
