@@ -1277,6 +1277,20 @@ public static class ActivityTrail
         return (arguments[0], section);
     }
 
+    /// <summary>
+    /// The words for <c>start of the year not done</c> when Go stopped part
+    /// way (#899 W8c-2a): the mac's <c>startOfYearStoppedPartWayLine</c> word
+    /// for word. <paramref name="where"/> is "from the app" and its kin; the
+    /// kept count is said only when a file was kept; no page is named.
+    /// </summary>
+    public static string StartOfYearStoppedPartWayLine(string where, int keptCount, string backupFileName)
+    {
+        string kept = keptCount == 1 ? ", 1 file kept beside its page"
+            : keptCount > 1 ? $", {keptCount.ToString(System.Globalization.CultureInfo.InvariantCulture)} files kept beside their pages"
+            : "";
+        return $"stopped part way getting ready for the start of the year {where} — some pages went into draft{kept}; offered the backup {backupFileName}";
+    }
+
     /// <summary>The words for <c>section restore stopped part way</c>: the mac's <c>sectionRestoreStoppedPartWayLine</c> word for word.</summary>
     public static string SectionRestoreStoppedPartWayLine(string keptAt) =>
         "a section restore stopped part way and could not move every file back; the section may hold " +

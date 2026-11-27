@@ -268,6 +268,11 @@ public static class StartOfYearWording
     public const string UndoEndsWhenYouQuit = "This undo is kept only while Plantoir is open. Quitting ends it.";
     /// <summary>The undo sheet and its result when every page is already as it was (#564, mac #555), never "0 pages".</summary>
     public const string UndoAllAlreadyBack = "Everything is already as it was before this change.";
+    /// <summary>Go stopped part way (#899 W8c-2a, the mac's restore offer): what the sheet says, then <see cref="RestoreOffer"/>.</summary>
+    public const string StoppedPartWay = "Plantoir stopped part way through putting the pages into draft, so Section {section} of {course} now has some pages in draft and some as they were.";
+    public const string RestoreOffer = "Restore Course puts {course} back as it was before you pressed Put These into Draft, from the backup “{backup}”. The course as it is now moves to Archived, at the bottom of the sidebar, so nothing is lost.";
+    public const string LeaveAsItIsButton = "Leave As It Is";
+    public const string RestoreCourseButton = "Restore Course";
 
     /// <summary>Every constant above, by the contract's key, for the pin.</summary>
     public static IReadOnlyDictionary<string, string> ByKey { get; } = new Dictionary<string, string>
@@ -287,6 +292,8 @@ public static class StartOfYearWording
         ["undoSkipped"] = UndoSkipped, ["undoButton"] = UndoButton, ["undone"] = Undone, ["undoLeftSome"] = UndoLeftSome,
         ["undoButtonAfterward"] = UndoButtonAfterward, ["undoHasEnded"] = UndoHasEnded, ["backupHoldsIt"] = BackupHoldsIt,
         ["undoEndsWhenYouQuit"] = UndoEndsWhenYouQuit, ["undoAllAlreadyBack"] = UndoAllAlreadyBack,
+        ["stoppedPartWay"] = StoppedPartWay, ["restoreOffer"] = RestoreOffer,
+        ["leaveAsItIsButton"] = LeaveAsItIsButton, ["restoreCourseButton"] = RestoreCourseButton,
     };
 
     public static string Fill(string template, params (string Key, string Value)[] values)

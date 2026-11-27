@@ -1,0 +1,38 @@
+#899 W8c-2b must-fail, VM A (Windows 11), 2026-11-27, from 516b06ecc (clean tree; each row sabotaged uncommitted,
+published as a dangling `git stash create` commit, run, then restored: `git diff` empty after every row).
+Rows: vm-tools/guest/899-w8c-2b-mustfail.json. RED 5 of 5.
+
+(1) a second dialog shown over the Go dialog for the part-way outcome
+    StartOfYearDialog.cs: the offer put on a new ContentDialog shown while the Go dialog stays open.
+    StartOfYearRestoreOfferUiTests: FAILED 2 of 2
+      Failed ...EnterIsRestoreCourseAndRestoresWithNoSecondQuestion
+      Failed ...TheOfferIsTheOneDialogWithItsTwoSentencesAndTwoButtons_EscapeLeavesItAsItIs
+      System.ComponentModel.Win32Exception : An async operation was not properly started. (0x80000019)
+    (WinUI refuses the second ContentDialog over the first; the red is the app falling over, not DialogsOnScreen == 1.)
+
+(2) Restore Course asking a question first
+    StartOfYearDialog.cs: the first Restore Course press cancels the close and asks "Restore the course now?".
+    StartOfYearRestoreOfferUiTests: FAILED 1 of 2
+      Failed ...EnterIsRestoreCourseAndRestoresWithNoSecondQuestion
+      Enter did not restore the course; the dialog on screen: Get SOY1W Section 1 Ready for the Start of the Year
+
+(3) Restore Course running while a deploy of the course runs
+    StartOfYearRestoreOffer.cs: the HeldBackByADeploy check removed.
+    StartOfYearTests: FAILED 1 of 18
+      Failed Plantoir.Tests.StartOfYearTests.ADeployHoldsRestoreCourseBackAndTheOfferStillWorksAfter
+
+(4) a preview stopped and never started again
+    StartOfYearRestoreOffer.cs: answers.StartPreview(section) removed.
+    StartOfYearTests: FAILED 3 of 18
+      Failed Plantoir.Tests.StartOfYearTests.TheOfferIsAnsweredOnceAndAPreviewIsStartedAgainOnce
+      Failed Plantoir.Tests.StartOfYearTests.ADeployHoldsRestoreCourseBackAndTheOfferStillWorksAfter
+      Failed Plantoir.Tests.StartOfYearTests.APreviewOfASectionTheRestoredCourseNoLongerHasIsNotStartedAgain
+
+(5) Leave As It Is writing anything
+    StartOfYearRestoreOffer.cs: LeaveAsItIs also chooses the restore (_restoreChosen = true).
+    StartOfYearTests: FAILED 1 of 18
+      Failed Plantoir.Tests.StartOfYearTests.StoppedPartWayCasesAsTheContractSays
+      Assert.Empty() Failure: Collection was not empty  Collection: [BackupItem { CourseCode = TEST, ... }]
+
+Re-run at 516b06ecc after restoring (origin/dev already merged, "Already up to date" at 16:20):
+  nine unit classes 285 of 285; StartOfYearRestoreOfferUiTests 2 of 2 (x64 Debug app build green).

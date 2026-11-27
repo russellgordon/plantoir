@@ -336,7 +336,7 @@ public static class MarketingShotCapturer
             ShowOver(window, dialog);
             // Never answered: the scene holds the sheet open until the process ends.
             return new TaskCompletionSource<ContentDialogResult?>().Task;
-        }, () => true);
+        }, () => true, window.SidebarPane.RestoreCourseAnswers(request.Folder, course.Code));
         if (!await Until(() => shown is not null, TimeSpan.FromSeconds(20)))
             return "refused: there was nothing to put into draft, so no plan was shown";
         await Task.Delay(1500);

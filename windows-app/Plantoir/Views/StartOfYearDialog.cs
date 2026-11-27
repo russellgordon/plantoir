@@ -26,10 +26,16 @@ public static class StartOfYearDialog
 {
     public static async Task<string?> OfferAsync(string folder, Course course, int section,
                                                  Func<ContentDialog, Task<ContentDialogResult?>> show,
-                                                 Func<bool> folderMovedMeanwhile)
+                                                 Func<bool> folderMovedMeanwhile,
+                                                 StartOfYearRestoreAnswers restoreAnswers)
     {
         var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
-            { Surface = AssistSurface.LocalWindow };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
+        {
+            Surface = AssistSurface.LocalWindow,   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
+#if DEBUG
+            StopsPartWayForUiTests = StopsPartWayForUiTests,
+#endif
+        };
         var proposal = workspace.PlanStartOfYear(course.Code, section);
         if (proposal.Plan.First is null || proposal.Plan.NothingToDo)
         {
@@ -57,9 +63,96 @@ public static class StartOfYearDialog
         DialogButtons.AskWithNoDefault(dialog);
         AutomationProperties.SetAutomationId(dialog, "startOfYearDialog");
         StartOfYearSheetView.Build(dialog, sheet);
-        var choice = await show(dialog);
-        if (choice != ContentDialogResult.Primary || folderMovedMeanwhile()) return null;
+        // Go runs in its own press, with the sheet still up (#899 W8c-2b):
+        // a part-way stop keeps this dialog open and turns it into the offer,
+        // so no second dialog ever stands over it (Apple's HIG, Sheets: "If
+        // something people do within a sheet results in another sheet
+        // appearing, close the first sheet before displaying the new one";
+        // WinUI allows one ContentDialog per window). Every other outcome
+        // closes it and is said as before.
+        string? said = null;
+        StartOfYearRestoreOffer? offer = null;
+        bool restoreCourse = false;
+        dialog.PrimaryButtonClick += (_, args) =>
+        {
+            if (offer is null)
+            {
+                if (folderMovedMeanwhile()) return;
+                said = Go(folder, course, section, workspace, proposal, out StartOfYearStoppedPartWay? stop);
+                if (stop is not null)
+                {
+                    offer = new StartOfYearRestoreOffer(stop, () => CourseActivity.IsPublishing(folder, course.Code));
+                    args.Cancel = true;
+                    ShowTheOffer(dialog, offer);
+                }
+                return;
+            }
+            // Answered in the press's own turn (the mac's restoreCourseIsPressed).
+            switch (offer.RestoreCourseIsPressed())
+            {
+                case RestoreCoursePress.HeldBackByADeploy:
+                    args.Cancel = true;
+                    ShowTheOffer(dialog, offer, offer.HeldBackSentence);
+                    break;
+                case RestoreCoursePress.Closes:
+                    restoreCourse = true;
+                    break;
+                case RestoreCoursePress.AlreadyAnswered:
+                    break;
+            }
+        };
+        // Leave As It Is: Escape, or the button itself. Changes nothing; the backup stays in Backups.
+        dialog.CloseButtonClick += (_, _) => offer?.LeaveAsItIs();
 
+        await show(dialog);
+        if (offer is not null)
+        {
+            // Closed some other way (the window went): as Leave As It Is.
+            offer.LeaveAsItIs();
+            if (restoreCourse) await offer.RestoreCourseAsync(restoreAnswers);
+            return null;
+        }
+        return said;
+    }
+
+    /// <summary>
+    /// The offer, in the Go dialog itself: <c>stoppedPartWay</c>, then
+    /// <c>restoreOffer</c>, then the restore's busy sentence while a deploy
+    /// holds it back. Restore Course is the primary button and the default
+    /// (Enter), Leave As It Is the close button (Escape): Microsoft's Dialog
+    /// controls, "The 'do it' action button(s) should appear as the leftmost
+    /// buttons. The safe, nondestructive action should appear as the rightmost
+    /// button." Restore Course is not destructive (Archived keeps the course
+    /// as it is now), so it may be the default (Apple's HIG, Buttons ▸ Role).
+    /// </summary>
+    private static void ShowTheOffer(ContentDialog dialog, StartOfYearRestoreOffer offer, string? heldBack = null)
+    {
+        var lines = new StackPanel { Spacing = 12 };
+        foreach (string sentence in offer.Sentences)
+            lines.Children.Add(new TextBlock { Text = sentence, TextWrapping = TextWrapping.Wrap });
+        if (heldBack is not null)
+        {
+            var busy = new TextBlock { Text = heldBack, TextWrapping = TextWrapping.Wrap };
+            AutomationProperties.SetAutomationId(busy, "startOfYearRestoreHeldBack");
+            AutomationProperties.SetLiveSetting(busy, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Assertive);
+            lines.Children.Add(busy);
+        }
+        dialog.Content = new ScrollViewer { Content = lines, MaxHeight = 480 };
+        dialog.PrimaryButtonText = StartOfYearWording.RestoreCourseButton;
+        dialog.CloseButtonText = StartOfYearWording.LeaveAsItIsButton;
+        // The Go page had no default (Q-B on #975); the offer's is Restore Course.
+        dialog.PrimaryButtonStyle = null;
+        DialogButtons.EnablePrimary(dialog, true);
+        // Enter goes to the focused button before the default, so the focus
+        // is put on the default itself (it may have been on Cancel).
+        if (DialogButtons.TemplatePart(dialog, "PrimaryButton") is Control restore) restore.Focus(FocusState.Programmatic);
+    }
+
+    /// <summary>Go itself, with the deploy check: what to say once the sheet has closed, or the part-way stop the sheet offers the restore for.</summary>
+    private static string? Go(string folder, Course course, int section, AssistWorkspace workspace, StartOfYearProposal proposal,
+                              out StartOfYearStoppedPartWay? stop)
+    {
+        stop = null;
         if (CourseActivity.IsPublishing(folder, course.Code))
         {
             ActivityTrail.Note(ActivityTrail.Event.StartOfYearNotDone,
@@ -69,6 +162,12 @@ public static class StartOfYearDialog
 
         var outcome = workspace.PrepareForStartOfYear(course.Code, section, proposal.Code, StartOfYearAskedFrom.TheApp,
             new BackupMaker.Teacher());
+        // Part way: the sheet's offer, never the assistants' sentence (no per-file kept sentence, the ruling).
+        if (outcome.StoppedPartWay is { } partWay)
+        {
+            stop = partWay;
+            return null;
+        }
         if (!outcome.Changed)
         {
             // Over MCP these are the assistant's sentences; from the app the sheet's own.
@@ -89,6 +188,11 @@ public static class StartOfYearDialog
             StartOfYearWording.Fill(StartOfYearWording.UndoAvailable, ("backup", backupName)),
             StartOfYearWording.UndoEndsWhenYouQuit);
     }
+
+#if DEBUG
+    /// <summary>A UI test's: Go stops part way (<see cref="AssistWorkspace.StopsPartWayForUiTests"/>). Set only by the Debug build's <c>--start-of-year-stops-part-way-for-tests</c>.</summary>
+    public static bool StopsPartWayForUiTests { get; set; }
+#endif
 
     /// <summary>The undo sheet: lists what would go back, and what changed since and stays.</summary>
     public static async Task<string?> UndoAsync(string folder, Course course, int section,
