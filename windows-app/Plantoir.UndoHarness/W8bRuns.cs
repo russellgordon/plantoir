@@ -161,7 +161,8 @@ internal static class W8bRuns
                 string at = Path.Combine(full, name);
                 string holds = UndoLinks.Look(at) switch
                 {
-                    UndoLinks.What.Link => "link " + (new FileInfo(at).LinkTarget ?? "notALink"),
+                    // A target outside names this run's own folder: written as <run>, so runs compare.
+                    UndoLinks.What.Link => "link " + (new FileInfo(at).LinkTarget?.Replace(run, "<run>", StringComparison.OrdinalIgnoreCase) ?? "notALink"),
                     UndoLinks.What.File => "page " + File.ReadAllText(at).Replace("\n", "\\n"),
                     UndoLinks.What other => other.ToString(),
                 };
