@@ -75,8 +75,10 @@ public sealed class UndoKeptLineByPathTests
     /// <summary>
     /// Item 1: two kept files with ONE bare name in two folders are two kept
     /// files, each listed; a kept file is skipped only when its whole path is
-    /// already listed. Both pages' outgoing bytes are refused by the list.
-    /// MUST FAIL keyed by file name (the second skipped).
+    /// already listed. Both pages' outgoing bytes are refused by the list, so
+    /// each is kept beside its page and the Redo is made from them. MUST FAIL
+    /// keyed by file name (the second skipped), and with the outgoing bytes
+    /// of a page put back from the list never stored nor kept.
     /// </summary>
     [Fact]
     public void TwoKeptFilesWithOneNameInTwoFoldersAreBothListed()
@@ -90,7 +92,12 @@ public sealed class UndoKeptLineByPathTests
             TakeAwayTheBlob(scribe, denials, SecondAfter);
             Assert.Equal("undone", scribe.Undo().Name);
             line = TheOneKeptLine(scribe);
+            // The only copies of what the step left are beside the pages, and
+            // the Redo is made from them (item 4 of the lows fixed with U4a).
+            Assert.Equal("redone", scribe.Redo().Name);
         }
+        Assert.Equal(FirstAfter, scribe.Page("A", FirstIndex));
+        Assert.Equal(SecondAfter, scribe.Page("A", SecondIndex));
 
         Assert.Equal(1, seq);
         Assert.StartsWith("Undo put back “section1/index.md”, “section2/index.md”, but the list", line.Words);

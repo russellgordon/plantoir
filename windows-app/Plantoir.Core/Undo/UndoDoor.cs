@@ -550,6 +550,15 @@ internal sealed class UndoDoor
                 // for the other direction, into the list first, inside the lock
                 // and before the swap (the first review of U3c, MEDIUM).
                 if (uses.Count > 0) notTaken = UndoRecovery.StoreWhatKeptOriginalsGive(uses, writer, _journal);
+                // A page put back from the list whose outgoing bytes the other
+                // direction needs and the list lacks (item 4 of the lows fixed
+                // with U4a): stored now, or kept beside the page by the swap.
+                HashSet<string> notStored = UndoRecovery.StoreWhatTheOtherDirectionNeeds(ready.InOrder, record.Step, backward, root, writer, _journal);
+                if (notStored.Count > 0)
+                {
+                    notStored.UnionWith(notTaken.OutgoingOf);
+                    notTaken = new UndoWhatTheListCouldNotTake(notStored, notTaken.KeptOriginalsHolding);
+                }
                 writer.Append(new JsonObject { ["seq"] = seq, ["event"] = starting, ["process"] = _process.DeepClone() });
                 writer.Sync();
                 return true;

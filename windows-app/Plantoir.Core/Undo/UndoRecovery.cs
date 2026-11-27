@@ -744,6 +744,49 @@ internal static class UndoRecovery
         return new UndoWhatTheListCouldNotTake(notWhole, keptNotStored);
     }
 
+    /// <summary>
+    /// An Undo or Redo never deletes an only copy (documentation 12, "The lows
+    /// fixed with U4a that W4c and W7 copy", item 4; the mac's
+    /// <c>UndoRecovery.storeWhatTheOtherDirectionNeeds</c>): under the lock,
+    /// before the swap, each page's outgoing bytes that the step's other
+    /// direction needs (a writeFile op's after for an Undo, its before for a
+    /// Redo) go into the list when it lacks them. The pages whose bytes the
+    /// list would not take are returned: the swap keeps those bytes beside the
+    /// page (<c>OutgoingOf</c>), and the other direction is made from that kept
+    /// file. Bytes a kept original of the step already holds beside the page
+    /// need nothing more. (#899 W8-9: the U4b2-4 stack case rests on it.)
+    /// </summary>
+    internal static HashSet<string> StoreWhatTheOtherDirectionNeeds(IReadOnlyList<(string Path, byte[]? Expected, byte[]? Replacement)> inOrder,
+                                                                    UndoStep step, bool backward, string root, UndoJournalWriter writer, UndoJournal journal)
+    {
+        var notStored = new HashSet<string>(StringComparer.Ordinal);
+        foreach ((string path, byte[]? outgoing, _) in inOrder)
+        {
+            if (outgoing is null) continue;
+            string outgoingSha = UndoCheck.Sha(outgoing);
+            bool needed = false;
+            foreach (UndoOp op in step.Ops)
+            {
+                if (op.Kind != UndoOp.WriteFile || op.Path != path) continue;
+                string? otherSha = backward ? op.AfterSha : op.BeforeSha;
+                if (string.Equals(otherSha, outgoingSha, StringComparison.Ordinal)) needed = true;
+            }
+            if (!needed || journal.Blob(outgoingSha) is not null) continue;
+            bool alreadyKept = false;
+            if (root.Length > 0)
+            {
+                foreach (string kept in KeptOriginalFiles(step, UndoDoor.FullPath(root, path)))
+                {
+                    if (UndoCurrent.Read(kept) is UndoCurrent.Bytes bytes && string.Equals(UndoCheck.Sha(bytes.Content), outgoingSha, StringComparison.Ordinal))
+                        alreadyKept = true;
+                }
+            }
+            if (alreadyKept) continue;
+            if (!TryToStore(outgoing, writer)) notStored.Add(path);
+        }
+        return notStored;
+    }
+
     private static bool TryToStore(byte[] bytes, UndoJournalWriter writer)
     {
         try { writer.WriteBlob(bytes); return true; }
