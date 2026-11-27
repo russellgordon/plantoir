@@ -644,4 +644,197 @@ public sealed class UndoRelinkTests : IDisposable
         });
         Assert.True(read.Readable);
     }
+
+    // ---- Killed (21b3; the mac's U4b3 relink-3 and reviews D and F) -----------
+
+    /// <summary>A step of this shape made through a door that names a process that is gone, stopped where <paramref name="stopping"/> says; its number.</summary>
+    private static long MakeTheStep(UndoScribe scribe, string shape, string work, UndoSeams stopping, out UndoOutcome stopped)
+    {
+        (JsonArray ops, List<byte[]> blobs) = UndoRelinkForTheCases.Lay(scribe, shape);
+        UndoOpsDraft draft = scribe.OpsDraft("A", ops, blobs, "insertClass");
+        if (work == "apply")
+        {
+            stopped = scribe.Door(stopping, UndoScribe.AProcessThatIsGone).Perform(draft);
+            return scribe.Fold().Steps.Keys.Max();
+        }
+        Assert.Equal(UndoOutcomeKind.Applied, scribe.Door().Perform(draft).Kind);
+        if (work == "redo") Assert.Equal(UndoOutcomeKind.Undone, scribe.Door().Undo().Kind);
+        stopped = work == "undo"
+            ? scribe.Door(stopping, UndoScribe.AProcessThatIsGone).Undo()
+            : scribe.Door(stopping, UndoScribe.AProcessThatIsGone).Redo();
+        return scribe.Fold().Steps.Keys.Max();
+    }
+
+    /// <summary>
+    /// What a recovery of this kill left: <c>before</c> or <c>after</c> (the
+    /// class pages and the library exactly as laid, or as the step makes
+    /// them), else what they hold; and the step's state.
+    /// </summary>
+    private static (string Files, string Phase) KillAndRecover(string shape, string work, string point, int index, string madeWhole, out bool reached)
+    {
+        using var scribe = new UndoScribe();
+        var stopping = new UndoSeams { StopsHere = (at, where) => at == point && (index < 0 || where == index) };
+        long seq = MakeTheStep(scribe, shape, work, stopping, out UndoOutcome stopped);
+        reached = stopped.Kind == UndoOutcomeKind.StoppedByATest;
+        if (!reached) return ("", "");
+        string laid = BeforeOf(shape);
+        scribe.Door().Recover();
+        string now = UndoHandoverForTheCases.Snapshot(scribe);
+        string files = now == laid ? "before" : now == madeWhole ? "after" : now;
+        Assert.Empty(scribe.StagedLeftovers("A"));
+        return (files, UndoContract.Spelled(scribe.Fold().Steps[seq].State));
+    }
+
+    /// <summary>The class pages and the library of this shape as laid, before any step.</summary>
+    private static string BeforeOf(string shape)
+    {
+        using var scribe = new UndoScribe();
+        UndoRelinkForTheCases.Lay(scribe, shape);
+        return UndoHandoverForTheCases.Snapshot(scribe);
+    }
+
+    /// <summary>
+    /// Each relinking chain of review D and F, and the plain link move chained
+    /// to a relink either way round, killed with both links standing inside a
+    /// swap or between swaps, settles to exactly the side the rule names: the
+    /// one link it removes is the one named by the test (a rolled-back step
+    /// shows the link removed was the one just made, since the earlier move
+    /// was then judged done), and a plain link move whose link holds the
+    /// relink's new text is never taken for one just made.
+    /// </summary>
+    [SymbolicLinkTheory]
+    // Review D: inside the second swap, Day 5's new link beside Day 4's old: Day 5's removed, Day 6's kept (rolled back, not failed).
+    [InlineData("chained", "apply", "relinkRenamedIn", 1, "before", "rolledBack")]
+    // Review D: before the first swap, Day 5's link is the first move's own, never the second's just made.
+    [InlineData("chained", "apply", "beforeSwap", 0, "before", "failed")]
+    // Review D: the undo's first swap, Day 4's link made again beside Day 5's: Day 5's removed (the LAST that passes), put forward again.
+    [InlineData("chained", "undo", "relinkRenamedIn", 0, "after", "done")]
+    // Review F: after both swaps, the first move stands both ways but the second no longer holds its start text: nothing removed.
+    [InlineData("chained", "apply", "beforeApplied", -1, "after", "done")]
+    [InlineData("chained", "redo", "beforeRedone", -1, "after", "done")]
+    // Review F: three chained, inside each swap and before the first.
+    [InlineData("chainedThree", "apply", "beforeSwap", 0, "before", "failed")]
+    // (A kill inside any of the three swaps leaves the same folder: the LAST that passes loses its link, so it reads as the first two done.)
+    [InlineData("chainedThree", "apply", "relinkRenamedIn", 0, "before", "rolledBack")]
+    [InlineData("chainedThree", "apply", "relinkRenamedIn", 1, "before", "rolledBack")]
+    [InlineData("chainedThree", "apply", "relinkRenamedIn", 2, "before", "rolledBack")]
+    // Review F: a relink, then a plain move into its place, after both swaps: nothing removed.
+    [InlineData("thenAMove", "apply", "beforeApplied", -1, "after", "done")]
+    [InlineData("thenAMove", "undo", "afterUndoing", -1, "after", "done")]
+    // Review F's counter-example: a plain move whose link holds the relink's new text, before anything moved: never taken for one just made.
+    [InlineData("aMoveThenARelink", "apply", "afterBegin", -1, "before", "failed")]
+    [InlineData("aMoveThenARelink", "apply", "beforeSwap", 0, "before", "failed")]
+    [InlineData("aMoveThenARelink", "undo", "beforeUndone", -1, "before", "undone")]
+    [InlineData("aMoveThenARelink", "redo", "afterRedoing", -1, "before", "undone")]
+    public void AKilledChainRemovesExactlyTheOneLinkTheRuleNames(string shape, string work, string point, int index, string files, string phase)
+    {
+        (string left, string settled) = KillAndRecover(shape, work, point, index, UndoRelinkForTheCases.MadeWhole(shape), out bool reached);
+        Assert.True(reached, $"{shape}-{work} did not stop at {point}:{index}");
+        Assert.Equal(files, left);
+        Assert.Equal(phase, settled);
+    }
+
+    /// <summary>
+    /// Every shape killed at every stop point the door has, going forward, in
+    /// an Undo and in a Redo, loses no link: after recovery every page and
+    /// link is exactly as before or exactly as after, nothing staged is left,
+    /// and the step is settled on the side its links show. The kills reached
+    /// are counted: an apply 2 + swaps + 2 x relinks (afterBegin, each
+    /// beforeSwap, both halves of each relink, beforeApplied); an Undo or a
+    /// Redo 3 + swaps + 2 x relinks (afterTheCheck, afterUndoing or
+    /// afterRedoing, and beforeUndone or beforeRedone).
+    /// </summary>
+    [SymbolicLinkTheory]
+    [InlineData("alone", "apply")]
+    [InlineData("alone", "undo")]
+    [InlineData("alone", "redo")]
+    [InlineData("leavingAHandedOverPlace", "apply")]
+    [InlineData("leavingAHandedOverPlace", "undo")]
+    [InlineData("chained", "apply")]
+    [InlineData("chained", "undo")]
+    [InlineData("chained", "redo")]
+    [InlineData("chainedThree", "apply")]
+    [InlineData("chainedThree", "undo")]
+    [InlineData("thenAMove", "apply")]
+    [InlineData("thenAMove", "undo")]
+    [InlineData("thenAMove", "redo")]
+    [InlineData("aMoveThenARelink", "apply")]
+    [InlineData("aMoveThenARelink", "undo")]
+    [InlineData("aMoveThenARelink", "redo")]
+    public void EveryShapeKilledAtEveryStopPointLosesNoLink(string shape, string work)
+    {
+        (JsonArray ops, int relinks) = OpsOf(shape);
+        int swaps = ops.Count;
+        var points = new List<(string Point, int Index)>();
+        if (work == "apply") points.Add(("afterBegin", -1));
+        else points.Add(("afterTheCheck", -1));
+        if (work == "undo") points.Add(("afterUndoing", -1));
+        if (work == "redo") points.Add(("afterRedoing", -1));
+        for (int index = 0; index < swaps; index++)
+        {
+            points.Add(("beforeSwap", index));
+            points.Add(("relinkStaged", index));
+            points.Add(("relinkRenamedIn", index));
+        }
+        points.Add((work switch { "apply" => "beforeApplied", "undo" => "beforeUndone", _ => "beforeRedone" }, -1));
+        string madeWhole = UndoRelinkForTheCases.MadeWhole(shape);
+        int reachedCount = 0;
+        var lost = new List<string>();
+        foreach ((string point, int index) in points)
+        {
+            (string left, string settled) = KillAndRecover(shape, work, point, index, madeWhole, out bool reached);
+            if (!reached) continue;
+            reachedCount++;
+            bool wholeSide = left == "after"
+                ? settled == "done"
+                : left == "before" && (work == "apply" ? settled is "failed" or "rolledBack" : settled == "undone");
+            if (!wholeSide) lost.Add($"{shape}-{work}-{point}:{index}: {left} {settled}");
+        }
+        Assert.Empty(lost);
+        Assert.Equal((work == "apply" ? 2 : 3) + swaps + 2 * relinks, reachedCount);
+    }
+
+    private static (JsonArray Ops, int Relinks) OpsOf(string shape)
+    {
+        using var scribe = new UndoScribe();
+        (JsonArray ops, _) = UndoRelinkForTheCases.Lay(scribe, shape);
+        int relinks = 0;
+        foreach (JsonNode? op in ops)
+        {
+            if (op?["linkShaBefore"] is not null) relinks++;
+        }
+        return (ops, relinks);
+    }
+
+    /// <summary>
+    /// A relink's two stop points are asked only going in, never by a
+    /// reversal: a later target refused after the relink went in reverses it
+    /// with no stop point asked, so the swap is refused, never stopped.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void ARelinksStopPointsAreAskedGoingInOnlyNeverInAReversal()
+    {
+        LaidRelink laid = LayARelink("inside");
+        WritePage(Day(8), "Eight.\n");
+        UndoOp fileMove = new UndoOp { Kind = UndoOp.Move, Readable = true, From = Day(8), To = Day(9), Sha = UndoCheck.Sha(Bytes("Eight.\n")) };
+        List<UndoSwapTarget> targets = ReadyTargets(Plan([laid.Op, fileMove], backward: false));
+        var asked = new List<string>();
+        var seams = new UndoSeams
+        {
+            BeforeEachSwap = (index, _) => { if (index == 1) WritePage(Day(9), "Someone's.\n"); },
+            StopsHere = (point, index) =>
+            {
+                if (point.StartsWith("relink", StringComparison.Ordinal)) asked.Add(point + ":" + index);
+                return false;
+            },
+        };
+
+        UndoSwapResult result = UndoSwap.Swap(targets, "1-apply", _root, seams);
+
+        Assert.True(result is UndoSwapResult.Refused, Described(result));
+        Assert.Equal(["relinkStaged:0", "relinkRenamedIn:0"], asked);
+        Assert.Equal(laid.OldText, LinkText(Day(4)));
+        Assert.False(StandsAnything(Day(5)));
+        Assert.Empty(StagedLeft());
+    }
 }
