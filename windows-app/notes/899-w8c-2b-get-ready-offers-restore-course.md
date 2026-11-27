@@ -27,19 +27,19 @@ Branch `issue/899-w8c-2b-get-ready-offers-restore-course`, from W8c-2a's 6e60765
 
 ## Must-fail lines
 
-OWED (budget). The brief's five rows are neither written to `vm-tools/guest/899-w8c-2b-mustfail.json` nor run. One real fault was caught red by the new tests during the work: `RestoreCourseAsync` gated on "answered" rather than "Restore Course chosen", so the `leaveAsItIs` case restored (`StoppedPartWayCasesAsTheContractSays`, `Assert.Empty(recorder.Restored)`), fixed in ba8570ae5.
+RED 5 of 5 (finishing round, VM A, from 516b06ecc), rows in `vm-tools/guest/899-w8c-2b-mustfail.json`, lines in `windows-app/notes/899-w8c-2b-mustfail.log`: (1) a second dialog over Go: `StartOfYearRestoreOfferUiTests` 2 of 2 red (WinUI refuses the second ContentDialog, so the app falls over: `Win32Exception 0x80000019`); (2) a question first: `EnterIsRestoreCourseAndRestoresWithNoSecondQuestion` ("Enter did not restore the course"); (3) restore during a deploy: `ADeployHoldsRestoreCourseBackAndTheOfferStillWorksAfter`; (4) a preview never started again: `TheOfferIsAnsweredOnceAndAPreviewIsStartedAgainOnce` and two more; (5) Leave As It Is writing: `StoppedPartWayCasesAsTheContractSays` (`Assert.Empty`, a restore recorded). Earlier, one real fault was caught red by the new tests during the work: `RestoreCourseAsync` gated on "answered" rather than "Restore Course chosen", so the `leaveAsItIs` case restored (`StoppedPartWayCasesAsTheContractSays`, `Assert.Empty(recorder.Restored)`), fixed in ba8570ae5.
 
 ## Runs (VM A, `Windows 11`, under `vm-tools/runs/VM.lock`, parked and released after)
 
 - a75e5839f: the nine unit classes, 283 of 285 (the leave-gate fault above; a test of mine that started section 2 in a one-section course).
 - ba8570ae5: `StartOfYearTests`, `StartOfYearSheetTests`, `UndoStartOfYearStepTests`, `QuestionDialogScanTests`, `DialogTitleScanTests`, `NamedGapLedgerTests`, `UndoWriterScanTests`, `UndoOpKindsContractTests`, `UndoStackContractTests`: 285 of 285. Both builds (the unit build and the UI run's x64 Debug app build) green.
 - ba8570ae5: `StartOfYearRestoreOfferUiTests` 2 of 2 (one dialog, both sentences in order, two buttons in Microsoft's order, Escape leaves it as it is, Enter restores with no second question), 2.3 minutes.
+- Finishing round, 516b06ecc after `git fetch` and `git merge origin/dev` (already up to date): the nine unit classes 285 of 285 (`vm-tools/runs/w8c-2b-unit-4.log`); `StartOfYearRestoreOfferUiTests` 2 of 2 with the x64 Debug app build (`vm-tools/runs/w8c-2b-ui-2.log`). The UI build needs `refetch-runtime.ps1` after every park (#965 runtime).
 
 ## Left for the next piece
 
-- The must-fail run (five rows).
 - The tests were committed before the product (b639477f5 before 2fdfa2d59) but were not run red on the product as it was: they reference the new types, so on the product before they do not compile.
-- A second `dev` merge before hand-back.
+- (Done in the finishing round: the must-fail run, and the second `dev` merge, which was already up to date at 16:20.)
 
 ## For the director
 
@@ -49,13 +49,13 @@ OWED (budget). The brief's five rows are neither written to `vm-tools/guest/899-
 
 ## Self-check
 
-1. Broke each change and watched a test fail: only partly. The leave gate was red before its fix; the five must-fail rows are owed.
+1. Broke each change and watched a test fail: yes. The leave gate was red before its fix, and the brief's five must-fail rows are RED 5 of 5 (`899-w8c-2b-mustfail.log`); each restored byte for byte (`git diff` empty).
 2. No timed waits where an event exists: none added; the preview stop is awaited, the UI test waits on conditions.
 3. Every sentence on the failure paths true: the offer's two sentences from the contract by key, the busy sentence the restore's own, a restore failure the restore's own error.
-4. `dev` merged in: at 635953b4c before proving; the second merge is owed.
+4. `dev` merged in: at 635953b4c before proving; fetched and merged again in the finishing round (already up to date), and the classes re-run after it.
 5. No number tuned by trial: none.
 6. Contract cases run from the JSON: `stoppedPartWayCases`, with the two `then` halves now run to their end.
 7. Fixture row / ledger: no row in this piece.
 8. Writer-scan count: `UndoWriterScanTests` green; no new write site (the restore's writes moved from SidebarPane into `CourseRestorer.RestoreWholeCourse` beside `RestoreBackup`).
 9. Riding lows: 2a LOW 3 fixed with the UI test and `TheOfferSaysTheTwoSentencesInOrderAndNamesNoHiddenFile`.
-11 to 14: no held rows; no key added; one function per rule (one whole-course restore, `CourseRestorer.RestoreWholeCourse`); no run left going, VM A suspended, lock released (it was mine).
+11 to 14: no held rows; no key added; one function per rule (one whole-course restore, `CourseRestorer.RestoreWholeCourse`); no run left going, VM A suspended, lock released (it was mine); the same in the finishing round (lock `w8c-2b-finish`, taken and released by it).
