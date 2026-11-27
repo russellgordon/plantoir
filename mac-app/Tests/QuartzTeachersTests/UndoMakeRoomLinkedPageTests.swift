@@ -804,10 +804,11 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
     /// 4 is a link holding `Unit 1, Day 3.md`; duplicating Day 1 moves Day
     /// 2 to 3 and Day 3 to 4, and re-points the link (now Day 5) at Day 4.
     /// It goes ahead as one step: the wiki link rewritten once in the page
-    /// at Day 4, nothing written at the link's name. (It passed on the
-    /// door before this fix too: Duplicate Class did not reach review E's
-    /// refusal in this arrangement; it pins the outcome.)
-    func testDuplicateClassRewritesARePointedLessonsWikiLinkAtItsOwnPage() async throws {
+    /// at Day 4, nothing written at the link's name. A PIN, not a proof of
+    /// review E's fix: it passes with that fix reverted too (reviews E and
+    /// F), since Duplicate Class does not reach review E's refusal in this
+    /// arrangement. What it shows is the outcome, kept.
+    func testDuplicateClassKeepsARePointedLessonsWikiLinkRewrittenAtItsOwnPage() async throws {
         let made = try AssistFixture.makeRunner(surface: .local)
         defer {
             try? FileManager.default.removeItem(at: made.root)
