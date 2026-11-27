@@ -33,6 +33,8 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         StartOfYearUndoRegistry.shared.forgetAll()
         FakePreview.shared.forget()
         SectionWindowControllers.shared.forgetAll()
+        PreviewLeases.reset()
+        CourseActivity.reset()
     }
 
     // MARK: - The contract's cases
@@ -150,6 +152,52 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
         }
     }
 
+    // MARK: - The real restore, with previews running (review 1, HIGH 1)
+
+    /// This section's preview was running when Go was pressed. Go stops it
+    /// before it writes; after a part-way stop it is NOT started again
+    /// while the offer is open, so the real whole-course restore
+    /// (`WorkspaceModel.restoreBackup`) is not refused as busy; once the
+    /// restore is done it is started again, once. MUST FAIL on aa991d513,
+    /// where the part-way branch restarted the preview before the offer and
+    /// the restore said "ICS3U is previewing or deploying right now".
+    func testRestoreCourseRestoresWhileThisSectionWasPreviewing() async throws {
+        let stopped: Stopped = try await stopPartWay(sections: [1])
+        defer { try? FileManager.default.removeItem(at: stopped.root) }
+        let preview: FakePreview = FakePreview.shared
+        preview.register(folderPath: stopped.root.path, courseCode: "ICS3U", sectionNumber: 1, holdingALease: true)
+        try await stopped.goAhead()
+
+        XCTAssertFalse(preview.events.contains("start"), "the preview was started again before the offer was answered: \(preview.events)")
+        await stopped.model.restoreCourse()
+
+        XCTAssertNil(stopped.workspace.backupProblem, stopped.workspace.backupProblem ?? "")
+        try stopped.assertEveryPlannedPageIsBackAsItWas()
+        XCTAssertEqual(StartOfYearRestoreOfferTests.count("start", in: preview.events), 1, "started again once: \(preview.events)")
+        await stopped.model.restoreCourse()
+        XCTAssertEqual(StartOfYearRestoreOfferTests.count("start", in: preview.events), 1, "nothing starts it twice: \(preview.events)")
+    }
+
+    /// Another section of the same course is previewing in its own window.
+    /// Restore Course stops that preview itself (the director's reading of
+    /// "It must offer an easy way to fix the problem for the user"),
+    /// restores, and starts it again. MUST FAIL on aa991d513.
+    func testRestoreCourseStopsAndRestartsAnotherSectionsPreview() async throws {
+        let stopped: Stopped = try await stopPartWay(sections: [1, 2])
+        defer { try? FileManager.default.removeItem(at: stopped.root) }
+        let other: FakePreview = FakePreview()
+        other.register(folderPath: stopped.root.path, courseCode: "ICS3U", sectionNumber: 2, holdingALease: true)
+        defer { other.forget() }
+        try await stopped.goAhead()
+        XCTAssertEqual(other.events, [], "Go leaves another section's preview alone")
+
+        await stopped.model.restoreCourse()
+
+        XCTAssertNil(stopped.workspace.backupProblem, stopped.workspace.backupProblem ?? "")
+        try stopped.assertEveryPlannedPageIsBackAsItWas()
+        XCTAssertEqual(other.events, ["stop-begins", "stop-ends", "start"], "stopped before the restore, started once after")
+    }
+
     // MARK: - The sentences
 
     /// The offer names the buttons as they are titled.
@@ -222,6 +270,111 @@ final class StartOfYearRestoreOfferTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// A course laid out as the contract's plain year, a window's model on
+    /// it, and the sheet's model wired to the REAL whole-course restore, as
+    /// the sidebar wires it.
+    struct Stopped {
+
+        // MARK: - Stored properties
+
+        let root: URL
+        let course: Course
+        let workspace: WorkspaceModel
+        let model: StartOfYearSheetModel
+        let urls: [String: URL]
+        let planned: [String]
+        let door: [String: Int]
+
+        // MARK: - Functions
+
+        /// Press Go with the door of the contract's "then restore" case.
+        @MainActor
+        func goAhead() async throws {
+            let heldOpen: Int? = door["fileInUseAtSwap"]
+            let cannotPutBack: Int? = door["putBackFailsAt"]
+            UndoKillPoints.fileInUseAtSwap = { (index: Int) -> Bool in
+                return index == heldOpen
+            }
+            UndoKillPoints.putBackFailsAt = { (index: Int) -> Bool in
+                return index == cannotPutBack
+            }
+            await model.goAhead()
+            UndoKillPoints.fileInUseAtSwap = nil
+            UndoKillPoints.putBackFailsAt = nil
+            guard case .stoppedPartWay = model.stage else {
+                XCTFail("no offer: \(model.stage)")
+                return
+            }
+        }
+
+        /// Every page the plan put into draft is published again: the
+        /// course is the backup's.
+        func assertEveryPlannedPageIsBackAsItWas() throws {
+            for title in planned {
+                let url: URL = try XCTUnwrap(urls[title])
+                let text: String = try String(contentsOf: url, encoding: .utf8)
+                XCTAssertNotEqual(PageVisibilityReader.answer(in: text, forSection: 1), .hidden, "\(title) is still in draft")
+            }
+        }
+    }
+
+    func stopPartWay(sections: [Int]) async throws -> Stopped {
+        let rules: [String: Any] = try StartOfYearTests.rules("startOfYear")
+        let cases: [[String: Any]] = try XCTUnwrap(rules["stoppedPartWayCases"] as? [[String: Any]])
+        var door: [String: Int]? = nil
+        for testCase in cases where (testCase["then"] as? String) == "restoreCourse" {
+            door = testCase["door"] as? [String: Int]
+        }
+        let plainYear: [String: Any] = try XCTUnwrap((rules["cases"] as? [[String: Any]])?.first)
+        let layout: [[String: Any]] = try XCTUnwrap(plainYear["pages"] as? [[String: Any]])
+        let planned: [String] = try XCTUnwrap(plainYear["expectDraft"] as? [String])
+        let made = try AssistFixture.makeRunner(surface: .mcp)
+        let urls: [String: URL] = try StartOfYearTests.layOut(layout, in: made.course)
+        var course: Course = made.course
+        if sections.count > 1 {
+            let configURL: URL = made.course.configFileURL
+            var config: [String: Any] = try XCTUnwrap(
+                try JSONSerialization.jsonObject(with: Data(contentsOf: configURL)) as? [String: Any]
+            )
+            config["section_numbers"] = sections
+            config["num_sections"] = sections.count
+            try JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]).write(to: configURL)
+            for section in sections {
+                try FileManager.default.createDirectory(
+                    at: made.course.sectionDirectoryURL(forSection: section).appendingPathComponent("All Classes"),
+                    withIntermediateDirectories: true
+                )
+            }
+            course = try made.course.asSavedNow()
+        }
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        workspace.chooseWorkspace(at: made.root)
+        workspace.reloadCourses()
+        let model: StartOfYearSheetModel = StartOfYearSheetModel(
+            course: course, sectionNumber: 1, workspaceURL: made.root, mode: .getReady,
+            restoreWholeCourse: { (item: BackupItem) async in
+                await workspace.restoreBackup(item)
+            }
+        )
+        model.load()
+        guard case .ready = model.stage else {
+            _ = try XCTUnwrap(Optional<Int>.none, "no plan: \(model.stage)")
+            throw CancellationError()
+        }
+        return Stopped(
+            root: made.root, course: course, workspace: workspace, model: model,
+            urls: urls, planned: planned, door: try XCTUnwrap(door)
+        )
+    }
+
+    static func count(_ event: String, in events: [String]) -> Int {
+        var found: Int = 0
+        for each in events where each == event {
+            found += 1
+        }
+        return found
+    }
 
     /// Every regular file under `root`, by standardized path, with its bytes.
     static func everyFile(under root: URL) throws -> [String: Data] {
