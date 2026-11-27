@@ -559,7 +559,7 @@
     "whyValuesMean": {
       "dated": "write `date`, the claiming class's day (step 2, or a step-1 page the build's own date pass does not read as a link)",
       "datedAsTheFirstClass": "write `date`, the first class's day",
-      "datedByTheBuild": "write no date: the build already gave it the date of the earliest visible class linking it directly, and will again; or it is a file a numbered class of the section owns (class-planning.json -> datingPagesAClassBrings.frontmatterKey.firstClassKeepsASharedLesson), whose date is that class's, claimedBy naming that class",
+      "datedByTheBuild": "write no date: the build already gave it the date of the earliest visible class linking it directly, and will again",
       "keepsItsDate": "write no date: the page is in the published-pages record",
       "structuralNeverDated": "write no date: a folder's index or Key Links",
       "classNeverDated": "a class page: never dated",

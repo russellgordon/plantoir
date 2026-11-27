@@ -1240,13 +1240,6 @@ nonisolated struct CoursePageCopySource: Sendable {
                 fileURL: fileURL,
                 relativePath: relativePath,
                 isSectionLocal: kind == .insideOneSectionsFolder,
-                // A PLACEHOLDER, never to be written or read: a page being
-                // copied is read without a section, so no date is read
-                // (`date: nil`) and section 1's key here says nothing about
-                // the section the copy goes to. A writer that ever dates from
-                // this graph must ask `ClassPages.dateKey` for the target
-                // section instead (#1048 review 1, LOW 2).
-                dateKey: PageFrontmatter.createdKey(forSection: 1, isSectionLocal: kind == .insideOneSectionsFolder),
                 isVisibleToStudents: true,
                 visibilityIsCertain: true,
                 date: nil,

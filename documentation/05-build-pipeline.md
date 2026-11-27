@@ -1181,14 +1181,7 @@ not walked from; the walk does not go through a folder index or Key Links.
   writes no date for it (`why: datedByTheBuild`). This is recorded as an
   exception to Russell's decision 4 (director's ruling N8): for those pages
   the build's rule wins even over "published before". Decision 4 governs
-  step-2 and other-group pages. A page whose file a numbered class of the
-  section owns (a shared lesson Unit 1, Day 2 is a link to; `class-planning.json`
-  → `frontmatterKey.firstClassKeepsASharedLesson`) is offered the same way,
-  however it is reached: no date, `datedByTheBuild`, `claimedBy` naming the
-  owning class (#1048b). Its date is the owner's and nothing writes over it;
-  the Mac's publisher also refuses to date such a file from any row
-  (`LinksChecklistPublisher.plan`, through `ClassPages.filesTheNumberedClassesOwn`),
-  so an offer from an older build cannot either.
+  step-2 and other-group pages.
 - **Linked from other pages** (`notReachedByAClass`): every other hidden page
   a visible page, OR an offered page, links to — closed transitively, stopping
   at class pages — so publishing everything ticked leaves no new dead link and

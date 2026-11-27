@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # #1048 (Mac): a linked class page's date is read and written under the key the TARGET's place calls for
 
 Branch `issue/1048-date-key-by-the-targets-place`, from `origin/day27/integration-1` (d334a288e).

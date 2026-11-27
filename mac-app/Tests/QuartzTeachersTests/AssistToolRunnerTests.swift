@@ -2850,7 +2850,7 @@ final class AssistToolRunnerTests: XCTestCase {
             return AssistSectionPage(
                 title: title.lowercased(), displayTitle: title,
                 fileURL: URL(fileURLWithPath: "/c/ICS3U/section1/All Classes/\(title).md"),
-                relativePath: "section1/All Classes/\(title).md", isSectionLocal: true, dateKey: "created",
+                relativePath: "section1/All Classes/\(title).md", isSectionLocal: true,
                 isVisibleToStudents: true, visibilityIsCertain: true, date: nil,
                 linkedTitles: [], classFolderNames: ["All Classes"],
                 pathWithinSection: "All Classes/\(title).md"

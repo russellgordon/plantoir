@@ -37,13 +37,6 @@ nonisolated struct AssistSectionPage {
     /// True when the page lives in this section's own folder.
     let isSectionLocal: Bool
 
-    /// The key this section's date of the page lives under, decided by the
-    /// place of the FILE the page is, through every link (#1048,
-    /// `ClassPages.dateKey`): a class page that is a link to a course-level
-    /// page reads and writes `createdSection<N>`, never the link's own plain
-    /// key. Visibility still follows `isSectionLocal`.
-    let dateKey: String
-
     /// True when students meet this page as things stand.
     ///
     /// Read the way the BUILT SITE reads it, and when the page's flag is one
@@ -262,10 +255,9 @@ nonisolated struct AssistSectionGraph {
         let isSectionLocal: Bool = AssistPageVisibility.isSectionLocal(
             pageAt: pageURL, forSection: sectionNumber, in: course
         )
-        // A link that leads to nothing is never read here (no text), so the
-        // page's own place is only the fallback (#1048).
-        let dateKey: String = ClassPages.dateKey(ofPageAt: pageURL, forSection: sectionNumber, in: course)
-            ?? PageFrontmatter.createdKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
+        let dateKey: String = PageFrontmatter.createdKey(
+            forSection: sectionNumber, isSectionLocal: isSectionLocal
+        )
         let visibility: PageVisibilityAnswer = AssistPageVisibility.answer(
             in: text, forSection: sectionNumber
         )
@@ -275,7 +267,6 @@ nonisolated struct AssistSectionGraph {
             fileURL: pageURL,
             relativePath: relativePath(of: pageURL, workspaceURL: workspaceURL),
             isSectionLocal: isSectionLocal,
-            dateKey: dateKey,
             isVisibleToStudents: visibility != .hidden,
             visibilityIsCertain: visibility != .cannotTell,
             date: PageFrontmatter.createdDay(in: text, key: dateKey),

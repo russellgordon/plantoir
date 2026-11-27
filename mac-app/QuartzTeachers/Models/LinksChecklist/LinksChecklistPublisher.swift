@@ -300,13 +300,6 @@ enum LinksChecklistPublisher {
         var comingWithPages: [(place: String, path: String)] = []
         var rowMoves: [String: AssistPublishDateMove] = [:]
         var classFiles: [URL] = []
-        // The files the section's numbered classes own, through their links
-        // (#1048b review 1, HIGH 1): a shared lesson Day 2 is a link to keeps
-        // Day 2's date, so no row writes another class's date into it,
-        // whatever date the offer carries (the build offers it with none,
-        // `datedByTheBuild`; an offer from an earlier build may carry one).
-        // The same guard publishing a class and Re-date use.
-        let filesTheNumberedClassesOwn: [ResolvedFile] = ClassPages.filesTheNumberedClassesOwn(among: classPages)
         for row in offer.rows {
             let key: String = row.place.precomposedStringWithCanonicalMapping
             guard let page = pages[key] else {
@@ -343,10 +336,6 @@ enum LinksChecklistPublisher {
                 continue
             }
             rowPages.append(page)
-            if ClassPages.isOneOf(filesTheNumberedClassesOwn, pageAt: page.fileURL) {
-                // Published, never dated: its date is the class's that owns it.
-                continue
-            }
             switch row.why {
             case .dated:
                 outcome.datedFromAClass += 1
