@@ -103,6 +103,21 @@ internal static class UndoTrail
 
     private static string Files(int count) => count == 1 ? "1 file" : $"{count} files";
 
+    /// <summary>
+    /// <c>the undo list set aside a change that stopped part way (3 files),
+    /// because a restore replaced its files; it is not judged again</c>, or,
+    /// for a step with other files, <c>the undo list set aside 2 files of a
+    /// change that stopped part way, because a restore replaced them; 1 other
+    /// file of it will be settled as before</c> (the mac's
+    /// <c>setAsideByARestoreLine</c>; "undo set aside a change a restore
+    /// replaced"). Counts only, never page text.
+    /// </summary>
+    internal static string SetAsideByARestoreWords(UndoPhase phase, int files, int stillJudged) =>
+        stillJudged > 0
+            ? $"the undo list set aside {Files(files)} of {What(phase)} that stopped part way, because a restore replaced them; "
+              + (stillJudged == 1 ? "1 other file" : $"{stillJudged} other files") + " of it will be settled as before"
+            : $"the undo list set aside {What(phase)} that stopped part way ({Files(files)}), because a restore replaced its files; it is not judged again";
+
     /// <summary>"a change", "an undo" or "a redo": the work that stopped.</summary>
     private static string What(UndoPhase phase) => phase switch
     {
@@ -325,6 +340,7 @@ internal static class UndoTrail
             ActivityTrail.Event.UndoKeptWhatAPageHeld => ActivityTrail.Event.UndoKeptWhatAPageHeld,
             ActivityTrail.Event.UndoKeptWhatItReplaced => ActivityTrail.Event.UndoKeptWhatItReplaced,
             ActivityTrail.Event.UndoRefusedForAChangeLeftPartWay => ActivityTrail.Event.UndoRefusedForAChangeLeftPartWay,
+            ActivityTrail.Event.UndoSetAsideByARestore => ActivityTrail.Event.UndoSetAsideByARestore,
             _ => throw new ArgumentException("An event Undo does not write: " + line.Event, nameof(line)),
         };
         if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(written, line.Words);
@@ -1417,7 +1433,12 @@ internal static class UndoRecovery
     private static SettleAnswer Settle(UndoFoldedStep record, string root, UndoJournalWriter writer, UndoJournal journal,
                                        UndoMode mode, Action<UndoTrailLine>? trail, UndoSeams? seams, IUndoExternalPlaces places)
     {
-        UndoStep step = record.Step;
+        // Files a restore replaced while the step was in flight are never
+        // judged, written or re-derived (#899, the director's ruling on M2):
+        // only the step's other ops are, and a step so settled is closed off
+        // the list (UndoRestoreSetAside.ClosingWithFilesSetAside).
+        IReadOnlyList<string> setAside = record.SetAsidePaths;
+        UndoStep step = UndoRestoreSetAside.StepWithout(setAside, record.Step);
         (UndoPhase phase, string work) = record.State switch
         {
             UndoStepState.Begun => (UndoPhase.Begin, "apply"),
@@ -1664,7 +1685,8 @@ internal static class UndoRecovery
             }
         }
         if (seams?.Stops("recoveryBeforeWriting") == true) return SettleAnswer.Halted;
-        if (outcome == UndoRecoveryOutcome.Completed && phase == UndoPhase.Begin)
+        if (setAside.Count > 0) events = UndoRestoreSetAside.ClosingWithFilesSetAside(events, phaseWord, setAside);
+        if (outcome == UndoRecoveryOutcome.Completed && phase == UndoPhase.Begin && setAside.Count == 0)
         {
             try { writer.DropTheRedoBranch(below: step.Seq); }
             catch (UndoJournalException) { return SettleAnswer.Nothing; }
@@ -1711,7 +1733,7 @@ internal static class UndoRecovery
         return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, outcome, step, root, putBack, CountShown(inTheWay)), false, false);
     }
 
-    private static JsonObject Interrupted(long seq, string phase, string reason, IReadOnlyList<string> paths)
+    internal static JsonObject Interrupted(long seq, string phase, string reason, IReadOnlyList<string> paths)
     {
         var named = new JsonArray();
         foreach (string path in paths) named.Add(path);

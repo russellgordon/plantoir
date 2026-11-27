@@ -8,6 +8,13 @@ internal enum UndoEvent
 {
     Begin, Applied, RolledBack, Interrupted, Undoing, Undone, Redoing, Redone,
     Failed, Dropped, Pruned, Cleared, Note,
+
+    /// <summary>
+    /// Some of a step's files were replaced by a restore while it was in
+    /// flight (#899, <c>events.filesReplacedByARestore</c>): no move, its
+    /// <c>paths</c> join the step's files set aside.
+    /// </summary>
+    FilesReplacedByARestore,
 }
 
 /// <summary>What a <c>failed</c>, <c>rolledBack</c> or <c>interrupted</c> line ended.</summary>
@@ -541,6 +548,9 @@ internal sealed record UndoLine
     internal UndoProcess? Process { get; init; }
     internal string? Reason { get; init; }
 
+    /// <summary>A <c>filesReplacedByARestore</c> line's <c>paths</c>: the files a restore replaced (empty on every other line).</summary>
+    internal IReadOnlyList<string> Paths { get; init; } = [];
+
     /// <summary>For an unreadable line: the blob names its text holds.</summary>
     internal IReadOnlyList<string> BlobNamesInText { get; init; } = [];
 
@@ -596,6 +606,7 @@ internal static class UndoFormat
         ["pruned"] = UndoEvent.Pruned,
         ["cleared"] = UndoEvent.Cleared,
         ["note"] = UndoEvent.Note,
+        ["filesReplacedByARestore"] = UndoEvent.FilesReplacedByARestore,
     };
 
     private static readonly IReadOnlyDictionary<string, UndoPhase> Phases = new Dictionary<string, UndoPhase>(StringComparer.Ordinal)
@@ -685,6 +696,22 @@ internal static class UndoFormat
                 ? reasonElement.GetString()
                 : null;
 
+            // The files a restore replaced: a list of paths, or the line is
+            // one this version cannot read, a barrier, never passed over as
+            // if it named none (the next recovery would judge them).
+            var paths = new List<string>();
+            if (kind == UndoEvent.FilesReplacedByARestore)
+            {
+                if (!root.TryGetProperty("paths", out JsonElement pathsElement) || pathsElement.ValueKind != JsonValueKind.Array)
+                    return Unreadable(seq, names(), segment, place);
+                foreach (JsonElement pathElement in pathsElement.EnumerateArray())
+                {
+                    if (pathElement.ValueKind != JsonValueKind.String || pathElement.GetString() is not { Length: > 0 } path)
+                        return Unreadable(seq, names(), segment, place);
+                    paths.Add(path);
+                }
+            }
+
             return new UndoLine
             {
                 Readable = true,
@@ -695,6 +722,7 @@ internal static class UndoFormat
                 Step = step,
                 Process = process,
                 Reason = reason,
+                Paths = paths,
                 Segment = segment,
                 Place = place,
             };
