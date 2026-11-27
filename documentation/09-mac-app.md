@@ -23967,9 +23967,21 @@ straight at the page's new place when the hop is outside. Riding: the
 two-place relink's pre-clean settles its staged name by the one rule (kept
 visible and said, never given back onto the relink's destination); after the
 exchange an item that cannot be settled is exchanged back unread, or, if that
-is refused too, the refusal names the hidden name; the async kill tables
-gather their faults and assert once. Contract rows for Windows are not added
-here (see the notes, "Left for the next piece").
+is refused too, the step is left part way at the visible place (`notPutBack`,
+in flight for recovery, which gives the item back or keeps it under a visible
+name and says so; never a hidden name in what a teacher reads, never "nothing
+was changed"); the async kill tables gather their faults and assert once. The
+hops already planned are compared by their own `lstat` identity, so two
+spellings of one hop (letter case, a linked folder) re-point it once. What
+landed in the contract: three `undo.stackCases` rows ("mac-2, Insert Class
+with a later class linked through a link inside the working folder: …"), the
+replay call `makeRoomWithALaterClassLinkedThroughALinkInside` and the key
+`hopLink` (in `stackCasesHow` and the Python model), the trail event "undo
+kept an item found where a link was being changed", and the left-part-way
+line's new `couldNotWrite` clause; all held on Windows by exact name. Still
+left: contract rows for the three re-date-only shapes (a numbered course's
+plan in the replay and the Python model), written for Windows in the piece's
+notes.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

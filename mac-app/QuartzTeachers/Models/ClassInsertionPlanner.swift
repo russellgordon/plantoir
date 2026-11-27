@@ -367,7 +367,7 @@ enum ClassInsertionPlanner {
         var renamed: [String: String] = [:]
         // The in-between links inside the working folder already re-pointed
         // where they stand (mac-2): each once, however many classes reach it.
-        var hopsRePointed: [String] = []
+        var hopsRePointed: [ResolvedFile] = []
         for rename in plan.renames {
             // A later class that is a link leading to nothing is still a
             // class: its link is renamed as any other (Russell, 2026-11-26:
@@ -852,16 +852,21 @@ enum ClassInsertionPlanner {
     /// `hop` (inside the working folder, not a class page) where it stands,
     /// its own text with only the last path part replaced by `newPlace`'s
     /// file name, planned once however many classes reach it (`done` holds
-    /// the hops already planned). False when its text cannot be read now or
-    /// the step will not take the relink.
-    static func rePointWhereItStands(_ hopAsReached: URL, at newPlace: URL, in step: JournaledStep, done: inout [String]) -> Bool {
+    /// the hops already planned, each by its own `lstat` identity, as
+    /// `reachOfALinkedClass` judges every hop: two spellings of one link,
+    /// by letter case or through a linked folder, are one hop; review 1 of
+    /// mac-2, LOW 2). False when its text cannot be read now or the step
+    /// will not take the relink.
+    static func rePointWhereItStands(_ hopAsReached: URL, at newPlace: URL, in step: JournaledStep, done: inout [ResolvedFile]) -> Bool {
         // Only the folders above are tidied (`..` taken out there): the
         // link itself is never followed, as tidying a whole path holding
         // `..` would follow it to the page it leads to.
         let hop: URL = hopAsReached.deletingLastPathComponent().standardizedFileURL
             .appendingPathComponent(hopAsReached.lastPathComponent)
-        let hopPath: String = hop.path
-        if done.contains(hopPath) {
+        guard let hopIdentity = ResolvedFile.ofThePlace(at: hop) else {
+            return false
+        }
+        if done.contains(hopIdentity) {
             return true
         }
         guard let textAfter = textAfterTheMove(of: hop, reach: .aRenamedPageByItsOwnText(newName: newPlace.lastPathComponent)) else {
@@ -870,7 +875,7 @@ enum ClassInsertionPlanner {
         if !step.relinkLink(hop, to: hop, textAfter: textAfter) {
             return false
         }
-        done.append(hopPath)
+        done.append(hopIdentity)
         return true
     }
 

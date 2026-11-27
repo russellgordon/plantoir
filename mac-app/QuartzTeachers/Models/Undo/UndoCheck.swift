@@ -976,9 +976,10 @@ nonisolated enum UndoRelinkOutcome: Equatable, Sendable {
     case cannotReadNow
     /// mac-2 (review 4 of mac-1, LOW): after the exchange, the teacher's
     /// item under the staged name could be neither settled nor exchanged
-    /// back: it is still there, and the refusal names that hidden name, so
-    /// it is said (`cannotTellNow` when it could not be read, else
-    /// `couldNotWrite`).
+    /// back: it is still there, the step's new link at the place. The swap
+    /// is left part way at the visible place (`notPutBack`, `cannotTellNow`
+    /// when it could not be read, else `couldNotWrite`), for recovery to
+    /// settle (review 1 of mac-2, LOW 1).
     case leftUnderTheStagedName(couldNotRead: Bool)
 }
 
@@ -1529,15 +1530,20 @@ nonisolated enum UndoSwap {
                         refusal = .cannotTellNow(path: namedAs)
                     }
                     if case .leftUnderTheStagedName(let couldNotRead) = relinked {
-                        // mac-2 (review 4 of mac-1, LOW): the step's new
-                        // link stands at the place and the teacher's item,
-                        // which neither settled nor went back, is under the
-                        // staged name: the refusal names that name, so the
-                        // item is said, never left hidden and unsaid.
-                        let folderPart: String = (namedAs as NSString).deletingLastPathComponent
-                        let hiddenName: String = UndoSwap.besideURL(for: target.url, label: label, role: "new").lastPathComponent
-                        let hidden: String = folderPart.isEmpty ? hiddenName : folderPart + "/" + hiddenName
-                        refusal = couldNotRead ? .cannotTellNow(path: hidden) : .couldNotWrite(path: hidden)
+                        // mac-2 (review 4 of mac-1, LOW; review 1 of mac-2,
+                        // LOW 1): the step's new link stands at the place
+                        // and the teacher's item, which neither settled nor
+                        // went back, is under the staged name. Something
+                        // changed, so this is a step left part way, never
+                        // "nothing was changed": the swaps before it are
+                        // put back, the step is left in flight, and
+                        // recovery settles the item by the one rule (given
+                        // back, or kept under a visible name and said). The
+                        // refusal names the VISIBLE place, never the hidden
+                        // staged name.
+                        let partWay: UndoRefusal = couldNotRead ? .cannotTellNow(path: namedAs) : .couldNotWrite(path: namedAs)
+                        _ = reverse()
+                        return .notPutBack(partWay, keptOriginals: originalsLeft())
                     }
                 } else {
                     makeTheFolder(for: target.url)
