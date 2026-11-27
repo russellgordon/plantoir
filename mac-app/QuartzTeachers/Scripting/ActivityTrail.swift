@@ -1316,6 +1316,13 @@ nonisolated enum ActivityTrail {
         /// else holds that place (#899, U4b3 kept-original-named). Both
         /// named. Written just before the rename. Never page text.
         case undoKeptAPageUnderAVisibleName = "undo kept a page under a visible name"
+        /// A restore that replaces a course closed a change, an undo or a
+        /// redo left part way in it, before it moved anything (#899, ahead
+        /// of U5), so recovery never judges the restored files against a
+        /// step that stopped before the restore; or the list could not be
+        /// reached to do so. The course and section, which work had
+        /// stopped, and how many files it names. Never page text.
+        case undoSetAsideByARestore = "undo set aside a change a restore replaced"
         /// Recovery could not put back a step left part way (#899, U3c):
         /// content it needs is gone from the list and no kept original beside
         /// its page matches what the journal recorded. The course and

@@ -1340,6 +1340,13 @@ nonisolated enum UndoTrailHook {
     /// place and the visible name, both inside the working folder.
     nonisolated(unsafe) static var keptAPageLine: ((_ course: String, _ section: Int?, _ place: String, _ keptAs: String) -> Void)?
 
+    /// #899, ahead of U5: a restore replacing a course closed a step left
+    /// in flight there (`UndoRestoreSetAside`), so recovery never judges the
+    /// restored files against it. The course and section, which work had
+    /// stopped, how many files the step names, and whether the list could
+    /// be reached at all (`closed` false: nothing was closed).
+    nonisolated(unsafe) static var setAsideByARestoreLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ files: Int, _ closed: Bool) -> Void)?
+
     // MARK: - Functions
 
     static func couldNotRecord(draft: UndoStepDraft, change: UndoUnrecordedChange, problem: Error) {

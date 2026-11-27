@@ -301,13 +301,27 @@ enum CourseRestorer {
                 of: item.courseCode, inMadeGroup: nil, coursesDirectoryURL: coursesDirectoryURL
             )
         }
+        // Every Undo step left in flight in the course is set aside inside
+        // the list's lock, after the caller's last refusal and immediately
+        // before anything moves (#899, ahead of U5), so recovery never
+        // judges the restored files against a step that stopped before the
+        // restore (`UndoRestoreSetAside`).
+        let workingFolderRoot: URL = coursesDirectoryURL.deletingLastPathComponent()
+        let courseCode: String = item.courseCode
+        let settingAsideFirst: (URL) throws -> Void = { (staging: URL) throws in
+            try beforeTheSwap(staging)
+            UndoRestoreSetAside.setAsideStepsInFlight(
+                inside: "courses/" + courseCode, workingFolderRoot: workingFolderRoot,
+                course: courseCode, journal: UndoJournalLocation.standardJournal()
+            )
+        }
         return try WholeCourseRestore.restore(
             fromZipAt: item.fileURL,
             courseCode: item.courseCode,
             coursesDirectoryURL: coursesDirectoryURL,
             archiveURL: archiveURL,
             archiveBegan: archiveBegan,
-            beforeTheSwap: beforeTheSwap,
+            beforeTheSwap: settingAsideFirst,
             hooks: hooks
         )
     }
