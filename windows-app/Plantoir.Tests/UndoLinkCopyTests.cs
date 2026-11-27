@@ -215,6 +215,34 @@ public sealed class UndoLinkCopyTests : IDisposable
     }
 
     /// <summary>
+    /// Window E review 1, LOW 2: a probe link a killed process left under the
+    /// probe's own fixed name is removed by the next probe, as the link
+    /// itself; anything there that is not a link is left as it is, and the
+    /// probe still answers.
+    /// </summary>
+    [SymbolicLinkTheory]
+    [InlineData("a link")]
+    [InlineData("a file")]
+    public void TheNextProbeRemovesALeftoverProbeLinkAndNothingElse(string leftover)
+    {
+        Directory.CreateDirectory(ListFolder);
+        string fixedName = Path.Combine(ListFolder, ".can-make-a-link");
+        if (leftover == "a link") File.CreateSymbolicLink(fixedName, ".can-make-a-link-target");
+        else File.WriteAllText(fixedName, "Someone's.\n");
+
+        Assert.True(UndoLinks.CanMakeALinkIn(ListFolder));
+
+        var left = new List<string>();
+        foreach (string entry in Directory.EnumerateFileSystemEntries(ListFolder)) left.Add(Path.GetFileName(entry));
+        if (leftover == "a link") Assert.Empty(left);
+        else
+        {
+            Assert.Equal([".can-make-a-link"], left);
+            Assert.Equal("Someone's.\n", File.ReadAllText(fixedName));
+        }
+    }
+
+    /// <summary>
     /// Not a symbolic-link fact: on a PC that can make a link (Developer Mode
     /// on) the answer is true, on one that cannot (the VMs) false, and either
     /// way the probe leaves nothing in the list's folder.

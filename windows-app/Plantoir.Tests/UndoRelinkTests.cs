@@ -627,6 +627,81 @@ public sealed class UndoRelinkTests : IDisposable
         Assert.Empty(StagedLeft());
     }
 
+    /// <summary>
+    /// Window E review 1, MEDIUM (piece 22's Insert Class shape): Day 4's link
+    /// relinked into Day 5 while Day 5's PAGE moves to Day 6. A plain page
+    /// move stages nothing, so the relink's own staged name beside Day 5 is
+    /// judged by the one rule, never by its kind nor by which other ops name
+    /// Day 5: a teacher's page or folder there is given back to Day 5 when it
+    /// is free, else kept under a visible name beside it and said; never
+    /// deleted.
+    /// </summary>
+    [SymbolicLinkTheory]
+    [InlineData("a page", "free")]
+    [InlineData("a page", "taken")]
+    [InlineData("a folder", "free")]
+    [InlineData("a folder", "taken")]
+    public void AnythingUnderARelinksOwnStagedNameBesideAPlaceAPageMoveLeavesIsTheTeachers(string item, string place)
+    {
+        LaidRelink laid = LayARelink("inside");
+        UndoOp pageMove = new UndoOp { Kind = UndoOp.Move, Readable = true, From = Day(5), To = Day(6), Sha = Store("Five.\n") };
+        string staged = UndoSwap.BesidePath(Full(Day(5)), "1-apply", "new");
+        if (item == "a page") File.WriteAllText(staged, "Someone's.\n");
+        else
+        {
+            Directory.CreateDirectory(staged);
+            File.WriteAllText(Path.Combine(staged, "inside.md"), "Someone's.\n");
+        }
+        if (place == "taken") WritePage(Day(5), "Five.\n");
+        var said = new List<string>();
+
+        UndoSwap.TidyLeftovers(StepOf(pageMove, laid.Op), _root, onKeptVisibly: (at, kept) => said.Add(Path.GetFileName(kept)));
+
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
+        string keptName = item == "a page" ? "Unit 1, Day 5 (kept by Undo).md" : "Unit 1, Day 5.md (kept by Undo)";
+        string holder = place == "free" ? Full(Day(5)) : Full(Section + "/" + keptName);
+        string held = item == "a page" ? File.ReadAllText(holder) : File.ReadAllText(Path.Combine(holder, "inside.md"));
+        Assert.Equal("Someone's.\n", held);
+        if (place == "taken")
+        {
+            Assert.Equal("Five.\n", File.ReadAllText(Full(Day(5))));
+            Assert.Equal([keptName], said);
+        }
+        else Assert.Empty(said);
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>
+    /// Window E review 1, LOW 3: a relink of a link to a FOLDER makes a folder
+    /// link, and its Undo and Redo make it back the same kind (the kind is
+    /// the link being replaced, which stands at every make).
+    /// </summary>
+    [SymbolicLinkFact]
+    public void AFolderLinkIsRelinkedUndoneAndRedoneAsAFolderLink()
+    {
+        Directory.CreateDirectory(Full(Section + "/media 3"));
+        Directory.CreateDirectory(Full(Section + "/media 4"));
+        Directory.CreateSymbolicLink(Full(Day(4)), "media 3");
+        UndoOp op = UndoOp.RelinkLink(Day(4), Day(5), Store("media 3"), Store("media 4"));
+        bool IsAFolderLink(string relative) =>
+            UndoLinks.Look(Full(relative)) == UndoLinks.What.Link && File.GetAttributes(Full(relative)).HasFlag(FileAttributes.Directory);
+
+        UndoSwapResult made = UndoSwap.Swap(ReadyTargets(Plan([op], backward: false)), "1-apply", _root);
+        Assert.True(made is UndoSwapResult.Swapped, Described(made));
+        Assert.Equal("media 4", LinkText(Day(5)));
+        Assert.True(IsAFolderLink(Day(5)));
+
+        UndoSwapResult undone = UndoSwap.Swap(ReadyTargets(Plan([op], backward: true)), "1-undo", _root);
+        Assert.True(undone is UndoSwapResult.Swapped, Described(undone));
+        Assert.Equal("media 3", LinkText(Day(4)));
+        Assert.True(IsAFolderLink(Day(4)));
+
+        UndoSwapResult redone = UndoSwap.Swap(ReadyTargets(Plan([op], backward: false)), "1-redo", _root);
+        Assert.True(redone is UndoSwapResult.Swapped, Described(redone));
+        Assert.True(IsAFolderLink(Day(5)));
+        Assert.Empty(StagedLeft());
+    }
+
     /// <summary>A relink's pre-clean never removes what is not its own: something of the teacher's under the staged name stays, and the make fails over it (could not write), the old link whole.</summary>
     [SymbolicLinkFact]
     public void ARelinksPreCleanNeverRemovesWhatIsNotItsOwn()

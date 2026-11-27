@@ -53,7 +53,11 @@ internal static class W8bRelinkRuns
         {
             if (layingFiles) File.CreateSymbolicLink(Full(run, Day(day)), T(holding));
         }
-        return Steps(run, shape, leadingOut, T, Link);
+        void Page(int day, string text)
+        {
+            if (layingFiles) File.WriteAllBytes(Full(run, Day(day)), Bytes(text));
+        }
+        return Steps(run, shape, leadingOut, T, Link, Page);
     }
 
     private static void LayThePages(string run, bool leadingOut)
@@ -70,7 +74,7 @@ internal static class W8bRelinkRuns
         }
     }
 
-    private static Laid Steps(string run, string shape, bool leadingOut, Func<int, string> T, Action<int, int> Link)
+    private static Laid Steps(string run, string shape, bool leadingOut, Func<int, string> T, Action<int, int> Link, Action<int, string> Page)
     {
         var ops = new JsonArray();
         var texts = new SortedSet<int>();
@@ -143,6 +147,16 @@ internal static class W8bRelinkRuns
                 ops.Add(UndoLineOps.ForAFile(Day(4), null, Bytes("New.\n"))[0]!.DeepClone());
                 blobs.Add(Bytes("New.\n"));
                 break;
+            case "aRelinkIntoADayAPageLeaves":
+                // Window E review 1, MEDIUM (piece 22's Insert Class shape, a
+                // teacher's row only): Day 5's PAGE moved to Day 6 and Day 4's
+                // link relinked into Day 5. A plain page move stages nothing.
+                Link(4, 1);
+                Page(5, "Five.\n");
+                ops.Add(new JsonObject { ["kind"] = "move", ["from"] = Day(5), ["to"] = Day(6), ["sha"] = UndoCheck.Sha(Bytes("Five.\n")) });
+                blobs.Add(Bytes("Five.\n"));
+                Relink(4, 5, 1, 2);
+                break;
             default:
                 throw new ArgumentException("no shape " + shape);
         }
@@ -175,11 +189,11 @@ internal static class W8bRelinkRuns
     /// (<c>in</c>, <c>out</c>) choose a part, comma-separated, or <c>all</c>;
     /// <paramref name="teachers"/> also runs the teacher's-item rows.
     /// </summary>
-    internal static int RelinkChainKill(string folder, string shapes, string leads, bool teachers)
+    internal static int RelinkChainKill(string folder, string shapes, string leads, string teachers)
     {
         int failures = 0;
         var counts = new List<string>();
-        string[] chosen = shapes == "all" ? Shapes : shapes.Split(',');
+        string[] chosen = shapes == "all" ? Shapes : shapes == "none" ? [] : shapes.Split(',');
         string[] leadsChosen = leads == "all" ? ["in", "out"] : leads.Split(',');
         foreach (string lead in leadsChosen)
         {
@@ -221,7 +235,7 @@ internal static class W8bRelinkRuns
                 counts.Add($"{shape}/{lead}={shapeReached} of {shapeExpected} notWhole={shapeNotWhole}");
             }
         }
-        if (teachers) failures += TeachersItems(folder, counts);
+        if (teachers != "no") failures += TeachersItems(folder, counts, teachers);
         Console.WriteLine("RESULT w8b-relink-chain-kill counts " + string.Join(" ; ", counts));
         Console.WriteLine($"RESULT w8b-relink-chain-kill done failures={failures}");
         return failures == 0 ? 0 : 1;
@@ -289,53 +303,65 @@ internal static class W8bRelinkRuns
     /// hidden; nothing staged; the pages the links lead to untouched.
     /// twoChainedRelinks: going forward (apply, redo) beside Day 6 (only a
     /// relink names it) and Day 5 (two relinks name it); going back (undo)
-    /// beside Day 4 and Day 5.
+    /// beside Day 4 and Day 5. Window E review 1: aRelinkIntoADayAPageLeaves,
+    /// a teacher's page beside Day 5 going forward (apply), Day 5 being the
+    /// relink's to and the plain page move's from.
+    /// <paramref name="which"/> is <c>yes</c> (every row) or one shape's name.
     /// </summary>
-    private static int TeachersItems(string folder, List<string> counts)
+    private static int TeachersItems(string folder, List<string> counts, string which)
     {
         int failures = 0;
         int rows = 0;
-        const string shape = "twoChainedRelinks";
-        string wholeRun = Path.Combine(folder, "whole-teachers");
-        Laid laid = Lay(wholeRun, shape, false);
-        string before = W8bRuns.Snapshot(wholeRun);
-        List(wholeRun).Door().Perform(laid.Draft);
-        string after = W8bRuns.Snapshot(wholeRun);
+        var table = new List<(string Shape, string Work, int Day, string Kind)>();
         foreach (string work in new[] { "apply", "undo", "redo" })
         {
             int[] days = work == "undo" ? new[] { 4, 5 } : new[] { 6, 5 };
             foreach (int day in days)
             {
-                foreach (string kind in new[] { "page", "link" })
-                {
-                    rows++;
-                    string run = Path.Combine(folder, "teachers-" + work + "-" + day + "-" + kind);
-                    string hiddenName = "." + Path.GetFileName(Day(day)) + UndoSwap.StagedMarker + "1-" + work + "-new";
-                    void LayIt(string where)
-                    {
-                        string at = Path.Combine(Full(where, Section), hiddenName);
-                        if (kind == "page") File.WriteAllBytes(at, Bytes("Teacher's own.\n"));
-                        else File.CreateSymbolicLink(at, "Someone's.md");
-                    }
-                    KillOne one = KillAt(run, shape, false, work, "beforeSwap@0", before, after, LayIt);
-                    string mark = kind == "page" ? "page Teacher's own.\\n" : "link Someone's.md";
-                    var found = new List<string>();
-                    bool hidden = false;
-                    foreach (string part in one.Now.Split(" | "))
-                    {
-                        if (!part.EndsWith(": " + mark, StringComparison.Ordinal)) continue;
-                        string name = part[(part.IndexOf('/') + 1)..part.LastIndexOf(": ", StringComparison.Ordinal)];
-                        found.Add(name);
-                        string at = Path.Combine(Full(run, Section), name);
-                        if (name.StartsWith('.') || (File.GetAttributes(at) & FileAttributes.Hidden) != 0) hidden = true;
-                    }
-                    bool targetsUntouched = one.Now.Contains("section1/Unit 1, Day 1.md: page One.\\n", StringComparison.Ordinal)
-                                            && one.Now.Contains("section1/Unit 1, Day 2.md: page Two.\\n", StringComparison.Ordinal);
-                    bool kept = one.Reached && found.Count == 1 && !hidden && W8bRuns.Staged(run) == 0 && targetsUntouched;
-                    Console.WriteLine($"RESULT w8b-relink-chain-kill teachers {work} Day{day} {kind} beforeSwap@0: {(kept ? "KEPT" : "NOT-KEPT")} at=[{string.Join(",", found)}] {one.States} now=[{one.Now}]");
-                    if (!kept) failures++;
-                }
+                foreach (string kind in new[] { "page", "link" }) table.Add(("twoChainedRelinks", work, day, kind));
             }
+        }
+        table.Add(("aRelinkIntoADayAPageLeaves", "apply", 5, "page"));
+        string? laidShape = null;
+        string before = "", after = "";
+        foreach ((string shape, string work, int day, string kind) in table)
+        {
+            if (which != "yes" && which != shape) continue;
+            if (laidShape != shape)
+            {
+                string wholeRun = Path.Combine(folder, "whole-teachers-" + shape);
+                Laid laid = Lay(wholeRun, shape, false);
+                before = W8bRuns.Snapshot(wholeRun);
+                List(wholeRun).Door().Perform(laid.Draft);
+                after = W8bRuns.Snapshot(wholeRun);
+                laidShape = shape;
+            }
+            rows++;
+            string run = Path.Combine(folder, "teachers-" + shape + "-" + work + "-" + day + "-" + kind);
+            string hiddenName = "." + Path.GetFileName(Day(day)) + UndoSwap.StagedMarker + "1-" + work + "-new";
+            void LayIt(string where)
+            {
+                string at = Path.Combine(Full(where, Section), hiddenName);
+                if (kind == "page") File.WriteAllBytes(at, Bytes("Teacher's own.\n"));
+                else File.CreateSymbolicLink(at, "Someone's.md");
+            }
+            KillOne one = KillAt(run, shape, false, work, "beforeSwap@0", before, after, LayIt);
+            string mark = kind == "page" ? "page Teacher's own.\\n" : "link Someone's.md";
+            var found = new List<string>();
+            bool hidden = false;
+            foreach (string part in one.Now.Split(" | "))
+            {
+                if (!part.EndsWith(": " + mark, StringComparison.Ordinal)) continue;
+                string name = part[(part.IndexOf('/') + 1)..part.LastIndexOf(": ", StringComparison.Ordinal)];
+                found.Add(name);
+                string at = Path.Combine(Full(run, Section), name);
+                if (name.StartsWith('.') || (File.GetAttributes(at) & FileAttributes.Hidden) != 0) hidden = true;
+            }
+            bool targetsUntouched = one.Now.Contains("section1/Unit 1, Day 1.md: page One.\\n", StringComparison.Ordinal)
+                                    && one.Now.Contains("section1/Unit 1, Day 2.md: page Two.\\n", StringComparison.Ordinal);
+            bool kept = one.Reached && found.Count == 1 && !hidden && W8bRuns.Staged(run) == 0 && targetsUntouched;
+            Console.WriteLine($"RESULT w8b-relink-chain-kill teachers {shape} {work} Day{day} {kind} beforeSwap@0: {(kept ? "KEPT" : "NOT-KEPT")} at=[{string.Join(",", found)}] {one.States} now=[{one.Now}]");
+            if (!kept) failures++;
         }
         counts.Add($"teachers={rows} rows failures={failures}");
         return failures;
