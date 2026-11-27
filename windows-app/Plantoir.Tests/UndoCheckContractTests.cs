@@ -210,6 +210,37 @@ public sealed class UndoCheckContractTests : IDisposable
         return current.TryGetProperty("cannotBeRead", out JsonElement flag) && flag.GetBoolean();
     }
 
+    /// <summary>
+    /// The two relink barrier rows are notReadable for the reason their names
+    /// give, by the relink's shape check (21b2), never because the pair's keys
+    /// went unread: the pair is read, and the same row with only its fault
+    /// mended (a second text, the missing blob) is readable.
+    /// </summary>
+    [Theory]
+    [InlineData("U4b3 relink, a link's move that changes its text: the two texts the same: not readable")]
+    [InlineData("U4b3 relink, a link's move that changes its text: one text missing from blobs: not readable")]
+    public void ARelinkBarrierRowIsNotReadableForTheReasonItsNameGives(string name)
+    {
+        JsonElement checkCase = CaseNamed(name);
+        UndoOp op = OpOf(checkCase);
+        Assert.False(op.Readable);
+        Assert.NotNull(op.LinkShaBefore);
+        Assert.NotNull(op.LinkShaAfter);
+        var mended = JsonNode.Parse(checkCase.GetRawText())!.AsObject();
+        JsonObject mendedOp = mended["op"]!.AsObject();
+        if (op.LinkShaBefore == op.LinkShaAfter)
+        {
+            mendedOp["linkTargetAfter"] = "Unit 1, Day 4.md";
+        }
+        else
+        {
+            Assert.Single(op.Blobs);
+            mendedOp["blobs"] = new JsonArray(op.LinkShaBefore, op.LinkShaAfter);
+        }
+        using JsonDocument document = JsonDocument.Parse(mended.ToJsonString());
+        Assert.True(OpOf(document.RootElement).Readable, name);
+    }
+
     /// <summary>Every case held open by name is a case the contract still has (none since W6).</summary>
     [Fact]
     public void EveryHeldCheckCaseIsStillInTheContract()
