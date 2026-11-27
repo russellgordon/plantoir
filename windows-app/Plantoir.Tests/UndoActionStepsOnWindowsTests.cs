@@ -195,6 +195,7 @@ internal static class WindowsActionsOnTheMacFixture
     /// </summary>
     private static void LayTheRenameCourse(string workingFolder)
     {
+        Directory.CreateDirectory(Path.Combine(workingFolder, "courses", Course));
         File.WriteAllText(Path.Combine(workingFolder, Workspace.MarkerLauncher), "");
         foreach (string name in new[] { "renameFolder", "renameFolderPerSection" })
         {
