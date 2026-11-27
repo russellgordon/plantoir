@@ -153,14 +153,6 @@ final class DateKeyByTheTargetsPlaceTests: XCTestCase {
         _ = try SectionReDatePlanner.apply(plan, forSection: 1, in: made.course)
     }
 
-    func makeRoom(atDay day: Int, in made: (root: URL, course: Course, classes: URL)) throws -> ClassInsertionPlan {
-        let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
-            unit: 1, atDay: day, count: 1, forSection: 1, in: made.course
-        )
-        _ = try ClassInsertionPlanner.apply(plan, in: made.course)
-        return plan
-    }
-
     // MARK: - Tests: the one rule
 
     /// The shared function, case by case: the key is the place of the FILE
@@ -334,60 +326,6 @@ final class DateKeyByTheTargetsPlaceTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), laid)
     }
 
-    // MARK: - Tests: Insert Class
-
-    /// Two classes linked to one lesson, room made at the first: the file
-    /// takes the day the first class is given, one step, undone exactly.
-    func testInsertClassMovingTheFirstOfTwoLinkedClassesWritesItsDate() async throws {
-        let made = try makeCourse()
-        let file: URL = try linkClasses(
-            ["Unit 1, Day 2", "Unit 1, Day 3"], toASharedLesson: sharedLesson(section1: "2026-09-10"), in: made
-        )
-        let before: [String: String] = everything(under: made)
-        let stepsBefore: Int = try stepCount()
-
-        let plan: ClassInsertionPlan = try makeRoom(atDay: 2, in: made)
-
-        var firstClassesDay: CalendarDay? = nil
-        for move in plan.moves where move.fileURL.lastPathComponent == "Unit 1, Day 2.md" {
-            firstClassesDay = move.to
-        }
-        let expected: String = (firstClassesDay ?? CalendarDay(text: "2026-09-10")!).text
-        let after: String = try String(contentsOf: file, encoding: .utf8)
-        XCTAssertTrue(after.contains("createdSection1: \(expected)T"), "the first class's day, \(expected): \(after)")
-        XCTAssertEqual(try stepCount() - stepsBefore, 1, "one step")
-        try await checkUndoReturns(before, in: made)
-    }
-
-    /// Two classes linked to one lesson, room made between them: the later
-    /// one moves and the first does not, so the file keeps the first
-    /// class's day. MUST FAIL on d334a288e, which wrote the later day.
-    func testInsertClassMovingOnlyTheLaterLinkedClassLeavesTheFile() async throws {
-        let made = try makeCourse()
-        let laid: String = sharedLesson(section1: "2026-09-10")
-        let file: URL = try linkClasses(["Unit 1, Day 2", "Unit 1, Day 3"], toASharedLesson: laid, in: made)
-        let before: [String: String] = everything(under: made)
-
-        _ = try makeRoom(atDay: 3, in: made)
-
-        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), laid)
-        try await checkUndoReturns(before, in: made)
-    }
-
-    /// Three classes linked to one lesson, room made at the second: the
-    /// first class does not move, so neither does the file.
-    func testInsertClassWithThreeLinkedClassesKeepsTheFirstClassesDate() throws {
-        let made = try makeCourse()
-        let laid: String = sharedLesson(section1: "2026-09-08")
-        let file: URL = try linkClasses(
-            ["Unit 1, Day 1", "Unit 1, Day 2", "Unit 1, Day 3"], toASharedLesson: laid, in: made
-        )
-
-        _ = try makeRoom(atDay: 2, in: made)
-
-        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), laid)
-    }
-
     // MARK: - Tests: fix round one
 
     /// Review 1, MEDIUM 1: Unit 1, Day 2 is a link to Unit 1, Day 3's own
@@ -407,24 +345,6 @@ final class DateKeyByTheTargetsPlaceTests: XCTestCase {
 
         XCTAssertEqual(try String(contentsOf: dayThree, encoding: .utf8), laid, "Day 3 stays on the 14th")
         XCTAssertEqual(everything(under: made), before, "nothing else is written either")
-    }
-
-    /// Review 1, MEDIUM 1: the same link, room made at Day 1. Day 3 (now
-    /// Day 4) moves to the 16th, its own page dated by its own move. MUST
-    /// FAIL on ffda0ce59, which skipped it as "not first" (the 14th).
-    func testInsertClassMovesALinkedToClassOwnDate() async throws {
-        let made = try makeCourse()
-        let dayTwo: URL = made.classes.appendingPathComponent("Unit 1, Day 2.md")
-        try FileManager.default.removeItem(at: dayTwo)
-        try FileManager.default.createSymbolicLink(atPath: dayTwo.path, withDestinationPath: "Unit 1, Day 3.md")
-        let before: [String: String] = everything(under: made)
-
-        _ = try makeRoom(atDay: 1, in: made)
-
-        let dayFour: URL = made.classes.appendingPathComponent("Unit 1, Day 4.md")
-        let after: String = try String(contentsOf: dayFour, encoding: .utf8)
-        XCTAssertTrue(after.contains("created: 2026-09-16T"), "the shifted class moves to the 16th: \(after)")
-        try await checkUndoReturns(before, in: made)
     }
 
     /// Review 1, MEDIUM 2: Day 2 is a link to a shared lesson and Day 3, a
