@@ -712,20 +712,25 @@ public class SpecialFolderRenamerTests : IDisposable
     }
 
     /// <summary>
-    /// Section 2's old place is taken while the step swaps (a folder made
-    /// there), so its move back fails and it stays at the new name; section
-    /// 1 goes back. Only section 2 is named, on the sheet and the trail.
+    /// Section 2's old place is taken just as its move is put back (a file
+    /// made there), so the move back fails and it stays at the new name;
+    /// section 1 goes back. Only section 2 is named, on the sheet and the
+    /// trail.
     /// </summary>
     [Fact]
     public void AFolderLeftAtTheNewNameIsNamedAndTheRenameSaysOnlyInPart()
     {
         TheRecordCourse();
         File.SetAttributes(InCourse("section1/index.md"), FileAttributes.ReadOnly);
+        string sectionTwosOldPlace = Path.GetFullPath(InCourse("section2/Tasks"));
+        string sectionTwosNewPlace = Path.GetFullPath(InCourse("section2/Assessments"));
         var seams = new UndoSeams
         {
-            BeforeEachSwap = (_, path) =>
+            EachRename = (from, onto) =>
             {
-                if (path.EndsWith("index.md", StringComparison.OrdinalIgnoreCase)) Directory.CreateDirectory(InCourse("section2/Tasks"));
+                bool puttingSectionTwoBack = string.Equals(Path.GetFullPath(from), sectionTwosNewPlace, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(Path.GetFullPath(onto), sectionTwosOldPlace, StringComparison.OrdinalIgnoreCase);
+                if (puttingSectionTwoBack) File.WriteAllText(sectionTwosOldPlace, "made meanwhile");
             },
         };
 
