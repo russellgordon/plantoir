@@ -57,6 +57,31 @@ internal sealed class UndoStepLeftPartWayException(UndoRefusal refusal, IReadOnl
 }
 
 /// <summary>
+/// A one-file settings step stopped part way and judged at once, closed
+/// WITHOUT the change because its file holds neither value (#899 W8c-1a; the
+/// mac's <c>JournaledStepError.notMade</c>): recovery's rule for a file
+/// changed by hand closed it and cleared the list. Nothing is written over
+/// what the file holds, nothing is offered, and a caller never tries it
+/// again (it is not a <see cref="UndoStepRefusedException"/>). Its message
+/// names no file.
+/// </summary>
+internal sealed class UndoStepNotMadeException() : IOException("the change was not made");
+
+/// <summary>
+/// A one-file settings step stopped part way that the door could not judge
+/// now (#899 W8c-1a; the mac's <c>JournaledStepError.couldNotFinish</c>): its
+/// file could not be read, or the list's lock was not had. Left in flight;
+/// <see cref="Seq"/> is the step Put It Back takes
+/// (<see cref="UndoDoor.PutBackAtOnce"/>). Never the part-way exception. Its
+/// message names no file.
+/// </summary>
+internal sealed class UndoStepCouldNotFinishException(long seq, UndoRefusal? refusal) : IOException("the change could not be finished")
+{
+    internal long Seq { get; } = seq;
+    internal UndoRefusal? Refusal { get; } = refusal;
+}
+
+/// <summary>
 /// A step stopped at a kill point of a test or the harness
 /// (<see cref="UndoOutcomeKind.StoppedByATest"/>; the mac's
 /// <c>JournaledStepError.stoppedByATest</c>): as a process that died there,
@@ -807,6 +832,10 @@ internal sealed class UndoActionStep
             case UndoOutcomeKind.ChangedNothing:
                 RederiveTheFrontPages();
                 return;
+            case UndoOutcomeKind.NotMade:
+                throw new UndoStepNotMadeException();
+            case UndoOutcomeKind.CouldNotFinish:
+                throw new UndoStepCouldNotFinishException(outcome.Seq!.Value, outcome.Refusal);
             case UndoOutcomeKind.Refused when outcome.LeftPartWay:
                 throw LeftPartWay(outcome.Refusal!, keptBefore);
             case UndoOutcomeKind.Refused:

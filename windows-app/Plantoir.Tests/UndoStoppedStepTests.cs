@@ -305,7 +305,12 @@ public sealed class UndoStoppedStepTests : IDisposable
         Assert.Equal(0, InFlightCount(list));
         Assert.Equal(UndoStepState.RolledBack, StateOf(list, 2));
         Assert.Contains(lines, line => line.Event == ActivityTrail.Event.UndoRolledBack);
-        Assert.False(AnythingStagedBeside(), "a staged copy stayed beside the file");
+        // Only the kept original of what the other program wrote stays (an only copy); nothing staged by the step.
+        foreach (string path in Directory.GetFiles(CourseFolder))
+        {
+            string name = Path.GetFileName(path);
+            if (name.Contains(UndoSwap.StagedMarker, StringComparison.Ordinal)) Assert.EndsWith("-orig", name, StringComparison.Ordinal);
+        }
         Assert.Null(ReferenceCourseUpkeep.WriteSchoolYear(TheCourse(), 2025, Today, list, Door(list)));
         Assert.Equal(2025, YearOnDisk());
     }

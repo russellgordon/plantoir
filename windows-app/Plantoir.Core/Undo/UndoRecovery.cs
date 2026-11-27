@@ -1304,6 +1304,28 @@ internal static class UndoRecovery
         return current;
     }
 
+    /// <summary>
+    /// Recovery's own settle of ONE step, at once, in the caller's hold (#899
+    /// W8c-1a: the door's judgement of a one-file settings step stopped part
+    /// way, the mac's <c>UndoStoppedStep.judgeAtOnce</c> calling
+    /// <c>UndoRecovery.settle</c>): the same rules, never a second copy of
+    /// them. The result, with what this process remembered of the step
+    /// forgotten as <see cref="Run"/> forgets it; null when it is left in
+    /// flight (a file that cannot be read now or is in use, a put-back that
+    /// cannot go in now, a closing not written, a test's stop).
+    /// </summary>
+    internal static UndoRecoveryResult? SettleAtOnce(UndoFoldedStep record, string root, UndoJournalWriter writer, UndoJournal journal,
+                                                     UndoMode mode, Action<UndoTrailLine>? trail, UndoSeams? seams, IUndoExternalPlaces places)
+    {
+        string key = KeyOf(record, journal);
+        string abandoned = AbandonedKeyOf(journal, record.Seq, record.State, record.Process?.Pid ?? 0);
+        SettleAnswer answer = Settle(record, root, writer, journal, mode, trail, seams, places);
+        if (answer.Result is not { } result) return null;
+        journal.Memory.ForgetTheRefusedSwap(key);
+        journal.Memory.ForgetAbandoned(abandoned);
+        return result;
+    }
+
     private static SettleAnswer Settle(UndoFoldedStep record, string root, UndoJournalWriter writer, UndoJournal journal,
                                        UndoMode mode, Action<UndoTrailLine>? trail, UndoSeams? seams, IUndoExternalPlaces places)
     {
@@ -1600,7 +1622,7 @@ internal static class UndoRecovery
     }
 
     /// <summary>Appends recovery's lines (a clearing's seq the highest in the journal as it is written) and makes them durable.</summary>
-    private static bool Write(IEnumerable<JsonObject> events, UndoStep step, UndoJournalWriter writer)
+    internal static bool Write(IEnumerable<JsonObject> events, UndoStep step, UndoJournalWriter writer)
     {
         try
         {
