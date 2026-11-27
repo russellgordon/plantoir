@@ -282,4 +282,122 @@ public sealed class UndoActionStepFolderMoveTests : IDisposable
         Assert.Equal(UndoRefusalKind.ChangedSince, refused.Refusal.Kind);
         Assert.Equal(handEdited, Tree());
     }
+
+    // ---- A link moved as itself (#899 W8b-21) ------------------------------------
+
+    /// <summary>The library a link leads to, outside the working folder: a.md and pictures/b.md.</summary>
+    private string ALibraryOutside()
+    {
+        string library = Path.Combine(_root, "library");
+        Directory.CreateDirectory(Path.Combine(library, "pictures"));
+        File.WriteAllText(Path.Combine(library, "a.md"), "A\n");
+        File.WriteAllText(Path.Combine(library, "pictures", "b.md"), "B\n");
+        return library;
+    }
+
+    /// <summary>
+    /// <see cref="UndoActionStep.MoveLink"/> plans ONE <c>move {from, to, linkSha}</c>
+    /// (the mac's <c>JournaledStep.moveLink</c>, U4b2-15), the target read as
+    /// stored when planned, never followed: no <c>listingSha</c>, no blob, and
+    /// what it leads to keeps its listing and the identity of every file. Undo
+    /// and Redo move the link again as itself.
+    /// </summary>
+    [Fact]
+    public void ALinkToAFolderIsOneMoveByItsLinkShaUndoneAndRedoneAndWhatItLeadsToIsUntouched()
+    {
+        ACourse();
+        string library = ALibraryOutside();
+        UndoKindsForTheCases.MakeAJunction(Full(Notes), library);
+        string target = new DirectoryInfo(Full(Notes)).LinkTarget!;
+        string untouched = UndoLinkMoveTests.Untouched(library);
+        UndoForThisProcess list = List();
+        UndoActionStep step = Step(list);
+
+        step.MoveLink(Full(Notes), Full(Zeta));
+        step.Make();
+
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(Notes)));
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(Full(Zeta)));
+        Assert.Equal(target, new DirectoryInfo(Full(Zeta)).LinkTarget);
+        JsonObject made = Assert.Single(Begins())["step"]!.AsObject();
+        JsonObject move = Assert.Single(made["ops"]!.AsArray())!.AsObject();
+        Assert.Equal("move", (string?)move["kind"]);
+        Assert.Equal(Notes, (string?)move["from"]);
+        Assert.Equal(Zeta, (string?)move["to"]);
+        Assert.Equal(UndoLinkMoveTests.ShaOfTarget(target), (string?)move["linkSha"]);
+        Assert.Null(move["listingSha"]);
+        Assert.Null(move["blobs"]);
+        Assert.Empty(_trail);
+        Assert.Equal(untouched, UndoLinkMoveTests.Untouched(library));
+
+        Assert.Equal(UndoOutcomeKind.Undone, list.Door().Undo().Kind);
+        Assert.Equal(target, new DirectoryInfo(Full(Notes)).LinkTarget);
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(Zeta)));
+        Assert.Equal(UndoOutcomeKind.Redone, list.Door().Redo().Kind);
+        Assert.Equal(target, new DirectoryInfo(Full(Zeta)).LinkTarget);
+        Assert.Equal(untouched, UndoLinkMoveTests.Untouched(library));
+    }
+
+    /// <summary>The same function moves a link to a FILE as itself (W8b-22 and 21a6 use it): its target as written, the file it leads to untouched.</summary>
+    [SymbolicLinkFact]
+    public void ALinkToAFileIsMovedAsItselfTheFileItLeadsToUntouched()
+    {
+        ACourse();
+        string page = "courses/TST1O/page.md";
+        string moved = "courses/TST1O/moved.md";
+        File.CreateSymbolicLink(Full(page), "media\\a.md");
+        byte[] leadsTo = File.ReadAllBytes(Full(Media + "/a.md"));
+        var identity = UndoFileIdentity.OfPlace(Full(Media + "/a.md"));
+        UndoForThisProcess list = List();
+        UndoActionStep step = Step(list);
+
+        step.MoveLink(Full(page), Full(moved));
+        step.Make();
+
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(page)));
+        Assert.Equal("media\\a.md", new FileInfo(Full(moved)).LinkTarget);
+        JsonObject move = Assert.Single(Assert.Single(Begins())["step"]!["ops"]!.AsArray())!.AsObject();
+        Assert.Equal(UndoLinkMoveTests.ShaOfTarget("media\\a.md"), (string?)move["linkSha"]);
+        Assert.Equal(leadsTo, File.ReadAllBytes(Full(Media + "/a.md")));
+        Assert.Equal(identity, UndoFileIdentity.OfPlace(Full(Media + "/a.md")));
+        Assert.Equal(UndoOutcomeKind.Undone, list.Door().Undo().Kind);
+        Assert.Equal("media\\a.md", new FileInfo(Full(page)).LinkTarget);
+    }
+
+    /// <summary>Unrecorded (no working folder), the link is moved by the swap's own rename, as itself, never followed.</summary>
+    [Fact]
+    public void UnrecordedALinkIsMovedAsItselfAndWhatItLeadsToIsUntouched()
+    {
+        ACourse();
+        string library = ALibraryOutside();
+        UndoKindsForTheCases.MakeAJunction(Full(Notes), library);
+        string target = new DirectoryInfo(Full(Notes)).LinkTarget!;
+        string untouched = UndoLinkMoveTests.Untouched(library);
+
+        var plain = new UndoActionStep(new UndoStepMaker("sheet", "renameFolder"), null, "TST1O", null, holds: "course", undo: List());
+        plain.MoveLink(Full(Notes), Full(Zeta));
+        plain.Make();
+
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(Notes)));
+        Assert.Equal(target, new DirectoryInfo(Full(Zeta)).LinkTarget);
+        Assert.Equal(untouched, UndoLinkMoveTests.Untouched(library));
+        Assert.Empty(Begins());
+        Assert.Single(_trail);
+    }
+
+    /// <summary>A link whose target cannot be read (WSL's own) is not planned: <c>cannotTellNow</c>, nothing changed.</summary>
+    [ReparsePointFact]
+    public void ALinkWhoseTargetCannotBeReadIsRefusedCannotTellNowAndNothingChanges()
+    {
+        ACourse();
+        Assert.Null(UndoReparsePoints.Make(Full(Notes), UndoReparsePoints.WslLink, UndoReparsePoints.WslLinkData("../library")));
+        UndoActionStep step = Step(List());
+
+        var refused = Assert.Throws<UndoStepRefusedException>(() => step.MoveLink(Full(Notes), Full(Zeta)));
+
+        Assert.Equal(UndoRefusalKind.CannotTellNow, refused.Refusal.Kind);
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(Full(Notes)));
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(Zeta)));
+        Assert.Empty(Begins());
+    }
 }

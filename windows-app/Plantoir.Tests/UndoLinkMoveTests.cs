@@ -53,7 +53,7 @@ public sealed class UndoLinkMoveTests : IDisposable
     }
 
     /// <summary>What a folder holds, for "untouched": its listing's hash and the identity of the folder and of each file.</summary>
-    private static string Untouched(string folder)
+    internal static string Untouched(string folder)
     {
         var said = new StringBuilder(UndoTreeReading.Read(folder).ListingSha ?? "no listing");
         said.Append(' ').Append(UndoFileIdentity.OfPlace(folder));

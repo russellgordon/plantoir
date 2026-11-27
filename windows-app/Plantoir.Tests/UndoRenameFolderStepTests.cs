@@ -71,9 +71,13 @@ public sealed class UndoRenameFolderStepTests : IDisposable
         Write("section2/Tasks/Quiz 2.md", "Quiz two.\n");
     }
 
+    /// <summary>The list the last <see cref="Rename"/> made its step on, for an Undo and a Redo after it.</summary>
+    private UndoForThisProcess? _list;
+
     private RenameOutcome Rename(bool finishing = false, UndoSeams? seams = null)
     {
         var list = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null);
+        _list = list;
         var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams, trail: list.Trail);
         var configuration = CourseConfiguration.Load(ConfigPath);
         var settings = SpecialFolderRenamer.RenamingTheSettings(configuration, ConfigPath, "Tasks", "Assessments", FolderScope.PerSection, CourseFolder);
@@ -110,6 +114,13 @@ public sealed class UndoRenameFolderStepTests : IDisposable
         {
             string relative = Path.GetRelativePath(Folder, entry).Replace('\\', '/');
             if (UndoOp.PartInside("courses/.internal", relative) is not null) continue;
+            // A link as itself, by the target it holds, never read through.
+            if (UndoLinks.Look(entry) == UndoLinks.What.Link)
+            {
+                FileSystemInfo link = File.GetAttributes(entry).HasFlag(FileAttributes.Directory) ? new DirectoryInfo(entry) : new FileInfo(entry);
+                tree[relative] = "link " + (link.LinkTarget ?? "that cannot be read");
+                continue;
+            }
             tree[relative] = Directory.Exists(entry) ? null : Convert.ToBase64String(File.ReadAllBytes(entry));
         }
         return tree;
@@ -201,21 +212,181 @@ public sealed class UndoRenameFolderStepTests : IDisposable
         Assert.Empty(AppliedSteps());
     }
 
-    /// <summary>
-    /// W8b-21 turns this round (it renames a linked place by moving the
-    /// link): on this branch only, a place of the folder that is a link
-    /// stops the plan <c>cannotTellNow</c> before anything is changed.
-    /// </summary>
-    [SymbolicLinkFact]
-    public void APlaceOfTheFolderThatIsALinkStopsThePlanCannotTellNowAndChangesNothing_UntilW8bPiece21()
+    // ---- A place of the folder that is a link (#899 W8b-21) --------------------
+
+    private const string LinkFrom = "courses/ICS3U/section2/Tasks";
+    private const string LinkTo = "courses/ICS3U/section2/Assessments";
+
+    /// <summary>Section 1's real Tasks folder and its index, both linking into it; section 2 holds only what the test lays at Tasks.</summary>
+    private void TheCourseWithSectionTwosTasksToLay()
     {
         Write("section1/Tasks/Quiz 1.md", "See [[Tasks/Quiz 2]].\n");
         Write("section1/index.md", "Start with [[Tasks/Quiz 1]].\n");
         Directory.CreateDirectory(Path.Combine(CourseFolder, "section2"));
-        string library = Path.Combine(_root, "library");
-        Directory.CreateDirectory(library);
+    }
+
+    private string SectionTwosTasks => Path.Combine(CourseFolder, "section2", "Tasks");
+    private string SectionTwosAssessments => Path.Combine(CourseFolder, "section2", "Assessments");
+
+    /// <summary>A library the link leads to: a page naming the old folder (never relinked through the link) and one in a folder.</summary>
+    private static string ALibrary(string library)
+    {
+        Directory.CreateDirectory(Path.Combine(library, "pictures"));
+        File.WriteAllText(Path.Combine(library, "Quiz 2.md"), "See [[Tasks/Quiz 1]].\n");
+        File.WriteAllText(Path.Combine(library, "pictures", "b.md"), "B\n");
+        return library;
+    }
+
+    /// <summary>
+    /// The one step a rename makes when section 2's Tasks is a link: section
+    /// 1's folder moved by its listing, then the LINK moved by its target as
+    /// stored (<c>linkSha</c>, no <c>listingSha</c>, from named as the link's
+    /// own place), then section 1's two pages, then the three members.
+    /// </summary>
+    private void TheStepMovesTheLinkAsItself(string target)
+    {
+        JsonObject step = Assert.Single(AppliedSteps());
+        Assert.Equal(
+            new[]
+            {
+                "move courses/ICS3U/section1/Tasks -> courses/ICS3U/section1/Assessments",
+                "move " + LinkFrom + " -> " + LinkTo,
+                "writeFile courses/ICS3U/section1/Assessments/Quiz 1.md",
+                "writeFile courses/ICS3U/section1/index.md",
+                "editJSON courses/ICS3U/course_config.json [\"expandable\"]",
+                "editJSON courses/ICS3U/course_config.json [\"hidden\"]",
+                "editJSON courses/ICS3U/course_config.json [\"per_section_folders\"]",
+            },
+            Ops(step));
+        JsonObject linkMove = step["ops"]!.AsArray()[1]!.AsObject();
+        Assert.Equal(UndoLinkMoveTests.ShaOfTarget(target), (string?)linkMove["linkSha"]);
+        Assert.Null(linkMove["listingSha"]);
+        Assert.Null(linkMove["blobs"]);
+        Assert.NotNull(step["ops"]!.AsArray()[0]!["listingSha"]);
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(SectionTwosTasks));
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(SectionTwosAssessments));
+        Assert.Equal(target, new DirectoryInfo(SectionTwosAssessments).LinkTarget);
+    }
+
+    /// <summary>
+    /// A place of the folder that is a JUNCTION (to a folder inside the
+    /// course) is renamed by moving the junction itself, one op of the one
+    /// step; what it leads to keeps its listing and every file's identity,
+    /// through the rename, its Undo and its Redo.
+    /// </summary>
+    [Fact]
+    public void AJunctionPlaceIsRenamedAsItselfUndoneAndRedoneWhatItLeadsToUntouched()
+    {
+        TheCourseWithSectionTwosTasksToLay();
+        string library = ALibrary(Path.Combine(CourseFolder, "library-of-tasks"));
         File.WriteAllText(Path.Combine(library, "Quiz 2.md"), "Quiz two.\n");
-        Directory.CreateSymbolicLink(Path.Combine(CourseFolder, "section2", "Tasks"), library);
+        UndoKindsForTheCases.MakeAJunction(SectionTwosTasks, library);
+        string target = new DirectoryInfo(SectionTwosTasks).LinkTarget!;
+        string untouched = UndoLinkMoveTests.Untouched(library);
+
+        var outcome = Rename();
+
+        Assert.Equal(2, outcome.FoldersMoved);
+        Assert.Equal(2, outcome.PagesRelinked);
+        TheStepMovesTheLinkAsItself(target);
+        Assert.Equal(untouched, UndoLinkMoveTests.Untouched(library));
+        Assert.Equal(UndoOutcomeKind.Undone, _list!.Door().Undo().Kind);
+        Assert.Equal(target, new DirectoryInfo(SectionTwosTasks).LinkTarget);
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(SectionTwosAssessments));
+        Assert.Equal(untouched, UndoLinkMoveTests.Untouched(library));
+        Assert.Equal(UndoOutcomeKind.Redone, _list.Door().Redo().Kind);
+        Assert.Equal(target, new DirectoryInfo(SectionTwosAssessments).LinkTarget);
+        Assert.Equal(untouched, UndoLinkMoveTests.Untouched(library));
+    }
+
+    /// <summary>A folder symbolic link holding a RELATIVE target (<c>..\library-of-tasks</c>): renamed as itself, the target as written, what it leads to untouched.</summary>
+    [SymbolicLinkFact]
+    public void ARelativeSymbolicLinkPlaceIsRenamedAsItselfItsTargetAsWritten()
+    {
+        TheCourseWithSectionTwosTasksToLay();
+        string library = ALibrary(Path.Combine(CourseFolder, "library-of-tasks"));
+        File.WriteAllText(Path.Combine(library, "Quiz 2.md"), "Quiz two.\n");
+        Directory.CreateSymbolicLink(SectionTwosTasks, "..\\library-of-tasks");
+        string untouched = UndoLinkMoveTests.Untouched(library);
+
+        var outcome = Rename();
+
+        Assert.Equal(2, outcome.FoldersMoved);
+        TheStepMovesTheLinkAsItself("..\\library-of-tasks");
+        Assert.Equal(untouched, UndoLinkMoveTests.Untouched(library));
+    }
+
+    /// <summary>
+    /// 15b's branch-only stop turned round: a symbolic link leading OUT of
+    /// the working folder is renamed as itself. The page behind it names the
+    /// old folder and is never relinked (the walk never goes through a link),
+    /// and what it leads to is untouched.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void APlaceOfTheFolderThatIsALinkLeadingOutIsRenamedAsTheLinkAndThePageBehindItIsNotRelinked()
+    {
+        TheCourseWithSectionTwosTasksToLay();
+        string library = ALibrary(Path.Combine(_root, "library"));
+        Directory.CreateSymbolicLink(SectionTwosTasks, library);
+        string untouched = UndoLinkMoveTests.Untouched(library);
+
+        var outcome = Rename();
+
+        Assert.Equal(2, outcome.FoldersMoved);
+        Assert.Equal(2, outcome.PagesRelinked);
+        TheStepMovesTheLinkAsItself(library);
+        Assert.Equal("See [[Tasks/Quiz 1]].\n", File.ReadAllText(Path.Combine(library, "Quiz 2.md")));
+        Assert.Equal(untouched, UndoLinkMoveTests.Untouched(library));
+    }
+
+    /// <summary>The same with a junction leading out of the working folder (runs where no symbolic link can be made).</summary>
+    [Fact]
+    public void AJunctionLeadingOutIsRenamedAsItselfAndThePageBehindItIsNotRelinked()
+    {
+        TheCourseWithSectionTwosTasksToLay();
+        string library = ALibrary(Path.Combine(_root, "library"));
+        UndoKindsForTheCases.MakeAJunction(SectionTwosTasks, library);
+        string target = new DirectoryInfo(SectionTwosTasks).LinkTarget!;
+        string untouched = UndoLinkMoveTests.Untouched(library);
+
+        var outcome = Rename();
+
+        Assert.Equal(2, outcome.PagesRelinked);
+        TheStepMovesTheLinkAsItself(target);
+        Assert.Equal("See [[Tasks/Quiz 1]].\n", File.ReadAllText(Path.Combine(library, "Quiz 2.md")));
+        Assert.Equal(untouched, UndoLinkMoveTests.Untouched(library));
+    }
+
+    /// <summary>
+    /// A link to a folder that leads NOWHERE (its folder taken away) is still
+    /// a link to a folder by its own attributes, and is renamed as itself:
+    /// nothing is made where it points.
+    /// </summary>
+    [Fact]
+    public void AJunctionLeadingNowhereIsRenamedAsItselfAndNothingIsMadeWhereItPoints()
+    {
+        TheCourseWithSectionTwosTasksToLay();
+        string gone = ALibrary(Path.Combine(_root, "gone"));
+        UndoKindsForTheCases.MakeAJunction(SectionTwosTasks, gone);
+        string target = new DirectoryInfo(SectionTwosTasks).LinkTarget!;
+        Directory.Delete(gone, recursive: true);
+
+        var outcome = Rename();
+
+        Assert.Equal(2, outcome.FoldersMoved);
+        TheStepMovesTheLinkAsItself(target);
+        Assert.False(Directory.Exists(gone) || File.Exists(gone), "nothing is made where the link points");
+        Assert.Equal(UndoOutcomeKind.Undone, _list!.Door().Undo().Kind);
+        Assert.Equal(target, new DirectoryInfo(SectionTwosTasks).LinkTarget);
+        Assert.False(Directory.Exists(gone) || File.Exists(gone), "nothing is made where the link points");
+    }
+
+    /// <summary>A link whose target cannot be read (WSL's own) refuses the rename <c>cannotTellNow</c>: nothing changed, nothing recorded.</summary>
+    [ReparsePointFact]
+    public void ALinkWhoseTargetCannotBeReadRefusesTheRenameCannotTellNowAndChangesNothing()
+    {
+        TheCourseWithSectionTwosTasksToLay();
+        Assert.Null(UndoReparsePoints.Make(SectionTwosTasks, UndoReparsePoints.WslLink, UndoReparsePoints.WslLinkData("../library")));
         SortedDictionary<string, string?> before = Tree();
 
         var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(() => Rename());
@@ -224,6 +395,24 @@ public sealed class UndoRenameFolderStepTests : IDisposable
         Assert.Equal(before, Tree());
         Assert.Empty(AppliedSteps());
         Assert.False(File.Exists(SpecialFolderRenamer.RenameRecordPath(CourseFolder)), "nothing started, nothing recorded");
+    }
+
+    /// <summary>A link to something that is not a folder is skipped, as a file at that place is: left as it is, and section 1 alone is renamed.</summary>
+    [SymbolicLinkFact]
+    public void ALinkToAFileAtThePlaceIsSkippedAsAFileIs()
+    {
+        TheCourseWithSectionTwosTasksToLay();
+        Write("Tasks list.md", "A list.\n");
+        File.CreateSymbolicLink(SectionTwosTasks, "..\\Tasks list.md");
+
+        var outcome = Rename();
+
+        Assert.Equal(1, outcome.FoldersMoved);
+        JsonObject step = Assert.Single(AppliedSteps());
+        Assert.Contains("move courses/ICS3U/section1/Tasks -> courses/ICS3U/section1/Assessments", Ops(step));
+        foreach (string op in Ops(step)) Assert.DoesNotContain("section2", op);
+        Assert.Equal("..\\Tasks list.md", new FileInfo(SectionTwosTasks).LinkTarget);
+        Assert.Equal("A list.\n", Read("Tasks list.md"));
     }
 
     [SymbolicLinkFact]

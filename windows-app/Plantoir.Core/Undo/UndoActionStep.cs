@@ -286,6 +286,9 @@ internal sealed class UndoActionStep
         _folderMoves.Add((from, to, listingSha));
     }
 
+    /// <summary>Not yet built (W8b-21's tests first): a link is refused as <see cref="MoveFolder"/> refuses it.</summary>
+    internal void MoveLink(string fromFull, string toFull) => MoveFolder(fromFull, toFull);
+
     /// <summary>
     /// Where a place is on the disk while the step is planned (the mac's
     /// <c>placeOnDiskNow</c>): under a planned folder move's <c>from</c> when
