@@ -29,3 +29,10 @@ F-P1 run-f1-mf-P1 (Python): part_inside without NFC.
    RED: test_check_cases on the normalisation row.
 F-P2 run-f1-mf-P2 (Python): settle_what_was_set_aside not called.
    RED: test_recovery_cases_with_a_relink on the two relinkSetAside rows.
+
+Fix round two (review 2), RED 2 of 2.
+F-G run-f2-mf-G: the one rule's block in UndoSwap.tidyLeftovers switched off (`if false, ...`): the relink staged name tidied by removeStaged as before.
+   RED, 3 failures: testAKillAfterTheExchangeOnceThePlaceChangedGivesTheTeachersItemBack (the teacher's file deleted), testRecoveryLeavesAStagedLinkHoldingAnotherText (left hidden).
+F-H run-f2-mf-H: settleUnderARelinksStagedName never keeps under a visible name (returns .notNow before the rename).
+   RED, 6 failures: case (a) file and folder, case (b) (the older save left under the staged name), and the third-text test.
+Each restored with git checkout; git status clean of Swift after each.
