@@ -40,7 +40,7 @@ public sealed class UndoCheckContractTests : IDisposable
     /// The link moves' cases that lay a link holding the target the case gives
     /// (<c>../library</c>, U4b2-14; #899 W8-6): only a symbolic link holds a
     /// relative target as written, so these run where this account may make
-    /// one and are SKIPPED, saying why, where it may not (the VMs).
+    /// one and are SKIPPED, saying why, where it may not (a machine that cannot make links).
     /// </summary>
     public static IEnumerable<object[]> LinkMoveCases() =>
         UndoContract.Undo.GetProperty("checkCases").EnumerateArray()

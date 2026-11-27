@@ -711,6 +711,17 @@ internal static class UndoLinks
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
     }
 
+    private const uint MountPoint = 0xA0000003;
+
+    /// <summary>
+    /// Whether the item at <paramref name="fullPath"/> is a junction (a mount
+    /// point's reparse tag), never followed (window E review 2, LOW 5): a link
+    /// kind Undo cannot make, so a relink of one is refused before anything
+    /// changes rather than re-made as a symbolic link.
+    /// </summary>
+    internal static bool IsAJunction(string fullPath) =>
+        Look(fullPath) == What.Link && ReparseTag(fullPath) == MountPoint;
+
     private static readonly Lazy<bool> ThisProcessCanMakeALink = new(() => CanMakeALinkIn(UndoJournalLocation.Folder));
 
     /// <summary>

@@ -707,6 +707,70 @@ public sealed class UndoRelinkTests : IDisposable
         Assert.Empty(StagedLeft());
     }
 
+    /// <summary>A junction (no privilege needed to make one, unlike a symbolic link), made by the system's own <c>mklink /J</c>.</summary>
+    private void MakeAJunction(string relative, string target)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /J \"{Full(relative)}\" \"{target}\"")
+        { CreateNoWindow = true, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+        using var process = System.Diagnostics.Process.Start(start)!;
+        process.WaitForExit();
+        Assert.True(UndoLinks.IsAJunction(Full(relative)), "mklink /J made no junction");
+    }
+
+    /// <summary>
+    /// Window E review 2, LOW 5: a relink keeps the KIND of link that stood,
+    /// and a junction is one kind this piece cannot make (only a symbolic
+    /// link is made, <c>CreateSymbolicLink</c>). So the door refuses a relink
+    /// whose link is a junction before anything changes (could not write, as
+    /// any link it cannot make), the junction whole, nothing at the new
+    /// place, nothing staged: never a symbolic link where a junction stood.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void AJunctionIsNeverRelinkedAsASymbolicLink()
+    {
+        string three = Full(Section + "/media 3");
+        string four = Full(Section + "/media 4");
+        Directory.CreateDirectory(three);
+        Directory.CreateDirectory(four);
+        MakeAJunction(Day(4), three);
+        string oldText = LinkText(Day(4))!;
+        UndoOp op = UndoOp.RelinkLink(Day(4), Day(5), Store(oldText), Store(four));
+
+        UndoSwapResult result = UndoSwap.Swap(ReadyTargets(Plan([op], backward: false)), "1-apply", _root);
+
+        Assert.True(result is UndoSwapResult.Refused { Refusal.Kind: UndoRefusalKind.CouldNotWrite }, Described(result));
+        Assert.True(UndoLinks.IsAJunction(Full(Day(4))));
+        Assert.Equal(oldText, LinkText(Day(4)));
+        Assert.False(StandsAnything(Day(5)));
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>
+    /// Window E review 2, LOW 5, when the step is planned: a relink of a
+    /// junction is refused (could not write) before anything is written or
+    /// put on the list.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void ARelinkOfAJunctionIsRefusedWhenPlanned()
+    {
+        string three = Full(Section + "/media 3");
+        string four = Full(Section + "/media 4");
+        Directory.CreateDirectory(three);
+        Directory.CreateDirectory(four);
+        MakeAJunction(Day(4), three);
+        AWorkingFolder();
+        string before = CourseNow();
+        UndoForThisProcess list = StepList();
+        UndoActionStep step = StepIn(list, _root);
+
+        var refused = Assert.Throws<UndoStepRefusedException>(() => step.RelinkLink(Full(Day(4)), Full(Day(5)), four));
+
+        Assert.Equal(UndoRefusalKind.CouldNotWrite, refused.Refusal.Kind);
+        Assert.True(UndoLinks.IsAJunction(Full(Day(4))));
+        Assert.Equal(before, CourseNow());
+        Assert.Empty(StepsOnTheList());
+    }
+
     /// <summary>A relink's pre-clean never removes what is not its own: something of the teacher's under the staged name stays, and the make fails over it (could not write), the old link whole.</summary>
     [SymbolicLinkFact]
     public void ARelinksPreCleanNeverRemovesWhatIsNotItsOwn()

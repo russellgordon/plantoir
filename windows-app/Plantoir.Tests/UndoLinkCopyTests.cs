@@ -244,7 +244,7 @@ public sealed class UndoLinkCopyTests : IDisposable
 
     /// <summary>
     /// Not a symbolic-link fact: on a PC that can make a link (Developer Mode
-    /// on) the answer is true, on one that cannot (the VMs) false, and either
+    /// on) the answer is true, on a machine that cannot make links false, and either
     /// way the probe leaves nothing in the list's folder.
     /// </summary>
     [Fact]

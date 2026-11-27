@@ -265,6 +265,33 @@ internal static class W8bRelinkRuns
 
     private sealed record KillOne(bool Reached, bool Whole, string States, string Now);
 
+    /// <summary>
+    /// The side and phase a kill of a chain of relinks alone must settle to
+    /// (window E review 2, LOW 1), as <c>state/phase</c>; null where either
+    /// settled side is accepted. Each relink's just-made link is the one
+    /// recovery removes (the LAST that passes, review D), so a work killed
+    /// before its close goes back to where it started: an apply to before,
+    /// failed while no swap has renamed anything in (afterBegin, the first
+    /// beforeSwap and relinkStaged), rolled back after; an Undo to after
+    /// (done); a Redo to before (undone). A work killed at its close
+    /// (beforeApplied, beforeUndone, beforeRedone) is finished. These are
+    /// 21b3's rows for the same chain (<c>AKilledChainRemovesExactlyTheOneLinkTheRuleNames</c>).
+    /// The FIRST that passes settles some of them on the other side, which
+    /// the either-side check could not tell apart.
+    /// </summary>
+    internal static string? MustSettleTo(string shape, string work, string point)
+    {
+        if (shape is not ("twoChainedRelinks" or "threeChainedRelinks" or "fourChainedRelinks")) return null;
+        if (point is "beforeApplied" or "beforeRedone") return "after/Done";
+        if (point == "beforeUndone") return "before/Undone";
+        return work switch
+        {
+            "apply" => point is "afterBegin" or "beforeSwap@0" or "relinkStaged@0" ? "before/Failed" : "before/RolledBack",
+            "undo" => "after/Done",
+            _ => "before/Undone",
+        };
+    }
+
     /// <summary>One kill: lay, set up the work, run the child to <paramref name="point"/>, lay the teacher's item if asked, kill, recover, judge.</summary>
     private static KillOne KillAt(string run, string shape, bool leadingOut, string work, string point, string before, string after, Action<string>? layTheTeachers)
     {
@@ -290,8 +317,14 @@ internal static class W8bRelinkRuns
             "before" => work == "apply" ? step.State is UndoStepState.Failed or UndoStepState.RolledBack : step.State == UndoStepState.Undone,
             _ => false,
         };
-        bool whole = state != "NEITHER" && staged == 0 && settled;
+        // Where the rule decides the side (window E review 2, LOW 1), the
+        // kill must settle to exactly that side and phase, not either one.
+        string? mustSettle = MustSettleTo(shape, work, point);
+        string settledAs = state + "/" + (step?.State.ToString() ?? "none");
+        bool asTheRuleSays = mustSettle is null || mustSettle == settledAs;
+        bool whole = state != "NEITHER" && staged == 0 && settled && asTheRuleSays;
         string states = $"setUp=[{setUp}] recovered=[{recovered}] step={step?.State.ToString() ?? "none"} state={state} staged={staged}" +
+                        (asTheRuleSays ? "" : $" mustSettle={mustSettle}") +
                         (whole ? "" : " now=[" + now + "]");
         return new KillOne(true, whole, states, now);
     }
