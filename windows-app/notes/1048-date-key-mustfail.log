@@ -37,3 +37,14 @@ Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheKeyIsDecid
 /Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:469: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingALaterClassLeavesTheLessonAnEarlierClassIs] : XCTAssertTrue failed
 /Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:515: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateDoesNotCountALaterLinkedClassAsADraftOnTheLastDay] : XCTAssertEqual failed: ("
 /Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:560: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testALinkThroughALinkedFolderIsDatedByTheFilesRealPlace] : XCTAssertEqual failed: ("Opti
+
+## Fix round one: fixes at f269c7377 with three reverted (publishing's key back to edit.isSectionLocal; the file-identity guard off in publishing's date moves and in Re-date's brought step), DateKeyByTheTargetsPlaceTests
+	 Executed 19 tests, with 6 failures (0 unexpected) in 1.030 (1.034) seconds
+	 Executed 19 tests, with 6 failures (0 unexpected) in 1.030 (1.035) seconds
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:444: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateKeepsTheFirstClassesDateWhenALaterClassBringsTheLesson] : XCTAssertTrue failed
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:445: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateKeepsTheFirstClassesDateWhenALaterClassBringsTheLesson] : XCTAssertEqual faile
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:465: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingALaterClassLeavesTheLessonAnEarlierClassIs] : XCTAssertNotEqual failed: ("
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:469: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingALaterClassLeavesTheLessonAnEarlierClassIs] : XCTAssertTrue failed
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:496: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingDatesALinkedPageItBringsUnderTheSectionsLine] : XCTAssertTrue failed - thi
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:497: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingDatesALinkedPageItBringsUnderTheSectionsLine] : XCTAssertFalse failed - no
+Restored: 19 of 19 green in the run below.
