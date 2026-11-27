@@ -977,6 +977,7 @@ final class SharedRulesContractTests: XCTestCase {
             fileURL: URL(fileURLWithPath: "/courses/ADA1O/Portfolios/index.md"),
             relativePath: "courses/ADA1O/Portfolios/index.md",
             isSectionLocal: false,
+            dateKey: "createdSection1",
             isVisibleToStudents: true,
             visibilityIsCertain: true,
             date: nil,

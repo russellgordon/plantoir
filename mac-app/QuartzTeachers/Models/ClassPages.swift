@@ -200,10 +200,7 @@ enum ClassPages {
                     continue
                 }
                 summaries.append(
-                    summary(
-                        ofPageAt: pageURL, forSection: sectionNumber,
-                        naming: course.configuration.classPageNaming
-                    )
+                    summary(ofPageAt: pageURL, forSection: sectionNumber, in: course)
                 )
             }
         }
@@ -229,19 +226,139 @@ enum ClassPages {
 
     /// One page, read.
     static func summary(
-        ofPageAt url: URL, forSection sectionNumber: Int,
-        naming: ClassPageNaming
+        ofPageAt url: URL, forSection sectionNumber: Int, in course: Course
     ) -> ClassPageSummary {
         let title: String = url.deletingPathExtension().lastPathComponent
         var date: CalendarDay? = nil
-        if let text = JournaledStep.textAsPlanned(at: url) {
-            // Class pages live inside `section<N>/`, so they carry a plain
-            // `created:` — the section-local key.
-            date = PageFrontmatter.createdDay(
-                in: text, key: PageFrontmatter.createdKey(forSection: sectionNumber, isSectionLocal: true)
-            )
+        // The key the date lives under is decided by the place of the FILE
+        // the page is (#1048): a class page that is a link to a course-level
+        // page reads `createdSection<N>`, never the link's own plain key.
+        if let key = dateKey(ofPageAt: url, forSection: sectionNumber, in: course),
+           let text = JournaledStep.textAsPlanned(at: url) {
+            date = PageFrontmatter.createdDay(in: text, key: key)
         }
-        return ClassPageSummary(title: title, fileURL: url, date: date, naming: naming)
+        return ClassPageSummary(
+            title: title, fileURL: url, date: date, naming: course.configuration.classPageNaming
+        )
+    }
+
+    /// The key this section's date of the page at `url` lives under, or nil
+    /// for a link that leads to nothing (no date to read, none to write).
+    ///
+    /// THE one rule for every reader and writer of a class's date (#1048,
+    /// Russell on #899, 2026-11-26: "a created front matter specific to the
+    /// section"). The key is decided by the place of the file the page IS,
+    /// followed through every link: plain `created` when that file is inside
+    /// the section's own folder, `createdSection<N>` when it is a course-level
+    /// page every section shares. Never by the place of the link.
+    static func dateKey(ofPageAt url: URL, forSection sectionNumber: Int, in course: Course) -> String? {
+        if ClassInsertionPlanner.isALinkToNothing(url) {
+            return nil
+        }
+        // The place of the file the page really IS, every link resolved, a
+        // linked folder on the way included (review 1, LOW 5): judged by the
+        // link's spelling, a link into `section1/Lessons`, itself a link to
+        // a course-level folder, read as a page of the section.
+        let filePath: String = UndoFolderPlaces.canonicalPath(of: url)
+        let sectionPath: String = UndoFolderPlaces.canonicalPath(
+            of: course.sectionDirectoryURL(forSection: sectionNumber)
+        )
+        let isSectionLocal: Bool = filePath.hasPrefix(sectionPath + "/")
+        return PageFrontmatter.createdKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
+    }
+
+    /// Whether the class page at `classPage` is the one that dates the file
+    /// it leads to, among the section's class pages `classes`.
+    ///
+    /// The rule in one sentence: the class page that IS the file, when one
+    /// of the section's class pages is that file and not a link, owns its
+    /// date; otherwise, among the class pages whose link leads to the file
+    /// without passing through another class page of the section, the one
+    /// with the lowest unit and day owns it.
+    ///
+    /// So a class page that is not a link always owns its own date (review
+    /// 1, MEDIUM 1: Day 2 a link to Day 3's own page never gives Day 3 Day
+    /// 2's date), and a class page whose link reaches another class page of
+    /// the section writes nothing through it, as Insert Class already held
+    /// (#899 U4b3). Russell on #899, 2026-11-26: a shared lesson several
+    /// classes link to keeps "the date of the first Unit x, Day y page that
+    /// linked to it. Always." A page that leads to nothing owns nothing
+    /// (callers write nothing for it); a link with no unit and day, and no
+    /// owner above it, owns its file.
+    static func isTheFirstClassLeadingToItsFile(
+        _ classPage: URL, among classes: [ClassPageSummary]
+    ) -> Bool {
+        if !ResolvedFile.isALink(classPage) {
+            return true
+        }
+        guard let ownFile = ResolvedFile.throughLinks(at: classPage) else {
+            return true
+        }
+        var places: [ClassPagePlace] = []
+        for summary in classes {
+            if let identity = ResolvedFile.ofThePlace(at: summary.fileURL) {
+                places.append(ClassPagePlace(identity: identity, newPlace: nil))
+            }
+        }
+        if ClassInsertionPlanner.reachOfALinkedClass(at: classPage, classPagePlaces: places) != .elsewhere {
+            return false
+        }
+        let ownPath: String = classPage.standardizedFileURL.path
+        var ownUnitAndDay: UnitDay? = nil
+        for summary in classes where summary.fileURL.standardizedFileURL.path == ownPath {
+            ownUnitAndDay = summary.unitAndDay
+        }
+        for summary in classes {
+            if summary.fileURL.standardizedFileURL.path == ownPath {
+                continue
+            }
+            if ResolvedFile.throughLinks(at: summary.fileURL) != ownFile {
+                continue
+            }
+            // The file's own class page owns it.
+            if !ResolvedFile.isALink(summary.fileURL) {
+                return false
+            }
+            // An earlier link that leads there directly owns it.
+            guard let own = ownUnitAndDay, let other = summary.unitAndDay, other < own else {
+                continue
+            }
+            if ClassInsertionPlanner.reachOfALinkedClass(at: summary.fileURL, classPagePlaces: places) == .elsewhere {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// Every file a NUMBERED class of the section owns (by
+    /// `isTheFirstClassLeadingToItsFile`, among every class page in
+    /// `classPages`), through its links: the files a change that dates
+    /// classes dates as classes. No other write in it may date one of them
+    /// (a page a class brings, a year-round page, publishing a later class),
+    /// so a shared lesson keeps its first class's date (review 1, MEDIUM 2).
+    /// A file only an unnumbered page of the class folder leads to is not
+    /// among them: no class dates it, so a class that brings it still does
+    /// (review 2, MEDIUM 1).
+    static func filesTheNumberedClassesOwn(among classPages: [ClassPageSummary]) -> [ResolvedFile] {
+        let numbered: [ClassPageSummary] = ClassInsertionPlanner.numberedClasses(among: classPages)
+        var files: [ResolvedFile] = []
+        for summary in numbered {
+            if !isTheFirstClassLeadingToItsFile(summary.fileURL, among: classPages) {
+                continue
+            }
+            if let file = ResolvedFile.throughLinks(at: summary.fileURL) {
+                files.append(file)
+            }
+        }
+        return files
+    }
+
+    /// Whether the page at `url` is one of `files`, through its links.
+    static func isOneOf(_ files: [ResolvedFile], pageAt url: URL) -> Bool {
+        guard let file = ResolvedFile.throughLinks(at: url) else {
+            return false
+        }
+        return files.contains(file)
     }
 
     /// Every markdown page belonging to one section: the section's own folder,

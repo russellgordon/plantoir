@@ -355,8 +355,11 @@ enum ClassInsertionPlanner {
         let step: JournaledStep = outerStep
             ?? JournaledStep(course: course, section: plan.sectionNumber, maker: maker)
         let folderURL: URL = ClassPages.folderURL(forSection: plan.sectionNumber, in: course)
+        // The section's classes as they stand, before anything is planned:
+        // who comes first among classes that lead to one file (#1048).
+        let classesBefore: [ClassPageSummary] = ClassPages.list(forSection: plan.sectionNumber, in: course)
         let tail: String = ClassPages.siblingTimeAndOffset(
-            from: ClassPages.list(forSection: plan.sectionNumber, in: course),
+            from: classesBefore,
             forSection: plan.sectionNumber
         )
 
@@ -464,8 +467,8 @@ enum ClassInsertionPlanner {
         // An ordinary class page lives in the section's folder: `created`.
         // A class that is a link takes the key its FILE's place calls for
         // (Russell, 2026-11-26): `createdSection<N>` for a course-level
-        // page, every other section's line left as it is.
-        let sectionCreatedKey: String = PageFrontmatter.createdKey(forSection: plan.sectionNumber, isSectionLocal: true)
+        // page, every other section's line left as it is
+        // (`ClassPages.dateKey`).
         var moved: Int = 0
         // Pages whose settings have no place a new date line can go (#186).
         // Named and carried on past: such a page had no date this app could
@@ -502,12 +505,19 @@ enum ClassInsertionPlanner {
             guard step.fileExists(pageURL), let text = step.readText(pageURL) else {
                 continue
             }
-            var createdKey: String = sectionCreatedKey
-            if let linkedFile = ClassInsertionPlanner.fileALinkLeadsTo(move.fileURL) {
-                let isSectionLocal: Bool = AssistPageVisibility.isSectionLocal(
-                    pageAt: linkedFile, forSection: plan.sectionNumber, in: course
-                )
-                createdKey = PageFrontmatter.createdKey(forSection: plan.sectionNumber, isSectionLocal: isSectionLocal)
+            // The key from the place of the file the class IS (#1048), the
+            // one rule every reader and writer of a class's date calls.
+            guard let createdKey = ClassPages.dateKey(
+                ofPageAt: move.fileURL, forSection: plan.sectionNumber, in: course
+            ) else {
+                continue
+            }
+            // A shared lesson several classes link to keeps the date of the
+            // FIRST of them (Russell on #899, 2026-11-26): the plan keeps the
+            // classes in order, so the first by the old names is the first
+            // by the new ones, and a later class writes nothing through.
+            if !ClassPages.isTheFirstClassLeadingToItsFile(move.fileURL, among: classesBefore) {
+                continue
             }
             let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                 in: text, key: createdKey, to: move.to, fallbackTail: tail

@@ -1568,6 +1568,11 @@ enum AssistPublishPlanner {
 
         var claimed: Set<String> = []
         var moves: [AssistPublishDateMove] = []
+        // The files the section's numbered classes own, through their links
+        // (review 1, MEDIUM 2): publishing Day 3, which brings the shared
+        // lesson Day 2 is a link to, must not date it to Day 3's day. A
+        // shared lesson keeps its first class's date (Russell on #899).
+        let filesTheNumberedClassesOwn: [ResolvedFile] = ClassPages.filesTheNumberedClassesOwn(among: classPages)
         for entry in named {
             // The same reach publishing uses, so the two halves of one publish
             // cannot disagree about how far it went. It stops at a class, so a
@@ -1596,6 +1601,9 @@ enum AssistPublishPlanner {
                 // rule, and a rule upheld only by the absence of a page is one
                 // a later reader deletes without knowing they have.
                 if page.isClassPage {
+                    continue
+                }
+                if ClassPages.isOneOf(filesTheNumberedClassesOwn, pageAt: page.fileURL) {
                     continue
                 }
                 claimed.insert(page.lowercasedTitle)
@@ -1724,20 +1732,20 @@ enum AssistPublishPlanner {
     ) throws -> PlannedWrites {
         // Every file this plan touches, gathered first, so a page that both
         // changes visibility and moves date is written once.
-        var editsByPath: [String: (url: URL, isSectionLocal: Bool)] = [:]
+        var editsByPath: [String: (url: URL, isSectionLocal: Bool, dateKey: String)] = [:]
         var publishByPath: [String: Bool] = [:]
         var dateByPath: [String: CalendarDay] = [:]
         var titleByPath: [String: String] = [:]
 
         for change in plan.changes {
             let path: String = change.page.fileURL.path
-            editsByPath[path] = (change.page.fileURL, change.page.isSectionLocal)
+            editsByPath[path] = (change.page.fileURL, change.page.isSectionLocal, change.page.dateKey)
             publishByPath[path] = change.willBeVisible
             titleByPath[path] = change.page.displayTitle
         }
         for move in plan.dateMoves {
             let path: String = move.page.fileURL.path
-            editsByPath[path] = (move.page.fileURL, move.page.isSectionLocal)
+            editsByPath[path] = (move.page.fileURL, move.page.isSectionLocal, move.page.dateKey)
             dateByPath[path] = move.to
             titleByPath[path] = move.page.displayTitle
         }
@@ -1785,9 +1793,8 @@ enum AssistPublishPlanner {
                 if let day = dateByPath[path] {
                     let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                         in: text,
-                        key: PageFrontmatter.createdKey(
-                            forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
-                        ),
+                        // The file's own place decides, through a link (#1048).
+                        key: edit.dateKey,
                         to: day,
                         fallbackTail: tail
                     )
