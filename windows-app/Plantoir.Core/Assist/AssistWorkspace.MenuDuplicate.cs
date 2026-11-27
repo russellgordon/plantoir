@@ -30,14 +30,15 @@ namespace Plantoir.Core.Assist;
 /// page itself is never resolved, so a page that is a link is still found.</para>
 ///
 /// <para><b>Built and read back BEFORE anything is written</b>, and written
-/// with <see cref="FileMode.CreateNew"/>, so a page that appeared at that name
-/// meanwhile is never written over; a write that fails part way removes the
-/// file it created.</para>
+/// as ONE step through the door (#899 W7b2-3, the mac's
+/// <c>duplicateAsTheNextClassFromTheMenu</c>): the new page is staged beside
+/// its place and renamed in whole, so nothing half written is ever left, and
+/// a page that appeared at that name meanwhile is never written over.</para>
 ///
 /// <para><b>No entry on the old undo list</b> (the night-3 settled list, lane
 /// B: the entries #927 describes are the in-memory list's, which the journal
-/// replaces; the copy's final form is the journal step the mac's U3a defines,
-/// which Windows' W7 copies). The contract's <c>expectUndoEntries</c> is held
+/// replaces; the copy is the journal step <c>duplicateAsTheNextClass</c>, as
+/// the mac's U3a defines it). The contract's <c>expectUndoEntries</c> is held
 /// against #899 in <c>NamedGapLedger</c> by case.</para>
 /// </remarks>
 public sealed partial class AssistWorkspace
