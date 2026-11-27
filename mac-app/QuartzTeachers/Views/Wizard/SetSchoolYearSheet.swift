@@ -147,6 +147,7 @@ struct SetSchoolYearSheet: View {
         switch answer {
         case .notNow:
             // Left in flight: recovery settles it at the next launch.
+            ActivityTrail.note(.settingsCouldNotBeSaved, SettingStopTrail.notNow(setting: "school year", course: course.code))
             return nil
         case .putItBack:
             return SetSchoolYearSheet.putBack(offer, course: course)
@@ -162,6 +163,10 @@ struct SetSchoolYearSheet: View {
             seq: offer.seq, in: UndoJournalLocation.standardJournal()
         )
         try? course.configuration.reloadFromDisk(url: course.configFileURL)
+        ActivityTrail.note(
+            .settingsCouldNotBeSaved,
+            SettingStopTrail.putItBack(setting: "school year", course: course.code, verdict: verdict)
+        )
         if verdict == .putBack {
             return nil
         }
@@ -195,6 +200,7 @@ struct SetSchoolYearSheet: View {
             )
         } catch JournaledStepError.couldNotFinish(let seq, _) {
             course.configuration.referenceSchoolYear = before
+            ActivityTrail.note(.settingsCouldNotBeSaved, SettingStopTrail.offered(setting: "school year", course: course.code))
             return .couldNotFinish(seq: seq)
         } catch {
             // Never the raw Foundation string. A teacher reads a sentence

@@ -1551,7 +1551,7 @@ nonisolated struct RenameRecordClaim {
     /// otherwise nothing was changed.
     mutating func stepWasNotMade(_ stopped: JournaledStepError) {
         switch stopped {
-        case .leftPartWay, .stoppedByATest:
+        case .leftPartWay, .stoppedByATest, .couldNotFinish:
             return
         default:
             nothingWasChanged()

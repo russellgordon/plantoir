@@ -234,6 +234,9 @@ struct CourseSettingsView: View {
                             )
                         },
                         onRename: renameFromTheSheet(scope: .shared),
+                        onRenamePutBackAnswer: { answer, offer in
+                            return CourseSettingsView.answerARenameOffer(answer, to: offer, course: course)
+                        },
                         renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
@@ -295,6 +298,9 @@ struct CourseSettingsView: View {
                             )
                         },
                         onRename: renameFromTheSheet(scope: .perSection),
+                        onRenamePutBackAnswer: { answer, offer in
+                            return CourseSettingsView.answerARenameOffer(answer, to: offer, course: course)
+                        },
                         renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .perSection)
@@ -454,6 +460,9 @@ struct CourseSettingsView: View {
             .padding(12)
         }
         .settingPutBackAlert(offer: $putBackOffer) { answer, shown in
+            if answer == .notNow {
+                ActivityTrail.note(.settingsCouldNotBeSaved, SettingStopTrail.notNow(setting: shown.setting, course: course.code))
+            }
             if answer == .putItBack, let refused = CourseSettingsView.putBack(shown, course: course) {
                 saveProblem = refused
             }
@@ -881,7 +890,14 @@ struct CourseSettingsView: View {
             )
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — stopped part way, offered to put back")
         } catch {
-            saveProblem = "Could not save: \(error.localizedDescription)"
+            // A refusal never names the file to a teacher (#899, the
+            // settings sweep's LOW A2): it is the course's settings file
+            // every time, and the trail keeps the full sentence.
+            if case .refused? = error as? JournaledStepError {
+                saveProblem = "Could not save: " + JournaledStepError.notMade.localizedDescription
+            } else {
+                saveProblem = "Could not save: \(error.localizedDescription)"
+            }
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
         }
     }
@@ -924,10 +940,46 @@ struct CourseSettingsView: View {
             seq: offer.seq, in: UndoJournalLocation.standardJournal()
         )
         try? course.configuration.replaceWithTheFile(url: course.configFileURL)
+        ActivityTrail.note(
+            .settingsCouldNotBeSaved,
+            SettingStopTrail.putItBack(setting: offer.setting, course: course.code, verdict: verdict)
+        )
         if verdict == .putBack {
             return nil
         }
         return "Could not save: " + JournaledStepError.notMade.localizedDescription
+    }
+
+    /// The answer to a rename's alert (#899, the settings sweep's MEDIUM),
+    /// on the offer the alert showed. Put It Back writes the folder's old
+    /// name back as recovery would and closes the step; when that fails
+    /// too, the rename's existing sentence for a step it could not put all
+    /// back (`renameFolderStoppedPartWay`), with no file name. Not Now
+    /// leaves the step to the next launch's recovery. Each leaves its line.
+    static func answerARenameOffer(
+        _ answer: SettingPutBackAnswer, to offer: SettingPutBackOffer, course: Course
+    ) -> String? {
+        let setting: String = "folder name " + (offer.valueBefore ?? "")
+        switch answer {
+        case .notNow:
+            ActivityTrail.note(.folderRenamed, SettingStopTrail.notNow(setting: setting, course: course.code))
+            return nil
+        case .putItBack:
+            let verdict: UndoPutBackVerdict = UndoStoppedStep.putBackAtOnce(
+                seq: offer.seq, in: UndoJournalLocation.standardJournal()
+            )
+            try? course.configuration.replaceWithTheFile(url: course.configFileURL)
+            ActivityTrail.note(
+                .folderRenamed,
+                SettingStopTrail.putItBack(setting: setting, course: course.code, verdict: verdict)
+            )
+            if verdict == .putBack {
+                return nil
+            }
+            return SpecialFolderRenamer.stoppedPartWay(
+                renaming: offer.valueBefore ?? "", said: JournaledStepError.notMade.localizedDescription
+            )
+        }
     }
 
     /// The working folder this course lives in — the folder a preview's
@@ -1367,6 +1419,19 @@ struct CourseSettingsView: View {
                     )
                     ActivityTrail.note(.folderRenamed, ending.line)
                     return .failed(ending.sentence)
+                }
+                if case .couldNotFinish(let seq, _) = partWay {
+                    // The settings file alone (a folder no section has, no
+                    // page relinked), stopped part way and not finished at
+                    // once by content: the same alert as every other
+                    // setting, by its own name and old value (#899, the
+                    // settings sweep's MEDIUM). The step stays in flight
+                    // for Put It Back or the next launch.
+                    ActivityTrail.note(
+                        .folderRenamed,
+                        SettingStopTrail.offered(setting: "folder name " + oldName, course: course.code)
+                    )
+                    return .couldNotFinish(SettingPutBackOffer(seq: seq, setting: "folder name", valueBefore: oldName))
                 }
                 if case .stoppedByATest = partWay {
                     // A process that died here leaves its record, as a kill does.

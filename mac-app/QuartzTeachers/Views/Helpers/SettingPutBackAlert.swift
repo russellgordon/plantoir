@@ -46,6 +46,29 @@ struct SettingPutBackOffer: Equatable, Identifiable {
     }
 }
 
+/// The trail's lines for a setting's stop and its answer (#899, the
+/// settings sweep's LOW A4): every caller of the alert leaves the same
+/// three, so a stop somebody is asked about next week can be explained.
+enum SettingStopTrail {
+
+    // MARK: - Functions
+
+    static func offered(setting: String, course: String) -> String {
+        return "the " + setting + " for " + course + " could not be changed — stopped part way, offered to put back"
+    }
+
+    static func notNow(setting: String, course: String) -> String {
+        return "the " + setting + " for " + course + " was left as it stopped (Not Now): the next launch settles it"
+    }
+
+    static func putItBack(setting: String, course: String, verdict: UndoPutBackVerdict) -> String {
+        if verdict == .putBack {
+            return "the " + setting + " for " + course + " was put back as it was (Put It Back)"
+        }
+        return "the " + setting + " for " + course + " could not be put back either (Put It Back): left for the next launch"
+    }
+}
+
 /// The teacher's answer.
 enum SettingPutBackAnswer: Equatable {
     case notNow

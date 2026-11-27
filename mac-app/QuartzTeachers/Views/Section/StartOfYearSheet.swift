@@ -236,13 +236,31 @@ final class StartOfYearSheetModel {
     /// restoreCourse`). The sheet has closed by now, so the restore's own
     /// alert can show if it fails.
     func restoreCourse() async {
-        guard case .stoppedPartWay(let stopped) = stage, !offerAnswered else {
+        guard let stopped = restoreCourseIsPressed() else {
             return
+        }
+        await restoreCourse(from: stopped)
+    }
+
+    /// The press itself, in one turn: nil when the offer was answered or a
+    /// deploy holds the restore back (its alert then over the sheet);
+    /// otherwise the offer is answered and the stop to restore from is
+    /// handed back, so nothing between the press and the restore asks
+    /// again where no one would see the answer (the settings sweep, LOW B1).
+    func restoreCourseIsPressed() -> StartOfYearPreparation.StoppedPartWay? {
+        guard case .stoppedPartWay(let stopped) = stage, !offerAnswered else {
+            return nil
         }
         if restoreIsHeldBackByADeploy() {
-            return
+            return nil
         }
         offerAnswered = true
+        return stopped
+    }
+
+    /// The restore, once pressed: the whole-course restore refuses a deploy
+    /// begun meanwhile with its own alert (`WorkspaceModel.restoreBackup`).
+    func restoreCourse(from stopped: StartOfYearPreparation.StoppedPartWay) async {
         await StartOfYearPreparation.restoreCourse(
             stopped, in: course, workspaceURL: workspaceURL, restore: restoreWholeCourse
         )
@@ -795,12 +813,16 @@ struct StartOfYearSheet: View {
                 Button(StartOfYearWording.restoreCourseButton) {
                     // A deploy of the course holds the restore back: the
                     // restore's alert over this sheet, which stays open.
-                    if model.restoreIsHeldBackByADeploy() {
+                    // Checked and answered in this press's own turn (#899,
+                    // the settings sweep's LOW B1), so no deploy can start
+                    // between the check and the restore unseen: from here
+                    // on the restore's own refusal says it.
+                    guard let stopped = model.restoreCourseIsPressed() else {
                         return
                     }
                     dismiss()
                     Task { @MainActor in
-                        await model.restoreCourse()
+                        await model.restoreCourse(from: stopped)
                     }
                 }
                 .keyboardShortcut(.defaultAction)
