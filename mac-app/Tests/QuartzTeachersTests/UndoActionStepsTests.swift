@@ -30,6 +30,14 @@ final class UndoActionStepsTests: XCTestCase {
 
     override func setUp() async throws {
         previousTrail = ActivityTrail.store
+        // A list of the test's own, never the suite's: a test that leaves a
+        // step part way (Today's Class, the class dates) would otherwise
+        // leave it in flight on the list every later class shares, and a
+        // later test's recovery would close it there (day27-7).
+        let ownList: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("undo-action-steps-\(UUID().uuidString)", isDirectory: true)
+        listFolders.append(ownList)
+        UndoJournalLocation.folderOverride = ownList
     }
 
     override func tearDown() async throws {
@@ -94,9 +102,10 @@ final class UndoActionStepsTests: XCTestCase {
         let list: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("undo-action-steps-\(UUID().uuidString)", isDirectory: true)
         listFolders.append(list)
+        let previousList: URL? = UndoJournalLocation.folderOverride
         UndoJournalLocation.folderOverride = list
         defer {
-            UndoJournalLocation.folderOverride = nil
+            UndoJournalLocation.folderOverride = previousList
         }
         let before: [String: Data] = UndoActionStepsTests.snapshot(of: root)
         let foldersBefore: [String] = UndoActionStepsTests.folders(of: root)

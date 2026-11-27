@@ -14,6 +14,8 @@ final class UndoRestoreSetAsideTests: XCTestCase {
 
     // MARK: - Set up
 
+    /// `offerTests.setUp()` gives the test its own Undo list and its
+    /// `tearDown()` puts the suite's back (day27-7).
     override func setUp() async throws {
         try await offerTests.setUp()
     }
@@ -66,8 +68,15 @@ final class UndoRestoreSetAsideTests: XCTestCase {
 
         // The app "dies": recovery runs as another process would at launch.
         let atLaunch: UndoJournal = UndoJournal(folderURL: journal.folderURL, processIsAlive: { (_: UndoProcess) -> Bool in false })
+        // Only this working folder resolves, as at a launch: a step made in
+        // any other folder is never judged against this course (day27-7).
         let root: URL = stopped.root
-        await UndoRecovery.recoverAndRederive(atLaunch, resolveRoot: { (_: UndoWorkingFolder) -> URL? in root })
+        await UndoRecovery.recoverAndRederive(atLaunch, resolveRoot: { (folder: UndoWorkingFolder) -> URL? in
+            if folder.id.lowercased() == folderID.lowercased() {
+                return root
+            }
+            return nil
+        })
 
         let settled: [UndoStepRecord] = UndoRestoreSetAsideTests.steps(in: try atLaunch.read(), after: baseline, folderID: folderID)
         var done: Int = 0
