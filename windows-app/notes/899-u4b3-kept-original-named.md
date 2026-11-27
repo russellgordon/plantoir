@@ -1,3 +1,5 @@
+Kept by #1055 (2026-11-27); its two recovery rows re-laid on a plain step by M5.
+
 # U4b3 kept-original-named (#899), 2026-11-26
 
 Brief `vm-tools/briefs/2026-11-26-899-u4b3-kept-original-named.md`, from bb92aabc2 (origin/dev 96a3d2b73 already merged in; still current at hand-back, no merge needed). Russell's answer to "Held for Russell" 1 (2026-11-26, recorded on #899): the words go BEFORE the extension, `Unit 1, Day 3 (kept by Undo).md`; nothing added to hide it from the website.

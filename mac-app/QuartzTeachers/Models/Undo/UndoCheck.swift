@@ -256,52 +256,8 @@ nonisolated enum UndoCheck {
         var movingNow: Set<String> = []
         var stagedAtItsTurn: Set<String> = []
         var leadingTargets: [UndoSwapTarget] = []
-        // U4b3 door-1 and door-2: each place an earlier op of the step
-        // leaves and a later op fills (a handed-over place), in either
-        // direction. Empty for every step readable today
-        // (`UndoStep.wholeOpsStandAlone`), so such a step is planned exactly
-        // as before.
-        let handovers: [UndoHandover] = UndoCheck.handovers(in: ops)
-        // The ops (by their place in the step, `stepIndex`) found already as
-        // wanted: no change of this plan.
-        var opsNotChanged: Set<Int> = []
-        // Each target's op, by its place in this plan's order (`opIndex`:
-        // the step's order going forward, reversed going back), for the
-        // order of a step with a handed-over place.
-        var leadingTargetOps: [Int] = []
-        var wholeTargetOps: [Int] = []
-        var firstOpOnPath: [String: Int] = [:]
-        var handedOverPaths: Set<String> = []
 
-        var opIndex: Int = -1
         for op in ordered {
-            opIndex += 1
-            // The op's place in the step itself, as `handovers` names it.
-            var stepIndex: Int = opIndex
-            if direction == .backward {
-                stepIndex = ops.count - 1 - opIndex
-            }
-            // The handed-over place is judged FREE for the op that comes
-            // second in this plan, when the op that comes first is a change
-            // of this plan. Going forward that is the filler, after its
-            // leaver (door-1). Going back it is the leaver, after its
-            // filler's taking-back (door-2). Skipped as already done, the
-            // first op leaves the place to be read from the disk as before.
-            var placeIsFree: Bool = false
-            var inAHandoverWithALink: Bool = false
-            for handover in handovers {
-                if direction == .forward && handover.fillerIndex == stepIndex
-                    && !opsNotChanged.contains(handover.leaverIndex) {
-                    placeIsFree = true
-                }
-                if direction == .backward && handover.leaverIndex == stepIndex
-                    && !opsNotChanged.contains(handover.fillerIndex) {
-                    placeIsFree = true
-                }
-                if handover.aLinkMoves && (handover.fillerIndex == stepIndex || handover.leaverIndex == stepIndex) && !op.isWhole {
-                    inAHandoverWithALink = true
-                }
-            }
             guard let kind = op.knownKind else {
                 // Never guessed at: a step this version cannot read is not
                 // undone or redone (the director's ruling 1).
@@ -321,9 +277,7 @@ nonisolated enum UndoCheck {
             // the other side of a move, which is as the step left it (U4b's
             // `placeAsFound` names a moved item only when the item itself is
             // what changed).
-            if let placeLeavingTheFolder = UndoCheck.placeLeavingTheFolder(
-                op, root: root, judgedOnTheFoldersAbove: inAHandoverWithALink
-            ) {
+            if let placeLeavingTheFolder = UndoCheck.placeLeavingTheFolder(op, root: root) {
                 if !inTheWay.contains(placeLeavingTheFolder) {
                     inTheWay.append(placeLeavingTheFolder)
                 }
@@ -360,13 +314,10 @@ nonisolated enum UndoCheck {
                     }
                 }
                 let state: UndoOpState = UndoCheck.wholeState(
-                    of: op, root: root, places: places, overridingTo: overridingTo, overridingFrom: overridingFrom,
-                    toIsHandedOver: placeIsFree && direction == .forward,
-                    fromIsHandedOver: placeIsFree && direction == .backward
+                    of: op, root: root, places: places, overridingTo: overridingTo, overridingFrom: overridingFrom
                 )
                 let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
                 if verdict == .alreadyBack || verdict == .alreadyRedone {
-                    opsNotChanged.insert(stepIndex)
                     continue
                 }
                 if verdict == .cannotTell {
@@ -409,11 +360,9 @@ nonisolated enum UndoCheck {
                 if carriesEdits && direction == .forward, let to = op.to {
                     movingNow.insert(to)
                     leadingTargets.append(target)
-                    leadingTargetOps.append(opIndex)
                     continue
                 }
                 wholeTargets.append(target)
-                wholeTargetOps.append(opIndex)
                 continue
             }
             guard let path = op.path else {
@@ -425,20 +374,10 @@ nonisolated enum UndoCheck {
                     readPath = UndoOp.placeBeforeTheMove(path, from: from, to: to)
                     stagedAtItsTurn.insert(path)
                 }
-                // A new file going forward, or a removal taken back, at a
-                // place this plan frees first: absent, never read through
-                // the link that still stands there.
-                var item: UndoItem = .absent
-                if !placeIsFree {
-                    item = UndoItem.read(at: root.appendingPathComponent(readPath))
-                }
+                let item: UndoItem = UndoItem.read(at: root.appendingPathComponent(readPath))
                 original[path] = item
                 working[path] = item
                 pathsInOrder.append(path)
-                firstOpOnPath[path] = opIndex
-            }
-            if inAHandoverWithALink {
-                handedOverPaths.insert(path)
             }
             if pathsWithMissingContent.contains(path) {
                 continue
@@ -447,7 +386,6 @@ nonisolated enum UndoCheck {
             let state: UndoOpState = UndoCheck.state(of: op, in: current)
             let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
             if verdict == .alreadyBack || verdict == .alreadyRedone {
-                opsNotChanged.insert(stepIndex)
                 continue
             }
             if verdict == .cannotTell {
@@ -515,37 +453,19 @@ nonisolated enum UndoCheck {
 
         // Going forward, a move that carries edits goes in before them.
         var targets: [UndoSwapTarget] = leadingTargets
-        var fileTargets: [UndoSwapTarget] = []
-        var fileTargetOps: [Int] = []
         for path in pathsInOrder {
             let before: UndoItem = original[path] ?? .absent
             let after: UndoItem = working[path] ?? .absent
             if before == after {
                 continue
             }
-            fileTargets.append(UndoSwapTarget(
+            targets.append(UndoSwapTarget(
                 url: root.appendingPathComponent(path),
                 relativePath: path,
                 expected: before.data,
                 replacement: after.data,
-                stagesAtItsTurn: stagedAtItsTurn.contains(path),
-                handedOver: handedOverPaths.contains(path)
+                stagesAtItsTurn: stagedAtItsTurn.contains(path)
             ))
-            fileTargetOps.append(firstOpOnPath[path] ?? 0)
-        }
-        if !handovers.isEmpty {
-            // A step with a handed-over place, in this plan's order: going
-            // forward every filler goes in after the op that leaves its
-            // place (U4b3 door-1); going back, in the step's ops reversed,
-            // every leaver's taking-back after its filler's (door-2).
-            let inTheStepsOrder: [UndoSwapTarget] = UndoCheck.targetsInTheStepsOrder(
-                [leadingTargets, fileTargets, wholeTargets],
-                ops: [leadingTargetOps, fileTargetOps, wholeTargetOps]
-            )
-            return .ready(targets: inTheStepsOrder, recomputes: recomputes, leftApart: leftApart)
-        }
-        for target in fileTargets {
-            targets.append(target)
         }
         for target in wholeTargets {
             targets.append(target)
@@ -558,19 +478,8 @@ nonisolated enum UndoCheck {
     /// nil when every one does. The one place a leaves-the-folder refusal
     /// names, at the plan and again just before each change
     /// (`undo.rule.stagedThenSwapped`; U4b2-2).
-    ///
-    /// `judgedOnTheFoldersAbove` is true for a file op at a handed-over
-    /// place whose other op is a link's move (U4b3 door-1): the link standing
-    /// there is leaving or arriving, never written through, so its place is
-    /// judged as a link's move judges its own places, on the folders above.
-    static func placeLeavingTheFolder(_ op: UndoOp, root: URL, judgedOnTheFoldersAbove: Bool = false) -> String? {
+    static func placeLeavingTheFolder(_ op: UndoOp, root: URL) -> String? {
         for place in op.pathsNamed {
-            if judgedOnTheFoldersAbove {
-                if !UndoPlaces.staysInsideAbove(root, place) {
-                    return place
-                }
-                continue
-            }
             if !UndoPlaces.staysInside(root, place, namedBy: op) {
                 return place
             }
@@ -578,51 +487,17 @@ nonisolated enum UndoCheck {
         return nil
     }
 
-    /// U4b3 door-1: the handed-over places of a step, in the step's order.
-    /// A place P is handed over when an EARLIER op leaves it (a move whose
-    /// `from` is P, or a `writeFile` at P that removes it) and a LATER op
-    /// fills it (a move whose `to` is P, or a `writeFile` at P that makes a
-    /// new file), at least one of them a move, and each move a file's or a
-    /// link's (never a folder's, a capitalisation-only one, a `moveApart`
-    /// or a `setAside`). Places are compared part by part without regard to
-    /// case (`UndoOp.partInside`), the exact place only. Each leaver hands
-    /// its place to the first filler after it.
-    static func handovers(in ops: [UndoOp]) -> [UndoHandover] {
-        var found: [UndoHandover] = []
-        var leaverIndex: Int = 0
-        while leaverIndex < ops.count {
-            let leaver: UndoOp = ops[leaverIndex]
-            guard let place = UndoCheck.placeLeft(by: leaver) else {
-                leaverIndex += 1
-                continue
-            }
-            var fillerIndex: Int = leaverIndex + 1
-            while fillerIndex < ops.count {
-                let filler: UndoOp = ops[fillerIndex]
-                if let filled = UndoCheck.placeFilled(by: filler), UndoOp.partInside(place, of: filled) == "",
-                   UndoCheck.handsOverAsAMove(leaver) || UndoCheck.handsOverAsAMove(filler) {
-                    let aLinkMoves: Bool = leaver.linkSha != nil || filler.linkSha != nil
-                    found.append(UndoHandover(
-                        place: place, leaverIndex: leaverIndex, fillerIndex: fillerIndex, aLinkMoves: aLinkMoves
-                    ))
-                    break
-                }
-                fillerIndex += 1
-            }
-            leaverIndex += 1
-        }
-        return found
-    }
-
-    /// A move that can hand a place over: a file's or a link's `move`.
+    /// A file's own `move` (by its `sha`): the one move whose places
+    /// `placeLeft` and `placeFilled` name. Never a folder's, a
+    /// capitalisation-only one, a link's, a `moveApart` or a `setAside`.
     static func handsOverAsAMove(_ op: UndoOp) -> Bool {
         if op.knownKind != .move || op.listingSha != nil || op.isCaseOnlyMove {
             return false
         }
-        return op.sha != nil || op.linkSha != nil
+        return op.sha != nil
     }
 
-    /// The place an op leaves: a handing-over move's `from`, or a removed
+    /// The place an op leaves: a file's move's `from`, or a removed
     /// file's path.
     static func placeLeft(by op: UndoOp) -> String? {
         if UndoCheck.handsOverAsAMove(op) {
@@ -634,7 +509,7 @@ nonisolated enum UndoCheck {
         return nil
     }
 
-    /// The place an op fills: a handing-over move's `to`, or a new file's
+    /// The place an op fills: a file's move's `to`, or a new file's
     /// path.
     static func placeFilled(by op: UndoOp) -> String? {
         if UndoCheck.handsOverAsAMove(op) {
@@ -644,34 +519,6 @@ nonisolated enum UndoCheck {
             return op.path
         }
         return nil
-    }
-
-    /// U4b3 door-1: the targets of a step with a handed-over place, in the
-    /// step's op order (each group's targets with the op each comes from,
-    /// a file target at the first op naming its path), so every filler's
-    /// change goes in after its leaver's. Targets of one op keep the order
-    /// they were given in.
-    static func targetsInTheStepsOrder(_ groups: [[UndoSwapTarget]], ops groupOps: [[Int]]) -> [UndoSwapTarget] {
-        var ordered: [UndoSwapTarget] = []
-        var orderedOps: [Int] = []
-        var groupIndex: Int = 0
-        while groupIndex < groups.count {
-            var position: Int = 0
-            while position < groups[groupIndex].count {
-                let target: UndoSwapTarget = groups[groupIndex][position]
-                let opIndex: Int = groupOps[groupIndex][position]
-                // After every target from an op at or before this one.
-                var insertAt: Int = ordered.count
-                while insertAt > 0 && orderedOps[insertAt - 1] > opIndex {
-                    insertAt -= 1
-                }
-                ordered.insert(target, at: insertAt)
-                orderedOps.insert(opIndex, at: insertAt)
-                position += 1
-            }
-            groupIndex += 1
-        }
-        return ordered
     }
 
     /// Each edit's path a move of the step carries (`UndoOp.moveCarries`,
@@ -806,24 +653,6 @@ nonisolated enum UndoCheck {
     }
 }
 
-/// U4b3 door-1: a place handed over in a step (`UndoCheck.handovers`): the
-/// op that leaves it and the later op that fills it, by their places in the
-/// step.
-nonisolated struct UndoHandover: Equatable, Sendable {
-
-    // MARK: - Stored properties
-
-    /// The place, as the leaver names it.
-    let place: String
-
-    let leaverIndex: Int
-
-    let fillerIndex: Int
-
-    /// Whether either op of the pair is a link's move.
-    let aLinkMoves: Bool
-}
-
 /// One page a check puts back from a kept original (`UndoCheck.plan`'s
 /// `keptOriginalUsed`): the content taken from it, and what the page holds
 /// at that op, which the swap sets aside and the other direction needs.
@@ -900,24 +729,15 @@ nonisolated struct UndoSwapTarget: Equatable, Sendable {
     /// folder is not there yet.
     let stagesAtItsTurn: Bool
 
-    /// U4b3 door-1: a file at a handed-over place whose other op is a link's
-    /// move. At staging, while the link still stands there, the place is
-    /// judged on the folders above it only, and nothing is read through it.
-    let handedOver: Bool
-
     // MARK: - Initializer
 
-    init(
-        url: URL, relativePath: String, expected: Data?, replacement: Data?,
-        stagesAtItsTurn: Bool = false, handedOver: Bool = false
-    ) {
+    init(url: URL, relativePath: String, expected: Data?, replacement: Data?, stagesAtItsTurn: Bool = false) {
         self.url = url
         self.relativePath = relativePath
         self.expected = expected
         self.replacement = replacement
         self.change = .file
         self.stagesAtItsTurn = stagesAtItsTurn
-        self.handedOver = handedOver
     }
 
     init(url: URL, relativePath: String, change: UndoSwapChange) {
@@ -927,7 +747,6 @@ nonisolated struct UndoSwapTarget: Equatable, Sendable {
         self.replacement = nil
         self.change = change
         self.stagesAtItsTurn = false
-        self.handedOver = false
     }
 }
 
@@ -1070,16 +889,11 @@ nonisolated enum UndoSwap {
             let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
             var mode: mode_t = 0o644
             var information: stat = stat()
-            // A handed-over place may still hold the link leaving it: never
-            // followed (U4b3 door-1). Its new file takes the default mode.
-            var found: Int32 = -1
-            if !target.handedOver {
-                found = target.url.withUnsafeFileSystemRepresentation { path in
-                    guard let path else {
-                        return -1
-                    }
-                    return stat(path, &information)
+            let found: Int32 = target.url.withUnsafeFileSystemRepresentation { path in
+                guard let path else {
+                    return -1
                 }
+                return stat(path, &information)
             }
             if found == 0 {
                 mode = information.st_mode & 0o7777
@@ -1290,7 +1104,7 @@ nonisolated enum UndoSwap {
             originals.append(nil)
             // Nothing is staged through a link that leaves the working folder
             // (the third hard review of U2b, LOW 3).
-            if let root, let leadingOut = UndoSwap.placeLeadingOut(target, root: root, atStaging: true) {
+            if let root, let leadingOut = UndoSwap.placeLeadingOut(target, root: root) {
                 staged.append(nil)
                 tidy()
                 removeTheFoldersMade()
@@ -1399,11 +1213,6 @@ nonisolated enum UndoSwap {
                 }
                 if atFrom == .cannotRead || atTarget == .cannotRead {
                     refusal = .cannotTellNow(path: namedAs)
-                } else if atFrom == .holdsTheContent && atTarget != .free && UndoSwap.placeIsLeftEarlier(in: targets, before: index) {
-                    // A handed-over place taken since its leaver left it:
-                    // named as the place that changed, not where the move
-                    // comes from (review A of U4b3, LOW 1).
-                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
                 } else if atFrom != .holdsTheContent || atTarget != .free {
                     refusal = .changedSince(firstPath: namedAs, others: 0)
                 } else {
@@ -1552,19 +1361,7 @@ nonisolated enum UndoSwap {
     /// same rule the planning check uses (`UndoCheck.placeLeavingTheFolder`;
     /// U4b2-2 review 1, MEDIUM 1), never the other side of the move; for
     /// any other change, the place it changes.
-    ///
-    /// `atStaging` is true for the look before staging: a file target at a
-    /// handed-over place (`handedOver`) is then judged on the folders above
-    /// it only, as the link leaving it still stands there (U4b3 door-1).
-    /// Before its own change the leaver has gone, and the place is judged
-    /// whole, as any file's.
-    static func placeLeadingOut(_ target: UndoSwapTarget, root: URL, atStaging: Bool = false) -> String? {
-        if atStaging && target.handedOver {
-            if UndoPlaces.staysInsideAbove(root, target.relativePath) {
-                return nil
-            }
-            return target.relativePath
-        }
+    static func placeLeadingOut(_ target: UndoSwapTarget, root: URL) -> String? {
         if staysInside(target, root: root) {
             return nil
         }
@@ -1696,19 +1493,6 @@ nonisolated enum UndoSwap {
             putBack = false
         }
         return refusal
-    }
-
-    /// Whether an earlier target of this swap is at the same place as the
-    /// target at `index`: a place handed over, which that earlier swap left.
-    static func placeIsLeftEarlier(in targets: [UndoSwapTarget], before index: Int) -> Bool {
-        var earlier: Int = 0
-        while earlier < index {
-            if targets[earlier].relativePath == targets[index].relativePath {
-                return true
-            }
-            earlier += 1
-        }
-        return false
     }
 
     /// A kept original put back at its page: over the new content when the

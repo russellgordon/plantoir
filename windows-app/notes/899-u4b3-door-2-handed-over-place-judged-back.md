@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # #899 U4b3 door-2: going back, a handed-over place is judged free for its leaver
 
 Brief: `vm-tools/briefs/2026-11-26-899-u4b3-door-2-handed-over-place-judged-back.md` (chain: `2026-11-26-899-u4b3-ORDER.md`). Branch `issue/899-u4b3-linked-class-page-moves-its-link`, worktree `wt-899-u4b3`, from door-1's head bdd04fa63. `contracts/` untouched. Inert, as door-1 is: no step readable today holds a handed-over place.

@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # #899 U4b3 door-3: recovery judges each op of a handed-over place as the other leaves it
 
 Brief: `vm-tools/briefs/2026-11-26-899-u4b3-door-3-recovery-judges-a-handed-over-place.md` (chain: `2026-11-26-899-u4b3-ORDER.md`). Branch `issue/899-u4b3-linked-class-page-moves-its-link`, worktree `wt-899-u4b3`, from door-2's head 9c0f34536. `contracts/` untouched. Inert, as doors 1 and 2 are: no step readable today holds a handed-over place.
