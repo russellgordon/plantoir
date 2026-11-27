@@ -36,7 +36,7 @@ internal static class WindowsActionsOnTheMacFixture
         "reDateClasses", "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear",
         "showTodaysClassOnTheFrontPage", "notTodayOnTheFrontPage", "keepClassesDatedLater", "answerTheLinksChecklist",
         "makeRoomForClasses", "duplicateClass", "duplicateAsTheNextClass", "setSchoolYear", "saveCourseSettings",
-        "addFolder",
+        "addFolder", "renameFolder", "renameFolderPerSection",
     ];
 
     /// <summary>
@@ -147,6 +147,11 @@ internal static class WindowsActionsOnTheMacFixture
             LayTheSettingsCourse(workingFolder);
             return;
         }
+        if (recorded.GetProperty("name").GetString() is "renameFolder" or "renameFolderPerSection")
+        {
+            LayTheRenameCourse(workingFolder);
+            return;
+        }
         string course = Path.Combine(workingFolder, "courses", Course);
         Directory.CreateDirectory(course);
         File.WriteAllText(Path.Combine(course, "course_config.json"),
@@ -178,6 +183,45 @@ internal static class WindowsActionsOnTheMacFixture
         File.WriteAllText(Path.Combine(course, "course_config.json"),
             "{\"course_code\":\"ICS3U\",\"course_name\":\"Introduction to Computer Science\",\"curriculum_folder\":\"Curriculum\",\"expandable\":[\"Concepts\"],\"hidden\":[\"Media\",\"Tasks\"],\"include_curriculum_coverage\":true,\"num_sections\":1,\"per_section_files\":[\"index.md\",\"Announcements.md\"],\"per_section_folders\":[\"All Classes\",\"Tasks\"],\"section_numbers\":[1],\"shared_files\":[\"Learning Goals.md\"],\"shared_folders\":[\"Concepts\",\"Curriculum\",\"Tasks\",\"Tests\"]}");
         File.WriteAllText(Path.Combine(workingFolder, Workspace.MarkerLauncher), "");
+    }
+
+    /// <summary>
+    /// The mac's <c>UndoActionStepsTests.renameCourse</c>, the course both
+    /// Rename folder steps were recorded on (#899 W8b-15b), laid from the two
+    /// recorded steps themselves: each folder a step moves at its <c>from</c>,
+    /// as its listing holds it; every other file of either step from its
+    /// before (a page a move carries is named at its new place, so it is laid
+    /// by its folder's listing instead); and the settings as recorded before.
+    /// </summary>
+    private static void LayTheRenameCourse(string workingFolder)
+    {
+        Directory.CreateDirectory(Path.Combine(workingFolder, "courses", Course));
+        File.WriteAllText(Path.Combine(workingFolder, Workspace.MarkerLauncher), "");
+        foreach (string name in new[] { "renameFolder", "renameFolderPerSection" })
+        {
+            JsonElement step = Recorded(name);
+            var movedTo = new List<string>();
+            foreach (JsonElement moved in step.GetProperty("folderMoves").EnumerateArray())
+            {
+                string from = moved.GetProperty("from").GetString()!;
+                movedTo.Add(moved.GetProperty("to").GetString()!);
+                Directory.CreateDirectory(UndoDoor.FullPath(workingFolder, from));
+                foreach (JsonElement folder in moved.GetProperty("folders").EnumerateArray())
+                    Directory.CreateDirectory(UndoDoor.FullPath(workingFolder, from + "/" + folder.GetString()));
+                foreach (JsonProperty file in moved.GetProperty("files").EnumerateObject())
+                    WriteAt(workingFolder, from + "/" + file.Name, new UTF8Encoding(false).GetBytes(file.Value.GetString()!));
+            }
+            foreach (JsonElement file in step.GetProperty("files").EnumerateArray())
+            {
+                string path = file.GetProperty("path").GetString()!;
+                bool carried = false;
+                foreach (string to in movedTo)
+                {
+                    if (UndoOp.PartInside(to, path) is not null) carried = true;
+                }
+                if (!carried) WriteAt(workingFolder, path, Bytes(file.GetProperty("before")));
+            }
+        }
     }
 
     /// <summary>
@@ -332,6 +376,22 @@ internal static class WindowsActionsOnTheMacFixture
                 FolderScaffold.ReadTemplate(templatePath), () => FolderScaffold.CurriculumPageNames(configuration, courseDirectory),
                 "2026-09-08T07:00:00.000-0400", workspace.UndoList, workspace.UndoDoorOfATest);
             return "folders created " + outcome.FoldersCreated;
+        }
+        // Rename folder is the sheet's Rename, given the folder, the new name
+        // and the scope the mac's CourseSettingsView.renameFolder was given,
+        // with the settings change the sheet passes in, on the workspace's
+        // list and door (#899 W8b-15b).
+        if (stepName is "renameFolder" or "renameFolderPerSection")
+        {
+            string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);
+            string configPath = Path.Combine(courseDirectory, "course_config.json");
+            var configuration = CourseConfiguration.Load(configPath);
+            (string oldName, string newName, FolderScope scope) = stepName == "renameFolder"
+                ? ("Concepts", "Ideas", FolderScope.Shared)
+                : ("Tasks", "Assessments", FolderScope.PerSection);
+            var settings = SpecialFolderRenamer.RenamingTheSettings(configuration, configPath, oldName, newName, scope, courseDirectory);
+            return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, configuration.SectionNumbers, settings,
+                finishing: false, workspace.UndoList, workspace.UndoDoorOfATest).Message;
         }
         if (stepName == "saveCourseSettings")
         {
@@ -677,10 +737,17 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
         var kinds = new List<string>();
         var paths = new List<string>();
         var recomputes = new List<string>();
+        var folderMoves = new List<string>();
         foreach (JsonNode? op in step["ops"]!.AsArray())
         {
             string kind = (string)op!["kind"]!;
             kinds.Add(kind);
+            // A folder moved whole names no file: its from, to and listing's hash (#899 W8b-15b).
+            if (kind == UndoOp.Move)
+            {
+                folderMoves.Add((string)op["from"]! + " -> " + (string)op["to"]! + " " + (string?)op["listingSha"]);
+                continue;
+            }
             if (kind == UndoOp.Recompute)
             {
                 recomputes.Add((string)op["maintainer"]! + " " + (string)op["path"]! + " " + (long)op["section"]!);
@@ -699,6 +766,14 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             foreach (JsonElement tree in recordedTrees.EnumerateArray()) recordedPaths.Add(tree.GetProperty("path").GetString()!);
         }
         Assert.True(recordedPaths.SequenceEqual(paths), $"{name}: files {string.Join(" | ", paths)}");
+        var recordedFolderMoves = new List<string>();
+        if (recorded.TryGetProperty("folderMoves", out JsonElement recordedMoves))
+        {
+            foreach (JsonElement moved in recordedMoves.EnumerateArray())
+                recordedFolderMoves.Add(moved.GetProperty("from").GetString() + " -> " + moved.GetProperty("to").GetString()
+                                        + " " + moved.GetProperty("listingSha").GetString());
+        }
+        Assert.True(recordedFolderMoves.SequenceEqual(folderMoves), $"{name}: folders moved {string.Join(" | ", folderMoves)}");
         var recordedKinds = recorded.GetProperty("ops").EnumerateArray().Select(op => op.GetString()!).ToList();
         if (holdsOneMore)
         {

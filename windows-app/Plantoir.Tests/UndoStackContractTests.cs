@@ -56,7 +56,7 @@ public sealed class UndoStackContractTests
             .Select(stackCase => new object[] { stackCase.GetProperty("name").GetString()! });
 
     private static bool LaysASymbolicLink(JsonElement stackCase) =>
-        stackCase.GetProperty("calls").EnumerateArray().Any(call => call.GetString() == "moveALinkToAFolder");
+        stackCase.GetProperty("calls").EnumerateArray().Any(call => call.GetString() is "moveALinkToAFolder" or "renameAPerSectionFolderThatIsALink");
 
     [Fact]
     public void TheContractHoldsTheStackCases()
@@ -649,17 +649,29 @@ public sealed class UndoStackContractTests
                 }
                 // U4b2-14 (W8-6): a symbolic link to a folder moved as itself.
                 case "moveALinkToAFolder":
-                {
-                    string media = _scribe.FullPath("A", LinkPlace);
-                    if (UndoLinks.Look(media) == UndoLinks.What.Nothing && UndoLinks.Look(_scribe.FullPath("A", LinkRenamed)) == UndoLinks.What.Nothing)
-                    {
-                        _scribe.WritePage("A", LinkLibrary + "/a.md", "A"u8.ToArray());
-                        _scribe.WritePage("A", LinkLibrary + "/pictures/b.md", "B"u8.ToArray());
-                        _libraryListing = UndoTreeReading.Read(_scribe.FullPath("A", LinkLibrary)).ListingSha;
-                        Directory.CreateDirectory(Path.GetDirectoryName(media)!);
-                        Directory.CreateSymbolicLink(media, LinkTarget);
-                    }
+                    LayTheLinkToTheLibrary();
                     Ops(new JsonArray(TheLinksMove()), []);
+                    return;
+                // U4b2-15 (W8b-21): Rename folder's own plan and apply, per
+                // section, media to renamed in section 1 alone, on the same
+                // link: the one step moveALinkToAFolder makes.
+                case "renameAPerSectionFolderThatIsALink":
+                {
+                    LayTheLinkToTheLibrary();
+                    string course = _scribe.FullPath("A", "courses/TST1O");
+                    long seq = _scribe.Fold().NextSeq;
+                    var list = new UndoForThisProcess(_scribe.JournalFolder, UndoMode.Live, null, maintainers: _scribe.Maintainers);
+                    Plantoir.Core.Models.SpecialFolderRenamer.Rename("media", "renamed", Plantoir.Core.Models.FolderScope.PerSection, course,
+                                                                     new[] { 1 }, null, false, list, _scribe.Door());
+                    // The sheet clears the rename record once the rename is whole.
+                    Plantoir.Core.Models.SpecialFolderRenamer.ClearRenameRecord(course);
+                    UndoOp move = Assert.Single(_scribe.Fold().Steps[seq].Step.Ops);
+                    Assert.Equal(UndoOp.Move, move.Kind);
+                    Assert.Equal(LinkPlace, move.From);
+                    Assert.Equal(LinkRenamed, move.To);
+                    Assert.Equal((string?)TheLinksMove()["linkSha"], move.LinkSha);
+                    Assert.Null(move.ListingSha);
+                    Last = "applied";
                     return;
                 }
                 // Review 1 of U4b2-14: that link's move with an edit inside its new place, changing nothing.
@@ -772,6 +784,18 @@ public sealed class UndoStackContractTests
         private string? _libraryListing;
 
         /// <summary>The link's move from section1/media to section1/renamed, its linkSha the SHA-256 of <c>../library</c> as written.</summary>
+        /// <summary>The library and the link to it, laid when neither the link's place nor its new place holds anything.</summary>
+        private void LayTheLinkToTheLibrary()
+        {
+            string media = _scribe.FullPath("A", LinkPlace);
+            if (UndoLinks.Look(media) != UndoLinks.What.Nothing || UndoLinks.Look(_scribe.FullPath("A", LinkRenamed)) != UndoLinks.What.Nothing) return;
+            _scribe.WritePage("A", LinkLibrary + "/a.md", "A"u8.ToArray());
+            _scribe.WritePage("A", LinkLibrary + "/pictures/b.md", "B"u8.ToArray());
+            _libraryListing = UndoTreeReading.Read(_scribe.FullPath("A", LinkLibrary)).ListingSha;
+            Directory.CreateDirectory(Path.GetDirectoryName(media)!);
+            Directory.CreateSymbolicLink(media, LinkTarget);
+        }
+
         private static JsonObject TheLinksMove() => new()
         {
             ["kind"] = "move", ["from"] = LinkPlace, ["to"] = LinkRenamed,

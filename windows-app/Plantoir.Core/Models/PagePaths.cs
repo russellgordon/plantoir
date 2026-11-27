@@ -162,7 +162,14 @@ public static class PagePaths
     /// sections' folders are left out too — a class page in section 1 has no
     /// business linking into section 2.
     /// </summary>
-    public static List<string> MarkdownPages(string courseDirectory, int? sectionNumber = null)
+    /// <param name="descendsIntoLinks">
+    /// False for Rename folder's walk (#899 W8b-15b): a folder entry that is a
+    /// link (<see cref="Plantoir.Core.Undo.UndoLinks.Look"/>, a name-surrogate
+    /// reparse point) is not descended into, so a page is found only at its own
+    /// place inside the course. Any other reparse point, a OneDrive
+    /// placeholder's among them, is walked as the folder it is.
+    /// </param>
+    public static List<string> MarkdownPages(string courseDirectory, int? sectionNumber = null, bool descendsIntoLinks = true)
     {
         var pages = new List<string>();
         Walk(courseDirectory);
@@ -192,6 +199,8 @@ public static class PagePaths
                     if (match.Success && sectionNumber is { } wanted &&
                         int.TryParse(match.Groups[1].Value, out int found) && found != wanted)
                         continue;
+                    if (!descendsIntoLinks && !WalksInto(Plantoir.Core.Undo.UndoLinks.Look(entry), descendsIntoLinks))
+                        continue;
                     Walk(entry);
                 }
                 else if (name.EndsWith(".md", StringComparison.OrdinalIgnoreCase) && !name.StartsWith('.'))
@@ -200,6 +209,19 @@ public static class PagePaths
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Whether the page walk goes into a folder entry, by what
+    /// <see cref="Plantoir.Core.Undo.UndoLinks.Look"/> reads it as: always
+    /// when the walk follows links; otherwise never into a link, and never
+    /// into an entry it cannot look at, which is skipped as the mac's walk
+    /// skips what it cannot read (window A fixes, review 1 L3).
+    /// </summary>
+    internal static bool WalksInto(Plantoir.Core.Undo.UndoLinks.What what, bool descendsIntoLinks)
+    {
+        if (descendsIntoLinks) return true;
+        return what != Plantoir.Core.Undo.UndoLinks.What.Link && what != Plantoir.Core.Undo.UndoLinks.What.CannotLook;
     }
 
     private static StringComparison PathComparison =>

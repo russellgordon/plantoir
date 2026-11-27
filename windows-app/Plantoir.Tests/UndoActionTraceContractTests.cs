@@ -21,8 +21,11 @@ namespace Plantoir.Tests;
 /// with no settings is left alone). A recorded step with <c>members</c> is
 /// made as its recorded <c>editJSON</c> ops (#899 W8-11); one with
 /// <c>trees</c> is made by its Windows action, each folder hashed by its
-/// listing (#899 W8-13); one with <c>moves</c> or <c>folderMoves</c> is held
-/// by name in the ledger.
+/// listing (#899 W8-13); one with <c>folderMoves</c> is made by its Windows
+/// action, each folder laid at its <c>from</c> as its listing, no carried
+/// page's before written at its new place, and each folder and its pages
+/// hashed at both places (#899 W8b-16); one with <c>moves</c> is held by name
+/// in the ledger.
 /// </summary>
 public sealed class UndoActionTraceContractTests
 {
@@ -57,6 +60,53 @@ public sealed class UndoActionTraceContractTests
         ReplayTheActionTrace(name);
     }
 
+    /// <summary>
+    /// The part of a recorded step this replay stops at by name, before any
+    /// door is asked, or null. The rollover's moves always (W7c).
+    /// </summary>
+    internal static string? WhatThisReplayDoesNotMake(JsonElement recorded, bool byTheWindowsAction)
+    {
+        if (recorded.TryGetProperty("moves", out _)) return "moves";
+        // A step with folderMoves, members or trees is made only by its
+        // Windows action (#899 W8-11 to 13, W8b-16; W8-11 to 13 review 1,
+        // LOW 4): the recorded-step draft writes whole files, moves no folder
+        // and makes none, so such a step that is not converted stops here by
+        // name, never at the final hashes. Rename folder's steps hold members
+        // AND folderMoves: folderMoves is named first.
+        foreach (string onlyByTheAction in new[] { "folderMoves", "members", "trees" })
+        {
+            if (!byTheWindowsAction && recorded.TryGetProperty(onlyByTheAction, out _)) return onlyByTheAction;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// A recorded step with folderMoves is made only by its Windows action
+    /// (#899 W8b-16): the recorded-step draft cannot move a folder, so such a
+    /// step that no Windows action makes stops by name at folderMoves, never
+    /// later at members or at the final hashes; one the Windows action makes
+    /// goes through. The rollover's moves stop it either way (W7c).
+    /// </summary>
+    [Fact]
+    public void AStepWithFolderMovesStopsByNameUnlessItsWindowsActionMakesIt()
+    {
+        int withFolderMoves = 0;
+        foreach (JsonElement recorded in StepsDocument.Value.RootElement.GetProperty("steps").EnumerateArray())
+        {
+            string stepName = recorded.GetProperty("name").GetString()!;
+            if (recorded.TryGetProperty("moves", out _))
+            {
+                Assert.Equal("moves", WhatThisReplayDoesNotMake(recorded, byTheWindowsAction: true));
+                continue;
+            }
+            if (!recorded.TryGetProperty("folderMoves", out _)) continue;
+            withFolderMoves++;
+            Assert.True(WhatThisReplayDoesNotMake(recorded, byTheWindowsAction: false) == "folderMoves", $"{stepName}: not stopped by folderMoves");
+            Assert.True(WhatThisReplayDoesNotMake(recorded, byTheWindowsAction: true) is null, $"{stepName}: stopped although its Windows action makes it");
+        }
+        Assert.True(withFolderMoves >= 2, $"{withFolderMoves} recorded steps hold folderMoves");
+    }
+
     private static JsonElement RecordedStep(string stepName) =>
         StepsDocument.Value.RootElement.GetProperty("steps").EnumerateArray()
             .Single(candidate => candidate.GetProperty("name").GetString() == stepName);
@@ -69,35 +119,50 @@ public sealed class UndoActionTraceContractTests
         JsonElement trace = UndoContract.Traces.RootElement.GetProperty("actionTraces").EnumerateArray()
             .Single(candidate => candidate.GetProperty("name").GetString() == name);
         JsonElement recorded = RecordedStep(trace.GetProperty("step").GetString()!);
-        // Rename folder's steps hold members AND folderMoves: the guard names
-        // folderMoves first, so they stop here rather than run with no folder
-        // move made.
         string stepName = recorded.GetProperty("name").GetString()!;
         bool byTheWindowsAction = WindowsActionsOnTheMacFixture.Converted.Contains(stepName);
-        foreach (string unmade in new[] { "moves", "folderMoves" })
-        {
-            if (recorded.TryGetProperty(unmade, out _))
-                Assert.Fail($"{name}: a step this replay does not make yet ({unmade})");
-        }
-        // A step with members or trees is made only by its Windows action
-        // (#899 W8-11 to 13; W8-11 to 13 review 1, LOW 4): the recorded-step
-        // draft below writes whole files and makes no folder, so a step of
-        // either that is not converted stops here by name, never at the
-        // final hashes.
-        foreach (string onlyByTheAction in new[] { "members", "trees" })
-        {
-            if (!byTheWindowsAction && recorded.TryGetProperty(onlyByTheAction, out _))
-                Assert.Fail($"{name}: a step this replay does not make yet ({onlyByTheAction})");
-        }
+        if (WhatThisReplayDoesNotMake(recorded, byTheWindowsAction) is { } unmade)
+            Assert.Fail($"{name}: a step this replay does not make yet ({unmade})");
 
         using var scribe = new UndoScribe();
         var files = recorded.GetProperty("files").EnumerateArray().ToList();
         var paths = new List<string>();
+        // Each folder a step moves is laid at its from as its listing holds it
+        // (U4b2-12, #899 W8b-16), and hashed at both places: the folder by its
+        // listing, and every page of its listing at the old place and the new.
+        var movedTo = new List<string>();
+        if (recorded.TryGetProperty("folderMoves", out JsonElement layFolderMoves))
+        {
+            foreach (JsonElement moved in layFolderMoves.EnumerateArray())
+            {
+                string from = moved.GetProperty("from").GetString()!;
+                string to = moved.GetProperty("to").GetString()!;
+                movedTo.Add(to);
+                Directory.CreateDirectory(scribe.FullPath("A", from));
+                foreach (JsonElement folder in moved.GetProperty("folders").EnumerateArray())
+                    Directory.CreateDirectory(scribe.FullPath("A", from + "/" + folder.GetString()));
+                paths.Add(from);
+                paths.Add(to);
+                foreach (JsonProperty page in moved.GetProperty("files").EnumerateObject())
+                {
+                    scribe.WritePage("A", from + "/" + page.Name, new UTF8Encoding(false).GetBytes(page.Value.GetString()!));
+                    paths.Add(from + "/" + page.Name);
+                    paths.Add(to + "/" + page.Name);
+                }
+            }
+        }
         foreach (JsonElement file in files)
         {
             string path = file.GetProperty("path").GetString()!;
-            paths.Add(path);
-            scribe.WritePage("A", path, Bytes(file.GetProperty("before")));
+            if (!paths.Contains(path)) paths.Add(path);
+            // A page inside a folder move's to is carried: its before is
+            // already in the listing at the old place, never written at the new.
+            bool carried = false;
+            foreach (string to in movedTo)
+            {
+                if (UndoOp.PartInside(to, path) is not null) carried = true;
+            }
+            if (!carried) scribe.WritePage("A", path, Bytes(file.GetProperty("before")));
         }
         // Each folder a step makes is judged by its path, hashed by its
         // listing, and absent before the action (#899 W8-13).
@@ -176,6 +241,17 @@ public sealed class UndoActionTraceContractTests
                     }
                     Assert.True(recordedOrder.SequenceEqual(LastBeginsFilePaths(scribe)),
                                 $"{where}: files in the order {string.Join(" | ", LastBeginsFilePaths(scribe))}");
+                    // Each folder moved whole, by its from, to and listing's
+                    // hash, in the recorded order (#899 W8b-16).
+                    var recordedFolderMoves = new List<string>();
+                    if (recorded.TryGetProperty("folderMoves", out JsonElement madeFolderMoves))
+                    {
+                        foreach (JsonElement moved in madeFolderMoves.EnumerateArray())
+                            recordedFolderMoves.Add(moved.GetProperty("from").GetString() + " -> " + moved.GetProperty("to").GetString()
+                                                    + " " + moved.GetProperty("listingSha").GetString());
+                    }
+                    Assert.True(recordedFolderMoves.SequenceEqual(LastBeginsFolderMoves(scribe)),
+                                $"{where}: folders moved {string.Join(" | ", LastBeginsFolderMoves(scribe))}");
                     break;
                 }
                 case "undo":
@@ -323,12 +399,37 @@ public sealed class UndoActionTraceContractTests
         {
             foreach (JsonNode? op in ops)
             {
-                if ((string?)op!["kind"] == UndoOp.Recompute) continue;
+                // A recompute names no file; a move names its from and to
+                // (LastBeginsFolderMoves).
+                if ((string?)op!["kind"] is UndoOp.Recompute or UndoOp.Move) continue;
                 string path = (string)op["path"]!;
                 if (!paths.Contains(path)) paths.Add(path);
             }
         }
         return paths;
+    }
+
+    /// <summary>Each move op of the newest begin line, as its from, to and listing's hash, in order.</summary>
+    private static List<string> LastBeginsFolderMoves(UndoScribe scribe)
+    {
+        JsonObject? last = null;
+        foreach (string segment in Directory.EnumerateFiles(scribe.JournalFolder, "journal-*.jsonl").Order(StringComparer.Ordinal))
+        {
+            foreach (string line in File.ReadAllLines(segment))
+            {
+                if (JsonNode.Parse(line) is JsonObject read && (string?)read["event"] == "begin") last = read;
+            }
+        }
+        var moves = new List<string>();
+        if (last?["step"]?["ops"] is JsonArray ops)
+        {
+            foreach (JsonNode? op in ops)
+            {
+                if ((string?)op!["kind"] != UndoOp.Move) continue;
+                moves.Add((string)op["from"]! + " -> " + (string)op["to"]! + " " + (string?)op["listingSha"]);
+            }
+        }
+        return moves;
     }
 
     private static Dictionary<string, string?> Hashes(UndoScribe scribe, IReadOnlyList<string> paths)
