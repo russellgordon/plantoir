@@ -269,15 +269,42 @@ class FrontPageTitleRepairTests(unittest.TestCase):
         os.chmod(page, stat.S_IREAD)
         self._assert_left_as_it_was(course_dir, "locked", original=WIZARD_PAGE.replace("\n", "\r\n"))
 
-    def test_a_linked_page_has_its_copy_quoted_and_is_left(self):
+    def test_a_page_with_a_second_name_has_its_copy_quoted_and_is_left(self):
+        # A hard link: the safe write's rename would part the two names, so
+        # the page is left exactly as released (#1055 S2).
+        course_dir = self._course(WIZARD_PAGE)
+        page = course_dir / "section1" / "index.md"
+        other_name = self.root / "elsewhere" / "index.md"
+        other_name.parent.mkdir(parents=True)
+        os.link(page, other_name)
+        self._assert_left_as_it_was(course_dir, "linked")
+        self.assertEqual(_read_exactly(other_name), WIZARD_PAGE, "the page's second name was rewritten")
+        self.assertEqual(os.stat(page).st_ino, os.stat(other_name).st_ino, "the two names were parted")
+
+    def test_a_symbolic_link_front_page_is_quoted_through_the_link(self):
+        # Russell's ruling of 2026-11-27 (#1055): Plantoir writes through a
+        # symbolic link, and the link stays a link with the same target.
         course_dir = self._course(WIZARD_PAGE)
         page = course_dir / "section1" / "index.md"
         elsewhere = self.root / "elsewhere" / "index.md"
         _write_exactly(elsewhere, WIZARD_PAGE)
         page.unlink()
         _link_or_skip(self, page, elsewhere)
-        self._assert_left_as_it_was(course_dir, "linked")
-        self.assertEqual(_read_exactly(elsewhere), WIZARD_PAGE, "a file outside the course was rewritten")
+
+        printed, hidden, _ = self._build(course_dir)
+        self.assertFalse(hidden, "the front page is still hidden, so the section has no website:\n" + printed)
+        self.assertTrue(page.is_symlink(), "the link was replaced by a file")
+        self.assertEqual(os.readlink(page), str(elsewhere), "the link leads somewhere else now")
+        self.assertEqual(_read_exactly(elsewhere), WIZARD_PAGE_QUOTED, "the file the link leads to was not quoted")
+        sentence = _filled(_rule("frontPageTitleQuoted", "sentence"), course="SPH4U", section=1)
+        self.assertIn(sentence, printed.splitlines())
+        self._assert_no_hidden_file_is_left(course_dir)
+        leftovers = []
+        for entry in elsewhere.parent.iterdir():
+            if entry.name.startswith("."):
+                leftovers.append(entry.name)
+        self.assertEqual(leftovers, [], "the write's hidden file was left beside the file the link leads to")
+        self._assert_the_console_names_no_machinery(printed)
 
     def _assert_left_as_it_was(self, course_dir: Path, reason: str, original: str = WIZARD_PAGE):
         printed, hidden, content_root = self._build(course_dir)
