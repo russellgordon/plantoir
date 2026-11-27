@@ -133,3 +133,32 @@ Restored: 428 of 428.
 - The rename's old-value ending still names the file ("… nothing was changed: “course_config.json” was changed by another program …"), as on the Mac, whose follow-up parked the same change; left as it was on both.
 - Windows has no shelf groups yet (#827), so the no-year value is the picker's own "No school year", not the Mac's no-year group title ("Other"). When #827 lands, `SchoolYear.PickerLabel(null)` is the one place to change.
 - Put It Back reads the settings from the file again (`RevertToFile`), which drops any other unsaved edit in Course Settings, as the Mac's `replaceWithTheFile` does.
+
+## Review 1 lows
+
+From `vm-tools/briefs/2026-11-27-899-w8c-1-review-1.md` (CLEAN, five LOWs). `origin/dev`
+99499d6b7 merged in first (no conflict). The two parked edge cases are not acted on.
+
+- **LOW 3** (`UndoSwap.TidyLeftovers`): the tidy knows Put It Back's own label
+  `<seq>-recover` beside `-apply`, `-undo` and `-redo`, as the mac tidies that label, so
+  what a put-back swap stopped part way left is removed by the tidy that settles the step
+  (keeping only copies, as before). Test `UndoSwapTests.TheTidyRemovesWhatAStoppedPutBackLeftUnderItsLabel`.
+- **LOW 4** (`UndoDoor.PutBack`, `SettingPutBack.Answer`): a step closed `Done` while the
+  alert was open is re-judged as `JudgeAtOnce` says a closed step: `UndoPutBackVerdict.WasMade`,
+  nothing written, the copy reads the file again (the new value), and nothing is said, as
+  the contract's new-value row (`settingStoppedCases`) says nothing. No Put It Back trail
+  line is left for it (neither existing line is true). Test
+  `UndoStoppedStepTests.PutItBackOnAStepSettledAsMadeMeanwhileSaysItWasSaved`.
+- **LOW 1** (`UndoStepNotMadeException`): its message is the mac's not-made description,
+  `SettingPutBack.NamingNoFile` ("The file couldn’t be saved."), so the rename's
+  `renameFolderNothingWasChanged` fills `{said}` as the mac's does. Test
+  `UndoStoppedStepTests.ARenameHoldingNeitherNameSaysTheFileCouldNotBeSaved`.
+- **LOW 2** (`SettingPutBack.NotNowLine`): the words are the mac's `SettingStopTrail`, not
+  the contract's, so only Windows' text changed: "… was left as it stopped (Not Now): the
+  next change or the next launch settles it". Test
+  `UndoStoppedStepTests.NotNowsLineSaysTheNextChangeOrTheNextLaunchSettlesIt`.
+- **LOW 5**: `PROGRESS.md`'s "Mac #899 settings stop" line now says Windows has the
+  judgement, the four keys and the alert, and `Reason899SettingsFinishesItself` is gone.
+  Documentation 12 is left to the merge clerk (this file's "For documentation 12").
+
+Tests first: 1bad2c870 (the four tests), fixes 845a2db3f.
