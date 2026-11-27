@@ -57,9 +57,6 @@ internal sealed record UndoSwapTarget(string FullPath, string RelativePath, byte
     /// written through. The look before its own change judges the place whole.
     /// </summary>
     internal bool HandedOver { get; init; }
-
-    /// <summary>A relinking move's two texts, each side's own (#899 W8b-21b1); null for every other change.</summary>
-    internal UndoRelink? Relink { get; init; }
 }
 
 /// <summary>How a swap went.</summary>
@@ -117,15 +114,6 @@ internal sealed class UndoSeams
 
     /// <summary>Called with the two full paths of every rename the swap makes, before it is tried (a test counts a capitalisation-only rename's renames, #899 W8-5).</summary>
     internal Action<string, string>? EachRename { get; init; }
-
-    /// <summary>A test's: called with the destination just before a relink's new link is renamed in; true makes the rename fail, as a place taken in that instant would (the mac's <c>relinkRenameInFails</c>, #899 W8b-21b1).</summary>
-    internal Func<string, bool>? RelinkRenameInFails { get; init; }
-
-    /// <summary>A test's: what making a link at this full path answers instead of the system (a Win32 error, 0 to make it), so a PC without the privilege (1314) can be met anywhere (#899 W8b-21b1).</summary>
-    internal Func<string, int>? MakingALinkAnswers { get; init; }
-
-    /// <summary>A test's: what <see cref="UndoLinks.CanMakeALink"/> answers instead of this process's probe (false: a PC that cannot make a link, #899 W8b-21b1a).</summary>
-    internal bool? CanMakeALinkAnswers { get; init; }
 
     /// <summary>The POSIX-semantics rename answers "not supported" (87), as on a network share, so every swap takes the fallback (M5).</summary>
     internal bool PosixRenameIsNotSupported { get; init; }
@@ -279,14 +267,6 @@ internal static class UndoSwap
                 {
                     case UndoSwapChange.MoveHere move:
                         LetGoOwnFilesInside(target.RelativePath);
-                        if (target.Relink is { } relink)
-                        {
-                            // Made back the same way the other way round: the
-                            // source's text made beside from, renamed in, the
-                            // link this swap made removed (#899 W8b-21b1).
-                            if (RelinkLink(target.FullPath, relink.DestinationText, move.FromFull, relink.SourceText, label, seams).Outcome != UndoRelinkOutcome.Made) whole = false;
-                            continue;
-                        }
                         if (RenameWithRetries(target.FullPath, move.FromFull, replace: false, seams) != 0) whole = false;
                         else FollowTheMove(target.RelativePath, move.FromRelative, target.FullPath, move.FromFull);
                         continue;
@@ -475,7 +455,6 @@ internal static class UndoSwap
         }
 
         // 2. Swap them in, re-reading each target first.
-        bool stoppedInside = false;
         for (int index = 0; index < count; index++)
         {
             UndoSwapTarget target = targets[index];
@@ -502,7 +481,7 @@ internal static class UndoSwap
                     // And what the step's EARLIER swaps left inside it (U4b, M1; #899 W8-3),
                     // never inside a link's move: nothing of the step's is there,
                     // and what the link leads to is never walked (U4b2-14; W8-6).
-                    if (!moving.Op.IsALinksMove && SeqOfLabel(label) is { } seq)
+                    if (moving.Op.LinkSha is null && SeqOfLabel(label) is { } seq)
                     {
                         foreach ((string inside, UndoCurrent absent) in StepsOwnFilesInside(moving.FromFull, seq))
                             ownLeftOut.TryAdd(inside, absent);
@@ -510,11 +489,9 @@ internal static class UndoSwap
                 }
                 refusal = root is not null && PlaceLeadingOut(target, root) is { } leadingOut
                     ? new UndoRefusal(UndoRefusalKind.ChangedSince, leadingOut)
-                    : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders, ref stoppedInside, ownLeftOut, foldersLeftOutOfAMove);
-                if (stoppedInside) return new UndoSwapResult.StoppedByATest();
+                    : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders, ownLeftOut, foldersLeftOutOfAMove);
                 wentIn = refusal is null;
-                // A relink moves nothing: the old link is removed, a new one made (the mac's relink branch).
-                if (wentIn && target.Change is UndoSwapChange.MoveHere moved && target.Relink is null) FollowTheMove(moved.FromRelative, target.RelativePath, moved.FromFull, target.FullPath);
+                if (wentIn && target.Change is UndoSwapChange.MoveHere moved) FollowTheMove(moved.FromRelative, target.RelativePath, moved.FromFull, target.FullPath);
             }
             if (wentIn) swapsMade++;
             if (refusal is not null)
@@ -576,9 +553,8 @@ internal static class UndoSwap
 
     /// <summary>One whole op's change (the mac's swap of <c>moveHere</c>, <c>makeTree</c>, <c>takeTree</c>, <c>setExternal</c>); the refusal, or null when it went in.</summary>
     /// <param name="ownLeftOut">For a move: this swap's own staged and kept files inside the folder, relative to it, left out of its last look (#899 W8-2b).</param>
-    /// <param name="stoppedInside">Set when a test stopped a relink's swap inside (W8b-21b3): the swap then stops there, as a process killed there would.</param>
     private static UndoRefusal? SwapAWholeOp(UndoSwapTarget target, int index, string label, UndoSeams? seams, IUndoExternalPlaces? places,
-                                             string?[] stagedFolders, string?[] asideFolders, ref bool stoppedInside,
+                                             string?[] stagedFolders, string?[] asideFolders,
                                              IReadOnlyDictionary<string, UndoCurrent>? ownLeftOut = null, List<string>? foldersLeftOutOfAMove = null)
     {
         switch (target.Change)
@@ -589,10 +565,8 @@ internal static class UndoSwap
                 // the place it leaves, nothing where it goes.
                 // The folders it names as left out are where the folder goes,
                 // once it has moved (U4b2-10; #899 W8-4).
-                // Each side by its own text for a relink (#899 W8b-21b1): the source's, then the destination's.
-                bool sourceIsFrom = target.Relink?.SourceIsFrom ?? true;
-                (UndoMoveSide atFrom, IReadOnlyList<string> foldersLeftOut) = UndoMoveSides.ReadNamingFoldersLeftOut(move.Op, move.FromFull, overriding: ownLeftOut, isAtFrom: sourceIsFrom);
-                UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath, isAtFrom: !sourceIsFrom);
+                (UndoMoveSide atFrom, IReadOnlyList<string> foldersLeftOut) = UndoMoveSides.ReadNamingFoldersLeftOut(move.Op, move.FromFull, overriding: ownLeftOut);
+                UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath);
                 if (move.Op.IsCaseOnlyMove && UndoMoveSides.SpellingListed(move.FromFull, target.FullPath) is { } spelled)
                 {
                     // One item under two spellings (U4b; W8-5): it goes in
@@ -619,16 +593,6 @@ internal static class UndoSwap
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException)
                 {
                     return new UndoRefusal(UndoRefusalKind.CouldNotWrite, move.FromRelative);
-                }
-                if (target.Relink is { } relink)
-                {
-                    // A relink: the new link made beside its place, renamed in
-                    // without replacing, then the old one removed once re-read.
-                    // Nothing is written through either link (#899 W8b-21b1).
-                    // Going in, so a test may stop it inside (W8b-21b3).
-                    UndoRelinkAnswer relinked = RelinkLink(move.FromFull, relink.SourceText, target.FullPath, relink.DestinationText, label, seams, stoppingAt: index);
-                    if (relinked.Outcome == UndoRelinkOutcome.StoppedByATest) stoppedInside = true;
-                    return relinked.Outcome == UndoRelinkOutcome.Failed ? new UndoRefusal(relinked.Refusal, move.FromRelative) : null;
                 }
                 // MoveFileEx WITHOUT MOVEFILE_REPLACE_EXISTING: never over
                 // anything that appeared at the destination since. A rename
@@ -1266,131 +1230,6 @@ internal static class UndoSwap
         catch (System.ComponentModel.Win32Exception) { return true; }
     }
 
-    /// <summary>
-    /// A link moved and given a new text (#899 W8b-21b1; the mac's
-    /// <c>UndoSwap.relinkLink</c>): a new link holding <paramref name="newText"/>
-    /// made under the staged <c>-new</c> name beside <paramref name="newFull"/>,
-    /// renamed in without replacing, and only then the link at
-    /// <paramref name="oldFull"/> removed, once re-read holding
-    /// <paramref name="oldText"/>. Neither link is ever followed or written
-    /// through. A make that fails (a link this process may not make, 1314,
-    /// included: an ordinary failed make, never retried, never a fallback) is
-    /// <see cref="UndoRefusalKind.CouldNotWrite"/>; a rename-in that fails, or
-    /// an old link changed or that will not go, is
-    /// <see cref="UndoRefusalKind.FileIsInUse"/>. Whatever this call made is
-    /// then taken away again and the old link left whole.
-    ///
-    /// <para>Going in, the swap passes its target's index
-    /// (<paramref name="stoppingAt"/>), so a test or the harness can stop it
-    /// inside, as a process killed there would stop (#899 W8b-21b3; the mac's
-    /// U4b3 relink-3): with the new link staged (<c>relinkStaged</c>), or
-    /// renamed in beside the old (<c>relinkRenamedIn</c>). A reversal passes
-    /// none, so it is never stopped inside.</para>
-    ///
-    /// <para>Whatever stands under the staged name is removed only when it is
-    /// this call's own, a link holding <paramref name="newText"/>
-    /// (<see cref="IsOurStagedLink"/>, the one test every tidy asks): anything
-    /// else there is never removed by name, and the make then fails over it.</para>
-    /// </summary>
-    internal static UndoRelinkAnswer RelinkLink(string oldFull, byte[] oldText, string newFull, byte[] newText, string label, UndoSeams? seams,
-                                                int? stoppingAt = null)
-    {
-        // A junction is a kind of link this swap cannot make (window E review
-        // 2, LOW 5): refused before anything changes, as any link it cannot
-        // make, never re-made as a symbolic link.
-        if (UndoLinks.IsAJunction(oldFull)) return UndoRelinkAnswer.Failed(UndoRefusalKind.CouldNotWrite);
-        string staged = BesidePath(newFull, label, "new");
-        string newSha = UndoCheck.Sha(newText);
-        RemoveOurStagedLink(staged, newSha);
-        // The new link is the kind the link it replaces is, a file's or a
-        // folder's: that link stands at every make, the swap having read it
-        // (window E review 1, LOW 3), so Undo and Redo make each back as it was.
-        if (MakeALink(staged, newText, seams, UndoLinks.IsAFolderLink(oldFull)) != 0)
-        {
-            RemoveOurStagedLink(staged, newSha);
-            return UndoRelinkAnswer.Failed(UndoRefusalKind.CouldNotWrite);
-        }
-        if (stoppingAt is { } index && seams?.Stops("relinkStaged", index) == true) return UndoRelinkAnswer.Stopped;
-        if (seams?.RelinkRenameInFails?.Invoke(newFull) == true || RenameWithRetries(staged, newFull, replace: false, seams) != 0)
-        {
-            RemoveOurStagedLink(staged, newSha);
-            return UndoRelinkAnswer.Failed(UndoRefusalKind.FileIsInUse);
-        }
-        if (stoppingAt is { } inside && seams?.Stops("relinkRenamedIn", inside) == true) return UndoRelinkAnswer.Stopped;
-        if (LinkHolds(oldFull, oldText) && RemoveALink(oldFull)) return UndoRelinkAnswer.Made;
-        // The old link changed under the swap, or would not go: the new one is
-        // taken away again (it is this call's own), the old left whole.
-        if (LinkHolds(newFull, newText)) RemoveALink(newFull);
-        return UndoRelinkAnswer.Failed(UndoRefusalKind.FileIsInUse);
-    }
-
-    /// <summary>
-    /// Whether the item at <paramref name="fullPath"/> (under a staged name)
-    /// is a relink's own staged link: a link (<see cref="UndoLinks.Look"/>)
-    /// whose text hashes to one of <paramref name="shas"/>, read as stored,
-    /// never followed. THE one test of "is this ours" for a staged link, asked
-    /// by the relink's own pre-clean and clean-up and by every tidy
-    /// (<see cref="WhoseIsIt"/>; #899 W8b-21b3, the invariant of the mac's
-    /// mac-1 review 2): anything else under that name is the teacher's.
-    /// </summary>
-    internal static bool IsOurStagedLink(string fullPath, IEnumerable<string> shas)
-    {
-        if (UndoLinks.Look(fullPath) != UndoLinks.What.Link || UndoLinks.LinkSha(fullPath) is not { } found) return false;
-        foreach (string sha in shas)
-        {
-            if (string.Equals(found, sha, StringComparison.Ordinal)) return true;
-        }
-        return false;
-    }
-
-    /// <summary>Removes the item under a relink's staged name only when it is this call's own link (<see cref="IsOurStagedLink"/>), as the link itself.</summary>
-    private static void RemoveOurStagedLink(string staged, string sha)
-    {
-        if (IsOurStagedLink(staged, [sha])) RemoveALink(staged);
-    }
-
-    /// <summary>
-    /// A symbolic link at <paramref name="fullPath"/> holding exactly
-    /// <paramref name="text"/> (UTF-8, as <see cref="UndoLinks.LinkSha"/>
-    /// reads it back; measured on the PC to be stored byte for byte, forward
-    /// slashes included), never over anything: a folder's link when
-    /// <paramref name="asAFolder"/>, else a file's. 0 when made, else the
-    /// Win32 error (1314 where this process may not make a link).
-    /// </summary>
-    internal static int MakeALink(string fullPath, byte[] text, UndoSeams? seams, bool asAFolder = false)
-    {
-        if (seams?.MakingALinkAnswers is { } answers) return answers(fullPath);
-        string target;
-        try { target = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(text); }
-        catch (DecoderFallbackException) { return InvalidData; }
-        if (target.Length == 0 || target.Contains('\0')) return InvalidData;
-        try
-        {
-            if (asAFolder) Directory.CreateSymbolicLink(fullPath, target);
-            else File.CreateSymbolicLink(fullPath, target);
-            return 0;
-        }
-        catch (UnauthorizedAccessException) { return 5; }
-        catch (IOException error) { return error.HResult & 0xFFFF; }
-    }
-
-    /// <summary>ERROR_INVALID_DATA: a link text that is not a path's (not UTF-8, empty, or holding a NUL).</summary>
-    private const int InvalidData = 13;
-
-    /// <summary>
-    /// Whether <paramref name="fullPath"/> is a link (<see cref="UndoLinks.Look"/>)
-    /// holding exactly <paramref name="text"/>, read as stored and never
-    /// followed (the mac's <c>linkHolds</c>): compared byte for byte, as
-    /// <see cref="UndoLinks.LinkSha"/> hashes it.
-    /// </summary>
-    internal static bool LinkHolds(string fullPath, byte[] text) =>
-        UndoLinks.Look(fullPath) == UndoLinks.What.Link
-        && string.Equals(UndoLinks.LinkSha(fullPath), UndoCheck.Sha(text), StringComparison.Ordinal);
-
-    /// <summary>Removes the link at <paramref name="fullPath"/> itself, opened as the reparse point, never what it leads to (the mac's <c>removeALink</c>); false when no link is there or it would not go.</summary>
-    internal static bool RemoveALink(string fullPath) =>
-        UndoLinks.Look(fullPath) == UndoLinks.What.Link && UndoStagedFile.RemoveByName(fullPath, asAFolderLink: UndoLinks.IsAFolderLink(fullPath));
-
     /// <summary><c>.&lt;name&gt;.plantoir-undo-&lt;label&gt;-&lt;role&gt;</c> in the target's own folder: a dot file, so Obsidian and the website builder pass over it.</summary>
     internal static string BesidePath(string target, string label, string role) =>
         Path.Combine(Path.GetDirectoryName(target)!, "." + Path.GetFileName(target) + StagedMarker + label + "-" + role);
@@ -1436,25 +1275,10 @@ internal static class UndoSwap
     /// hidden name (the mac's U3c: nothing that is an only copy is deleted).</param>
     /// <param name="keepingCopiesHolding">The hashes of kept originals' bytes the list would not take just now: a kept original
     /// holding one stays even when its page holds the same (the second review of U3c, MEDIUM).</param>
-    /// <param name="trail">Where the line "undo kept a page under a visible name" goes, written just BEFORE an item of the
-    /// teacher's found under a relink's staged name is renamed to a visible name (<see cref="WhoseIsIt"/>; #899 W8b-21b3).
-    /// Asked of EVERY tidy of a step, never optional (window E review 1, LOW 1), so none keeps an item unsaid; null only
-    /// where a test or a caller with no trail reads the result itself.</param>
-    internal static bool TidyLeftovers(UndoStep step, string root, Action<UndoTrailLine>? trail,
+    internal static bool TidyLeftovers(long seq, IEnumerable<string> relativePaths, string root,
                                        IReadOnlyDictionary<string, string>? asideListings = null, Action<UndoAsideFolder>? onAside = null,
                                        bool keepingOnlyCopies = false, Func<string, string, bool>? unlessTheListHolds = null,
-                                       IReadOnlySet<string>? keepingCopiesHolding = null) =>
-        TidyLeftovers(step.Seq, step.PathsToTidy, root, asideListings, onAside, keepingOnlyCopies, unlessTheListHolds, keepingCopiesHolding,
-                      new UndoStagedLinks(step.Ops), UndoRecovery.KeptVisibly(step, root, trail));
-
-    /// <summary>The tidy beside these places for a step whose ops are not given: no relink staged anything, so a link under a staged name is the teacher's.</summary>
-    internal static bool TidyLeftovers(long seq, IEnumerable<string> relativePaths, string root, bool keepingOnlyCopies = false) =>
-        TidyLeftovers(seq, relativePaths, root, null, null, keepingOnlyCopies, null, null, UndoStagedLinks.None, null);
-
-    private static bool TidyLeftovers(long seq, IEnumerable<string> relativePaths, string root,
-                                      IReadOnlyDictionary<string, string>? asideListings, Action<UndoAsideFolder>? onAside,
-                                      bool keepingOnlyCopies, Func<string, string, bool>? unlessTheListHolds,
-                                      IReadOnlySet<string>? keepingCopiesHolding, UndoStagedLinks stagedLinks, Action<string, string>? onKeptVisibly)
+                                       IReadOnlySet<string>? keepingCopiesHolding = null)
     {
         bool allGone = true;
         var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1478,18 +1302,6 @@ internal static class UndoSwap
                 if (!labels.Any(label => IsStaged(name, label))) continue;
                 UndoLinks.What what = UndoLinks.Look(entry);
                 if (what == UndoLinks.What.Nothing) continue;
-                if (what == UndoLinks.What.CannotLook) { allGone = false; continue; }
-                // Whose it is, by the ONE test (W8b-21b3): a relink's own link
-                // goes as the link itself; the teacher's is never removed by name.
-                switch (WhoseIsIt(entry, name, folder, root, stagedLinks))
-                {
-                    case UndoStagedOwner.OursAsALink:
-                        if (!RemoveALink(entry)) allGone = false;
-                        continue;
-                    case UndoStagedOwner.TheTeachers:
-                        if (!GiveBackOrKeepVisibly(entry, name, folder, what, onKeptVisibly)) allGone = false;
-                        continue;
-                }
                 if (what == UndoLinks.What.Folder)
                 {
                     if (IsAFolderSetAside(entry))
@@ -1517,50 +1329,6 @@ internal static class UndoSwap
             }
         }
         return allGone;
-    }
-
-    /// <summary>
-    /// Whose the item under a staged name is (#899 W8b-21b3; the invariant of
-    /// the mac's mac-1 reviews 2 and 3, window E review 1, MEDIUM). It is a
-    /// relink's own only when it is a <c>-new</c> link holding a text a relink
-    /// of the step stages beside that place (<see cref="IsOurStagedLink"/>),
-    /// and then goes as the link itself. Under a relink's OWN staged name
-    /// (<see cref="UndoStagedLinks.IsARelinksOwnStagedName"/>) that one rule
-    /// is the whole judgement, whatever the item's kind and whichever other
-    /// ops name the place: anything else there is the teacher's, never removed
-    /// by name, given back or kept under a visible name and said
-    /// (<see cref="GiveBackOrKeepVisibly"/>). Under every other staged name a
-    /// link that is not the step's is the teacher's too, and a file or folder
-    /// is judged by its kind, as every staged item always was (a write's staged
-    /// page, a kept original, a tree made beside its place).
-    /// </summary>
-    internal static UndoStagedOwner WhoseIsIt(string entry, string name, string folder, string root, UndoStagedLinks stagedLinks)
-    {
-        bool isALink = UndoLinks.Look(entry) == UndoLinks.What.Link;
-        if (PlaceOfStagedName(name) is not { } placeName) return isALink ? UndoStagedOwner.TheTeachers : UndoStagedOwner.ByItsKind;
-        string place = Path.GetRelativePath(root, Path.Combine(folder, placeName)).Replace(Path.DirectorySeparatorChar, '/');
-        List<string> texts = stagedLinks.TextsAt(place);
-        if (texts.Count > 0 && name.EndsWith("-new", StringComparison.Ordinal) && IsOurStagedLink(entry, texts)) return UndoStagedOwner.OursAsALink;
-        if (isALink || stagedLinks.IsARelinksOwnStagedName(place, name)) return UndoStagedOwner.TheTeachers;
-        return UndoStagedOwner.ByItsKind;
-    }
-
-    /// <summary>
-    /// An item of the teacher's found under a staged name: renamed back into
-    /// its place when that is free, else to the first free visible name beside
-    /// it (<see cref="RenameToAVisibleName"/>), <paramref name="onKeptVisibly"/>
-    /// told first; both renames never replace. Never deleted. False when it is
-    /// still hidden (its place cannot be looked at, or a rename failed): a
-    /// later try.
-    /// </summary>
-    private static bool GiveBackOrKeepVisibly(string hidden, string name, string folder, UndoLinks.What what, Action<string, string>? onKeptVisibly)
-    {
-        if (PlaceOfStagedName(name) is not { } placeName) return false;
-        string place = Path.Combine(folder, placeName);
-        UndoLinks.What there = UndoLinks.Look(place);
-        if (there == UndoLinks.What.CannotLook) return false;
-        if (there == UndoLinks.What.Nothing && RenameWithRetries(hidden, place, replace: false, null) == 0) return true;
-        return RenameToAVisibleName(hidden, place, isAPage: what != UndoLinks.What.Folder, kept => onKeptVisibly?.Invoke(place, kept));
     }
 
     /// <summary>
@@ -1801,11 +1569,10 @@ internal sealed class UndoStagedFile
     }
 
     /// <summary>Removes a staged file by its name, its attributes untouched (the read-only bit ignored, never cleared). True when it is gone.</summary>
-    internal static bool RemoveByName(string path, bool asAFolderLink = false)
+    internal static bool RemoveByName(string path)
     {
-        // A folder's link opens only as a folder does (backup semantics), as the reparse point itself (window E review 1, LOW 3).
         using SafeFileHandle byName = CreateFileW(UndoLock.LongPath(path), Delete | ReadAttributes | Synchronize, ShareAll, IntPtr.Zero,
-                                                  OpenExisting, asAFolderLink ? OpenReparsePoint | BackupSemantics : OpenReparsePoint, IntPtr.Zero);
+                                                  OpenExisting, OpenReparsePoint, IntPtr.Zero);
         if (byName.IsInvalid) return Marshal.GetLastWin32Error() is 2 or 3;
         return DeleteByHandle(byName);
     }
@@ -1897,7 +1664,6 @@ internal sealed class UndoStagedFile
     private const uint ShareAll = 0x7;
     private const uint OpenExisting = 3;
     private const uint OpenReparsePoint = 0x00200000;
-    private const uint BackupSemantics = 0x02000000;
     private const int FileDispositionInfo = 4;
     private const int FileDispositionInfoEx = 21;
     private const uint DispositionDelete = 0x1;
@@ -1915,117 +1681,6 @@ internal sealed class UndoStagedFile
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CreateHardLinkW(string newName, string existing, IntPtr security);
-}
-
-
-/// <summary>What a relink's swap came to (#899 W8b-21b3; the mac's <c>UndoRelinkOutcome</c>).</summary>
-internal enum UndoRelinkOutcome
-{
-    /// <summary>The new link stands at its place and the old one is gone.</summary>
-    Made,
-    /// <summary>Nothing of it went in: the old link left whole, whatever this call made taken away.</summary>
-    Failed,
-    /// <summary>A test stopped it inside (<c>relinkStaged</c> or <c>relinkRenamedIn</c>), as a process killed there would stop.</summary>
-    StoppedByATest,
-}
-
-/// <summary><see cref="UndoSwap.RelinkLink"/>'s answer: what it came to and, when it failed, why.</summary>
-internal readonly record struct UndoRelinkAnswer(UndoRelinkOutcome Outcome, UndoRefusalKind Refusal)
-{
-    internal static UndoRelinkAnswer Made => new(UndoRelinkOutcome.Made, default);
-    internal static UndoRelinkAnswer Stopped => new(UndoRelinkOutcome.StoppedByATest, default);
-    internal static UndoRelinkAnswer Failed(UndoRefusalKind why) => new(UndoRelinkOutcome.Failed, why);
-}
-
-/// <summary>Whose an item under one of a step's staged names is (<see cref="UndoSwap.WhoseIsIt"/>).</summary>
-internal enum UndoStagedOwner
-{
-    /// <summary>A relink's own staged link: removed as the link itself.</summary>
-    OursAsALink,
-    /// <summary>Under a relink's own staged name and not its link, or a link no relink of the step staged: the teacher's, never removed by name.</summary>
-    TheTeachers,
-    /// <summary>A file or folder under any other staged name: judged by its kind, as every staged file and folder is.</summary>
-    ByItsKind,
-}
-
-/// <summary>
-/// What a tidy needs to know of a step's relinks (#899 W8b-21b3; window E
-/// review 1, MEDIUM, as the mac's <c>UndoStepLinks</c>): the texts a relink
-/// stages beside each of its places (beside <c>to</c> its
-/// <c>linkShaAfter</c> text, beside <c>from</c> its <c>linkShaBefore</c>), and
-/// each relink's OWN staged names, the <c>-new</c> name beside the place it
-/// goes into for the direction a label moves. Only those names are judged by
-/// the one rule alone; no other op of the step (a page or folder move, a
-/// write, another link's move) changes that, and no other staged name is
-/// judged by it.
-/// </summary>
-internal sealed class UndoStagedLinks
-{
-    // MARK: - Stored properties
-
-    private readonly List<(string From, string To, string ShaBefore, string ShaAfter)> _relinks = [];
-
-    // MARK: - Computed properties
-
-    /// <summary>None: a step with no relink, or a caller that knows no step (a test's own tidy).</summary>
-    internal static UndoStagedLinks None => new([]);
-
-    // MARK: - Initializer
-
-    internal UndoStagedLinks(IReadOnlyList<UndoOp> ops)
-    {
-        foreach (UndoOp op in ops)
-        {
-            if (!op.IsARelink || op.From is not { } from || op.To is not { } to) continue;
-            _relinks.Add((from, to, op.LinkShaBefore!, op.LinkShaAfter!));
-        }
-    }
-
-    // MARK: - Functions
-
-    /// <summary>The texts a relink of the step stages beside <paramref name="place"/> (relative, forward slashes): what a link of the step's there may hold.</summary>
-    internal List<string> TextsAt(string place)
-    {
-        var texts = new List<string>();
-        foreach ((string from, string to, string shaBefore, string shaAfter) in _relinks)
-        {
-            if (SamePlace(from, place)) texts.Add(shaBefore);
-            if (SamePlace(to, place)) texts.Add(shaAfter);
-        }
-        return texts;
-    }
-
-    /// <summary>
-    /// Whether <paramref name="stagedName"/>, found beside <paramref name="place"/>,
-    /// is a relink's own staged name (the mac's <c>ownStagedNames(label:)</c>):
-    /// role <c>-new</c>, beside <c>to</c> for a label that goes forward
-    /// (<c>&lt;seq&gt;-apply</c>, <c>&lt;seq&gt;-redo</c>) and beside <c>from</c>
-    /// for one that goes back (<c>&lt;seq&gt;-undo</c>); a <c>-recover</c> label
-    /// puts back the work it names, so goes the other way. A relink whose two
-    /// places are one stages beside it either way.
-    /// </summary>
-    internal bool IsARelinksOwnStagedName(string place, string stagedName)
-    {
-        int marker = stagedName.LastIndexOf(UndoSwap.StagedMarker, StringComparison.Ordinal);
-        if (marker < 0) return false;
-        string tail = stagedName[(marker + UndoSwap.StagedMarker.Length)..];
-        if (!tail.EndsWith("-new", StringComparison.Ordinal)) return false;
-        string work = tail[..^"-new".Length];
-        bool puttingBack = work.EndsWith("-recover", StringComparison.Ordinal);
-        if (puttingBack) work = work[..^"-recover".Length];
-        bool forward = !work.EndsWith("-undo", StringComparison.Ordinal);
-        if (puttingBack) forward = !forward;
-        foreach ((string from, string to, string _, string _) in _relinks)
-        {
-            string goesInto = SamePlace(from, to) ? from : forward ? to : from;
-            if (SamePlace(goesInto, place)) return true;
-        }
-        return false;
-    }
-
-    /// <summary>One place, part by part (<see cref="UndoOp.PartInside"/>), never a place inside it.</summary>
-    private static bool SamePlace(string one, string other) =>
-        UndoOp.PartInside(one, other) is "" && one.Split('/').Length == other.Split('/').Length;
 }
 
 /// <summary>

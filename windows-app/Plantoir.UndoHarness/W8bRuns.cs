@@ -147,7 +147,7 @@ internal static class W8bRuns
     }
 
     /// <summary>Every entry of section 1, the library and the folder outside, by name: a link with its target as written, a page with its text, or what else stands there.</summary>
-    internal static string Snapshot(string run)
+    private static string Snapshot(string run)
     {
         var parts = new List<string>();
         foreach ((string label, string full) in new[] { ("section1", Full(run, Section)), ("library", Full(run, Library)), ("outside", Outside(run)) })
@@ -161,7 +161,8 @@ internal static class W8bRuns
                 string at = Path.Combine(full, name);
                 string holds = UndoLinks.Look(at) switch
                 {
-                    UndoLinks.What.Link => LinkReading(at, run),
+                    // A target outside names this run's own folder: written as <run>, so runs compare.
+                    UndoLinks.What.Link => "link " + (new FileInfo(at).LinkTarget?.Replace(run, "<run>", StringComparison.OrdinalIgnoreCase) ?? "notALink"),
                     UndoLinks.What.File => "page " + File.ReadAllText(at).Replace("\n", "\\n"),
                     UndoLinks.What other => other.ToString(),
                 };
@@ -171,22 +172,8 @@ internal static class W8bRuns
         return string.Join(" | ", parts);
     }
 
-    /// <summary>
-    /// A link as the snapshot reads it: its whole target as text, never
-    /// followed (84c7f53be). A target outside names this run's own folder:
-    /// written as &lt;run&gt;, so runs compare.
-    /// </summary>
-    private static string LinkReading(string at, string run) => "link " + (new FileInfo(at).LinkTarget?.Replace(run, "<run>", StringComparison.OrdinalIgnoreCase) ?? "notALink");
-
-    /// <summary>What a link leads to, followed: the must-fail of W8b-21b4 puts it in place of <see cref="LinkReading"/> (a link given another text leading to the same page then reads the same).</summary>
-    internal static string Followed(string at)
-    {
-        try { return "leads to " + File.ReadAllText(at).Replace("\n", "\\n"); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return "leads nowhere"; }
-    }
-
     /// <summary>Every staged entry (the journal's hidden names) anywhere in the working folder or outside it.</summary>
-    internal static int Staged(string run)
+    private static int Staged(string run)
     {
         int count = 0;
         foreach (string place in new[] { Root(run), Outside(run) })
@@ -229,7 +216,7 @@ internal static class W8bRuns
         return 0;
     }
 
-    internal static string Child(string[] arguments, bool kill, Action? beforeTheKill = null)
+    private static string Child(string[] arguments, bool kill)
     {
         var start = new ProcessStartInfo(Exe) { RedirectStandardOutput = true, UseShellExecute = false };
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
@@ -238,7 +225,6 @@ internal static class W8bRuns
         if (said == "STARTED") said = child.StandardOutput.ReadLine();
         if (kill && said is not null && said.StartsWith("AT ", StringComparison.Ordinal))
         {
-            beforeTheKill?.Invoke();
             try { child.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
         }
         child.WaitForExit();
@@ -246,12 +232,10 @@ internal static class W8bRuns
     }
 
     /// <summary>Seams that park this process at <paramref name="at"/> (<c>point@index</c>) until the harness kills it.</summary>
-    internal static UndoSeams StopAt(string at)
+    private static UndoSeams StopAt(string at)
     {
-        // A point with no index (afterBegin) is asked with -1.
-        int marker = at.IndexOf('@');
-        string point = marker < 0 ? at : at[..marker];
-        int index = marker < 0 ? -1 : int.Parse(at[(marker + 1)..], CultureInfo.InvariantCulture);
+        string point = at[..at.IndexOf('@')];
+        int index = int.Parse(at[(at.IndexOf('@') + 1)..], CultureInfo.InvariantCulture);
         return new UndoSeams
         {
             StopsHere = (name, where) =>

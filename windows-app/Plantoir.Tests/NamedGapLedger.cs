@@ -678,9 +678,6 @@ internal static class NamedGapLedger
         Owed(UndoRecoveryCases, 1055, V200, Reason1055KeptPageReLaid,
              "U4b3 kept-original-named, re-laid (#1055 M5): a step that removes Day 3's page dies with the page removed, and someone's page is then written at Day 3: nothing written over it, the removed page kept as Unit 1, Day 3 (kept by Undo).md and named on the trail, the step interrupted, the list cleared",
              "U4b3 kept-original-named, re-laid (#1055 M5): the same, with Unit 1, Day 3 (kept by Undo).md already taken: the removed page kept as Unit 1, Day 3 (kept by Undo 2).md, the taken name untouched"),
-        // ---- U4b3 relink-3 and reviews D and F (#899): the 13 recoveryCases
-        // rows held here under Reason899W8RelinkedLink went when Windows'
-        // W8b-21b3 built a killed relink's recovery (2026-11-27).
         // ---- U3c (the mac's U3c for #899, 2026-11-20): its 4 trail events, 12
         // stackCases and 10 recoveryCases were held here under a reason then
         // named Reason899W4c (later named Reason899U4aContentGone, which held

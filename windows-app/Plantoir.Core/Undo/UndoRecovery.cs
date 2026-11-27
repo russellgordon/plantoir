@@ -671,7 +671,7 @@ internal static class UndoRecovery
                 // Nothing will put a closed step's page back: a kept original
                 // that differs from its page is the only copy of what it held,
                 // and stays (the mac's U3c).
-                allGone = UndoSwap.TidyLeftovers(closedStep, root, trail, AsideListings(closedStep, root),
+                allGone = UndoSwap.TidyLeftovers(record.Seq, closedStep.PathsToTidy, root, AsideListings(closedStep, root),
                                                  found => NoteAnAsideFolder(found, closedStep, root, journal, trail), keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { allGone = false; }
@@ -1160,116 +1160,6 @@ internal static class UndoRecovery
     }
 
     /// <summary>
-    /// A link move of a step, read for <see cref="RemoveTheLinksJustMade"/>:
-    /// its two places, the text each side holds when it stands as before
-    /// (<c>from</c>, its <c>linkShaBefore</c> or a plain move's <c>linkSha</c>)
-    /// and as after (<c>to</c>), and what each side holds now.
-    /// </summary>
-    internal readonly record struct UndoLinkMoveRead(string From, string To, string Before, string After, UndoMoveSide AtFrom, UndoMoveSide AtTo)
-    {
-        /// <summary>A plain link move (one text at both sides), renamed in one step: never in flight with both links standing.</summary>
-        internal bool IsPlain => string.Equals(Before, After, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// W8b-21b3 (#899; the mac's U4b3 relink-3 and reviews D and F,
-    /// <c>removeTheLinksJustMade</c>): a relinking move whose two links both
-    /// stand (<c>from</c> holding its <c>linkShaBefore</c> text, <c>to</c> its
-    /// <c>linkShaAfter</c> text, each read as the link itself, never followed)
-    /// may be the one whose swap was in flight when the process died; the
-    /// link that swap had just made is removed: at <c>to</c> going forward (an
-    /// apply or a Redo), at <c>from</c> going back (an Undo), once re-read
-    /// holding that side's text. Both texts are in the list, so neither link
-    /// is an only copy. A plan never does this: a link at the other name may be
-    /// the teacher's.
-    ///
-    /// <para>At most ONE link is removed for the whole step, by the rule as
-    /// finally built: every link move of the step, a plain one included, is
-    /// read in the work's swap order (index order going forward, reversed for
-    /// an Undo); a relink passes when it stands both ways, every link move
-    /// before it holds its end text at its end side and every one after it
-    /// its start text at its start side (<see cref="IsTheOneInFlight"/>); the
-    /// LAST that passes loses its just-made link; none passing, nothing is
-    /// removed. A plain link move is a constraint only. A side whose folders
-    /// lead out of the working folder is judged as always
-    /// (<see cref="UndoPlaces.StaysInside(string, string, UndoOp)"/>), never
-    /// read here.</para>
-    ///
-    /// <para>Either side unreadable, or the removal failing: the place, so the
-    /// step is left for the next recovery (cannot tell now); else null.</para>
-    /// </summary>
-    /// <param name="beforeTheRemoval">A test's: told the just-made link's full path between the reading and the re-read before its removal (it changes the link there).</param>
-    internal static string? RemoveTheLinksJustMade(UndoStep step, string root, bool goingForward, Action<string>? beforeTheRemoval = null)
-    {
-        var moves = new List<UndoLinkMoveRead>();
-        for (int position = 0; position < step.Ops.Count; position++)
-        {
-            UndoOp op = goingForward ? step.Ops[position] : step.Ops[step.Ops.Count - 1 - position];
-            if (!op.IsALinksMove || op.From is not { } from || op.To is not { } to) continue;
-            if (op.LinkText(isAtFrom: true) is not { } before || op.LinkText(isAtFrom: false) is not { } after) continue;
-            if (!UndoPlaces.StaysInside(root, from, op) || !UndoPlaces.StaysInside(root, to, op)) continue;
-            UndoMoveSide atFrom = UndoMoveSides.Read(op, UndoDoor.FullPath(root, from), isAtFrom: true);
-            UndoMoveSide atTo = UndoMoveSides.Read(op, UndoDoor.FullPath(root, to), isAtFrom: false);
-            if (atFrom == UndoMoveSide.CannotRead) return from;
-            if (atTo == UndoMoveSide.CannotRead) return to;
-            moves.Add(new UndoLinkMoveRead(from, to, before, after, atFrom, atTo));
-        }
-        (string Path, string Sha)? inFlight = null;
-        for (int index = 0; index < moves.Count; index++)
-        {
-            if (!IsTheOneInFlight(index, moves, goingForward)) continue;
-            UndoLinkMoveRead candidate = moves[index];
-            inFlight = goingForward ? (candidate.To, candidate.After) : (candidate.From, candidate.Before);
-        }
-        if (inFlight is not { } found) return null;
-        // Re-read just before it goes: removed only while it is still the link
-        // the swap made, holding that side's text, as the link itself.
-        string justMade = UndoDoor.FullPath(root, found.Path);
-        beforeTheRemoval?.Invoke(justMade);
-        if (UndoLinks.Look(justMade) == UndoLinks.What.CannotLook) return found.Path;
-        bool stillHoldsIt = UndoLinks.Look(justMade) == UndoLinks.What.Link
-                            && string.Equals(UndoLinks.LinkSha(justMade), found.Sha, StringComparison.Ordinal);
-        if (stillHoldsIt && !UndoSwap.RemoveALink(justMade)) return found.Path;
-        return null;
-    }
-
-    /// <summary>
-    /// Whether the link move at <paramref name="index"/> (in the work's swap
-    /// order) can be the one whose swap was in flight (the mac's
-    /// <c>isTheOneInFlight</c>, review F of U4b3): it is a relink, it stands
-    /// both ways, every link move before it holds its end text at its end side
-    /// (<c>to</c> going forward, <c>from</c> for an Undo), and every link move
-    /// after it holds its start text at its start side.
-    /// </summary>
-    internal static bool IsTheOneInFlight(int index, IReadOnlyList<UndoLinkMoveRead> moves, bool goingForward)
-    {
-        UndoLinkMoveRead candidate = moves[index];
-        if (candidate.IsPlain) return false;
-        if (candidate.AtFrom != UndoMoveSide.HoldsTheContent || candidate.AtTo != UndoMoveSide.HoldsTheContent) return false;
-        for (int other = 0; other < moves.Count; other++)
-        {
-            UndoLinkMoveRead move = moves[other];
-            bool startHolds = (goingForward ? move.AtFrom : move.AtTo) == UndoMoveSide.HoldsTheContent;
-            bool endHolds = (goingForward ? move.AtTo : move.AtFrom) == UndoMoveSide.HoldsTheContent;
-            if (other < index && !endHolds) return false;
-            if (other > index && !startHolds) return false;
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// What a tidy says when it keeps an item of the teacher's, found under a
-    /// relink's staged name, under a visible name (W8b-21b3): the line "undo
-    /// kept a page under a visible name", naming the place and the visible
-    /// name, written just before the rename.
-    /// </summary>
-    internal static Action<string, string>? KeptVisibly(UndoStep step, string root, Action<UndoTrailLine>? trail) =>
-        trail is null
-            ? null
-            : (place, keptAs) => trail(new UndoTrailLine(ActivityTrail.Event.UndoKeptAPageUnderAVisibleName, step.Course, step.Section,
-                                                         UndoTrail.KeptAPageWords(InsideTheFolder(place, root), InsideTheFolder(keptAs, root))));
-
-    /// <summary>
     /// Where each file of a step stands now, by content, in the order its ops
     /// name them. U4b (opKinds.wholeOps' order; #899 W8-7): an edit a move of
     /// the step carries is read where its folder is now (<see cref="PlaceNow"/>),
@@ -1484,7 +1374,7 @@ internal static class UndoRecovery
             // beside it, never deleted (W6).
             try
             {
-                UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root),
+                UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root),
                                        found => NoteAnAsideFolder(found, step, root, journal, trail), keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
@@ -1493,13 +1383,6 @@ internal static class UndoRecovery
 
         bool startedFromBefore = phase is UndoPhase.Begin or UndoPhase.Redoing;
         UndoOpState startState = startedFromBefore ? UndoOpState.Before : UndoOpState.After;
-        // A relinking move's swap killed with both links standing loses the
-        // link it had just made first, so the op stands where its swap began;
-        // only then is the step judged (W8b-21b3; the mac's U4b3 relink-3).
-        // Live only: shadow recovery never writes into a working folder, so
-        // there both links standing is neither and the step closes interrupted.
-        if (live && RemoveTheLinksJustMade(step, root, startedFromBefore) is { } unreadable)
-            return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow, unreadable));
         IReadOnlyList<(string Path, UndoOpState State)> files = FileStates(step, root, places, journal.Blob);
         // A teacher's folder still set aside after the tidying is IN THE WAY,
         // never settled as if it were gone; one whose place cannot be read stays
@@ -1625,7 +1508,7 @@ internal static class UndoRecovery
                         // change rolled back leaves the list.
                         try
                         {
-                            UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null,
+                            UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root), null,
                                                    keepingOnlyCopies: true, unlessTheListHolds: ListHolds(step, root, journal));
                         }
                         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
@@ -1667,7 +1550,7 @@ internal static class UndoRecovery
                         // Said after the tidy, so it names what is on the disk.
                         try
                         {
-                            UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null, keepingOnlyCopies: true);
+                            UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root), null, keepingOnlyCopies: true);
                         }
                         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
                         // A page the step removed or moved away whose place is now
@@ -1723,7 +1606,7 @@ internal static class UndoRecovery
             // page and named on the trail (the third review of U3a, LOW 1).
             try
             {
-                UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null, keepingOnlyCopies: true,
+                UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root), null, keepingOnlyCopies: true,
                                        unlessTheListHolds: ListHolds(step, root, journal), keepingCopiesHolding: keptNotTaken);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
@@ -1743,12 +1626,10 @@ internal static class UndoRecovery
             // until the switch flips. Nothing took effect, so every staged
             // file is the journal's own; a kept original that differs from
             // its page still stays (W7a, the harness's w7-publish-kill,
-            // shadow beforeSwap@0). Nothing else on the trail, as shadow writes
-            // none; only a teacher's item kept under a visible name is said, as
-            // by every tidy (window E review 1, LOW 1).
+            // shadow beforeSwap@0). Nothing on the trail, as shadow writes none.
             try
             {
-                UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null, keepingOnlyCopies: true);
+                UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root), null, keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
         }

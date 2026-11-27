@@ -221,7 +221,7 @@ internal sealed partial class UndoDoor
                                              UndoTrail.RolledBackWords(UndoPhase.Begin, toPutBack.Count)));
         try
         {
-            UndoSwap.TidyLeftovers(step, root, _trail, UndoRecovery.AsideListings(step, root), null, keepingOnlyCopies: true,
+            UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, UndoRecovery.AsideListings(step, root), null, keepingOnlyCopies: true,
                                    unlessTheListHolds: UndoRecovery.ListHolds(step, root, _journal));
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }

@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # W8b-21b1 (#899, Windows #949): a relinking move judged by each side's own text, swapped as make, rename in, remove
 
 Brief `vm-tools/briefs/2026-11-27-899-w8b-21b1-a-relink-judged-and-swapped.md`. Branch `issue/899-w8b-21b-relink` from the pushed head of `issue/899-w8b-21a-handed-over-place` (db430aa41, `origin/dev` 6dc36fcea already merged in; checked before proving and before handing back, no merge needed). The mac's piece: U4b3 relink-1. No `contracts/` or `mac-app/` change.

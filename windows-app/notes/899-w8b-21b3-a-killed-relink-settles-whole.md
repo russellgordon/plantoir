@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # W8b-21b3 (#899, Windows #949): a step with a relinking move, killed at any moment of its swaps, settles whole
 
 Brief `vm-tools/briefs/2026-11-27-899-w8b-21b3-a-killed-relink-settles-whole.md`. Branch `issue/899-w8b-21b-relink` from 21b2's pushed head 629ebd160. `origin/dev` 454ef4c6f (already merged in) fetched before proving and again before handing back: unchanged, so no merge commit this piece. The mac's pieces: U4b3 relink-3, reviews D and F (the rule as finally built, ruling 7). No `contracts/` or `mac-app/` change.

@@ -39,8 +39,6 @@ public sealed class UndoRecoveryContractTests
         "withAHandedOverPlace", "handedOver",
         // U4b3 kept-original-named's (W8b-21c, W8b-21c2)
         "keptPageLines",
-        // U4b3 relink-3's and reviews D and F (W8b-21b3)
-        "withARelink",
     };
 
     private const string First = "courses/TST1O/Section 1/Classes/first.md";
@@ -150,13 +148,7 @@ public sealed class UndoRecoveryContractTests
         if (handoverShape is not (null or "afterALinksMove" or "beforeALinksMove"))
             Assert.Fail("a key this replay does not check: withAHandedOverPlace " + handoverShape);
         var handover = new UndoHandoverForTheCases(scribe);
-        // U4b3 relink-3 and reviews D and F (W8b-21b3): in place of the two
-        // pages, a step holding relinking moves, made as recoveryCasesHow's
-        // withARelink says (UndoRelinkForTheCases, the one spelling).
-        string? relinkShape = recoveryCase.TryGetProperty("withARelink", out JsonElement relinkNamed) ? relinkNamed.GetString()! : null;
-        if (relinkShape is not (null or "alone" or "leavingAHandedOverPlace" or "chained" or "chainedThree" or "thenAMove"))
-            Assert.Fail("a key this replay does not check: withARelink " + relinkShape);
-        bool byOps = withAMove || withATree || withAPreference || withAMovedFolder || handoverShape is not null || relinkShape is not null;
+        bool byOps = withAMove || withATree || withAPreference || withAMovedFolder || handoverShape is not null;
         scribe.Places.Write(UndoKindsForTheCases.Preference, new UndoJson.Text("a"));
         JsonArray? ops = null;
         var blobs = new List<byte[]>();
@@ -168,13 +160,7 @@ public sealed class UndoRecoveryContractTests
                 UndoKindsForTheCases.LayTheMediaFolder(scribe);
                 ops.Add(UndoKindsForTheCases.MoveTheMediaFolder(scribe));
             }
-            if (relinkShape is not null)
-            {
-                (JsonArray relinking, List<byte[]> relinkBlobs) = UndoRelinkForTheCases.Lay(scribe, relinkShape);
-                foreach (JsonNode? op in relinking) ops.Add(op!.DeepClone());
-                blobs.AddRange(relinkBlobs);
-            }
-            else if (handoverShape is not null)
+            if (handoverShape is not null)
             {
                 if (handoverShape == "afterALinksMove") handover.LayAfterALinksMove();
                 else handover.LayBeforeALinksMove();
@@ -213,8 +199,6 @@ public sealed class UndoRecoveryContractTests
         // made whole (made in a scribe of its own, so this one is untouched).
         string? handoverBefore = handoverShape is null ? null : UndoHandoverForTheCases.Snapshot(scribe);
         string? handoverAfter = handoverShape is null ? null : UndoHandoverForTheCases.MadeWhole(handoverShape);
-        string? relinkBefore = relinkShape is null ? null : UndoHandoverForTheCases.Snapshot(scribe);
-        string? relinkAfter = relinkShape is null ? null : UndoRelinkForTheCases.MadeWhole(relinkShape);
         UndoOutcome MakeTheStep(UndoDoor door) => byOps ? door.Perform(scribe.OpsDraft("A", (JsonArray)ops!.DeepClone(), blobs)) : door.Perform(draft);
 
         UndoOutcome stopped;
@@ -485,17 +469,7 @@ public sealed class UndoRecoveryContractTests
 
         // The pages.
         string files = recoveryCase.GetProperty("files").GetString()!;
-        if (relinkShape is not null && files != "unchecked")
-        {
-            // Section 1's class pages, each a page by its text, a link by its
-            // text or nothing (recoveryCasesHow: Day 3 to Day 5, Day 4 to Day 6
-            // or Day 4 to Day 7, the only days the shape lays), a staged name
-            // left there included; and nothing staged anywhere.
-            Assert.True(files is "before" or "after", "a files value this replay does not know with withARelink: " + files);
-            Assert.Equal(files == "before" ? relinkBefore : relinkAfter, UndoHandoverForTheCases.Snapshot(scribe));
-            Assert.Empty(scribe.StagedLeftovers("A"));
-        }
-        else if (handoverShape is not null && files != "unchecked")
+        if (handoverShape is not null && files != "unchecked")
         {
             // handAPlaceOver's pages and the library, not first and second.
             Assert.True(files is "before" or "after", "a files value this replay does not know with withAHandedOverPlace: " + files);

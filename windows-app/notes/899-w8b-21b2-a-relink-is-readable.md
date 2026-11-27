@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # W8b-21b2 (#899, Windows #949): a relinking move is readable from the list
 
 Brief `vm-tools/briefs/2026-11-27-899-w8b-21b2-a-relink-is-readable.md`. Branch `issue/899-w8b-21b-relink` from 21b1a's pushed head 05f829c69. `origin/dev` 454ef4c6f was already merged in (60f80972a, 21b1a's merge); fetched again before proving and before handing back, unchanged, so no merge commit this piece. The mac's piece: U4b3 relink-2. No `contracts/` or `mac-app/` change.

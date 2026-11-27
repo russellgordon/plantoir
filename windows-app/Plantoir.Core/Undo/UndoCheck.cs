@@ -268,16 +268,14 @@ internal static class UndoCheck
                     if (spelled == UndoCaseOnlySpelling.CannotRead) return UndoOpState.CannotTell;
                     if (spelled == UndoCaseOnlySpelling.Another) return UndoOpState.Neither;
                     UndoMoveSide side = spelled == UndoCaseOnlySpelling.To
-                        ? UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo, isAtFrom: false)
-                        : UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom, isAtFrom: true);
+                        ? UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo)
+                        : UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom);
                     if (side == UndoMoveSide.CannotRead) return UndoOpState.CannotTell;
                     if (side != UndoMoveSide.HoldsTheContent) return UndoOpState.Neither;
                     return spelled == UndoCaseOnlySpelling.To ? UndoOpState.After : UndoOpState.Before;
                 }
-                // Each side by its own text for a relink (#899 W8b-21b1): both
-                // links standing holds the content on both sides, neither state.
-                UndoMoveSide atFrom = fromIsHandedOver ? UndoMoveSide.Free : UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom, isAtFrom: true);
-                UndoMoveSide atTo = toIsHandedOver ? UndoMoveSide.Free : UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo, isAtFrom: false);
+                UndoMoveSide atFrom = fromIsHandedOver ? UndoMoveSide.Free : UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom);
+                UndoMoveSide atTo = toIsHandedOver ? UndoMoveSide.Free : UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo);
                 if (atFrom == UndoMoveSide.CannotRead || atTo == UndoMoveSide.CannotRead) return UndoOpState.CannotTell;
                 if (atFrom == UndoMoveSide.Free && atTo == UndoMoveSide.HoldsTheContent) return UndoOpState.After;
                 if (atFrom == UndoMoveSide.HoldsTheContent && atTo == UndoMoveSide.Free) return UndoOpState.Before;
@@ -778,23 +776,9 @@ internal static class UndoCheck
             {
                 string source = backward ? op.To! : op.From!;
                 string destination = backward ? op.From! : op.To!;
-                UndoRelink? relink = null;
-                if (op.IsARelink)
-                {
-                    // A relinking move (#899 W8b-21b1; the mac's U4b3 relink-1):
-                    // the link is made anew with the destination's text, so both
-                    // texts come from the list. Either missing: content missing,
-                    // nothing changed.
-                    if (op.LinkShaBefore is not { } beforeSha || op.LinkShaAfter is not { } afterSha
-                        || blob(beforeSha) is not { } beforeText || !string.Equals(Sha(beforeText), beforeSha, StringComparison.Ordinal)
-                        || blob(afterSha) is not { } afterText || !string.Equals(Sha(afterText), afterSha, StringComparison.Ordinal))
-                        return null;
-                    relink = backward ? new UndoRelink(afterText, beforeText, SourceIsFrom: false) : new UndoRelink(beforeText, afterText, SourceIsFrom: true);
-                }
                 return new UndoSwapTarget(UndoTreeReading.Under(root, destination), destination, null, null)
                 {
                     Change = new UndoSwapChange.MoveHere(UndoTreeReading.Under(root, source), source, op),
-                    Relink = relink,
                 };
             }
             case UndoOp.CreateTree:
@@ -833,15 +817,6 @@ internal static class UndoCheck
 /// path: an external op alone) and the places outside every working folder.
 /// <see cref="CannotRead"/> is a test's seam.
 /// </summary>
-/// <summary>
-/// A relinking move's two texts as one swap goes (#899 W8b-21b1; the mac's
-/// <c>UndoRelink</c>): the text the link at the source must hold before it is
-/// removed, the text the new link at the destination is made with, and whether
-/// the source is the op's <c>from</c> (going forward), so each side is read by
-/// its own sha. Read from the list by their blobs.
-/// </summary>
-internal sealed record UndoRelink(byte[] SourceText, byte[] DestinationText, bool SourceIsFrom);
-
 internal sealed record UndoWholeReads(string Root, IUndoExternalPlaces Places, Func<string, bool>? CannotRead = null);
 
 /// <summary>The kinds of change a swap makes besides a file's content (the mac's <c>UndoSwapChange</c>).</summary>
