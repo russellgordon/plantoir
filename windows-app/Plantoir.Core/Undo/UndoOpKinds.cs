@@ -713,7 +713,25 @@ internal static class UndoLinks
     /// <param name="seams">A test's answer (<see cref="UndoSeams.CanMakeALinkAnswers"/>) in place of the probe.</param>
     internal static bool CanMakeALink(UndoSeams? seams = null) => seams?.CanMakeALinkAnswers ?? ThisProcessCanMakeALink.Value;
 
-    internal static string TextToWrite(string textNow, string wanted) => throw new NotImplementedException();
+    /// <summary>
+    /// The text a link Windows makes holds (#899 W8b-21b5; the director's
+    /// reading of 21b1's parked point, kept in this ONE function so it can be
+    /// reversed): where <paramref name="wanted"/> differs from
+    /// <paramref name="textNow"/> only in its last path part (the parts
+    /// before it the same, either separator read as one), the text now is
+    /// kept byte for byte but that last part, so a link the mac made keeps its
+    /// spelling; any other text is written with backslashes, which the system
+    /// opens (measured on 21b1: a forward-slash text is stored but not opened).
+    /// </summary>
+    internal static string TextToWrite(string textNow, string wanted)
+    {
+        int nowCut = textNow.LastIndexOfAny(['/', '\\']) + 1;
+        int wantedCut = wanted.LastIndexOfAny(['/', '\\']) + 1;
+        string nowAbove = textNow[..nowCut].Replace('\\', '/');
+        string wantedAbove = wanted[..wantedCut].Replace('\\', '/');
+        if (string.Equals(nowAbove, wantedAbove, StringComparison.Ordinal)) return textNow[..nowCut] + wanted[wantedCut..];
+        return wanted.Replace('/', '\\');
+    }
 
     /// <summary>
     /// Makes a file's symbolic link under a dot name in <paramref name="folder"/>,
@@ -762,16 +780,24 @@ internal static class UndoLinks
     /// be read: a reparse point .NET does not read as a link (WSL's own), or
     /// an error.
     /// </summary>
-    internal static string? LinkSha(string fullPath)
+    internal static string? LinkSha(string fullPath) =>
+        TextOf(fullPath) is { } target ? Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(target))) : null;
+
+    /// <summary>
+    /// The text a link holds, as stored (<see cref="FileSystemInfo.LinkTarget"/>,
+    /// never <c>ResolveLinkTarget</c>): the text <see cref="LinkSha"/> hashes
+    /// as UTF-8, read without opening what it leads to (#899 W8b-21b5). Null
+    /// when it cannot be read: not a link, a reparse point .NET does not read
+    /// as one (WSL's own), or an error.
+    /// </summary>
+    internal static string? TextOf(string fullPath)
     {
-        string? target;
         try
         {
             FileSystemInfo link = File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory) ? new DirectoryInfo(fullPath) : new FileInfo(fullPath);
-            target = link.LinkTarget;
+            return link.LinkTarget;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
-        return target is null ? null : Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(target)));
     }
 
     /// <summary>
