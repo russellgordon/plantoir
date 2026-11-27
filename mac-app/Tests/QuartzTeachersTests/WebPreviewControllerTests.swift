@@ -52,7 +52,7 @@ final class WebPreviewControllerTests: XCTestCase {
     @MainActor
     func testShowFreshBuildLoadsEvenWhenTheAddressWasAlreadyRequested() {
         let controller: WebPreviewController = WebPreviewController()
-        let url: URL = URL(string: "http://localhost:8081/")!
+        let url: URL = URL(string: "http://127.0.0.1:8081/")!
 
         // The phantom load that re-arms the last-requested address.
         let firstHandOff: XCTestExpectation = expectation(description: "the first load is handed to WebKit")
@@ -63,6 +63,10 @@ final class WebPreviewControllerTests: XCTestCase {
         XCTAssertEqual(controller.appLoadsAskedFor, 1, "the first request for an address did not load it")
         controller.loadIfNeeded(url)
         XCTAssertEqual(controller.appLoadsAskedFor, 1, "a repeated request for the same address loaded it again")
+        // WebKit empties its caches and calls back on a later turn, so no
+        // load may have reached WebKit yet: one that has went ahead of the
+        // emptying (#1046).
+        XCTAssertEqual(controller.appLoadsHandedToWebKit, 0, "the first load reached WebKit before the caches were emptied")
         wait(for: [firstHandOff], timeout: WebPreviewControllerTests.longestWaitForAHandOff)
         XCTAssertEqual(controller.appLoadsHandedToWebKit, 1, "the first load was not handed to WebKit once")
 
@@ -72,6 +76,7 @@ final class WebPreviewControllerTests: XCTestCase {
         }
         controller.showFreshBuild(url)
         XCTAssertEqual(controller.appLoadsAskedFor, 2, "showFreshBuild did not load an address that was already requested")
+        XCTAssertEqual(controller.appLoadsHandedToWebKit, 1, "showFreshBuild's load reached WebKit before the caches were emptied")
         wait(for: [freshHandOff], timeout: WebPreviewControllerTests.longestWaitForAHandOff)
         XCTAssertEqual(controller.appLoadsHandedToWebKit, 2, "showFreshBuild's load was not handed to WebKit once")
 
