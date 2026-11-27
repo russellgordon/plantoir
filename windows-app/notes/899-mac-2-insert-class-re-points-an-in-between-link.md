@@ -28,11 +28,15 @@ Not run (stop figure). Owed: M1 refusal put back; M2 the class's own link re-poi
 
 ## Left for the next piece
 
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
+
 - `undo.stackCases` rows "mac-2, Insert Class with a later class linked through a link inside the working folder: …" (one step; undone; undone and redone) and one per re-date-only shape; replay call `makeRoomWithALaterClassLinkedThroughALinkInside` and a key reading the hop's text in `UndoContractReplay.swift`; `stackCasesHow`; the Python model's hop re-point; each row held under `Reason899W8bLinkedClassPage` with the constant reworded (brief's "What Windows must hold"). Each will fail on Windows because its call is unknown to the replay.
 - The must-fail log (M1 to M5) and a re-measure of F-J with the gathered faults (expected 7 of 20).
 - Doc 12's two sentences (the clerk, from the text above).
 
 ## For the director
+
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
 
 Nothing parked.
 
@@ -53,6 +57,8 @@ Nothing parked.
 5. **The exchange refusal's reason (sweep point 3).** The only "(the disk may be full)" on the Mac is the trail line `undo refused for a change left part way` (`UndoTrail.leftNewestLine`), whose `couldNotWrite` clause was "nothing could be written beside X (the disk may be full)". It now reads "X could not be changed in its folder, which may be full or may not allow the change", true of a full disk, a folder that will not take a new file and a volume that refuses the exchange; the event's `carries` says so. What a teacher reads when Insert Class meets such a volume is unchanged and true: "Nothing was changed: The file “hop.md” couldn’t be saved." (the system's sentence for `couldNotWrite`, `JournaledStepError.errorDescription`), refused before anything changed, the step closed failed, nothing on the list. Tested through `relinkRenameInFails` (`UndoRelinkTests.testAVolumeThatRefusesTheExchangeIsSaidTruly`, `UndoMakeRoomLinkedPageTests.testInsertClassOnAVolumeThatRefusesTheExchangeIsRefusedWithATrueReason`).
 
 ### What Windows must hold (complete)
+
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
 
 - Three new `stackCases` rows held in `NamedGapLedger.cs` by exact name under `Reason899W8bLinkedClassPage` (each name once in the contract and once in the ledger, checked by script); the reason reworded: no arrangement is said to be refused; it adds "a later class reaching a renamed class page through an in-between link inside the working folder is renamed as itself and the in-between link re-pointed where it stands (mac-1's relink, Reason899W8RelinkedLink first; …); a class only re-dated is re-pointed where it stands (…)" and names the new call and the key `hopLink`. No unescaped double quote in the C# string (checked by script). Each new row fails on Windows today at its first call: `makeRoomWithALaterClassLinkedThroughALinkInside` is unknown to Windows' stack replay, and the key `hopLink` is not in its checked keys.
 - **New trail event** `undo kept an item found where a link was being changed` (`activityTrail.mustRecord`): Windows' W8b piece 21b says it, never the kept-page or kept-folder line, wherever its relink keeps an item found under a relink's own staged name (NEW or ASIDE) under `<name> (kept by Undo)`, live and in recovery. Windows' trail-event pin will fail until `ActivityTrail` gains the event: say so on the W8b 21b issue (the director's to file; this writer opened no issue).
@@ -83,6 +89,8 @@ Each sabotage applied by script, built, run, restored from a copy and compared e
 
 ### Left for the next piece (second writer)
 
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
+
 - `stackCases` rows for the three re-date-only shapes: need a numbered-course fixture in the replay and the Python model (see point 2 above); Mac unit tests cover all three.
 - Windows' trail clause in `UndoRecovery.cs` about 299 and the new trail event (above): W8b 21b or 22, the director to put on its issue.
 
@@ -99,6 +107,8 @@ Brief `vm-tools/briefs/2026-11-27-899-mac-2-review-1.md`. `origin/dev` (454ef4c6
 5. **LOW 3.** NOT done as contract rows: a numbered-course setup in the replay is not small. The replay's linked course (`laidLinkedPageCourse`) is a dated course with a remembered timetable; a numbered course needs its own course, a plan whose classes are re-dated without renaming (Week 1 to 3 and Week 5), and the Python model would need the numbered plan (which classes are renamed, which only re-dated) to compute the rows' expected links, which it does not model today. Written for Windows below instead.
 
 ### What Windows must hold (fix round one)
+
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
 
 - The new ledger row (above), until W8b 21b adds `ActivityTrail.Event` for "undo kept an item found where a link was being changed" and says it wherever its relink keeps an item found under a relink's own staged name, live and in recovery.
 - **(Corrected in fix round two; this item replaces its first wording.) An item under a relink's own staged name is judged by `lstat` alone, never by its contents.** Windows' relink where it stands has no exchange: as `contracts/file-formats.json` states its mechanism, (1) the new link is made under the NEW name (relinkStaged); (2) the item at the place is renamed exclusively to the ASIDE name (relinkSetAside); (3) the new link is renamed exclusively from the NEW name to the place (relinkRenamedIn); (4) the item under the ASIDE name is re-read; holding the source's text it is removed by that text, anything else is the teacher's and the swap is settled back (the new link renamed from the place back to the NEW name, exclusively; the item renamed back to the place, exclusively; the new link removed by its text; refused changed since). The rule for every item under either staged name, live, in a pre-clean and in recovery: a symbolic link (or junction) is judged by its TEXT (read as the link's own target, never followed); anything that is not a link is the teacher's WITHOUT being read (the step stages only links), whatever it is and whether or not it can be opened or listed. So it is always settled: renamed back to its place when the place is free (or holds only the step's own link, which is taken back out first), else kept under `<name> (kept by Undo)` and said by the line "undo kept an item found where a link was being changed". It never waits "for a later try" because it cannot be read, and nothing stays under a hidden name for that reason. Only a refused RENAME (the item will not move) leaves it there: the step stays in flight, a later Undo or Redo is refused naming the VISIBLE place (never the staged name), and the next recovery tries the rename again. "Cannot tell now" is left for a link whose text, or a place, that cannot be read. Windows' 21b tests: (a) in a live relink where it stands, the place is replaced after (1) by a folder no one may list (an ACL denying list to the user); at (4) the item under the ASIDE name cannot be read and the rename back is refused once: expect it renamed back on the settle's own rename, or kept visible and said, nothing under a staged name, nothing a teacher reads naming `.plantoir-undo`; (b) kill after (3) with that unlistable folder, and with an unreadable file (an ACL denying read), under the ASIDE name: recovery renames it back when the place holds only the step's link (taken back out first) or keeps it visible and says the line; nothing hidden left. (The Mac's rows: `UndoRelinkTests.testRecoverySettlesAnUnreadableItemUnderTheStagedNameVisiblyAndSaysSo`, `testAnItemThatCannotGoBackByTheExchangeIsGivenBackUnread`, `testAnUnreadableItemUnderTheStagedNameIsKeptVisibleAndSaid`.)

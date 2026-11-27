@@ -48,9 +48,13 @@ No row (inert). `NamedGapLedgerTests` run.
 
 ## Left for the next piece
 
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
+
 - 21b5: call `CopyTheLessonInsteadOfALink` from `RelinkLink` where `UndoLinks.CanMakeALink()` is false. 22b: the line a teacher reads (from `CopiedInsteadOfLinks`), and dating and titling the copy as a class page.
 - The copy is read from the disk at plan time: 21b5 and 22 must plan it before any write of the file the link leads to (documented on the function).
 
 ## For the director
+
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
 
 - Nothing parked.

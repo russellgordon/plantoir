@@ -23896,7 +23896,7 @@ The place is never handed over (`handsOverAsAMove` is false for it), and in
 `JournaledStep` `relinkLink(p, to: p, textAfter:)` plans it with no place
 freed: a write planned at `p` refuses the step before anything changes.
 Nothing calls it yet but the tests: Insert Class's in-between link (ruling 6)
-and an earlier class's link (the evening's ruling 3) are mac-2 and mac-3.
+and an earlier class's link (the evening's ruling 3) were mac-2 and mac-3 (mac-3 and mac-4: struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; not built.).
 
 Fix round one (review 1). The same-place test compares UTF-8 bytes through one
 function, `UndoOp.isOnePathByteForByte`, everywhere it is asked (Swift's `==`
@@ -23994,7 +23994,7 @@ kept an item found where a link was being changed", and the left-part-way
 line's new `couldNotWrite` clause; all held on Windows by exact name. Still
 left: contract rows for the three re-date-only shapes (a numbered course's
 plan in the replay and the Python model), written for Windows in the piece's
-notes.
+notes. What Windows was to copy of it is struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; not built.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

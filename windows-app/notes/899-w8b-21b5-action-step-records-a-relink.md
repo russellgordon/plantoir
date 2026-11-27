@@ -50,9 +50,13 @@ No row. `NamedGapLedgerTests` run.
 
 ## Left for the next piece
 
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
+
 - 22a: call `RelinkLink` from Insert Class, plan it before any write of the file the link leads to (the copy reads it from the disk at plan time), and say copied in 22b's line (`CopiedInsteadOfLinks`).
 - A relink whose `from` and `to` are one place (ruling 8; the mac has not built it).
 
 ## For the director
+
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
 
 - Nothing parked. Two readings, both small: (1) where no link can be made and the link leads to no lesson (nowhere, or a folder), `RelinkLink` moves it as itself with its old text and answers moved, as 21b1a's summary said its caller would; (2) a write planned at the new name BEFORE the relink is refused too (the mac refuses only a write planned after it). A removal planned there first is allowed, as on the mac (Insert Class removes a page below before a link moves into its place).

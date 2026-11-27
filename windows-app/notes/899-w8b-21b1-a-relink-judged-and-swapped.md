@@ -62,10 +62,14 @@ No row (inert). `NamedGapLedgerTests` green in -b.
 
 ## Left for the next piece
 
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
+
 - 21b1a: the copy where a link cannot be made. 21b2: `ReadOp`, `ShapeIsKnown`, the seven check rows. 21b3: recovery and the stop points `relinkStaged`, `relinkRenamedIn` (inside `RelinkLink`, between the make and the rename, and between the rename and the removal). 21b5: `UndoActionStep.RelinkLink`.
 - `MakeALink` makes a FILE symbolic link (a class page's). A relink of a link to a folder is not a shape anything makes (the mac's relink is for class pages); if one is ever wanted, the make must ask the old link's kind (`UndoLinks` folder-link test).
 
 ## For the director
+
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
 
 - **Parked (measured, for piece 22 and 21b5): a link holding the mac's forward-slash text does not open on Windows.** Example: `section1/Unit 1, Day 4.md` → `../library/Day 4.md`, made by `File.CreateSymbolicLink`, reads back byte for byte but `File.ReadAllText` through it fails (ERROR_INVALID_NAME); `..\library\Day 4.md` opens. The relink swap is unaffected (it judges and makes by text, never follows). What it touches: which text a link that WINDOWS makes holds (21b5's `RelinkLink` and 22a's re-pointing write a new text), and the contract rows that lay `../../elsewhere/Unit 1, Day 3.md` (order file, director item 9). Options: (a, recommended) a link text Windows itself writes uses backslashes, and one it keeps (a plain move, a relink's old text) is kept byte for byte, so a mac-made link keeps its text and a Windows-made one opens; (b) keep the mac's spelling everywhere and accept that such links do not open on Windows (Obsidian and the builder then cannot read the page); (c) rewrite separators when relinking, which breaks byte-for-byte judging and is rejected. Nothing built for it here.
 - No lock was removed that this piece did not take.

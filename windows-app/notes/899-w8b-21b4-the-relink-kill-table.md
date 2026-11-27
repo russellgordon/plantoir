@@ -70,9 +70,13 @@ No row. `NamedGapLedgerTests` run, green.
 
 ## Left for the next piece
 
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
+
 - 21b5: `UndoActionStep.RelinkLink`.
 
 ## For the director
+
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
 
 - The fix touches 21b3's `UndoStagedLinks` (one line and its summary); the mac's `isOurs` should be checked for the same thing: a page under a relink's staged name beside a place only link moves name.
 - No lock was removed that this piece did not take.

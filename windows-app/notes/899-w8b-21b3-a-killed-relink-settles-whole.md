@@ -37,9 +37,13 @@ RED 4 of 4; restored 478 of 478, HEAD-AFTER same, status clean.
 
 ## Left for the next piece
 
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
+
 - 21b4: the harness kill table. 21b5: `UndoActionStep.RelinkLink`.
 
 ## For the director
+
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
 
 - A reading, not parked: the teacher's item kept under a visible name is said with the existing "undo kept a page under a visible name" line (`KeptAPageWords`: "…removed or moved away by a change that stopped, as …, because something else now holds …"). It is true of the case Windows can meet (something else holds the place); no new wording key. If the mac's mac-1 fix round adds a wording for this, Windows should switch to it.
 - No lock was removed that this piece did not take.

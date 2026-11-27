@@ -37,8 +37,12 @@ RED 3 of 3; restored 669 of 669, HEAD-AFTER same, status clean.
 
 ## Left for the next piece
 
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
+
 - 21b3: recovery (`withARelink`, the stop points), `Reason899W8RelinkedLink` goes. 21b5: the journal writer for the pair (`UndoActionStep` writes `linkSha` only today).
 
 ## For the director
+
+Struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; nothing here is to be built.
 
 - Nothing parked.
