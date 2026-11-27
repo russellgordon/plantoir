@@ -226,7 +226,7 @@ nonisolated final class JournaledStep {
     /// file planned at or inside a folder move's `to` is an edit the move
     /// carries (`undoJournal.opKinds.wholeOps`): its `before` is read where
     /// the file is now, under `from`, and its op goes after the move. A
-    /// symbolic link moved as itself (U4b2-15) carries its `linkSha`
+    /// symbolic link moved as itself (no teacher action does so now; #1055 M6 removes it) carries its `linkSha`
     /// instead (`moveLink`), and carries no edit. A RELINKING move (U4b3
     /// relink-4, `relinkLink`) carries `linkSha` as the sha of the text the
     /// link holds now, and both texts, `textBefore` and `textAfter`; every
@@ -408,8 +408,8 @@ nonisolated final class JournaledStep {
     }
 
     /// Plans the symbolic LINK at `from` to be moved as itself to `to`
-    /// (#899 U4b2-15: Rename folder of a per-section or shared folder that
-    /// is a link), judged by `linkSha`, the SHA-256 of the target it holds
+    /// (no teacher action calls this now, Rename folder refuses a link;
+    /// #1055 M6 removes it), judged by `linkSha`, the SHA-256 of the target it holds
     /// as `readlink` gives it, never followed (`undoJournal.opKinds.move`).
     /// What it leads to is never opened, listed or touched. Plan no edit
     /// inside its `to`: a link's move carries none.

@@ -994,7 +994,8 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
 
     /// A link's `linkSha` (`opKinds.move`, U4b2-14): the SHA-256 of the
     /// bytes it holds (`linkTarget`), never followed. Nil when it cannot be
-    /// read. The one rule a writer records by (Rename folder, U4b2-15), the
+    /// read. No teacher action calls this now (Rename folder refuses a link;
+    /// #1055 M6 removes it). The one rule the
     /// door judges by (`UndoMoveSide.readLink`) and a folder's listing
     /// lists a link inside it by (`link` lines).
     static func linkSha(at url: URL) -> String? {
