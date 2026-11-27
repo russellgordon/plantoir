@@ -50,7 +50,7 @@ public sealed class UndoStackContractTests
     /// <summary>
     /// The cases whose calls lay a symbolic link holding <c>../library</c> as
     /// written (<c>moveALinkToAFolder</c>, U4b2-14; #899 W8-6): run where this
-    /// account may make one, SKIPPED saying why where it may not (the VMs).
+    /// account may make one, SKIPPED saying why where it may not (a machine that cannot make links).
     /// </summary>
     public static IEnumerable<object[]> LinkCases() =>
         UndoContract.Undo.GetProperty("stackCases").EnumerateArray()

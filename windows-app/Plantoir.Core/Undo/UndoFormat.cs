@@ -95,6 +95,60 @@ internal sealed record UndoOp
     /// </summary>
     internal string? LinkSha { get; init; }
 
+    /// <summary>
+    /// A RELINKING move (#899 W8b-21b1; the mac's U4b3 relink-1): the SHA-256
+    /// of the text the link holds at <c>from</c> (<see cref="LinkShaBefore"/>)
+    /// and of the text a new link holds at <c>to</c> (<see cref="LinkShaAfter"/>),
+    /// both texts in <see cref="Blobs"/> (an Undo needs the old, a Redo the
+    /// new), never beside <see cref="Sha"/>, <see cref="ListingSha"/> or
+    /// <see cref="LinkSha"/>. Read from the journal as ONE content form
+    /// (21b2, <see cref="UndoFormat"/>'s <c>RelinkShapeIsKnown</c>).
+    /// </summary>
+    internal string? LinkShaBefore { get; init; }
+
+    /// <summary>See <see cref="LinkShaBefore"/>: the text the link holds at <c>to</c>.</summary>
+    internal string? LinkShaAfter { get; init; }
+
+    /// <summary>
+    /// Whether the op is a link's move: a plain one (<see cref="LinkSha"/>, the
+    /// same text on both sides) or a relinking one (<see cref="LinkShaBefore"/>
+    /// and <see cref="LinkShaAfter"/>). The ONE test every "is this a link's
+    /// move" site asks (the mac's <c>isALinksMove</c>), never <c>LinkSha</c>
+    /// alone, or a relink would be read through, judged leading out, or carry
+    /// edits.
+    /// </summary>
+    internal bool IsALinksMove => LinkSha is not null || LinkShaBefore is not null;
+
+    /// <summary>Whether the op is a relinking move: a link's move that changes the text the link holds (the mac's <c>isARelink</c>).</summary>
+    internal bool IsARelink => LinkShaBefore is not null;
+
+    /// <summary>
+    /// The SHA-256 of the text a link's move holds at <c>from</c>
+    /// (<paramref name="isAtFrom"/>) or at <c>to</c>: <see cref="LinkSha"/> on
+    /// both sides of a plain one, each side's own for a relink; null for any
+    /// other op (the mac's <c>linkText(isAtFrom:)</c>).
+    /// </summary>
+    internal string? LinkText(bool isAtFrom) => LinkSha ?? (isAtFrom ? LinkShaBefore : LinkShaAfter);
+
+    /// <summary>
+    /// A symbolic link moved and given a new text in one op (the mac's
+    /// <c>UndoOp.relinkLink</c>): judged at <c>from</c> by
+    /// <paramref name="linkShaBefore"/> and at <c>to</c> by
+    /// <paramref name="linkShaAfter"/>, both texts kept as blobs. Swapped as:
+    /// a new link made beside <c>to</c>, renamed in without replacing, the old
+    /// one removed once re-read (<see cref="UndoSwap.RelinkLink"/>).
+    /// </summary>
+    internal static UndoOp RelinkLink(string from, string to, string linkShaBefore, string linkShaAfter) => new()
+    {
+        Kind = Move,
+        Readable = true,
+        From = from,
+        To = to,
+        LinkShaBefore = linkShaBefore,
+        LinkShaAfter = linkShaAfter,
+        Blobs = [linkShaBefore, linkShaAfter],
+    };
+
     /// <summary><c>external</c>: what outside every working folder it changed (<c>preference:&lt;name&gt;</c>).</summary>
     internal string? Target { get; init; }
 
@@ -147,6 +201,11 @@ internal sealed record UndoOp
             if (string.Equals(from, to, StringComparison.Ordinal) || PartInside(from, to) is not "") return false;
             int fromSlash = from.LastIndexOf('/');
             int toSlash = to.LastIndexOf('/');
+            // Alike after NFC alone is another normalisation of one name, not
+            // a change of case: the places overlap and the op is not readable
+            // (mac-1's normalisation row); a change of case and normalisation
+            // together is still a capitalisation-only move.
+            if (string.Equals(from[(fromSlash + 1)..].Normalize(NormalizationForm.FormC), to[(toSlash + 1)..].Normalize(NormalizationForm.FormC), StringComparison.Ordinal)) return false;
             return fromSlash == toSlash && string.Equals(from[..(fromSlash + 1)], to[..(toSlash + 1)], StringComparison.Ordinal);
         }
     }
@@ -207,7 +266,7 @@ internal sealed record UndoOp
     internal static bool MoveCarries(UndoOp move, UndoOp edit)
     {
         if (move.Kind != Move || !move.Readable || move.From is not { } from || move.To is not { } to || edit.Path is not { } path) return false;
-        if (move.LinkSha is not null) return false;
+        if (move.IsALinksMove) return false;
         if (edit.Kind is not (WriteFile or EditLine or ReplaceText or EditJson)) return false;
         if (edit.From is not null || edit.To is not null || edit.Target is not null) return false;
         if (PartInside(to, path) is null) return false;
@@ -246,15 +305,21 @@ internal sealed record UndoOp
     /// </summary>
     internal static string? PartInside(string place, string path)
     {
+        // Two names are one part when equal after NFC normalisation and
+        // lowercasing (opKinds.wholeOps' one comparison, mac-1 review 2 LOW 1),
+        // as the mac's volume and Python's part_inside take them.
         string[] placeParts = place.Split('/');
         string[] pathParts = path.Split('/');
         if (pathParts.Length < placeParts.Length) return null;
         for (int index = 0; index < placeParts.Length; index++)
         {
-            if (!string.Equals(placeParts[index].ToLowerInvariant(), pathParts[index].ToLowerInvariant(), StringComparison.Ordinal)) return null;
+            if (!string.Equals(OnePart(placeParts[index]), OnePart(pathParts[index]), StringComparison.Ordinal)) return null;
         }
         return string.Join('/', pathParts, placeParts.Length, pathParts.Length - placeParts.Length);
     }
+
+    /// <summary>One part as <see cref="PartInside"/> compares it: NFC-normalised, then lowercased.</summary>
+    private static string OnePart(string part) => part.Normalize(NormalizationForm.FormC).ToLowerInvariant();
 
     /// <summary>
     /// The handed-over places of a step, in the step's order (#899 W8b-21a1;
@@ -281,7 +346,7 @@ internal sealed record UndoOp
                 UndoOp filler = ops[fillerIndex];
                 if (PlaceFilledBy(filler) is not { } filled || PartInside(place, filled) is not "") continue;
                 if (!HandsOverAsAMove(leaver) && !HandsOverAsAMove(filler)) continue;
-                found.Add(new UndoHandover(leaverIndex, fillerIndex, place, leaver.LinkSha is not null || filler.LinkSha is not null));
+                found.Add(new UndoHandover(leaverIndex, fillerIndex, place, leaver.IsALinksMove || filler.IsALinksMove));
                 break;
             }
         }
@@ -297,7 +362,7 @@ internal sealed record UndoOp
     internal static bool HandsOverAsAMove(UndoOp op)
     {
         if (op.Kind != Move || op.ListingSha is not null || op.IsCaseOnlyMove) return false;
-        return op.Sha is not null || op.LinkSha is not null;
+        return op.Sha is not null || op.IsALinksMove;
     }
 
     /// <summary>The place an op leaves: a handing-over move's <c>from</c>, or a removed file's path (the mac's <c>placeLeft(by:)</c>).</summary>
@@ -802,6 +867,8 @@ internal static class UndoFormat
         if (!OptionalString(element, "sha", out string? sha)) readable = false;
         if (!OptionalString(element, "listingSha", out string? listingSha)) readable = false;
         if (!OptionalString(element, "linkSha", out string? linkSha)) readable = false;
+        if (!OptionalString(element, "linkShaBefore", out string? linkShaBefore)) readable = false;
+        if (!OptionalString(element, "linkShaAfter", out string? linkShaAfter)) readable = false;
         if (!OptionalString(element, "target", out string? target)) readable = false;
         List<string>? keyPath = null;
         if (element.TryGetProperty("keyPath", out JsonElement keyPathElement) && keyPathElement.ValueKind != JsonValueKind.Null)
@@ -881,6 +948,8 @@ internal static class UndoFormat
             Sha = sha,
             ListingSha = listingSha,
             LinkSha = linkSha,
+            LinkShaBefore = linkShaBefore,
+            LinkShaAfter = linkShaAfter,
             Target = target,
             Blobs = blobs.Distinct(StringComparer.Ordinal).ToList(),
         };
@@ -905,8 +974,14 @@ internal static class UndoFormat
             case UndoOp.Move:
                 // No path: from and to follow path's rules, differ, and neither
                 // holds the other, but for a capitalisation-only rename (U4b;
-                // W8-5); exactly one of a file's sha, a folder's listingSha
-                // and a link's linkSha (U4b2-14; W8-6).
+                // W8-5); exactly one content form: a file's sha, a folder's
+                // listingSha, a link's linkSha (U4b2-14; W8-6), or a relinking
+                // link's pair linkShaBefore and linkShaAfter counted as ONE
+                // (U4b3 relink-2; W8b-21b2). The pair is never linkSha plus one
+                // new key: a reader that knew linkSha but not the new key would
+                // read a plain link's move and Redo it with the OLD text;
+                // finding none of sha, listingSha and linkSha, it cannot read
+                // the op instead.
                 if (op.Path is not null || op.From is null || op.To is null) return false;
                 if (!UndoPath.IsWithinTheRules(op.From) || !UndoPath.IsWithinTheRules(op.To)) return false;
                 if (UndoOp.PlacesOverlap(op.From, op.To) && !op.IsCaseOnlyMove) return false;
@@ -914,6 +989,11 @@ internal static class UndoFormat
                 foreach (string? given in new[] { op.Sha, op.ListingSha, op.LinkSha })
                 {
                     if (given is not null) contents++;
+                }
+                if (op.LinkShaBefore is not null || op.LinkShaAfter is not null)
+                {
+                    if (!RelinkShapeIsKnown(op, listedBlobs)) return false;
+                    contents++;
                 }
                 return contents == 1;
             case UndoOp.External:
@@ -943,6 +1023,25 @@ internal static class UndoFormat
                 return op.ListingSha is not null && listedBlobs is not null && listedBlobs.Contains(op.ListingSha, StringComparer.Ordinal);
         }
         return true;
+    }
+
+    /// <summary>
+    /// The shape of a relinking move (U4b3 relink-2, opKinds.move; the mac's
+    /// <c>UndoOp.relinkShapeIsKnown</c>): a <c>move</c>, never a
+    /// capitalisation-only rename (nor a <c>moveApart</c> or <c>setAside</c>,
+    /// kinds this version does not know), carrying BOTH
+    /// <c>linkShaBefore</c> and <c>linkShaAfter</c>, each a blob name, the two
+    /// different (a link whose text did not change is a plain link's move),
+    /// and <c>blobs</c> holding exactly those two, so an Undo has the old text
+    /// and a Redo the new.
+    /// </summary>
+    private static bool RelinkShapeIsKnown(UndoOp op, IReadOnlyList<string>? listedBlobs)
+    {
+        if (op.Kind != UndoOp.Move || op.IsCaseOnlyMove) return false;
+        if (op.LinkShaBefore is not { } before || op.LinkShaAfter is not { } after) return false;
+        if (!IsBlobName(before) || !IsBlobName(after) || string.Equals(before, after, StringComparison.Ordinal)) return false;
+        if (listedBlobs is not { Count: 2 }) return false;
+        return listedBlobs.Contains(before, StringComparer.Ordinal) && listedBlobs.Contains(after, StringComparer.Ordinal);
     }
 
     private static UndoProcess? ReadProcess(JsonElement element)

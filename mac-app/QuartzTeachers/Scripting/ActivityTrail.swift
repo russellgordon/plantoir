@@ -1316,6 +1316,13 @@ nonisolated enum ActivityTrail {
         /// else holds that place (#899, U4b3 kept-original-named). Both
         /// named. Written just before the rename. Never page text.
         case undoKeptAPageUnderAVisibleName = "undo kept a page under a visible name"
+        /// An item that was not Plantoir's (a page, a folder, a link with
+        /// another text) was found where a link was being changed, under the
+        /// change's own hidden name, and is kept under a visible name beside
+        /// the link's place (#899, mac-2; the day27b-2 sweep, finding 1).
+        /// Said live and by recovery alike. Both named. Written just before
+        /// the rename. Never page text.
+        case undoKeptAnItemFoundWhereALinkWasChanged = "undo kept an item found where a link was being changed"
         /// A restore that replaced files of a course set aside a change, an
         /// undo or a redo left part way in it (#899, ahead of U5), so
         /// recovery never judges the restored files against a step that

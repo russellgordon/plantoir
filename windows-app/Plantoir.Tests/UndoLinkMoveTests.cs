@@ -332,7 +332,7 @@ internal static class UndoSymbolicLinks
         }
         catch (Exception error)
         {
-            return "this account cannot make a symbolic link (Developer Mode is off, as in the VMs: " + error.Message.Trim()
+            return "this account cannot make a symbolic link (a machine that cannot make links, Developer Mode off: " + error.Message.Trim()
                  + "), so a link holding its target as written (../library) cannot be laid on the disk here";
         }
         finally
