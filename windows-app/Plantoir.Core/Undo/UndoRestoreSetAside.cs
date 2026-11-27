@@ -214,7 +214,7 @@ internal static class UndoRestoreSetAside
                 UndoStep theOpsSetAside = StepWithout(notNow, step);
                 try
                 {
-                    UndoSwap.TidyLeftovers(step.Seq, theOpsSetAside.PathsToTidy, root, UndoRecovery.AsideListings(theOpsSetAside, root),
+                    UndoSwap.TidyLeftovers(theOpsSetAside, root, trail, UndoRecovery.AsideListings(theOpsSetAside, root),
                                            found => UndoRecovery.NoteAnAsideFolder(found, theOpsSetAside, root, journal, trail),
                                            keepingOnlyCopies: true);
                 }
