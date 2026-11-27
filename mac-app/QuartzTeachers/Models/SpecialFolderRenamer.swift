@@ -1040,8 +1040,8 @@ enum SpecialFolderRenamer {
     /// may have moved are `cannotTellWhose` (U4b2-6), told, never counted.
     ///
     /// The disk decides only which of those places are at the new name:
-    /// a folder, by `lstat`, never followed; a link only where this run moved
-    /// a link (review 1, L3); a capitalisation-only rename counts a place only
+    /// a folder, by `lstat`, never followed; a link never counts
+    /// (review 1, L3); a capitalisation-only rename counts a place only
     /// when its directory lists the new spelling. Whatever is at the OLD name
     /// does not count (U4b part six's review, L1). A place that cannot be
     /// read (a refused `lstat`, a listing that fails) is neither counted nor
