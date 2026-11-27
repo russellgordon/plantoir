@@ -947,8 +947,9 @@ internal sealed class UndoDoor
     /// every file in the order the check met it, a carried one staged only at
     /// its turn, then the other whole ops (#899 W8-2). A step with a
     /// handed-over place goes in the order of the ops each target comes from
-    /// instead, so every filler goes in after its leaver
-    /// (<see cref="UndoCheck.PlanResult.Ready.InTheStepsOrder"/>; #899 W8b-21a1).
+    /// instead, so every filler goes in after its leaver, and going back
+    /// every leaver's taking-back after its filler's
+    /// (<see cref="UndoCheck.PlanResult.Ready.InTheStepsOrder"/>; #899 W8b-21a1, 21a2).
     /// </summary>
     internal static List<UndoSwapTarget> TargetsOf(UndoCheck.PlanResult.Ready ready, string root)
     {
