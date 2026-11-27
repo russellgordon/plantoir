@@ -11,10 +11,11 @@ namespace Plantoir.Tests;
 /// or a removal) and a later op fills (a move in, or a new file), at least one
 /// of the two a plain move with <c>sha</c> or <c>linkSha</c>. Insert Class
 /// makes such steps when a later class is a symbolic link: the link moves up a
-/// day and the class below it, or the new class, fills its place. No step
-/// readable today holds one (the step's shape check refuses it until
-/// 21a4), so the check and the swap are called directly here, with ops
-/// built in memory.
+/// day and the class below it, or the new class, fills its place. Such a step
+/// is readable since 21a4 (<see cref="UndoStep.WholeOpsStandAlone"/>, its
+/// shape tests below); the check and the swap are called directly here, with
+/// ops built in memory, and the stack contract's "U4b3 door" rows take one
+/// through the door.
 /// </summary>
 public sealed class UndoHandedOverPlaceTests : IDisposable
 {
@@ -212,6 +213,85 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
 
         Assert.Empty(UndoOp.Handovers([apart, NewFile(Day(3), "New.\n")]));
         Assert.Empty(UndoOp.Handovers([Removal(Day(4), "Three.\n"), apart with { From = Day(5) }]));
+    }
+
+    // ---- The step's shape (W8b-21a4; the mac's U4b3 door-4) ------------------
+
+    private static UndoOp FolderMove() => Op(new JsonObject
+    {
+        ["kind"] = "move", ["from"] = Section + "/media", ["to"] = Section + "/renamed", ["listingSha"] = new UndoTreeListing([], []).Sha,
+    });
+
+    private static List<UndoOp> ShapeAInMemory() => [LinkMoveInMemory(Day(3), Day(4)), NewFile(Day(3), "New.\n")];
+
+    /// <summary>Shape A (a link's move away from Day 3, then a new page there) and shape B (Day 3 left by a removal and filled by the link's move from Day 2, Day 2 filled by a new page) are readable.</summary>
+    [Fact]
+    public void AStepThatHandsAPlaceOverIsReadable()
+    {
+        Assert.True(UndoStep.WholeOpsStandAlone(ShapeAInMemory()));
+        Assert.True(UndoStep.WholeOpsStandAlone([NewFile(Day(4), "Three.\n"), Removal(Day(3), "Three.\n"), LinkMoveInMemory(Day(2), Day(3)), NewFile(Day(2), "New.\n")]));
+    }
+
+    /// <summary>A filler before its leaver is outside the exception: the step is not readable.</summary>
+    [Fact]
+    public void AFillerBeforeItsLeaverIsNotReadable()
+    {
+        List<UndoOp> ops = [NewFile(Day(3), "New.\n"), LinkMoveInMemory(Day(3), Day(4))];
+        Assert.False(UndoStep.WholeOpsStandAlone(ops));
+        Assert.Empty(UndoOp.Handovers(ops));
+    }
+
+    /// <summary>A folder's move never hands its place over, so a new file at the place it leaves is not readable.</summary>
+    [Fact]
+    public void AFoldersPlaceWrittenAfterItsMoveIsNotReadable()
+    {
+        Assert.False(UndoStep.WholeOpsStandAlone([FolderMove(), NewFile(Section + "/media", "New.\n")]));
+    }
+
+    /// <summary>
+    /// Two pairs at one place: two removals of Day 3 then a file's move into
+    /// it. Each leaver hands Day 3 to the same filler, and the two removals,
+    /// neither of them a whole op, are never compared with each other, so it
+    /// is the one-handover-per-place rule alone that refuses the step.
+    /// </summary>
+    [Fact]
+    public void APlaceHandedOverTwiceIsNotReadable()
+    {
+        List<UndoOp> ops = [Removal(Day(3), "Three.\n"), Removal(Day(3), "Three.\n"), FileMove(Day(5), Day(3), "A\n")];
+        Assert.Equal(2, UndoOp.Handovers(ops).Count);
+        Assert.False(UndoStep.WholeOpsStandAlone(ops));
+    }
+
+    /// <summary>A third op at, inside or above a handed-over place overlaps a whole op outside its pair: the step is not readable.</summary>
+    [Theory]
+    [InlineData("at")]
+    [InlineData("inside")]
+    [InlineData("above")]
+    public void AThirdOpNamingAHandedOverPlaceIsNotReadable(string where)
+    {
+        UndoOp third = where switch
+        {
+            "at" => Removal(Day(3), "New.\n"),
+            "inside" => NewFile(Day(3) + "/inside.md", "B\n"),
+            _ => NewFile(Section, "B\n"),
+        };
+        List<UndoOp> ops = [.. ShapeAInMemory(), third];
+        Assert.Single(UndoOp.Handovers(ops));
+        Assert.False(UndoStep.WholeOpsStandAlone(ops));
+    }
+
+    /// <summary>A step that hands a place over may carry no edit (the first exception): each readable alone, not together.</summary>
+    [Fact]
+    public void ACarryingMoveWithAHandoverIsNotReadable()
+    {
+        UndoOp edit = Op(new JsonObject
+        {
+            ["kind"] = "writeFile", ["path"] = Section + "/renamed/a.md", ["beforeSha"] = UndoCheck.Sha(Bytes("A\n")), ["afterSha"] = UndoCheck.Sha(Bytes("A2\n")),
+        });
+        Assert.True(UndoOp.MoveCarries(FolderMove(), edit));
+        Assert.True(UndoStep.WholeOpsStandAlone([FolderMove(), edit]));
+
+        Assert.False(UndoStep.WholeOpsStandAlone([FolderMove(), edit, .. ShapeAInMemory()]));
     }
 
     // ---- Going forward: the plan and the swap --------------------------------
