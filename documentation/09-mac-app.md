@@ -23867,9 +23867,7 @@ old name is a new file, never through the link). Six `stackCases` rows
 and `makeRoomWithALaterClassLinkedToALinkedClass`, the call
 `makeRoomWithALaterClassLinkedToAnEarlierClass` turned round from a refusal,
 key `laterLinks`) replace the refusal row, held for Windows under
-`Reason899W8bLinkedClassPage`. Known limits, not built yet: an EARLIER class's
-link to a page Insert Class renames keeps its text and then leads to the page
-now at that name (ruled 2026-11-26: it will be re-pointed; mac-3); two later classes
+`Reason899W8bLinkedClassPage`. Known limits, not built yet: two later classes
 linked to one shared lesson keep the last date written (ruled: it will keep
 the first class's date); a renamed page's rename that cannot be done (its new
 name taken) leaves a link re-pointed at that new name.
@@ -23975,8 +23973,11 @@ once. Whose an item under a relink's own staged name is is decided by
 text (`readlink`); anything else is the teacher's, whether or not it can be
 read or listed, because the step stages only links. So the pre-clean, the
 live settle after the exchange and recovery's tidy always settle it: given
-back when its place is free (or holds only the step's own link), else kept
-under `<name> (kept by Undo)` and said by the kept-item line. Nothing waits
+back when its place is free, else kept under `<name> (kept by Undo)` and said
+by the kept-item line. Only the live settle after the exchange also gives it
+back over the step's own link (the swap knows which way its exchange went);
+the pre-clean and recovery's tidy never take a step's link out, so there the
+step's link stays at the place and the item is kept visible beside it. Nothing waits
 under the hidden name because it cannot be read; only a refused MOVE leaves
 it there, the step then in flight (a later Undo or Redo is refused naming the
 visible place, the list kept), and the next recovery moves it again. "Cannot
@@ -23995,6 +23996,30 @@ line's new `couldNotWrite` clause; all held on Windows by exact name. Still
 left: contract rows for the three re-date-only shapes (a numbered course's
 plan in the replay and the Python model), written for Windows in the piece's
 notes.
+
+### mac-3: an earlier class is re-pointed
+
+Russell's ruling of 2026-11-26 evening (#899, item 3): when Insert Class
+renames class pages, every OTHER class page of the section the plan does not
+rename, an earlier class above all, whose link reaches a renamed class page
+is re-pointed in the same step by mac-2's rules, so it keeps leading to the
+same lesson. mac-2's loop over re-date-only classes is widened, not copied:
+step 1b of `ClassInsertionPlanner.apply` walks every class page of the section
+as it stood (`classesBefore`) that the plan does not rename, re-date-only or
+neither; its own text names the page: re-pointed where it stands; through an
+in-between link inside the working folder: that link re-pointed where it
+stands, once however many classes reach it (`HopEntry`); through one outside:
+its own link straight at the page's new place. Nothing is written through it:
+an earlier class is in no `plan.moves`, so the dates loop never reaches it.
+Before this piece Day 1 holding `Unit 1, Day 3.md`, after room at Day 2, led
+to old Day 2's lesson (now at that name); it now holds `Unit 1, Day 4.md`.
+Contract: five `undo.stackCases` rows ("mac-3, …"), calls
+`makeRoomWithAnEarlierClassLinkedToAClassItRenames` and
+`makeRoomWithAnEarlierClassLinkedThroughALinkInside`, in `stackCasesHow` and
+the Python model, held on Windows under `Reason899W8bLinkedClassPage`. Noticed,
+not changed: such an earlier class's date is read through its link (the
+lesson's), so the plan dates the classes it renames one meeting later than
+with Day 1 a plain page.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

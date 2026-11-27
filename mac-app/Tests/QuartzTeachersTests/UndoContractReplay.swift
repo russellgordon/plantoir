@@ -1108,6 +1108,18 @@ nonisolated enum UndoContractReplay {
                     last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
                         root: root, journal: stackJournal, places: places, day3Plain: true, throughAHopInside: true
                     )
+                } else if value == "makeRoomWithAnEarlierClassLinkedToAClassItRenames" {
+                    // mac-3: Day 1, an earlier class, a link to Day 3's page.
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
+                        root: root, journal: stackJournal, places: places, day3Plain: true, day1LinkedToDay3: true
+                    )
+                } else if value == "makeRoomWithAnEarlierClassLinkedThroughALinkInside" {
+                    // mac-3: Day 1 reaching Day 3's page through the hop.
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
+                        root: root, journal: stackJournal, places: places, day3Plain: true, day1ThroughAHopInside: true
+                    )
                 } else if value == "makeRoomWithALaterClassLinkedToALinkedClass" {
                     let stackJournal: UndoJournal = journal()
                     last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(

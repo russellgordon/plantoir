@@ -444,32 +444,35 @@ enum ClassInsertionPlanner {
             renamed[rename.from] = rename.to
         }
 
-        // 1b. A class the plan only re-dates, not renames, whose link reaches
-        //     a renamed class page (mac-2): re-pointed where it stands by the
-        //     same rules. Its own text when its text names the page; the
-        //     in-between link when the hop is inside the working folder; its
-        //     own link straight at the page's new place when the hop is
-        //     outside, where Plantoir never writes. Nothing written through.
+        // 1b. Every OTHER class page of the section, one the plan does not
+        //     rename (only re-dated, mac-2, or neither, an earlier class
+        //     above all, mac-3: the ruling of 2026-11-26 evening), whose link
+        //     reaches a renamed class page: re-pointed where it stands, in
+        //     this same step, by the same rules. Its own text when its text
+        //     names the page; the in-between link when the hop is inside the
+        //     working folder; its own link straight at the page's new place
+        //     when the hop is outside, where Plantoir never writes. Nothing
+        //     written through, no title and no date.
         var renamedPlaces: [String] = []
         for rename in plan.renames {
             renamedPlaces.append(rename.fromURL.standardizedFileURL.path)
         }
-        for move in plan.moves {
-            if renamedPlaces.contains(move.fileURL.standardizedFileURL.path) {
+        for classPage in classesBefore {
+            if renamedPlaces.contains(classPage.fileURL.standardizedFileURL.path) {
                 continue
             }
-            let reach: LinkedClassReach = reachOfALinkedClass(at: move.fileURL, classPagePlaces: classPagePlaces)
+            let reach: LinkedClassReach = reachOfALinkedClass(at: classPage.fileURL, classPagePlaces: classPagePlaces)
             switch reach {
             case .elsewhere, .aClassPageTheyLeave:
                 continue
             case .aRenamedPageThrough(let hop, let newPlace) where isInside(workingFolder, hop):
                 if !rePointWhereItStands(hop, at: newPlace, in: step, done: &hopsRePointed) {
-                    notFinished.linksNotUpdated.append(move.title)
+                    notFinished.linksNotUpdated.append(classPage.title)
                 }
             case .aRenamedPageByItsOwnText, .aRenamedPageThrough:
-                guard let textAfter = textAfterTheMove(of: move.fileURL, reach: reach),
-                      step.relinkLink(move.fileURL, to: move.fileURL, textAfter: textAfter) else {
-                    notFinished.linksNotUpdated.append(move.title)
+                guard let textAfter = textAfterTheMove(of: classPage.fileURL, reach: reach),
+                      step.relinkLink(classPage.fileURL, to: classPage.fileURL, textAfter: textAfter) else {
+                    notFinished.linksNotUpdated.append(classPage.title)
                     continue
                 }
             }

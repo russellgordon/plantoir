@@ -1233,6 +1233,38 @@ class ContractCaseTests(unittest.TestCase):
             ops += traces.ops_for_change(self.linked_day(4), None, self.linked_text(4, 4, body=3))
             ops += traces.ops_for_change(self.linked_day(3), three, self.linked_text(3, 3, body=2))
             return self.vetted_ops_step(model, ops + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
+        if call in ("makeRoomWithAnEarlierClassLinkedToAClassItRenames", "makeRoomWithAnEarlierClassLinkedThroughALinkInside"):
+            # mac-3 (Russell's ruling of 2026-11-26 evening): Day 1, an
+            # EARLIER class the plan neither renames nor re-dates, a link to
+            # Day 3's page (which the plan renames), by its own text or
+            # through hop.md inside the working folder: Day 1, or hop.md,
+            # re-pointed where it stands in the same step (one relinking
+            # move naming the one place twice), nothing written through
+            # it. Day 1's date is read through its link (Day 3's), so the
+            # plan dates the renamed pages one meeting later.
+            through_the_hop = call == "makeRoomWithAnEarlierClassLinkedThroughALinkInside"
+            if through_the_hop:
+                place, old, new = self.HOP, self.HOP_BEFORE, self.HOP_AFTER
+            else:
+                place, old, new = self.linked_day(1), "Unit 1, Day 3.md", "Unit 1, Day 4.md"
+            if pages.get(self.linked_day(3)) is None and pages.get(self.linked_day(4)) is None:
+                pages[self.linked_day(2)] = self.linked_text(2, 2)
+                pages[self.LINKED_FILE] = self.linked_text(3, 3)
+                pages[self.linked_day(3)] = self.linked_text(3, 3)
+                if through_the_hop:
+                    pages[self.HOP] = ("link", old)
+                    pages[self.linked_day(1)] = ("link", self.HOP_FROM_DAY4)
+                else:
+                    pages[self.linked_day(1)] = ("link", old)
+            two, three = pages.get(self.linked_day(2)), pages.get(self.linked_day(3))
+            ops = [{"kind": "move", "from": place, "to": place,
+                    "linkShaBefore": traces.sha(old), "linkShaAfter": traces.sha(new),
+                    "blobs": [traces.sha(old), traces.sha(new)],
+                    "linkTexts": {traces.sha(old): old, traces.sha(new): new}}]
+            self.assertTrue(traces.is_a_relink_in_place(ops[0]))
+            ops += traces.ops_for_change(self.linked_day(4), None, self.linked_text(4, 5, body=3))
+            ops += traces.ops_for_change(self.linked_day(3), three, self.linked_text(3, 4, body=2))
+            return self.vetted_ops_step(model, ops + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
         if call == "handAPlaceOverAfterALinksMove":
             # U4b3 door-4, shape A: the link leaves Day 3, a new page fills it.
             if pages.get(self.day(3)) is None and pages.get(self.day(4)) is None:
@@ -1497,7 +1529,8 @@ class ContractCaseTests(unittest.TestCase):
                   "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
                   "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass",
                   "makeRoomWithALaterClassThatIsABrokenLink", "makeRoomWithALaterClassLinkedToAClassItRenames",
-                  "makeRoomWithALaterClassLinkedToALinkedClass", "makeRoomWithALaterClassLinkedThroughALinkInside")
+                  "makeRoomWithALaterClassLinkedToALinkedClass", "makeRoomWithALaterClassLinkedThroughALinkInside",
+                  "makeRoomWithAnEarlierClassLinkedToAClassItRenames", "makeRoomWithAnEarlierClassLinkedThroughALinkInside")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)

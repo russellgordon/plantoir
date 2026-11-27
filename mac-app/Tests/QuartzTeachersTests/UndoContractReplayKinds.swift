@@ -887,7 +887,8 @@ nonisolated enum UndoContractKinds {
     @MainActor
     static func makeRoomWithALaterClassThatIsALink(
         root: URL, journal: UndoJournal, places: UndoMemoryPlaces, linkedToDay1: Bool = false, broken: Bool = false,
-        day4LinkedToDay3: Bool = false, day3Plain: Bool = false, throughAHopInside: Bool = false
+        day4LinkedToDay3: Bool = false, day3Plain: Bool = false, throughAHopInside: Bool = false,
+        day1LinkedToDay3: Bool = false, day1ThroughAHopInside: Bool = false
     ) throws -> String {
         // U4b3 part 2: Unit 1, Day 1 to Day 3 in section 1, Day 3 a link
         // to a file elsewhere in the course; room for one class at Day
@@ -922,6 +923,23 @@ nonisolated enum UndoContractKinds {
             // the hop re-pointed where it stands.
             try layALink(hopLinkPath, leadingTo: hopLinkBefore, root: root)
             try layALink(linkedPageDay(4), leadingTo: hopLinkFromDay4, root: root)
+        }
+        if (day1LinkedToDay3 || day1ThroughAHopInside) && !somethingIsAt(linkedPageDay(4), in: root) {
+            // mac-3's `makeRoomWithAnEarlierClassLinkedToAClassItRenames`
+            // and `makeRoomWithAnEarlierClassLinkedThroughALinkInside`: Day
+            // 1, an EARLIER class the plan neither renames nor re-dates, a
+            // link holding `Unit 1, Day 3.md` (Day 3's page, which the plan
+            // renames), or reaching it through `hopLinkPath`: Day 1 is
+            // re-pointed at Day 3's page's new name, or the hop where it
+            // stands, in the same step (the ruling of 2026-11-26 evening).
+            let day1: URL = root.appendingPathComponent(linkedPageDay(1))
+            try FileManager.default.removeItem(at: day1)
+            if day1ThroughAHopInside {
+                try layALink(hopLinkPath, leadingTo: hopLinkBefore, root: root)
+                try layALink(linkedPageDay(1), leadingTo: hopLinkFromDay4, root: root)
+            } else {
+                try layALink(linkedPageDay(1), leadingTo: "Unit 1, Day 3.md", root: root)
+            }
         }
         if day4LinkedToDay3 && !somethingIsAt(linkedPageDay(4), in: root) {
             // Relink-5: Day 4 a link holding `Unit 1, Day 3.md`, a class page
