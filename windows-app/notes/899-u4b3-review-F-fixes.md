@@ -8,6 +8,27 @@ Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from 57afa8408. `origi
 - **Counter-example found, as the brief said to stop for:** a plain link move (`linkSha`) chained to a relink in one step still loses a link at 8 of its 40 kills under the rule as briefed. Details and a scratch-proven extension under "For the director". Not built.
 - Review F's three lows: done (see "Lows").
 
+## Follow-up: the director's ruling (adopted, 2026-11-26, night)
+
+The director ruled to adopt the extension proposed under "For the director" below, which is now built. Where this section and the older text below disagree, this section is true.
+
+- **Rule as built.** Every link move of the step is read in the work's swap order. A plain link move (`linkSha`, the same text at both sides) counts like a relink as a before/after constraint: it must hold its end text when it is before the candidate, and its start text when it is after. It is never itself the one in flight, because its swap is one rename. Only a relink (two texts, always different, `opKinds.move`) can pass. The changes are in Swift `removeTheLinksJustMade` and `isTheOneInFlight`, and in the Python `remove_the_links_just_made`.
+- **Test.** The test is now `UndoRelinkTests.testChainedLinkMovesKilledAtEveryStopPointLoseNoLink`, and it runs all four shapes (`ChainShape.allCases`): 101 kills, all passed. There are 61 relink kills, plus 20 for each move shape (an apply: afterBegin, two swaps, both halves of the one relink, beforeApplied; an Undo or a Redo: 7).
+- **Must-fail on 113b1c77f's rule** (HEAD's `UndoRecovery.swift` put back, then the built file copied back from the scratchpad). 9 move-chained kills were RED:
+  - `aMoveThenARelinkIntoItsPlace`: apply at `afterBegin` and `beforeSwap(0)`; undo at `beforeUndone`; redo at `afterRedoing` and `beforeSwap(0)`;
+  - `aRelinkThenAMoveIntoItsPlace`: apply at `beforeApplied`; undo at `afterUndoing` and `beforeSwap(0)`; redo at `beforeRedone`.
+
+  The earlier run of the same rule showed 8: `aMoveThenARelinkIntoItsPlace-apply-beforeSwap(0)` passed there. That one difference between two runs of one rule is not explained. The folder at that point reads the same as at `afterBegin`.
+- **Python.** `test_chained_link_moves_killed_at_every_point_lose_no_link` replaces the relinks-only test and adds both move shapes: 54 model kills. With the old model rule it fails 5 move-shape subtests. 41 tests OK.
+- **Contract.** One new `recoveryCases` row, `withARelink: thenAMove` (call `relinkThenMoveALinkIntoItsPlace`, files read on Day 4 to Day 6), step at `beforeApplied`: done, files after. The Mac replay now has 85 rows.
+  - The row fails with the old rule in both the Swift replay and the Python model.
+  - It is held for Windows under `Reason899W8RelinkedLink`, its name matched byte for byte, once.
+  - `recoveryCasesHow` says what `thenAMove` is.
+- **Sentences.** `undo.rule.recovery`, the `Reason899W8RelinkedLink` sentence and the code comment now say "every link move before/after it" and give a plain move's part. The test comment says what the test proves.
+- **Why a swap has no kill test.** The door refuses a swap of two links (Day 4's relinked into Day 5 and Day 5's into Day 4) before anything changes, because a relink never renames over an occupied place. No stop point inside it can be reached, so `testTwoLinksSwappedInOneStepAreRefusedWithNothingChanged` pins the refusal instead.
+- **For documentation 12, as now built.** A relink passes when both of its links stand, every link move before it (plain ones included) holds its end text at its end side, and every link move after it holds its start text at its start side. Remove the just-made link of the LAST relink that passes, or nothing. A plain link move is a constraint only.
+- **Runs.** `UndoRelinkTests` (16), `UndoJournalContractTests`, `UndoMakeRoomLinkedPageTests`, `UndoHandedOverPlaceTests` and `JournaledStepTests`: 131 tests, 0 failures, through xlock.sh. `origin/dev` was merged in before handing back, with nothing new.
+
 ## The rule as built (Swift `UndoRecovery.removeTheLinksJustMade` and `isTheOneInFlight`; Python `remove_the_links_just_made`)
 
 - The relinking ops are read in the work's own swap order: index order for an apply or a Redo, reversed for an Undo.
