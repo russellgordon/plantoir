@@ -428,6 +428,67 @@ public sealed partial class UndoStoppedStepTests
     }
 
     /// <summary>
+    /// #899 W8c-1 review 1, LOW 1: a rename whose file holds neither name says
+    /// what the mac's says, <c>renameFolderNothingWasChanged</c> with
+    /// <c>{said}</c> its not-made description ("The file couldn’t be saved."),
+    /// never "the change was not made". MUST FAIL with the old fragment.
+    /// </summary>
+    [Fact]
+    public void ARenameHoldingNeitherNameSaysTheFileCouldNotBeSaved()
+    {
+        TheSettingsNameLabs();
+        UndoForThisProcess list = List();
+
+        Exception? thrown = RenameLabs(list, Door(list, StopTheRename(StoppedWith.AThirdValue)));
+
+        var refused = Assert.IsType<SpecialFolderRenamer.RenameException>(thrown);
+        Assert.Equal(SpecialNames.RenameFolderNothingWasChanged.Replace("{old}", "Labs").Replace("{said}", SettingPutBack.NamingNoFile),
+                     refused.Message);
+    }
+
+    /// <summary>
+    /// #899 W8c-1 review 1, LOW 4: the alert open, the step settled as made
+    /// meanwhile (recovery's own settle, as any change's hold runs it): Put It
+    /// Back says nothing, as the new value's row does, the copy reads the new
+    /// value from the file, and no line says it could not be put back. MUST
+    /// FAIL with a closed step judged by the old value alone.
+    /// </summary>
+    [Fact]
+    public void PutItBackOnAStepSettledAsMadeMeanwhileSaysItWasSaved()
+    {
+        KeepTheTrail();
+        try
+        {
+            UndoForThisProcess list = List();
+            Course course = TheCourse();
+            course.Configuration.Values["course_name"] = "Computer Studies";
+            var offer = Assert.IsType<SettingCouldNotFinishException>(
+                Save(course, list, Door(list, StopTheNameChange(StoppedWith.Unreadable)))).Offer;
+            LetGoOfTheFile();
+            Assert.Equal(UndoStoppedStepVerdict.Finished, Door(list).JudgeAtOnce(offer.Seq));
+
+            Assert.Null(SettingPutBack.AnswerForASave(SettingPutBackAnswer.PutItBack, offer, course, Door(list)));
+
+            Assert.Equal("Computer Studies", CourseNameOnDisk());
+            Assert.Equal("Computer Studies", course.Configuration.CourseName);
+            Assert.Equal(0, InFlightCount(list));
+            Assert.False(TrailSays(SettingPutBack.PutItBackLine("course name", "ICS3U", putBack: false)));
+            Assert.False(TrailSays(SettingPutBack.PutItBackLine("course name", "ICS3U", putBack: true)));
+        }
+        finally { PutTheTrailBack(); }
+    }
+
+    /// <summary>
+    /// #899 W8c-1 review 1, LOW 2: Not Now's line says what Windows does: the
+    /// next change (its hold settles the step by content in this session) or
+    /// the next launch settles it.
+    /// </summary>
+    [Fact]
+    public void NotNowsLineSaysTheNextChangeOrTheNextLaunchSettlesIt() =>
+        Assert.Equal("the folder name Labs for ICS3U was left as it stopped (Not Now): the next change or the next launch settles it",
+                     SettingPutBack.NotNowLine("folder name Labs", "ICS3U"));
+
+    /// <summary>
     /// Could not finish: the alert by "folder name" and the old name, the
     /// offer line under <c>folder renamed</c>, the step in flight. MUST FAIL
     /// with the could-not-finish skipped (the old "was not renamed" sentence).

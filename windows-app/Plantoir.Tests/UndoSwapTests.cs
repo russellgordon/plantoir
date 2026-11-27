@@ -391,6 +391,29 @@ public sealed class UndoSwapTests : IDisposable
         Assert.Equal(Old, ReadShared(page));
     }
 
+    /// <summary>
+    /// #899 W8c-1 review 1, LOW 3: what a Put It Back swap stopped part way left
+    /// under its own label (<c>&lt;seq&gt;-recover</c>) is tidied by the tidy
+    /// that settles the step, as the mac's tidies that label: the staged new
+    /// bytes go, and a kept original that is a copy of its page goes too.
+    /// </summary>
+    [Fact]
+    public void TheTidyRemovesWhatAStoppedPutBackLeftUnderItsLabel()
+    {
+        string root = Path.Combine(_root, "wf");
+        string page = Path.Combine(root, "courses", "A", "a.md");
+        Directory.CreateDirectory(Path.GetDirectoryName(page)!);
+        File.WriteAllBytes(page, Old);
+        string staged = UndoSwap.BesidePath(page, "7-recover", "new");
+        File.WriteAllBytes(staged, New);
+        string kept = UndoSwap.BesidePath(page, "7-recover", "orig");
+        File.WriteAllBytes(kept, Old);
+        Assert.True(UndoSwap.TidyLeftovers(7, ["courses/A/a.md"], root, keepingOnlyCopies: true));
+        Assert.False(File.Exists(staged));
+        Assert.False(File.Exists(kept));
+        Assert.Equal(Old, ReadShared(page));
+    }
+
     /// <summary>LOW 8: OneDrive's Pinned and Unpinned are attributes the page keeps across a swap (they stick on any NTFS file, measured).</summary>
     [Theory]
     [InlineData(0x00080000)]
