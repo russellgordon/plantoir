@@ -99,7 +99,9 @@ internal abstract record UndoCurrent
     }
 
     /// <summary>
-    /// <see cref="Read"/> as recovery judges a page op's place (<see cref="UndoRecovery.FileStates"/>):
+    /// <see cref="Read"/> as recovery judges a page op's place (<see cref="UndoRecovery.FileStates"/>)
+    /// and as every tidy judges whether a kept original is a copy of its place
+    /// (<see cref="UndoSwap.IsACopyOfItsPlace"/>, review 2 of window D):
     /// a link there (<see cref="UndoLinks.Look(string)"/>, the one test of a
     /// link) is <see cref="NotAFile"/>, and what it leads to is never read as
     /// the page, as the mac's <c>UndoItem.read</c> (lstat) calls it
