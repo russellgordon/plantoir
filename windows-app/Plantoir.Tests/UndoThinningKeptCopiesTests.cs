@@ -95,4 +95,60 @@ public sealed class UndoThinningKeptCopiesTests
         Assert.False(File.Exists(redoKept), "the later copy by name is removed");
         Assert.True(File.Exists(undoKept), "the only copy of its content is never removed");
     }
+
+    /// <summary>
+    /// Content is told by its hash, never its size: two kept copies of equal
+    /// length and different bytes are two contents, and both stay (W8-9 to 14
+    /// review 1, LOW 1). MUST FAIL with the thinning judging by length.
+    /// </summary>
+    [Fact]
+    public void TwoContentsOfEqualLengthBothStay()
+    {
+        using var scribe = new UndoScribe();
+        scribe.WritePage("A", PagePath, Before);
+        long seq = scribe.Step("A", [(PagePath, After)])!.Value;
+        string page = scribe.FullPath("A", PagePath);
+        byte[] oneContent = Encoding.UTF8.GetBytes("Same length, one.\n");
+        byte[] otherContent = Encoding.UTF8.GetBytes("Same length, two.\n");
+        Assert.Equal(oneContent.Length, otherContent.Length);
+        string applyKept = UndoSwap.BesidePath(page, $"{seq}-apply", "orig");
+        string redoKept = UndoSwap.BesidePath(page, $"{seq}-redo", "orig");
+        File.WriteAllBytes(applyKept, oneContent);
+        File.WriteAllBytes(redoKept, otherContent);
+
+        UndoRecovery.RemoveSupersededKeptCopies(scribe.Fold().Steps[seq].Step, scribe.FullPath("A", ""), [PagePath], $"{seq}-redo");
+        Assert.Equal(oneContent, File.ReadAllBytes(applyKept));
+        Assert.Equal(otherContent, File.ReadAllBytes(redoKept));
+    }
+
+    /// <summary>
+    /// A kept copy that cannot be read just now is never removed, though a
+    /// readable copy of the same step may hold the same bytes; and another
+    /// step's kept copy beside the same page, holding the same bytes, is never
+    /// touched (W8-9 to 14 review 1, LOW 1). MUST FAIL with an unreadable copy
+    /// removed, and with another step's copy taken as this step's.
+    /// </summary>
+    [Fact]
+    public void AnUnreadableCopyAndAnotherStepsCopyAreLeftAlone()
+    {
+        using var scribe = new UndoScribe();
+        scribe.WritePage("A", PagePath, Before);
+        long seq = scribe.Step("A", [(PagePath, After)])!.Value;
+        string page = scribe.FullPath("A", PagePath);
+        string applyKept = UndoSwap.BesidePath(page, $"{seq}-apply", "orig");
+        string undoKept = UndoSwap.BesidePath(page, $"{seq}-undo", "orig");
+        string anotherStepsKept = UndoSwap.BesidePath(page, $"{seq + 1}-apply", "orig");
+        File.WriteAllBytes(applyKept, Before);
+        File.WriteAllBytes(undoKept, Before);
+        File.WriteAllBytes(anotherStepsKept, Before);
+
+        using (var denials = new UndoDenials())
+        {
+            denials.FileCannotBeRead(undoKept);
+            UndoRecovery.RemoveSupersededKeptCopies(scribe.Fold().Steps[seq].Step, scribe.FullPath("A", ""), [PagePath], $"{seq}-apply");
+            Assert.True(File.Exists(undoKept), "a kept copy that cannot be read was removed");
+        }
+        Assert.True(File.Exists(applyKept), "the newest readable copy of its content is kept");
+        Assert.Equal(Before, File.ReadAllBytes(anotherStepsKept));
+    }
 }

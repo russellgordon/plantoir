@@ -53,6 +53,8 @@ internal abstract record UndoCurrent
 
     internal sealed record Absent : UndoCurrent;
     internal sealed record Folder : UndoCurrent;
+    /// <summary>A symbolic link or junction at the path (<see cref="UndoLinks.Look(string)"/>), as recovery judges a page's place (<see cref="ReadWithoutFollowingALink"/>): not a file, never read through (the mac's <c>UndoItem.notAFile</c>, lstat).</summary>
+    internal sealed record NotAFile : UndoCurrent;
     internal sealed record Bytes(byte[] Content) : UndoCurrent;
     internal sealed record CannotReadNow(int ErrorCode) : UndoCurrent;
 
@@ -95,6 +97,25 @@ internal abstract record UndoCurrent
             return new CannotReadNow(exception.HResult & 0xFFFF);
         }
     }
+
+    /// <summary>
+    /// <see cref="Read"/> as recovery judges a page op's place (<see cref="UndoRecovery.FileStates"/>)
+    /// and as every tidy judges whether a kept original is a copy of its place
+    /// (<see cref="UndoSwap.IsACopyOfItsPlace"/>, review 2 of window D):
+    /// a link there (<see cref="UndoLinks.Look(string)"/>, the one test of a
+    /// link) is <see cref="NotAFile"/>, and what it leads to is never read as
+    /// the page, as the mac's <c>UndoItem.read</c> (lstat) calls it
+    /// <c>notAFile</c>. Read through, a link the mac writes
+    /// (<c>../library/Day 2.md</c>) was cannot tell, so recovery left a step
+    /// that handed a place over in flight for good and the page it removed
+    /// stayed hidden (#899 W8b-21c2); a link Windows writes was judged by its
+    /// target's bytes. The door's plan and the swap's re-read still read a
+    /// page through its link: with the switch off, a step on a linked page is
+    /// written through its link, or a linked later class written plainly,
+    /// until W8b piece 22 moves the link itself (documentation 12).
+    /// </summary>
+    internal static UndoCurrent ReadWithoutFollowingALink(string fullPath) =>
+        UndoLinks.Look(fullPath) == UndoLinks.What.Link ? new NotAFile() : Read(fullPath);
 
     private static bool IsNotFound(IOException exception) => (exception.HResult & 0xFFFF) is 2 or 3;
 }
@@ -163,7 +184,7 @@ internal static class UndoCheck
 
             case UndoOp.WriteFile:
             {
-                if (current is UndoCurrent.Folder) return UndoOpState.Neither;
+                if (current is UndoCurrent.Folder or UndoCurrent.NotAFile) return UndoOpState.Neither;
                 string? sha = current is UndoCurrent.Bytes bytes ? Sha(bytes.Content) : null;
                 if (string.Equals(sha, op.BeforeSha, StringComparison.Ordinal)) return UndoOpState.Before;
                 if (string.Equals(sha, op.AfterSha, StringComparison.Ordinal)) return UndoOpState.After;
@@ -210,9 +231,18 @@ internal static class UndoCheck
     /// </summary>
     /// <param name="overridingTo">For a move that carries edits, going back: each carried file, relative to its <c>to</c>, as the step's own edit leaves it once taken back (the listing override; the mac's <c>overridingTo</c>, U4b; #899 W8-2), and the step's own staged and kept files inside it as absent (W8-3).</param>
     /// <param name="overridingFrom">For a move that carries edits: the step's own staged and kept files inside its <c>from</c>, as absent (the mac's <c>overridingFrom</c>, U4b's M1; #899 W8-3).</param>
+    /// <param name="toIsHandedOver">For a file's or a link's move that FILLS a place an earlier change of the same plan leaves
+    /// (a handed-over place, <see cref="UndoOp.Handovers"/>; #899 W8b-21a1, the mac's U4b3 door-1): its <c>to</c> is judged free,
+    /// whatever stands there now, because the leaver is swapped out before it. A flag of its own, never an
+    /// <paramref name="overridingTo"/> entry: those name paths inside a moved folder and what carried edits leave there, and an
+    /// entry at "" would read as a carried edit's file at the move's own place.</param>
+    /// <param name="fromIsHandedOver">Going back, for a file's or a link's move that LEFT a place a later op of the step fills
+    /// (#899 W8b-21a2, the mac's U4b3 door-2): its <c>from</c> is judged free, whatever stands there now, when the filler's
+    /// taking-back is a change of the same plan, because that is swapped out before the move comes back.</param>
     internal static UndoOpState WholeStateOf(UndoOp op, string root, IUndoExternalPlaces places, Func<string, bool>? cannotRead = null,
                                              IReadOnlyDictionary<string, UndoCurrent>? overridingTo = null,
-                                             IReadOnlyDictionary<string, UndoCurrent>? overridingFrom = null)
+                                             IReadOnlyDictionary<string, UndoCurrent>? overridingFrom = null,
+                                             bool toIsHandedOver = false, bool fromIsHandedOver = false)
     {
         if (!op.Readable) return UndoOpState.NotReadable;
         switch (op.Kind)
@@ -232,8 +262,8 @@ internal static class UndoCheck
                     if (side != UndoMoveSide.HoldsTheContent) return UndoOpState.Neither;
                     return spelled == UndoCaseOnlySpelling.To ? UndoOpState.After : UndoOpState.Before;
                 }
-                UndoMoveSide atFrom = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom);
-                UndoMoveSide atTo = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo);
+                UndoMoveSide atFrom = fromIsHandedOver ? UndoMoveSide.Free : UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom);
+                UndoMoveSide atTo = toIsHandedOver ? UndoMoveSide.Free : UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo);
                 if (atFrom == UndoMoveSide.CannotRead || atTo == UndoMoveSide.CannotRead) return UndoOpState.CannotTell;
                 if (atFrom == UndoMoveSide.Free && atTo == UndoMoveSide.HoldsTheContent) return UndoOpState.After;
                 if (atFrom == UndoMoveSide.HoldsTheContent && atTo == UndoMoveSide.Free) return UndoOpState.Before;
@@ -318,6 +348,22 @@ internal static class UndoCheck
             /// each rename (W2b).
             /// </summary>
             internal IReadOnlyList<(string Path, byte[]? Expected, byte[]? Replacement)> InOrder { get; init; } = [];
+
+            /// <summary>
+            /// The step holds a handed-over place (<see cref="UndoOp.Handovers"/>; #899 W8b-21a1, the mac's U4b3
+            /// door-1): its targets go in the order of the ops each comes from (<see cref="TargetsInTheStepsOrder"/>),
+            /// so going forward every filler's change goes in after its leaver's, and going back, in the step's ops
+            /// reversed, every leaver's taking-back after its filler's (W8b-21a2, door-2). False: today's order, exactly.
+            /// </summary>
+            internal bool InTheStepsOrder { get; init; }
+
+            /// <summary>The op each of <see cref="Leading"/>, <see cref="InOrder"/> (a file at the first op naming it) and <see cref="Whole"/> comes from, by its place in this plan's order.</summary>
+            internal IReadOnlyList<int> LeadingOps { get; init; } = [];
+            internal IReadOnlyList<int> InOrderOps { get; init; } = [];
+            internal IReadOnlyList<int> WholeOps { get; init; } = [];
+
+            /// <summary>The files (relative paths) at a handed-over place whose other op is a link's move: judged before staging on the folders above them only (<see cref="UndoSwapTarget.HandedOver"/>).</summary>
+            internal IReadOnlySet<string> HandedOver { get; init; } = new HashSet<string>(StringComparer.Ordinal);
         }
 
         /// <summary>Something it changed was changed since: the first met is named, with how many others.</summary>
@@ -407,8 +453,38 @@ internal static class UndoCheck
         // where it is before the move, and its kept original beside it there.
         var readAt = new Dictionary<string, string>(StringComparer.Ordinal);
         var leading = new List<UndoSwapTarget>();
+        // #899 W8b-21a1 (the mac's U4b3 door-1): each place an earlier op of
+        // the step leaves and a later op fills. Empty for every step readable
+        // today, so such a step is planned exactly as before.
+        IReadOnlyList<UndoHandover> handovers = UndoOp.Handovers(ops);
+        // The ops (by their place in the step) found already as wanted: no
+        // change of this plan.
+        var opsNotChanged = new HashSet<int>();
+        // Each target's op, by its place in this plan's order, for the order
+        // of a step with a handed-over place.
+        var leadingOps = new List<int>();
+        var wholeOps = new List<int>();
+        var firstOpOnPath = new Dictionary<string, int>(StringComparer.Ordinal);
+        var handedOverPaths = new HashSet<string>(StringComparer.Ordinal);
+        int opIndex = -1;
         foreach (UndoOp op in ordered)
         {
+            opIndex++;
+            int stepIndex = backward ? ops.Count - 1 - opIndex : opIndex;
+            // The handed-over place is judged FREE for the op that comes
+            // second in this plan, when the op that comes first is a change
+            // of this plan: going forward the filler, after its leaver
+            // (W8b-21a1); going back the leaver, after its filler's
+            // taking-back (W8b-21a2). Skipped as already done, the first op
+            // leaves the place to be read from the disk as before.
+            bool placeIsFree = false;
+            bool inAHandoverWithALink = false;
+            foreach (UndoHandover handover in handovers)
+            {
+                if (!backward && handover.FillerIndex == stepIndex && !opsNotChanged.Contains(handover.LeaverIndex)) placeIsFree = true;
+                if (backward && handover.LeaverIndex == stepIndex && !opsNotChanged.Contains(handover.FillerIndex)) placeIsFree = true;
+                if (handover.ALinkMoves && !op.IsWhole && (handover.FillerIndex == stepIndex || handover.LeaverIndex == stepIndex)) inAHandoverWithALink = true;
+            }
             if (op.Kind == UndoOp.Recompute) continue;   // re-derived after, never checked
             // Every place it names still inside the working folder, links
             // resolved: a folder on its path replaced by a junction to outside
@@ -417,7 +493,10 @@ internal static class UndoCheck
             // U2b, MEDIUM 2).
             // The place named is the first that leads out, never the other
             // side of a move (U4b2-2; #899 W8-1).
-            if (whole is { Root.Length: > 0 } && UndoPlaces.FirstPlaceLeadingOut(whole.Root, op) is { } leadingOut)
+            // A file op at a place a link leaves or fills is judged on the
+            // folders above it: the link standing there is leaving or
+            // arriving, never written through (W8b-21a1).
+            if (whole is { Root.Length: > 0 } && UndoPlaces.FirstPlaceLeadingOut(whole.Root, op, judgedOnTheFoldersAbove: inAHandoverWithALink) is { } leadingOut)
             {
                 if (!inTheWay.Contains(leadingOut, StringComparer.Ordinal)) inTheWay.Add(leadingOut);
                 continue;
@@ -461,9 +540,14 @@ internal static class UndoCheck
                     overridingTo = both;
                     overridingFrom = both;
                 }
-                UndoOpState wholeState = WholeStateOf(op, whole.Root, whole.Places, whole.CannotRead, overridingTo, overridingFrom);
+                UndoOpState wholeState = WholeStateOf(op, whole.Root, whole.Places, whole.CannotRead, overridingTo, overridingFrom,
+                                                      toIsHandedOver: placeIsFree && !backward, fromIsHandedOver: placeIsFree && backward);
                 UndoVerdict verdict = backward ? UndoVerdictOf(wholeState) : RedoVerdictOf(wholeState);
-                if (verdict is UndoVerdict.AlreadyBack or UndoVerdict.AlreadyRedone) continue;
+                if (verdict is UndoVerdict.AlreadyBack or UndoVerdict.AlreadyRedone)
+                {
+                    opsNotChanged.Add(stepIndex);
+                    continue;
+                }
                 // A moved item is named where a teacher finds it now: its to
                 // before an Undo, its from before a Redo (placeAsFound).
                 if (verdict == UndoVerdict.CannotTell) { cannotTell ??= op.PlaceAsFound(backward); continue; }
@@ -478,9 +562,11 @@ internal static class UndoCheck
                 {
                     movingNow.Add(op.To!);
                     leading.Add(target);
+                    leadingOps.Add(opIndex);
                     continue;
                 }
                 wholeChanges.Add(target);
+                wholeOps.Add(opIndex);
                 continue;
             }
             string path = op.Path!;
@@ -495,10 +581,15 @@ internal static class UndoCheck
                     stagedAtItsTurn.Add(path);
                 }
                 readAt[path] = readPath;
-                original[path] = read(readPath);
+                // A new file going forward, or a removal taken back, at a
+                // place this plan frees first: absent, never read through the
+                // link still standing there (W8b-21a1, W8b-21a2).
+                original[path] = placeIsFree ? new UndoCurrent.Absent() : read(readPath);
                 working[path] = original[path];
                 met.Add(path);
+                firstOpOnPath[path] = opIndex;
             }
+            if (inAHandoverWithALink) handedOverPaths.Add(path);
             UndoOpState state = StateOf(op, working[path]);
             if (state == UndoOpState.InUse) { inUse ??= path; continue; }
             if (state == UndoOpState.CannotTell) { cannotTell ??= path; continue; }
@@ -508,7 +599,11 @@ internal static class UndoCheck
                 continue;
             }
             UndoOpState wantedFrom = backward ? UndoOpState.After : UndoOpState.Before;
-            if (state != wantedFrom) continue;   // already where this move takes it
+            if (state != wantedFrom)
+            {
+                opsNotChanged.Add(stepIndex);   // already where this move takes it
+                continue;
+            }
 
             if (op.Kind == UndoOp.WriteFile)
             {
@@ -586,6 +681,7 @@ internal static class UndoCheck
 
         var changes = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
         var inOrder = new List<(string, byte[]?, byte[]?)>();
+        var inOrderOps = new List<int>();
         foreach (string path in met)
         {
             UndoCurrent was = original[path];
@@ -594,8 +690,42 @@ internal static class UndoCheck
             byte[]? replacement = now is UndoCurrent.Bytes bytes ? bytes.Content : null;
             changes[path] = replacement;
             inOrder.Add((path, was is UndoCurrent.Bytes before ? before.Content : null, replacement));
+            inOrderOps.Add(firstOpOnPath[path]);
         }
-        return new PlanResult.Ready(changes) { InOrder = inOrder, Whole = wholeChanges, Leading = leading, StagedAtItsTurn = stagedAtItsTurn };
+        return new PlanResult.Ready(changes)
+        {
+            InOrder = inOrder, Whole = wholeChanges, Leading = leading, StagedAtItsTurn = stagedAtItsTurn,
+            InTheStepsOrder = handovers.Count > 0, LeadingOps = leadingOps, InOrderOps = inOrderOps, WholeOps = wholeOps,
+            HandedOver = handedOverPaths,
+        };
+    }
+
+    /// <summary>
+    /// The targets of a step with a handed-over place, in the op order of
+    /// this plan (#899 W8b-21a1; the mac's <c>targetsInTheStepsOrder</c>,
+    /// U4b3 door-1): each group's targets with the op each comes from, a file
+    /// target at the first op naming its path, so every filler's change goes
+    /// in after its leaver's. Targets of one op keep the order they were
+    /// given in, the groups' order first.
+    /// </summary>
+    internal static List<UndoSwapTarget> TargetsInTheStepsOrder(IReadOnlyList<IReadOnlyList<UndoSwapTarget>> groups,
+                                                               IReadOnlyList<IReadOnlyList<int>> groupOps)
+    {
+        var ordered = new List<UndoSwapTarget>();
+        var orderedOps = new List<int>();
+        for (int group = 0; group < groups.Count; group++)
+        {
+            for (int position = 0; position < groups[group].Count; position++)
+            {
+                int opIndex = groupOps[group][position];
+                // After every target from an op at or before this one.
+                int insertAt = ordered.Count;
+                while (insertAt > 0 && orderedOps[insertAt - 1] > opIndex) insertAt--;
+                ordered.Insert(insertAt, groups[group][position]);
+                orderedOps.Insert(insertAt, opIndex);
+            }
+        }
+        return ordered;
     }
 
     /// <summary>Each edit's path a move of the step carries (<see cref="UndoOp.MoveCarries"/>, the edit after the move), with that move (the mac's <c>UndoCheck.carriers</c>).</summary>

@@ -255,6 +255,66 @@ internal sealed record UndoOp
         }
         return string.Join('/', pathParts, placeParts.Length, pathParts.Length - placeParts.Length);
     }
+
+    /// <summary>
+    /// The handed-over places of a step, in the step's order (#899 W8b-21a1;
+    /// the mac's <c>UndoCheck.handovers(in:)</c>, U4b3 door-1). A place is
+    /// handed over when an EARLIER op leaves it (<see cref="PlaceLeftBy"/>: a
+    /// file's or a link's move away from it, or a <c>writeFile</c> that
+    /// removes it) and a LATER op fills it (<see cref="PlaceFilledBy"/>: a
+    /// file's or a link's move into it, or a <c>writeFile</c> that makes a new
+    /// file), at least one of the two a move (<see cref="HandsOverAsAMove"/>).
+    /// The exact place only, compared by <see cref="PartInside"/>, the one
+    /// comparison (part by part, no regard to case). Each leaver hands its
+    /// place to the FIRST filler after it. The ONE finder: the plan, the
+    /// format check and recovery all call it.
+    /// </summary>
+    internal static IReadOnlyList<UndoHandover> Handovers(IReadOnlyList<UndoOp> ops)
+    {
+        var found = new List<UndoHandover>();
+        for (int leaverIndex = 0; leaverIndex < ops.Count; leaverIndex++)
+        {
+            UndoOp leaver = ops[leaverIndex];
+            if (PlaceLeftBy(leaver) is not { } place) continue;
+            for (int fillerIndex = leaverIndex + 1; fillerIndex < ops.Count; fillerIndex++)
+            {
+                UndoOp filler = ops[fillerIndex];
+                if (PlaceFilledBy(filler) is not { } filled || PartInside(place, filled) is not "") continue;
+                if (!HandsOverAsAMove(leaver) && !HandsOverAsAMove(filler)) continue;
+                found.Add(new UndoHandover(leaverIndex, fillerIndex, place, leaver.LinkSha is not null || filler.LinkSha is not null));
+                break;
+            }
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// A move that can hand a place over: a plain <c>move</c> with
+    /// <c>sha</c> (a file's) or <c>linkSha</c> (a link's), never a folder's
+    /// (<c>listingSha</c>), a capitalisation-only one, a <c>moveApart</c> or
+    /// a <c>setAside</c> (the mac's <c>handsOverAsAMove</c>).
+    /// </summary>
+    internal static bool HandsOverAsAMove(UndoOp op)
+    {
+        if (op.Kind != Move || op.ListingSha is not null || op.IsCaseOnlyMove) return false;
+        return op.Sha is not null || op.LinkSha is not null;
+    }
+
+    /// <summary>The place an op leaves: a handing-over move's <c>from</c>, or a removed file's path (the mac's <c>placeLeft(by:)</c>).</summary>
+    internal static string? PlaceLeftBy(UndoOp op)
+    {
+        if (HandsOverAsAMove(op)) return op.From;
+        if (op.Kind == WriteFile && op.AfterSha is null && op.BeforeSha is not null) return op.Path;
+        return null;
+    }
+
+    /// <summary>The place an op fills: a handing-over move's <c>to</c>, or a new file's path (the mac's <c>placeFilled(by:)</c>).</summary>
+    internal static string? PlaceFilledBy(UndoOp op)
+    {
+        if (HandsOverAsAMove(op)) return op.To;
+        if (op.Kind == WriteFile && op.BeforeSha is null && op.AfterSha is not null) return op.Path;
+        return null;
+    }
 }
 
 /// <summary>
@@ -331,12 +391,31 @@ internal sealed record UndoStep
     /// <c>opKinds.wholeOps</c>: no other op of the step names a whole op's
     /// places (a move's two, a tree's folder or anything inside it) or its
     /// target. A step that breaks it is one this version cannot read: a
-    /// barrier, never undone in a guessed order. The one exception: an edit a
-    /// move carries (<see cref="UndoOp.MoveCarries"/>), after the move; one
-    /// inside the move's <c>from</c>, or before it, is still a barrier.
+    /// barrier, never undone in a guessed order. Two exceptions (the mac's
+    /// <c>UndoStep.wholeOpsStandAlone</c>). U4b: an edit a move carries
+    /// (<see cref="UndoOp.MoveCarries"/>), after the move; one inside the
+    /// move's <c>from</c>, or before it, is still a barrier. U4b3: a place
+    /// HANDED OVER (<see cref="UndoOp.Handovers"/>, the one finder the plan
+    /// and recovery use too; #899 W8b-21a4): the pair may share exactly that
+    /// place, and nothing else may. A step with a handed-over place hands
+    /// each place over once and carries no edit; a filler before its leaver,
+    /// or a third op at, inside or above the place, still overlaps a whole
+    /// op and is refused here with no rule of its own.
     /// </summary>
     internal static bool WholeOpsStandAlone(IReadOnlyList<UndoOp> ops)
     {
+        IReadOnlyList<UndoHandover> handovers = UndoOp.Handovers(ops);
+        if (handovers.Count > 0)
+        {
+            if (UndoCheck.Carriers(ops).Count > 0) return false;
+            for (int first = 0; first < handovers.Count; first++)
+            {
+                for (int second = first + 1; second < handovers.Count; second++)
+                {
+                    if (UndoOp.PartInside(handovers[first].Place, handovers[second].Place) is "") return false;
+                }
+            }
+        }
         for (int index = 0; index < ops.Count; index++)
         {
             UndoOp op = ops[index];
@@ -354,12 +433,28 @@ internal sealed record UndoStep
                 {
                     foreach (string theirs in second.PathsNamed)
                     {
-                        if (UndoOp.PlacesOverlap(mine, theirs)) return false;
+                        if (UndoOp.PlacesOverlap(mine, theirs) && !IsHandedOver(mine, theirs, index, other, handovers)) return false;
                     }
                 }
             }
         }
         return true;
+    }
+
+    /// <summary>
+    /// U4b3: whether two places two ops of a step name are the one place a
+    /// handover between exactly those two ops hands over (the exact place,
+    /// never one inside it; the mac's <c>UndoStep.isHandedOver</c>).
+    /// </summary>
+    private static bool IsHandedOver(string mine, string theirs, int first, int second, IReadOnlyList<UndoHandover> handovers)
+    {
+        foreach (UndoHandover handover in handovers)
+        {
+            bool samePair = (handover.LeaverIndex == first && handover.FillerIndex == second)
+                            || (handover.LeaverIndex == second && handover.FillerIndex == first);
+            if (samePair && UndoOp.PartInside(handover.Place, mine) is "" && UndoOp.PartInside(handover.Place, theirs) is "") return true;
+        }
+        return false;
     }
 }
 
@@ -948,3 +1043,11 @@ internal static class UndoFormat
         return found;
     }
 }
+
+/// <summary>
+/// A place an earlier op of a step leaves and a later op fills (#899
+/// W8b-21a1; the mac's <c>UndoHandover</c>): the leaver's and the filler's
+/// index in the step, the place as the leaver names it, and whether either of
+/// the two is a link's move.
+/// </summary>
+internal sealed record UndoHandover(int LeaverIndex, int FillerIndex, string Place, bool ALinkMoves);

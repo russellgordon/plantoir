@@ -57,6 +57,17 @@ internal sealed class UndoStepLeftPartWayException(UndoRefusal refusal, IReadOnl
 }
 
 /// <summary>
+/// A step stopped at a kill point of a test or the harness
+/// (<see cref="UndoOutcomeKind.StoppedByATest"/>; the mac's
+/// <c>JournaledStepError.stoppedByATest</c>): as a process that died there,
+/// which may be after the swap. Its own type so a caller can keep what a
+/// process that died would leave (Rename folder's record) and treat every
+/// other exception as nothing changed (#899 W8b window B, LOW 1).
+/// </summary>
+internal sealed class UndoStepStoppedByATestException()
+    : InvalidOperationException("The step was stopped by a test.");
+
+/// <summary>
 /// ONE action's writes, gathered and then made through the door as ONE step
 /// (#899 W7a; the mac's <c>JournaledStep</c>, U3a). The action plans every
 /// file it will write here instead of writing it (<see cref="Write"/>); it
@@ -227,9 +238,9 @@ internal sealed class UndoActionStep
     /// </summary>
     internal void EditJson(string fullPath, byte[] read, IReadOnlyList<UndoMemberChange> members, byte[] after)
     {
-        bool plannedBefore = _before.ContainsKey(Path.GetFullPath(fullPath));
+        bool plannedBefore = _before.ContainsKey(PlannedPlace(fullPath));
         PlanFrom(fullPath, read, after);
-        if (!plannedBefore && members.Count > 0) _members[Path.GetFullPath(fullPath)] = members;
+        if (!plannedBefore && members.Count > 0) _members[PlannedPlace(fullPath)] = members;
     }
 
     /// <summary>
@@ -240,7 +251,8 @@ internal sealed class UndoActionStep
     /// </summary>
     private void PlanFrom(string fullPath, byte[] read, byte[] after)
     {
-        string key = Path.GetFullPath(fullPath);
+        RefuseAWriteAtALinkMovedAway(fullPath);
+        string key = PlannedPlace(fullPath);
         if (_before.ContainsKey(key))
         {
             Plan(fullPath, after);
@@ -249,7 +261,7 @@ internal sealed class UndoActionStep
         if (Directory.Exists(PlaceOnDiskNow(key))) throw new IOException($"“{Path.GetFileName(key)}” is a folder, so it could not be written.");
         _before[key] = read;
         _order.Add(key);
-        _shownAs[key] = fullPath;
+        _shownAs[key] = ShownAs(fullPath, key);
         _after[key] = after;
     }
 
@@ -261,7 +273,12 @@ internal sealed class UndoActionStep
     /// new page put where a renamed one stood) is ONE change of that file
     /// (#899 W7b2-1, Make Room for Classes).
     /// </summary>
-    internal void Remove(string fullPath) => Plan(fullPath, null);
+    /// <remarks>
+    /// A link is never followed here (the mac's <c>remove</c>, planned
+    /// <c>throughALink: false</c>): removing what a link leads to would leave
+    /// the link pointing at nothing.
+    /// </remarks>
+    internal void Remove(string fullPath) => Plan(fullPath, null, throughALink: false);
 
     /// <summary>
     /// Plans a folder made whole at <paramref name="fullPath"/>, where nothing
@@ -326,8 +343,10 @@ internal sealed class UndoActionStep
     /// never followed, so what it leads to is never opened, listed or touched,
     /// wherever it is. Undo, Redo and the unrecorded make move the link with
     /// the swap's own rename (<c>MoveFileEx</c>, never replacing). A link's
-    /// move carries nothing: plan no read or write at or inside its new place
-    /// (<see cref="PlaceOnDiskNow"/> never maps through it). A place that is
+    /// move carries nothing of its own, and (W8b-21a6) the link's new place, in
+    /// the same folder, is read and written as the file the link leads to
+    /// (<see cref="UndoLinks.FileALinkLeadsTo"/>), while the place the link
+    /// leaves reads as free until a new file is written there. A place that is
     /// not a link now, or a link whose target cannot be read (WSL's own),
     /// refuses the action, <c>cannotTellNow</c>, before anything changes.
     /// </summary>
@@ -363,6 +382,78 @@ internal sealed class UndoActionStep
     }
 
     private static string Slashed(string fullPath) => fullPath.Replace('\\', '/');
+
+    /// <summary>The planned link move whose <c>to</c> is exactly the place (<see cref="UndoOp.PartInside"/>, the one comparison), or null (the mac's <c>plannedLinkMove(endingAt:)</c>).</summary>
+    private (string From, string To)? LinkMoveEndingAt(string fullPath)
+    {
+        string place = Slashed(Path.GetFullPath(fullPath));
+        foreach ((string from, string to, _, string? linkSha) in _folderMoves)
+        {
+            if (linkSha is not null && UndoOp.PartInside(Slashed(to), place) is "") return (from, to);
+        }
+        return null;
+    }
+
+    /// <summary>The planned link move whose <c>from</c> is exactly the place, or null (the mac's <c>plannedLinkMove(startingAt:)</c>).</summary>
+    private (string From, string To)? LinkMoveStartingAt(string fullPath)
+    {
+        string place = Slashed(Path.GetFullPath(fullPath));
+        foreach ((string from, string to, _, string? linkSha) in _folderMoves)
+        {
+            if (linkSha is not null && UndoOp.PartInside(Slashed(from), place) is "") return (from, to);
+        }
+        return null;
+    }
+
+    /// <summary>Whether a link's move keeps it in the folder it was in, so a relative target leads to the same file from either name (the mac's <c>staysInItsFolder</c>).</summary>
+    private static bool StaysInItsFolder((string From, string To) move) =>
+        Path.GetDirectoryName(move.From) is { } fromFolder && Path.GetDirectoryName(move.To) is { } toFolder
+        && UndoOp.PartInside(Slashed(fromFolder), Slashed(toFolder)) is "";
+
+    /// <summary>
+    /// Whether the place is one a planned link move leaves, no link move
+    /// fills, and nothing is planned at yet (#899 W8b-21a6; the mac's
+    /// <c>isLeftFreeByALinkMove</c>, U4b3 door-6): it reads as free, no file
+    /// and no text, never through the leaving link.
+    /// </summary>
+    private bool IsLeftFreeByALinkMove(string fullPath) =>
+        LinkMoveStartingAt(fullPath) is not null && LinkMoveEndingAt(fullPath) is null && !_after.ContainsKey(Path.GetFullPath(fullPath));
+
+    /// <summary>
+    /// The place the step reads and writes for <paramref name="fullPath"/>
+    /// (#899 W8b-21a6; the mac's <c>placeALinkLeadsTo</c> and
+    /// <c>plannedKey</c>, U4b3 door-6): a planned link move's new place, in
+    /// the same folder, is the file the link leads to
+    /// (<see cref="UndoLinks.FileALinkLeadsTo"/>, followed from the link where
+    /// it stands now, its target as stored, so a link the mac writes leads
+    /// there too), the same file before and after the move, even where the
+    /// step removes the page the link moves over; never the link's new place
+    /// itself. Every other place is itself.
+    /// </summary>
+    private string PlannedPlace(string fullPath)
+    {
+        string place = Path.GetFullPath(fullPath);
+        if (LinkMoveEndingAt(place) is { } move && StaysInItsFolder(move)) return UndoLinks.FileALinkLeadsTo(move.From);
+        return place;
+    }
+
+    /// <summary>The path a planned file is shown by: as the caller named it, or the file a link's new place leads to.</summary>
+    private static string ShownAs(string fullPath, string key) =>
+        string.Equals(Path.GetFullPath(fullPath), key, StringComparison.OrdinalIgnoreCase) ? fullPath : key;
+
+    /// <summary>
+    /// Refuses, <c>cannotTellNow</c>, before anything changes, a plan at the
+    /// new place of a link moved to ANOTHER folder (the mac's
+    /// <c>refusesAWrite</c>, U4b3): a relative target leads elsewhere from
+    /// there, so a write would be a write through a link no step can judge.
+    /// </summary>
+    private void RefuseAWriteAtALinkMovedAway(string fullPath)
+    {
+        if (LinkMoveEndingAt(fullPath) is not { } move || StaysInItsFolder(move)) return;
+        string place = Path.GetFullPath(fullPath);
+        var refusal = new UndoRefusal(UndoRefusalKind.CannotTellNow, RelativeOf(place) ?? place);
+        throw new UndoStepRefusedException(refusal, Reason(refusal));
+    }
 
     /// <summary>
     /// The one page order (#899 W8b-15a; documentation 12, "What W8 owes from
@@ -444,8 +535,9 @@ internal sealed class UndoActionStep
     /// <summary>The file's text as the step will leave it, or null when it is (or will be) absent.</summary>
     internal string? ReadTextIfAny(string fullPath)
     {
-        string key = Path.GetFullPath(fullPath);
+        string key = PlannedPlace(fullPath);
         if (_after.TryGetValue(key, out byte[]? planned)) return TextOf(planned);
+        if (IsLeftFreeByALinkMove(key)) return null;
         string onDisk = PlaceOnDiskNow(key);
         return File.Exists(onDisk) ? File.ReadAllText(onDisk) : null;
     }
@@ -453,8 +545,9 @@ internal sealed class UndoActionStep
     /// <summary>Whether the file is there as the step will leave it: planned with content, else on the disk (the mac's <c>fileExists</c>).</summary>
     internal bool Exists(string fullPath)
     {
-        string key = Path.GetFullPath(fullPath);
+        string key = PlannedPlace(fullPath);
         if (_after.TryGetValue(key, out byte[]? planned)) return planned is not null;
+        if (IsLeftFreeByALinkMove(key)) return false;
         return File.Exists(PlaceOnDiskNow(key));
     }
 
@@ -465,7 +558,7 @@ internal sealed class UndoActionStep
     /// </summary>
     internal bool WasThereWhenPlanned(string fullPath)
     {
-        string key = Path.GetFullPath(fullPath);
+        string key = PlannedPlace(fullPath);
         if (!_before.TryGetValue(key, out byte[]? before))
             throw new InvalidOperationException($"“{Path.GetFileName(key)}” is not planned in this step.");
         return before is not null;
@@ -474,9 +567,10 @@ internal sealed class UndoActionStep
     /// <summary>The file's text as the step will leave it: what is planned, else the disk's.</summary>
     internal string ReadText(string fullPath)
     {
-        string key = Path.GetFullPath(fullPath);
+        string key = PlannedPlace(fullPath);
         if (_after.TryGetValue(key, out byte[]? planned))
             return planned is null ? throw new FileNotFoundException("A file this change removes.", fullPath) : TextOf(planned)!;
+        if (IsLeftFreeByALinkMove(key)) throw new FileNotFoundException("The place a link this change moves leaves.", fullPath);
         return File.ReadAllText(PlaceOnDiskNow(key));
     }
 
@@ -489,20 +583,33 @@ internal sealed class UndoActionStep
         if (!_frontPages.Contains(page)) _frontPages.Add(page);
     }
 
-    private void Plan(string fullPath, byte[]? after)
+    /// <param name="throughALink">False for a removal: a link's new place is then the link's own (the mac's <c>throughALink</c>).</param>
+    private void Plan(string fullPath, byte[]? after, bool throughALink = true)
     {
-        string key = Path.GetFullPath(fullPath);
+        RefuseAWriteAtALinkMovedAway(fullPath);
+        string key = throughALink ? PlannedPlace(fullPath) : Path.GetFullPath(fullPath);
         if (!_before.ContainsKey(key))
         {
-            // Read NOW, at plan time: the step's before is what the plan was
-            // built from. A file that cannot be read stops the action here,
-            // before anything is written (it threw at this read before W7a too).
-            // Inside a folder this step moves: read at its old place, named at the new one.
-            string onDisk = PlaceOnDiskNow(key);
-            if (Directory.Exists(onDisk)) throw new IOException($"“{Path.GetFileName(key)}” is a folder, so it could not be written.");
-            _before[key] = File.Exists(onDisk) ? File.ReadAllBytes(onDisk) : null;
+            if (LinkMoveStartingAt(key) is not null)
+            {
+                // The place a link's move leaves holds nothing once it has
+                // gone (W8b-21a6; the mac's U4b3 door-6): a new file there,
+                // named from the folder above it, never read through the
+                // leaving link.
+                _before[key] = null;
+            }
+            else
+            {
+                // Read NOW, at plan time: the step's before is what the plan was
+                // built from. A file that cannot be read stops the action here,
+                // before anything is written (it threw at this read before W7a too).
+                // Inside a folder this step moves: read at its old place, named at the new one.
+                string onDisk = PlaceOnDiskNow(key);
+                if (Directory.Exists(onDisk)) throw new IOException($"“{Path.GetFileName(key)}” is a folder, so it could not be written.");
+                _before[key] = File.Exists(onDisk) ? File.ReadAllBytes(onDisk) : null;
+            }
             _order.Add(key);
-            _shownAs[key] = fullPath;
+            _shownAs[key] = ShownAs(fullPath, key);
         }
         _after[key] = after;
         if (after is null) _removedOnce.Add(key);
@@ -618,6 +725,10 @@ internal sealed class UndoActionStep
             blobs.AddRange(treeBlobs);
         }
         foreach (JsonObject recompute in recomputes) ops.Add(recompute);
+        // Every handed-over place left before it is filled (W8b-21a6; the
+        // mac's makeAsOps, U4b3 door-6): a removal a link moves onto goes
+        // before that move, and the move before a new page where it was.
+        ops = InHandingOverOrder(ops);
         var draft = new UndoOpsDraft
         {
             ActionKey = _maker.ActionKey,
@@ -704,7 +815,7 @@ internal sealed class UndoActionStep
                 // A kill point of a test or the harness, which may fall after
                 // the swap: never said in the "Nothing was changed" family
                 // (review 1, LOW).
-                throw new InvalidOperationException("The step was stopped by a test.");
+                throw new UndoStepStoppedByATestException();
             case UndoOutcomeKind.AnotherChangeIsUnderWay:
                 throw new UndoStepRefusedException(new UndoRefusal(UndoRefusalKind.FileIsInUse), "another change to this folder is under way");
             default:
@@ -725,7 +836,11 @@ internal sealed class UndoActionStep
         {
             if (Same(_before[path], _after[path])) continue;
             if (RelativeOf(path) is not { } relative || !UndoPlaces.StaysInside(_root, relative)) return null;
-            if (UndoLinks.Look(PlaceOnDiskNow(path)) is UndoLinks.What.Link or UndoLinks.What.CannotLook) return null;
+            // The place a link's move leaves is named in the step as a new
+            // file, the link standing there now never written through
+            // (W8b-21a6): the door hands it over.
+            if (LinkMoveStartingAt(path) is null
+                && UndoLinks.Look(PlaceOnDiskNow(path)) is UndoLinks.What.Link or UndoLinks.What.CannotLook) return null;
             changes.Add(new UndoFileChange(relative, _before[path], _after[path]));
         }
         foreach ((string full, _) in _frontPages)
@@ -746,6 +861,8 @@ internal sealed class UndoActionStep
     private void WritePlainlyQuietly()
     {
         var targets = new List<UndoSwapTarget>();
+        // Each target's ops, its places spelled one way, to order them by.
+        var targetOps = new List<IReadOnlyList<UndoOp>>();
         // Each folder moved first, by the swap's own rename (MoveFileEx,
         // never replacing, its listing judged again just before), never
         // Directory.Move (W8b-15a); a link the same way, as itself, judged by
@@ -757,6 +874,7 @@ internal sealed class UndoActionStep
             string to = Slashed(toFull);
             UndoOp move = UndoLineOps.Read(FolderMoveOp(from, to, listingSha, linkSha));
             targets.Add(new UndoSwapTarget(toFull, to, null, null) { Change = new UndoSwapChange.MoveHere(fromFull, from, move) });
+            targetOps.Add([move]);
         }
         foreach (string path in _order)
         {
@@ -766,6 +884,7 @@ internal sealed class UndoActionStep
             if (!string.Equals(PlaceOnDiskNow(path), path, StringComparison.OrdinalIgnoreCase))
             {
                 targets.Add(new UndoSwapTarget(path, Slashed(path), _before[path], _after[path]) { StagesAtItsTurn = true });
+                targetOps.Add([WholeFileOp(Slashed(path), _before[path], _after[path])]);
                 continue;
             }
             // A link is written through, as File.WriteAllText wrote it: the
@@ -775,13 +894,22 @@ internal sealed class UndoActionStep
             // (the next rename in the chain), as Save wrote a plain file
             // there once the link was gone: the file it leads to is never
             // touched.
-            string place = _removedOnce.Contains(path) ? path : PlaceWritten(path);
+            // So is the place a link's move leaves (W8b-21a6): a new file
+            // there, made once the link has moved, never through it.
+            string place = _removedOnce.Contains(path) || LinkMoveStartingAt(path) is not null ? path : PlaceWritten(path);
             // Named by its full path: no working folder is there to name it
             // inside, and the refusal's sentence checks the page it names.
             targets.Add(new UndoSwapTarget(place, place, _before[path], _after[path]));
+            targetOps.Add([WholeFileOp(Slashed(place), _before[path], _after[path])]);
         }
         foreach ((string full, UndoTreeListing listing, Dictionary<string, byte[]> contents) in _trees)
+        {
             targets.Add(new UndoSwapTarget(full, full, null, null) { Change = new UndoSwapChange.MakeTree(listing, contents) });
+            targetOps.Add([]);
+        }
+        // The one handing-over order (W8b-21a6; the mac's writePlainly):
+        // files and folders alone hand no place over, so this keeps their order.
+        targets = InHandingOverOrder(targets, targetOps);
         HashSet<string> keptBefore = KeptOriginalsNow();
         switch (UndoSwap.Swap(targets, UndoSwap.PlainLabel(), null, _plainSeams))
         {
@@ -793,6 +921,87 @@ internal sealed class UndoActionStep
                 throw new UndoStepRefusedException(new UndoRefusal(UndoRefusalKind.CouldNotWrite), "stopped by a test");
         }
         RederiveTheFrontPages();
+    }
+
+    /// <summary>A file's change as one <c>writeFile</c> op at <paramref name="path"/>, to order the plain write's targets by (the mac's <c>wholeFileOp</c>).</summary>
+    private static UndoOp WholeFileOp(string path, byte[]? before, byte[]? after)
+    {
+        var op = new JsonObject { ["kind"] = UndoOp.WriteFile, ["path"] = path };
+        if (before is not null) op["beforeSha"] = UndoCheck.Sha(before);
+        if (after is not null) op["afterSha"] = UndoCheck.Sha(after);
+        return UndoLineOps.Read(op);
+    }
+
+    /// <summary>A step's ops in handing-over order (<see cref="InHandingOverOrder{T}"/>), each op an item of its own.</summary>
+    private static JsonArray InHandingOverOrder(JsonArray ops)
+    {
+        var nodes = new List<JsonNode>();
+        var opsOf = new List<IReadOnlyList<UndoOp>>();
+        foreach (JsonNode? node in ops)
+        {
+            nodes.Add(node!.DeepClone());
+            opsOf.Add([UndoLineOps.Read(node.AsObject())]);
+        }
+        var ordered = new JsonArray();
+        foreach (JsonNode node in InHandingOverOrder(nodes, opsOf)) ordered.Add(node);
+        return ordered;
+    }
+
+    /// <summary>
+    /// The items of a step in an order where every handed-over place is left
+    /// before it is filled (#899 W8b-21a6; the mac's
+    /// <c>JournaledStep.inHandingOverOrder</c>, U4b3 door-6, the door-4 rule):
+    /// an item that fills a place goes straight after a later item that
+    /// leaves it, until none is left before its filler, by the one
+    /// leaver/filler definition the door's finder uses
+    /// (<see cref="UndoOp.Handovers"/>: <see cref="UndoOp.PlaceLeftBy"/>,
+    /// <see cref="UndoOp.PlaceFilledBy"/>, <see cref="UndoOp.HandsOverAsAMove"/>,
+    /// <see cref="UndoOp.PartInside"/>). <paramref name="opsOf"/> holds each
+    /// item's ops, its places spelled one way. A step with no such pair keeps
+    /// its order exactly.
+    /// </summary>
+    internal static List<T> InHandingOverOrder<T>(IReadOnlyList<T> items, IReadOnlyList<IReadOnlyList<UndoOp>> opsOf)
+    {
+        var order = new List<int>();
+        for (int index = 0; index < items.Count; index++) order.Add(index);
+        // Each pass moves one filler; a step whose places go round in a
+        // circle stops here, and the door refuses it.
+        int passesLeft = items.Count * items.Count;
+        bool movedOne = true;
+        while (movedOne && passesLeft > 0)
+        {
+            movedOne = false;
+            passesLeft--;
+            for (int position = 0; position < order.Count && !movedOne; position++)
+            {
+                if (LaterLeaver(opsOf[order[position]], position, order, opsOf) is not { } leaverPosition) continue;
+                int filler = order[position];
+                order.RemoveAt(position);
+                order.Insert(leaverPosition, filler);
+                movedOne = true;
+            }
+        }
+        var ordered = new List<T>();
+        foreach (int index in order) ordered.Add(items[index]);
+        return ordered;
+    }
+
+    /// <summary>The position after <paramref name="position"/> of the first item with an op that leaves a place one of <paramref name="fillerOps"/> fills, one of the pair a handing-over move; null when there is none (the mac's <c>laterLeaver</c>).</summary>
+    private static int? LaterLeaver(IReadOnlyList<UndoOp> fillerOps, int position, List<int> order, IReadOnlyList<IReadOnlyList<UndoOp>> opsOf)
+    {
+        foreach (UndoOp filler in fillerOps)
+        {
+            if (UndoOp.PlaceFilledBy(filler) is not { } filled) continue;
+            for (int later = position + 1; later < order.Count; later++)
+            {
+                foreach (UndoOp leaver in opsOf[order[later]])
+                {
+                    if (UndoOp.PlaceLeftBy(leaver) is not { } left || UndoOp.PartInside(left, filled) is not "") continue;
+                    if (UndoOp.HandsOverAsAMove(leaver) || UndoOp.HandsOverAsAMove(filler)) return later;
+                }
+            }
+        }
+        return null;
     }
 
     /// <summary>The trail line, written once what became of the change is known (the mac's <c>UndoTrailHook.couldNotRecord</c>).</summary>

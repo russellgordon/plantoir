@@ -475,6 +475,12 @@ public static class SpecialFolderRenamer
                 Scripting.ActivityTrail.Note(Scripting.ActivityTrail.Event.FolderRenamed, ending.Line);
                 throw new RenameException(ending.Sentence);
             }
+            catch (UndoStepStoppedByATestException)
+            {
+                // A test's kill point, as a process that died there: this
+                // run's record stays (the mac's stepWasNotMade, stoppedByATest).
+                throw;
+            }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
                 // A refusal (the door's UndoStepRefusedException is one) or
@@ -482,8 +488,14 @@ public static class SpecialFolderRenamer
                 record.NothingWasChanged();
                 throw new RenameException(NothingWasChanged(oldName, error.Message));
             }
-            // Anything else (a test's kill point, as a process that died
-            // there) leaves this run's record, as the mac's stoppedByATest.
+            catch
+            {
+                // Anything else is a bug before the door, which changed
+                // nothing: the record as it was (the mac's catch-all,
+                // nothingWasChanged), then the error as it came.
+                record.NothingWasChanged();
+                throw;
+            }
             if (plannedSettings is not null) settings!.Configuration.FinishRecord(plannedSettings, settings.Change, settings.Path);
             record.RenameIsWhole();
 
@@ -671,7 +683,7 @@ public static class SpecialFolderRenamer
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            said = error.Message;
+            said = UndoLinks.ShortReason(error, Path.GetDirectoryName(path)!);
             return UndoLinks.What.CannotLook;
         }
     }

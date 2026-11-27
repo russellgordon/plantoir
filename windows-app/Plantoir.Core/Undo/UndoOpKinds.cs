@@ -686,7 +686,7 @@ internal static class UndoLinks
         try { attributes = File.GetAttributes(fullPath); }
         catch (FileNotFoundException) { return What.Nothing; }
         catch (DirectoryNotFoundException) { return What.Nothing; }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { said = error.Message; return What.CannotLook; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { said = ShortReason(error, fullPath); return What.CannotLook; }
         if (attributes.HasFlag(FileAttributes.ReparsePoint))
         {
             if (ReparseTag(fullPath) is not { } tag)
@@ -697,6 +697,24 @@ internal static class UndoLinks
             if ((tag & NameSurrogate) != 0) return What.Link;
         }
         return attributes.HasFlag(FileAttributes.Directory) ? What.Folder : What.File;
+    }
+
+    /// <summary>
+    /// What the system said, short and with no path (the mac's
+    /// <c>strerror</c>, #899 W8b window B, LOW 2): .NET's own message names
+    /// the full path, the teacher's account folder included, and the
+    /// sentence it goes into already names the place as the course does. An
+    /// error of the system's carries its code, said as the system says it
+    /// ("Access is denied."); any other keeps .NET's message with
+    /// <paramref name="fullPath"/> said as its last name.
+    /// </summary>
+    internal static string ShortReason(Exception error, string fullPath)
+    {
+        const int FacilityWin32 = unchecked((int)0x80070000);
+        if ((error.HResult & unchecked((int)0xFFFF0000)) == FacilityWin32)
+            return new System.ComponentModel.Win32Exception(error.HResult & 0xFFFF).Message;
+        string full = Path.TrimEndingDirectorySeparator(fullPath);
+        return error.Message.Replace(full, Path.GetFileName(full), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -732,6 +750,40 @@ internal static class UndoLinks
     {
         try { return File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>
+    /// The file a link at <paramref name="fullPath"/> leads to, followed link
+    /// by link (at most 32, as the mac's <c>MAXSYMLINKS</c>) from the target
+    /// each holds AS STORED (<see cref="FileSystemInfo.LinkTarget"/>), its
+    /// separators read either way and a relative one taken from the folder
+    /// above the link, the folders named as the caller named them; the place
+    /// itself when it is not a link (<see cref="Look(string)"/>) or its target
+    /// cannot be read (#899 W8b-21a6; the mac's
+    /// <c>CourseConfiguration.fileALinkLeadsTo</c>). So a link the mac writes
+    /// (<c>../library/Day 2.md</c>), which Windows does not open, leads to the
+    /// same file as one Windows writes. Nothing is opened: where it leads
+    /// need not exist.
+    /// </summary>
+    internal static string FileALinkLeadsTo(string fullPath)
+    {
+        string place = Path.GetFullPath(fullPath);
+        for (int hops = 0; hops < 32; hops++)
+        {
+            if (Look(place) != What.Link) return place;
+            string? target;
+            try
+            {
+                FileSystemInfo link = IsALinkToAFolder(place) ? new DirectoryInfo(place) : new FileInfo(place);
+                target = link.LinkTarget;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return place; }
+            if (string.IsNullOrEmpty(target)) return place;
+            string spelled = target.Replace('/', Path.DirectorySeparatorChar);
+            string folder = Path.GetDirectoryName(place) ?? place;
+            place = Path.GetFullPath(Path.IsPathRooted(spelled) ? spelled : Path.Combine(folder, spelled));
+        }
+        return place;
     }
 
     /// <summary>A file's bytes, read sharing everything, or null when it cannot be read now.</summary>
