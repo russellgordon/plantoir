@@ -172,6 +172,41 @@ public sealed class UndoActionStepFolderMoveTests : IDisposable
         Assert.Equal("C, edited\n", File.ReadAllText(Full(Zeta + "/c.md")));
     }
 
+    /// <summary>
+    /// The settings planned WHOLE (the fallback when their members cannot be
+    /// moved one by one) keep the place they were planned in, after the
+    /// pages: only the pages are put in the one page order (window A fixes,
+    /// review 1 L4; the mac keeps the planned order).
+    /// </summary>
+    [Fact]
+    public void ASettingsFilePlannedWholeKeepsItsPlannedPlaceAfterThePages()
+    {
+        ACourse();
+        UndoForThisProcess list = List();
+        UndoActionStep step = Step(list);
+
+        step.MoveFolder(Full(Media), Full(Renamed));
+        step.Write(Full(Renamed + "/sub/b.md"), "B, edited\n");
+        step.Write(Full(Renamed + "/a.md"), "A, edited\n");
+        byte[] config = File.ReadAllBytes(Full(Config));
+        byte[] whole = Encoding.UTF8.GetBytes("{\"course_code\":\"TST1O\",\"expandable\":[\"renamed\"]}");
+        step.EditJson(Full(Config), config, [], whole);
+        step.Make();
+
+        JsonArray ops = Assert.Single(Begins())["step"]!["ops"]!.AsArray();
+        var seen = new List<(string, string)>();
+        foreach (JsonNode? op in ops) seen.Add(KindAndPlace(op));
+        Assert.Equal(
+            [
+                ("move", Media + " -> " + Renamed),
+                ("writeFile", Renamed + "/a.md"),
+                ("writeFile", Renamed + "/sub/b.md"),
+                ("writeFile", Config),
+            ],
+            seen);
+        Assert.Equal(whole, File.ReadAllBytes(Full(Config)));
+    }
+
     [Fact]
     public void TheOnePageOrderIsTheLowercasedPathThenTheBytesAsSpelled()
     {

@@ -362,6 +362,14 @@ public static class SpecialFolderRenamer
     /// that cannot be read, or is not UTF-8, is left out, as on the mac.
     /// Returns how many pages are planned.
     /// </summary>
+    /// <summary>
+    /// Tests only: called once the plan has read each page and before the
+    /// step is planned from that read, so a test can edit or remove the page
+    /// in between (the mac's <c>planReadsAPage</c>; window A fixes, review 1
+    /// M1). Null in the app.
+    /// </summary>
+    internal static Action<string>? PlanReadAPage;
+
     internal static int PlanRelinkedPages(UndoActionStep step, string courseDirectory, string oldName, string newName,
                                           IReadOnlyList<(string From, string To, int? Section)> moves)
     {
@@ -370,8 +378,10 @@ public static class SpecialFolderRenamer
         foreach (string page in PagePaths.MarkdownPages(courseDirectory, descendsIntoLinks: false))
         {
             string text;
-            try { text = strict.GetString(File.ReadAllBytes(page)); }
+            byte[] read;
+            try { read = File.ReadAllBytes(page); text = strict.GetString(read); }
             catch (Exception) { continue; }
+            PlanReadAPage?.Invoke(page);
             if (FolderPathRewriter.Count(text, oldName) == 0) continue;
             string rewritten = FolderPathRewriter.Rewritten(text, oldName, newName);
             if (rewritten == text) continue;

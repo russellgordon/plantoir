@@ -199,7 +199,7 @@ public static class PagePaths
                     if (match.Success && sectionNumber is { } wanted &&
                         int.TryParse(match.Groups[1].Value, out int found) && found != wanted)
                         continue;
-                    if (!descendsIntoLinks && Plantoir.Core.Undo.UndoLinks.Look(entry) == Plantoir.Core.Undo.UndoLinks.What.Link)
+                    if (!descendsIntoLinks && !WalksInto(Plantoir.Core.Undo.UndoLinks.Look(entry), descendsIntoLinks))
                         continue;
                     Walk(entry);
                 }
@@ -209,6 +209,17 @@ public static class PagePaths
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Whether the page walk goes into a folder entry, by what
+    /// <see cref="Plantoir.Core.Undo.UndoLinks.Look"/> reads it as: always
+    /// when the walk follows links; otherwise never into a link.
+    /// </summary>
+    internal static bool WalksInto(Plantoir.Core.Undo.UndoLinks.What what, bool descendsIntoLinks)
+    {
+        if (descendsIntoLinks) return true;
+        return what != Plantoir.Core.Undo.UndoLinks.What.Link;
     }
 
     private static StringComparison PathComparison =>

@@ -50,6 +50,7 @@ public sealed class UndoRenameFolderStepTests : IDisposable
 
     public void Dispose()
     {
+        SpecialFolderRenamer.PlanReadAPage = null;
         if (_syncRoot is not null) UndoCloudPlaceholders.Unregister(_syncRoot);
         try { Directory.Delete(_root, recursive: true); } catch { }
     }
@@ -74,14 +75,14 @@ public sealed class UndoRenameFolderStepTests : IDisposable
     /// <summary>The list the last <see cref="Rename"/> made its step on, for an Undo and a Redo after it.</summary>
     private UndoForThisProcess? _list;
 
-    private RenameOutcome Rename(bool finishing = false, UndoSeams? seams = null)
+    private RenameOutcome Rename(bool finishing = false, UndoSeams? seams = null, string newName = "Assessments")
     {
         var list = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null);
         _list = list;
         var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams, trail: list.Trail);
         var configuration = CourseConfiguration.Load(ConfigPath);
-        var settings = SpecialFolderRenamer.RenamingTheSettings(configuration, ConfigPath, "Tasks", "Assessments", FolderScope.PerSection, CourseFolder);
-        return SpecialFolderRenamer.Rename("Tasks", "Assessments", FolderScope.PerSection, CourseFolder, new[] { 1, 2 },
+        var settings = SpecialFolderRenamer.RenamingTheSettings(configuration, ConfigPath, "Tasks", newName, FolderScope.PerSection, CourseFolder);
+        return SpecialFolderRenamer.Rename("Tasks", newName, FolderScope.PerSection, CourseFolder, new[] { 1, 2 },
                                            settings, finishing, list, door);
     }
 
@@ -210,6 +211,143 @@ public sealed class UndoRenameFolderStepTests : IDisposable
         Assert.False(string.IsNullOrWhiteSpace(refused.Message));
         Assert.Equal(before, Tree());
         Assert.Empty(AppliedSteps());
+    }
+
+    // ---- The walk's read is the step's before (window A fixes, review 1 M1) ------
+
+    /// <summary>
+    /// The teacher saves a page AFTER the walk read it and before the step is
+    /// planned (the mac's <c>planReadsAPage</c>, a seam between the read and
+    /// the plan): the step judges the page by the bytes its rewrite came
+    /// from, so the door refuses <c>changedSince</c>, the rename is planned
+    /// again once, and the teacher's edit is kept, relinked.
+    /// </summary>
+    [Fact]
+    public void APageEditedBetweenTheWalksReadAndThePlanIsPlannedAgainAndTheEditIsKept()
+    {
+        TheCourse();
+        string index = Path.Combine(CourseFolder, "section1", "index.md");
+        int readsOfTheIndex = 0;
+        SpecialFolderRenamer.PlanReadAPage = page =>
+        {
+            if (!string.Equals(Path.GetFullPath(page), Path.GetFullPath(index), StringComparison.OrdinalIgnoreCase)) return;
+            readsOfTheIndex++;
+            if (readsOfTheIndex == 1) File.WriteAllText(index, "Start with [[Tasks/Quiz 1]]. Edited by hand.\n");
+        };
+
+        var outcome = Rename();
+
+        Assert.Equal(2, readsOfTheIndex);
+        Assert.Equal("Start with [[Assessments/Quiz 1]]. Edited by hand.\n", Read("section1/index.md"));
+        Assert.Equal(2, outcome.FoldersMoved);
+        Assert.Single(AppliedSteps());
+    }
+
+    /// <summary>
+    /// A page removed AFTER the walk read it and before the step is planned:
+    /// the door sees the change (<c>changedSince</c>), the rename is planned
+    /// again once, and the removed page is not brought back.
+    /// </summary>
+    [Fact]
+    public void APageRemovedBetweenTheWalksReadAndThePlanIsPlannedAgainAndNotBroughtBack()
+    {
+        TheCourse();
+        string index = Path.Combine(CourseFolder, "section1", "index.md");
+        int readsOfTheIndex = 0;
+        SpecialFolderRenamer.PlanReadAPage = page =>
+        {
+            if (!string.Equals(Path.GetFullPath(page), Path.GetFullPath(index), StringComparison.OrdinalIgnoreCase)) return;
+            readsOfTheIndex++;
+            if (readsOfTheIndex == 1) File.Delete(index);
+        };
+
+        var outcome = Rename();
+
+        Assert.Equal(1, readsOfTheIndex);
+        Assert.False(File.Exists(index), "a page removed during the walk is not brought back");
+        Assert.Equal(1, outcome.PagesRelinked);
+        List<JsonObject> steps = AppliedSteps();
+        Assert.Single(steps);
+        Assert.DoesNotContain("writeFile courses/ICS3U/section1/index.md", Ops(steps[0]));
+    }
+
+    // ---- The destination and a rename of case only (window A fixes, L2, L6) --
+
+    /// <summary>
+    /// A link that leads nowhere already at the destination is a destination
+    /// taken (<see cref="UndoLinks.Look"/>, never <c>Directory.Exists</c>,
+    /// which follows it): refused before anything is planned, with the
+    /// destination's own sentence.
+    /// </summary>
+    [Fact]
+    public void ADestinationThatIsALinkLeadingNowhereIsTakenAndTheRenameIsRefusedWithItsSentence()
+    {
+        TheCourse();
+        string gone = Path.Combine(_root, "gone");
+        Directory.CreateDirectory(gone);
+        UndoKindsForTheCases.MakeAJunction(SectionTwosAssessments, gone);
+        Directory.Delete(gone);
+        SortedDictionary<string, string?> before = Tree();
+
+        var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(() => Rename());
+
+        Assert.Equal(SpecialNames.RenameProblemDestinationExists.Replace("{name}", "Assessments"), refused.Message);
+        Assert.Equal(before, Tree());
+        Assert.Empty(AppliedSteps());
+    }
+
+    /// <summary>
+    /// <c>Tasks</c> to <c>tasks</c> through the door: on Windows the
+    /// destination "exists" because it IS the source, and the rename still
+    /// goes through as one step; Undo puts the old capitalisation back and
+    /// Redo the new.
+    /// </summary>
+    [Fact]
+    public void ACapitalisationOnlyRenameThroughTheDoorIsOneStepAndUndoPutsTheOldCaseBack()
+    {
+        TheCourse();
+
+        var outcome = Rename(newName: "tasks");
+
+        Assert.Equal(2, outcome.FoldersMoved);
+        Assert.Single(AppliedSteps());
+        Assert.Equal(new[] { "tasks" }, NamesOfFoldersIn("section1"));
+        Assert.Equal(new[] { "tasks" }, NamesOfFoldersIn("section2"));
+        Assert.Equal("Start with [[tasks/Quiz 1]].\n", Read("section1/index.md"));
+
+        Assert.Equal(UndoOutcomeKind.Undone, _list!.Door().Undo().Kind);
+        Assert.Equal(new[] { "Tasks" }, NamesOfFoldersIn("section1"));
+        Assert.Equal(new[] { "Tasks" }, NamesOfFoldersIn("section2"));
+        Assert.Equal("Start with [[Tasks/Quiz 1]].\n", Read("section1/index.md"));
+
+        Assert.Equal(UndoOutcomeKind.Redone, _list!.Door().Redo().Kind);
+        Assert.Equal(new[] { "tasks" }, NamesOfFoldersIn("section1"));
+    }
+
+    /// <summary>
+    /// The walk that never goes through a link does not go into an entry
+    /// <see cref="UndoLinks.Look"/> cannot look at either (window A fixes,
+    /// review 1 L3): the mac's walk descends only into what it reads as a
+    /// plain folder and skips what it cannot read, so this one skips it too.
+    /// </summary>
+    [Fact]
+    public void AnEntryThatCannotBeLookedAtIsNotWalkedByTheWalkThatNeverGoesThroughALink()
+    {
+        Assert.False(PagePaths.WalksInto(UndoLinks.What.CannotLook, descendsIntoLinks: false));
+        Assert.False(PagePaths.WalksInto(UndoLinks.What.Link, descendsIntoLinks: false));
+        Assert.True(PagePaths.WalksInto(UndoLinks.What.Folder, descendsIntoLinks: false));
+        Assert.True(PagePaths.WalksInto(UndoLinks.What.Link, descendsIntoLinks: true));
+    }
+
+    /// <summary>The names of the folders in a course folder, as the disk spells them.</summary>
+    private string[] NamesOfFoldersIn(string relative)
+    {
+        var names = new List<string>();
+        foreach (string folder in Directory.EnumerateDirectories(Path.Combine(CourseFolder, relative)))
+        {
+            names.Add(Path.GetFileName(folder));
+        }
+        return names.ToArray();
     }
 
     // ---- A place of the folder that is a link (#899 W8b-21) --------------------
