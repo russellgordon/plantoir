@@ -114,7 +114,35 @@ at the step's before).
 
 ## Must-fail log
 
-See the hand-back's numbers; each break listed with its RED test.
+Three breaks in three different places, run together in ONE run of
+UndoStoppedStepTests and UndoCourseSettingsStepTests (budget; each RED
+test's message names its own break), then restored by hand to the
+committed tree (39c32d392):
+
+| Break | RED |
+|---|---|
+| the rename's `.couldNotFinish` branch skipped (`if false, case …`) | testARenameOfAFolderNoSectionHasThatCannotFinishOffersPutItBack, testNotNowOnARenameLeavesTheStepAndATrailLine ("was not renamed, and nothing was changed") |
+| Save's refusal sentence by `error.localizedDescription` again | testAFourthRefusalInARowWritesNothingAndKeepsTheEditsUnsaved (names course_config.json) |
+| Set School Year's offer line removed | testSetSchoolYearsOfferAndItsAnswerLeaveTrailLines |
+
+3 of 3 RED. Not broken separately: the Put It Back and Not Now trail lines
+of Save, the B1 split (pinned only by the source-reading test), the Help
+lines.
+
+Proof: UndoStoppedStepTests, UndoCourseSettingsStepTests,
+UndoRenameFolderStepTests, ReferenceCourseTests,
+StartOfYearRestoreOfferTests: 123 of 123 green on the committed tree.
+
+## For the director (parked)
+
+- The rename's old-value ending is the existing sentence of any refused
+  rename, and it names the file: "“Labs” was not renamed, and nothing was
+  changed: The file “course_config.json” couldn’t be saved." Example: rename
+  `Labs` (no section has it) while another program keeps changing the
+  settings file, four times in a row. Every refused rename says this today;
+  dropping the file name there is the same change Save had (LOW A2) and
+  touches the rename's other tests. Left as it was.
+- The restore and Get Ready's in-flight step (above): a fault, not fixed.
 
 ## Self-check
 
