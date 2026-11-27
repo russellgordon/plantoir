@@ -1939,6 +1939,10 @@ internal enum UndoStagedOwner
 /// <c>from</c> the <c>linkShaBefore</c> text (going in for an Undo, and every
 /// reversal), and whether another op of the step names that place too (a
 /// handed-over place, whose filler or leaver stages files of its own there).
+/// Another LINK's move (a chained relink, a plain link move) stages only
+/// links, never a page, so it does not share the place: a page under a
+/// staged name there is the teacher's (#899 W8b-21b4, the kill table's
+/// teacher's rows; never deleted as a staged copy).
 /// </summary>
 internal sealed class UndoStagedLinks
 {
@@ -1984,7 +1988,7 @@ internal sealed class UndoStagedLinks
     {
         for (int index = 0; index < ops.Count; index++)
         {
-            if (index == relinkIndex) continue;
+            if (index == relinkIndex || ops[index].IsALinksMove) continue;
             foreach (string named in ops[index].PathsNamed)
             {
                 if (UndoOp.PartInside(named, place) is "" && named.Split('/').Length == place.Split('/').Length) return true;
