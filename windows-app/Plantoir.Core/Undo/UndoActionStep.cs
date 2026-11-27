@@ -309,6 +309,19 @@ internal sealed class UndoActionStep
         return File.Exists(fullPath);
     }
 
+    /// <summary>
+    /// Whether the file held content when the step first planned it: the
+    /// step's own before, read once at plan time, never the disk again (W7b2-3
+    /// review 1, L1). A file this step has not planned throws.
+    /// </summary>
+    internal bool WasThereWhenPlanned(string fullPath)
+    {
+        string key = Path.GetFullPath(fullPath);
+        if (!_before.TryGetValue(key, out byte[]? before))
+            throw new InvalidOperationException($"“{Path.GetFileName(key)}” is not planned in this step.");
+        return before is not null;
+    }
+
     /// <summary>The file's text as the step will leave it: what is planned, else the disk's.</summary>
     internal string ReadText(string fullPath)
     {

@@ -157,14 +157,15 @@ public sealed partial class AssistWorkspace
         // swap, never beforehand. Never written over, as the exclusive
         // create never wrote over one: a page at the new name when planned is
         // refused (after the plan made again, whose sentence comes first, as
-        // before), and its before (none) is read as it is planned, so a page
-        // that appears after this is a change since the plan, refused by the
+        // before). Whether it was there is the step's own before, read ONCE
+        // as the page is planned (W7b2-3 review 1, L1), so a page that
+        // appears after that read is a change since the plan, refused by the
         // door's check or by its rename in the last instant.
         var step = NewUndoStep("duplicateAsTheNextClass", course.Code, request.Section);
         try
         {
-            bool alreadyThere = step.Exists(request.NewPath);
             step.Write(request.NewPath, request.CopyText);
+            bool alreadyThere = step.WasThereWhenPlanned(request.NewPath);
 
             // Held again to the plan after the copy and after the step's
             // before is read (#351's plan/write gap): the source's words, the
