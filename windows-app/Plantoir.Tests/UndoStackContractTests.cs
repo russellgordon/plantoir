@@ -31,48 +31,28 @@ public sealed class UndoStackContractTests
         "madeFolder", "foldersInside",
         // U4b part C's (W8-5)
         "caseOnlyFolder",
-        // U4b2-14's (W8-6)
-        "linkedFolder",
         // U4b2-4's (W8-9)
         "keptWhatItReplacedSays",
         // U4a review 1, LOW 4's (W8-10)
         "keptBesideThePage",
-        // U4b3 door-4's (W8b-21a4)
-        "handedOver",
     };
 
-    /// <summary>Every case but those that lay a symbolic link (<see cref="LinkCases"/>).</summary>
     public static IEnumerable<object[]> Cases() =>
         UndoContract.Undo.GetProperty("stackCases").EnumerateArray()
-            .Where(stackCase => !LaysASymbolicLink(stackCase))
             .Select(stackCase => new object[] { stackCase.GetProperty("name").GetString()! });
-
-    /// <summary>
-    /// The cases whose calls lay a symbolic link holding <c>../library</c> as
-    /// written (<c>moveALinkToAFolder</c>, U4b2-14; #899 W8-6): run where this
-    /// account may make one, SKIPPED saying why where it may not (a machine that cannot make links).
-    /// </summary>
-    public static IEnumerable<object[]> LinkCases() =>
-        UndoContract.Undo.GetProperty("stackCases").EnumerateArray()
-            .Where(LaysASymbolicLink)
-            .Select(stackCase => new object[] { stackCase.GetProperty("name").GetString()! });
-
-    private static bool LaysASymbolicLink(JsonElement stackCase) =>
-        stackCase.GetProperty("calls").EnumerateArray().Any(call => call.GetString() is "moveALinkToAFolder" or "renameAPerSectionFolderThatIsALink"
-                                                                          or "handAPlaceOverAfterALinksMove" or "handAPlaceOverBeforeALinksMove");
 
     [Fact]
     public void TheContractHoldsTheStackCases()
     {
         // 46 when W1 was written; a count that falls is a contract change to read, never a silent pass.
         Assert.True(UndoContract.Undo.GetProperty("stackCases").GetArrayLength() >= 46);
-        Assert.Equal(UndoContract.Undo.GetProperty("stackCases").GetArrayLength(), Cases().Count() + LinkCases().Count());
+        Assert.Equal(UndoContract.Undo.GetProperty("stackCases").GetArrayLength(), Cases().Count());
     }
 
     /// <summary>Every case held open by name is a case the contract still has (none since W6).</summary>
     [Fact]
     public void EveryHeldStackCaseIsStillInTheContract() =>
-        NamedGapLedger.StillNamed(NamedGapLedger.UndoStackCases, Cases().Concat(LinkCases()).Select(row => (string)row[0]));
+        NamedGapLedger.StillNamed(NamedGapLedger.UndoStackCases, Cases().Select(row => (string)row[0]));
 
     /// <summary>
     /// Every case, asserted in full, U2's calls and keys included (W6). A case
@@ -134,16 +114,12 @@ public sealed class UndoStackContractTests
             Assert.Equal(expectLast.GetString(), replay.Last);
         if (stackCase.TryGetProperty("movedFolder", out JsonElement movedFolder))
             Assert.Equal(movedFolder.GetString(), replay.MovedFolder());
-        if (stackCase.TryGetProperty("linkedFolder", out JsonElement linkedFolder))
-            Assert.Equal(linkedFolder.GetString(), replay.LinkedFolder());
         if (stackCase.TryGetProperty("caseOnlyFolder", out JsonElement caseOnlyFolder))
             Assert.Equal(caseOnlyFolder.GetString(), replay.CaseOnlyFolder());
         if (stackCase.TryGetProperty("madeFolder", out JsonElement madeFolder))
             Assert.Equal(madeFolder.GetString(), replay.MadeFolder());
         if (stackCase.TryGetProperty("foldersInside", out JsonElement foldersInside))
             Assert.Equal(foldersInside.GetString(), replay.FoldersInside());
-        if (stackCase.TryGetProperty("handedOver", out JsonElement handedOver))
-            Assert.Equal(handedOver.GetString(), replay.HandedOver());
         if (stackCase.TryGetProperty("refusalNamed", out JsonElement refusalNamed))
             Assert.Equal(refusalNamed.GetString(), replay.RefusalNamed);
         if (stackCase.TryGetProperty("cleared", out JsonElement cleared))
@@ -647,75 +623,6 @@ public sealed class UndoStackContractTests
                     Ops(new JsonArray(move, EditInside(MediaFolder + "/a.md")), []);
                     return;
                 }
-                // U4b2-14 (W8-6): a symbolic link to a folder moved as itself.
-                case "moveALinkToAFolder":
-                    LayTheLinkToTheLibrary();
-                    Ops(new JsonArray(TheLinksMove()), []);
-                    return;
-                // U4b2-15 (W8b-21): Rename folder's own plan and apply, per
-                // section, media to renamed in section 1 alone, on the same
-                // link: the one step moveALinkToAFolder makes.
-                case "renameAPerSectionFolderThatIsALink":
-                {
-                    LayTheLinkToTheLibrary();
-                    string course = _scribe.FullPath("A", "courses/TST1O");
-                    long seq = _scribe.Fold().NextSeq;
-                    var list = new UndoForThisProcess(_scribe.JournalFolder, UndoMode.Live, null, maintainers: _scribe.Maintainers);
-                    Plantoir.Core.Models.SpecialFolderRenamer.Rename("media", "renamed", Plantoir.Core.Models.FolderScope.PerSection, course,
-                                                                     new[] { 1 }, null, false, list, _scribe.Door());
-                    // The rename record is cleared by the rename itself once it is whole (W8b-17).
-                    UndoOp move = Assert.Single(_scribe.Fold().Steps[seq].Step.Ops);
-                    Assert.Equal(UndoOp.Move, move.Kind);
-                    Assert.Equal(LinkPlace, move.From);
-                    Assert.Equal(LinkRenamed, move.To);
-                    Assert.Equal((string?)TheLinksMove()["linkSha"], move.LinkSha);
-                    Assert.Null(move.ListingSha);
-                    Last = "applied";
-                    return;
-                }
-                // Review 1 of U4b2-14: that link's move with an edit inside its new place, changing nothing.
-                case "stepEditingInsideALinksMove":
-                {
-                    long seq = _scribe.Fold().NextSeq;
-                    _scribe.Append(_scribe.BeginLine(seq, new JsonArray(TheLinksMove(), EditInside(LinkRenamed + "/a.md")), "A"));
-                    _scribe.Finish(seq);
-                    return;
-                }
-                // U4b3 door-4 (W8b-21a4): a place handed over within one step
-                // (opKinds.wholeOps' second exception), through the door.
-                case "handAPlaceOverAfterALinksMove":
-                {
-                    if (Nothing(ClassPage(3)) && Nothing(ClassPage(4))) Handover.LayAfterALinksMove();
-                    (JsonArray ops, List<byte[]> blobs) = Handover.HandAPlaceOverAfterALinksMove();
-                    Ops(ops, blobs);
-                    return;
-                }
-                case "handAPlaceOverBeforeALinksMove":
-                {
-                    if (Nothing(ClassPage(2)) && Nothing(ClassPage(3))) Handover.LayBeforeALinksMove();
-                    (JsonArray ops, List<byte[]> blobs) = Handover.HandAPlaceOverBeforeALinksMove();
-                    Ops(ops, blobs);
-                    return;
-                }
-                case "editTheHandedOverPageByHand":
-                    _scribe.WritePage("A", ClassPage(3), "Hand.\n"u8.ToArray());
-                    return;
-                case "stepFillingAPlaceBeforeItIsLeft":
-                {
-                    long seq = _scribe.Fold().NextSeq;
-                    _scribe.Append(_scribe.BeginLine(seq, new JsonArray(ClassPageOp(3, null, "New.\n"), TheClassLinksMove(3, 4)), "A"));
-                    _scribe.Finish(seq);
-                    return;
-                }
-                case "stepHandingOverAFoldersPlace":
-                {
-                    long seq = _scribe.Fold().NextSeq;
-                    var folderMove = new JsonObject { ["kind"] = "move", ["from"] = LinkPlace, ["to"] = LinkRenamed, ["listingSha"] = new UndoTreeListing([], []).Sha };
-                    JsonNode write = _scribe.OpsFor(LinkPlace, null, "New.\n"u8.ToArray())[0]!.DeepClone();
-                    _scribe.Append(_scribe.BeginLine(seq, new JsonArray(folderMove, write), "A"));
-                    _scribe.Finish(seq);
-                    return;
-                }
                 case "spellTheFolderAnotherWay":
                     Assert.Equal(0, UndoSwap.Rename(_scribe.FullPath("A", MediaFolder), _scribe.FullPath("A", "courses/TST1O/MEDIA"), replace: false));
                     return;
@@ -810,63 +717,6 @@ public sealed class UndoStackContractTests
         }
 
         private const string CaseOnlyOld = "courses/TST1O/Media";
-
-        private const string LinkPlace = "courses/TST1O/section1/media";
-        private const string LinkRenamed = "courses/TST1O/section1/renamed";
-        private const string LinkLibrary = "courses/TST1O/library";
-        private const string LinkTarget = "../library";
-        private string? _libraryListing;
-
-        /// <summary>The link's move from section1/media to section1/renamed, its linkSha the SHA-256 of <c>../library</c> as written.</summary>
-        /// <summary>The library and the link to it, laid when neither the link's place nor its new place holds anything.</summary>
-        private void LayTheLinkToTheLibrary()
-        {
-            string media = _scribe.FullPath("A", LinkPlace);
-            if (UndoLinks.Look(media) != UndoLinks.What.Nothing || UndoLinks.Look(_scribe.FullPath("A", LinkRenamed)) != UndoLinks.What.Nothing) return;
-            _scribe.WritePage("A", LinkLibrary + "/a.md", "A"u8.ToArray());
-            _scribe.WritePage("A", LinkLibrary + "/pictures/b.md", "B"u8.ToArray());
-            _libraryListing = UndoTreeReading.Read(_scribe.FullPath("A", LinkLibrary)).ListingSha;
-            Directory.CreateDirectory(Path.GetDirectoryName(media)!);
-            Directory.CreateSymbolicLink(media, LinkTarget);
-        }
-
-        private static JsonObject TheLinksMove() => new()
-        {
-            ["kind"] = "move", ["from"] = LinkPlace, ["to"] = LinkRenamed,
-            ["linkSha"] = UndoCheck.Sha(Encoding.UTF8.GetBytes(LinkTarget)),
-        };
-
-        /// <summary><c>linkedFolder</c>: which place holds the link (renamed, media, both or neither), the target the link there holds (<c>notALink</c>), then whether the library holds what the call made.</summary>
-        internal string LinkedFolder()
-        {
-            string renamedFull = _scribe.FullPath("A", LinkRenamed);
-            string mediaFull = _scribe.FullPath("A", LinkPlace);
-            bool renamed = UndoLinks.Look(renamedFull) == UndoLinks.What.Link;
-            bool media = UndoLinks.Look(mediaFull) == UndoLinks.What.Link;
-            string place = renamed && media ? "both" : renamed ? "renamed" : media ? "media" : "neither";
-            string at = renamed ? renamedFull : mediaFull;
-            string target = UndoLinks.Look(at) == UndoLinks.What.Link ? new DirectoryInfo(at).LinkTarget ?? "notALink" : "notALink";
-            string library = _libraryListing is not null && UndoTreeReading.Read(_scribe.FullPath("A", LinkLibrary)).ListingSha == _libraryListing ? "untouched" : "changed";
-            return place + ", " + target + ", " + library;
-        }
-
-        // ---- U4b3 door-4 (stackCasesHow): the class pages and their links --
-        // Laid and read by UndoHandoverForTheCases, which the recovery replay
-        // shares (W8b-21a5).
-
-        private UndoHandoverForTheCases? _handover;
-        private UndoHandoverForTheCases Handover => _handover ??= new UndoHandoverForTheCases(_scribe);
-
-        private static string ClassPage(int day) => UndoHandoverForTheCases.ClassPage(day);
-
-        private static JsonObject TheClassLinksMove(int from, int to) => UndoHandoverForTheCases.TheClassLinksMove(from, to);
-
-        private JsonNode ClassPageOp(int day, string? before, string? after) => Handover.ClassPageOp(day, before, after);
-
-        private bool Nothing(string relative) => Handover.Nothing(relative);
-
-        /// <summary><c>handedOver</c>, as <see cref="UndoHandoverForTheCases.HandedOver"/> reads it.</summary>
-        internal string HandedOver() => Handover.HandedOver();
 
         /// <summary>The spelling courses/TST1O lists for the media folder, as spelled, or null when it lists none.</summary>
         private string? CaseOnlySpellingListed()

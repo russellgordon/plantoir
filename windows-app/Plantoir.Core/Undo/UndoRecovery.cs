@@ -671,7 +671,7 @@ internal static class UndoRecovery
                 // Nothing will put a closed step's page back: a kept original
                 // that differs from its page is the only copy of what it held,
                 // and stays (the mac's U3c).
-                allGone = UndoSwap.TidyLeftovers(closedStep, root, trail, AsideListings(closedStep, root),
+                allGone = UndoSwap.TidyLeftovers(record.Seq, closedStep.PathsToTidy, root, AsideListings(closedStep, root),
                                                  found => NoteAnAsideFolder(found, closedStep, root, journal, trail), keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { allGone = false; }
@@ -936,16 +936,14 @@ internal static class UndoRecovery
         {
             if (UndoCurrent.Read(kept) is not UndoCurrent.Bytes keptBytes) return false;
             string wanted = Path.GetFullPath(place);
-            // Each op on the place with its index in the step.
-            var onThePlace = new SortedDictionary<int, UndoOp>();
+            var opsOnThePlace = new List<UndoOp>();
             Dictionary<string, UndoOp> carriers = UndoCheck.Carriers(step.Ops);
-            for (int index = 0; index < step.Ops.Count; index++)
+            foreach (UndoOp op in step.Ops)
             {
-                UndoOp op = step.Ops[index];
                 if (op.Kind == UndoOp.Recompute || op.IsWhole || op.Path is not { } path) continue;
                 if (string.Equals(Path.GetFullPath(UndoDoor.FullPath(root, path)), wanted, StringComparison.OrdinalIgnoreCase))
                 {
-                    onThePlace[index] = op;
+                    opsOnThePlace.Add(op);
                 }
                 else if (carriers.TryGetValue(path, out UndoOp? carrier))
                 {
@@ -953,32 +951,14 @@ internal static class UndoRecovery
                     // the same op, judged at its old place.
                     string oldPlace = UndoOp.PlaceBeforeTheMove(path, carrier.From!, carrier.To!);
                     if (string.Equals(Path.GetFullPath(UndoDoor.FullPath(root, oldPlace)), wanted, StringComparison.OrdinalIgnoreCase))
-                        onThePlace[index] = op with { Path = oldPlace };
+                        opsOnThePlace.Add(op with { Path = oldPlace });
                 }
             }
-            // A page at a handed-over place is planned with the other op of
-            // its pair, in the step's order, so the plan judges the place as
-            // handed over: the write at a place a link leaves, judged alone
-            // against the link still there, is never ready (W8b-21a3, the
-            // mac's U4b3 door-3).
-            bool withAPartner = false;
-            foreach (UndoHandover handover in UndoOp.Handovers(step.Ops))
-            {
-                bool leaverHere = onThePlace.ContainsKey(handover.LeaverIndex);
-                bool fillerHere = onThePlace.ContainsKey(handover.FillerIndex);
-                if (leaverHere == fillerHere) continue;
-                int partner = leaverHere ? handover.FillerIndex : handover.LeaverIndex;
-                onThePlace[partner] = step.Ops[partner];
-                withAPartner = true;
-            }
-            var opsOnThePlace = new List<UndoOp>(onThePlace.Values);
-            // A partner that is a move is read on the working folder as a whole.
-            UndoWholeReads? whole = withAPartner ? new UndoWholeReads(root, new UndoAppSettingsPlaces()) : null;
             if (opsOnThePlace.Count == 0) return false;
             foreach (bool backward in new[] { true, false })
             {
                 UndoCheck.PlanResult plan;
-                try { plan = UndoCheck.Plan(opsOnThePlace, backward, relative => UndoCurrent.Read(UndoDoor.FullPath(root, relative)), blob, whole: whole); }
+                try { plan = UndoCheck.Plan(opsOnThePlace, backward, relative => UndoCurrent.Read(UndoDoor.FullPath(root, relative)), blob); }
                 catch (UndoListUnreadableException) { continue; }
                 if (plan is not UndoCheck.PlanResult.Ready ready) continue;
                 foreach ((string path, _, byte[]? replacement) in ready.InOrder)
@@ -1041,112 +1021,18 @@ internal static class UndoRecovery
 
     /// <summary>
     /// The ops of a step to put back: each one whose place, by the name
-    /// <see cref="FileStates"/> judged it under (<see cref="PlaceJudged"/>: a
-    /// move that hands a place over by its two places), took effect (the
-    /// mac's <c>settle</c>; U4b3 door-3).
+    /// <see cref="FileStates"/> judged it under (<see cref="UndoOp.PlaceName"/>),
+    /// took effect (the mac's <c>settle</c>).
     /// </summary>
     internal static List<UndoOp> OpsToPutBack(UndoStep step, IReadOnlyCollection<string> endPaths)
     {
-        HashSet<int> moving = MovesHandingOver(UndoOp.Handovers(step.Ops), step.Ops);
         var ops = new List<UndoOp>();
-        for (int index = 0; index < step.Ops.Count; index++)
+        foreach (UndoOp op in step.Ops)
         {
-            UndoOp op = step.Ops[index];
             if (op.Kind == UndoOp.Recompute) continue;
-            string place = op.IsWhole ? PlaceJudged(op, index, moving) : op.PlaceName;
-            if (endPaths.Contains(place)) ops.Add(op);
+            if (endPaths.Contains(op.PlaceName)) ops.Add(op);
         }
         return ops;
-    }
-
-    /// <summary>The step's moves that leave or fill a handed-over place, by their index in the step (the mac's <c>movesHandingOver</c>, U4b3 door-3).</summary>
-    internal static HashSet<int> MovesHandingOver(IReadOnlyList<UndoHandover> handovers, IReadOnlyList<UndoOp> ops)
-    {
-        var found = new HashSet<int>();
-        foreach (UndoHandover handover in handovers)
-        {
-            if (ops[handover.LeaverIndex].IsWhole) found.Add(handover.LeaverIndex);
-            if (ops[handover.FillerIndex].IsWhole) found.Add(handover.FillerIndex);
-        }
-        return found;
-    }
-
-    /// <summary>
-    /// The name recovery judges a whole op under: its <see cref="UndoOp.PlaceName"/>,
-    /// but for a move that hands a place over its two places, "from → to",
-    /// since its <c>from</c> (its place name) is the path of the file op it
-    /// shares the place with, and the two are judged apart (the mac's
-    /// <c>placeJudged</c>, U4b3 door-3). <see cref="OpsToPutBack"/> chooses by
-    /// the same name.
-    /// </summary>
-    internal static string PlaceJudged(UndoOp op, int index, IReadOnlySet<int> movesHandingOver) =>
-        movesHandingOver.Contains(index) && op.From is { } from && op.To is { } to ? from + " → " + to : op.PlaceName;
-
-    /// <summary>
-    /// For each move that hands a place over, the plain path its judged name
-    /// ("from → to", <see cref="PlaceJudged"/>) is shown as on the trail and
-    /// to a teacher: its own place (<see cref="UndoOp.PlaceName"/>), as every
-    /// other move is named (the mac's <c>placesShown</c>, U4b3 door-5).
-    /// </summary>
-    internal static IReadOnlyDictionary<string, string> PlacesShown(UndoStep step)
-    {
-        HashSet<int> moving = MovesHandingOver(UndoOp.Handovers(step.Ops), step.Ops);
-        var shown = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (int index in moving)
-        {
-            UndoOp op = step.Ops[index];
-            shown[PlaceJudged(op, index, moving)] = op.PlaceName;
-        }
-        return shown;
-    }
-
-    /// <summary>
-    /// Each op of a step judged by <paramref name="judge"/>, then each
-    /// handed-over pair judged together (#899 W8b-21a3, the mac's U4b3
-    /// door-3; the pairs are <see cref="UndoOp.Handovers"/>, the one finder
-    /// the plan uses too): when the filler stands AFTER, the leaver is judged
-    /// again with the place free (a move's <c>from</c> side; a file op's page
-    /// read as absent); when the leaver stands BEFORE, the filler is judged
-    /// again with the place absent (a move's <c>to</c> side; a file op's page
-    /// absent). Judged again until nothing changes, for a chain of places,
-    /// each op at most once on each side, so a step stopped before, between
-    /// or after the pair's swaps is all before, part way or all after, and a
-    /// place holding something neither op recorded leaves both neither.
-    /// </summary>
-    internal static UndoOpState?[] JudgedTogether(IReadOnlyList<UndoOp> ops, IReadOnlyList<UndoHandover> handovers,
-                                                  Func<int, UndoHandedOverSides, UndoOpState?> judge)
-    {
-        var states = new UndoOpState?[ops.Count];
-        var fromIsFree = new bool[ops.Count];
-        var toIsFree = new bool[ops.Count];
-        var isAbsent = new bool[ops.Count];
-        UndoHandedOverSides SidesOf(int index) => new(fromIsFree[index], toIsFree[index], isAbsent[index]);
-        for (int index = 0; index < ops.Count; index++) states[index] = judge(index, SidesOf(index));
-        for (int round = 0; handovers.Count > 0 && round <= ops.Count; round++)
-        {
-            bool changed = false;
-            foreach (UndoHandover handover in handovers)
-            {
-                int leaver = handover.LeaverIndex;
-                int filler = handover.FillerIndex;
-                if (states[filler] == UndoOpState.After && !fromIsFree[leaver] && !isAbsent[leaver])
-                {
-                    if (ops[leaver].IsWhole) fromIsFree[leaver] = true;
-                    else isAbsent[leaver] = true;
-                    states[leaver] = judge(leaver, SidesOf(leaver));
-                    changed = true;
-                }
-                if (states[leaver] == UndoOpState.Before && !toIsFree[filler] && !isAbsent[filler])
-                {
-                    if (ops[filler].IsWhole) toIsFree[filler] = true;
-                    else isAbsent[filler] = true;
-                    states[filler] = judge(filler, SidesOf(filler));
-                    changed = true;
-                }
-            }
-            if (!changed) break;
-        }
-        return states;
     }
 
     private sealed record SettleAnswer(UndoRecoveryResult? Result, bool TryAgain, bool Stopped, UndoRefusal? Why = null)
@@ -1160,116 +1046,6 @@ internal static class UndoRecovery
     }
 
     /// <summary>
-    /// A link move of a step, read for <see cref="RemoveTheLinksJustMade"/>:
-    /// its two places, the text each side holds when it stands as before
-    /// (<c>from</c>, its <c>linkShaBefore</c> or a plain move's <c>linkSha</c>)
-    /// and as after (<c>to</c>), and what each side holds now.
-    /// </summary>
-    internal readonly record struct UndoLinkMoveRead(string From, string To, string Before, string After, UndoMoveSide AtFrom, UndoMoveSide AtTo)
-    {
-        /// <summary>A plain link move (one text at both sides), renamed in one step: never in flight with both links standing.</summary>
-        internal bool IsPlain => string.Equals(Before, After, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// W8b-21b3 (#899; the mac's U4b3 relink-3 and reviews D and F,
-    /// <c>removeTheLinksJustMade</c>): a relinking move whose two links both
-    /// stand (<c>from</c> holding its <c>linkShaBefore</c> text, <c>to</c> its
-    /// <c>linkShaAfter</c> text, each read as the link itself, never followed)
-    /// may be the one whose swap was in flight when the process died; the
-    /// link that swap had just made is removed: at <c>to</c> going forward (an
-    /// apply or a Redo), at <c>from</c> going back (an Undo), once re-read
-    /// holding that side's text. Both texts are in the list, so neither link
-    /// is an only copy. A plan never does this: a link at the other name may be
-    /// the teacher's.
-    ///
-    /// <para>At most ONE link is removed for the whole step, by the rule as
-    /// finally built: every link move of the step, a plain one included, is
-    /// read in the work's swap order (index order going forward, reversed for
-    /// an Undo); a relink passes when it stands both ways, every link move
-    /// before it holds its end text at its end side and every one after it
-    /// its start text at its start side (<see cref="IsTheOneInFlight"/>); the
-    /// LAST that passes loses its just-made link; none passing, nothing is
-    /// removed. A plain link move is a constraint only. A side whose folders
-    /// lead out of the working folder is judged as always
-    /// (<see cref="UndoPlaces.StaysInside(string, string, UndoOp)"/>), never
-    /// read here.</para>
-    ///
-    /// <para>Either side unreadable, or the removal failing: the place, so the
-    /// step is left for the next recovery (cannot tell now); else null.</para>
-    /// </summary>
-    /// <param name="beforeTheRemoval">A test's: told the just-made link's full path between the reading and the re-read before its removal (it changes the link there).</param>
-    internal static string? RemoveTheLinksJustMade(UndoStep step, string root, bool goingForward, Action<string>? beforeTheRemoval = null)
-    {
-        var moves = new List<UndoLinkMoveRead>();
-        for (int position = 0; position < step.Ops.Count; position++)
-        {
-            UndoOp op = goingForward ? step.Ops[position] : step.Ops[step.Ops.Count - 1 - position];
-            if (!op.IsALinksMove || op.From is not { } from || op.To is not { } to) continue;
-            if (op.LinkText(isAtFrom: true) is not { } before || op.LinkText(isAtFrom: false) is not { } after) continue;
-            if (!UndoPlaces.StaysInside(root, from, op) || !UndoPlaces.StaysInside(root, to, op)) continue;
-            UndoMoveSide atFrom = UndoMoveSides.Read(op, UndoDoor.FullPath(root, from), isAtFrom: true);
-            UndoMoveSide atTo = UndoMoveSides.Read(op, UndoDoor.FullPath(root, to), isAtFrom: false);
-            if (atFrom == UndoMoveSide.CannotRead) return from;
-            if (atTo == UndoMoveSide.CannotRead) return to;
-            moves.Add(new UndoLinkMoveRead(from, to, before, after, atFrom, atTo));
-        }
-        (string Path, string Sha)? inFlight = null;
-        for (int index = 0; index < moves.Count; index++)
-        {
-            if (!IsTheOneInFlight(index, moves, goingForward)) continue;
-            UndoLinkMoveRead candidate = moves[index];
-            inFlight = goingForward ? (candidate.To, candidate.After) : (candidate.From, candidate.Before);
-        }
-        if (inFlight is not { } found) return null;
-        // Re-read just before it goes: removed only while it is still the link
-        // the swap made, holding that side's text, as the link itself.
-        string justMade = UndoDoor.FullPath(root, found.Path);
-        beforeTheRemoval?.Invoke(justMade);
-        if (UndoLinks.Look(justMade) == UndoLinks.What.CannotLook) return found.Path;
-        bool stillHoldsIt = UndoLinks.Look(justMade) == UndoLinks.What.Link
-                            && string.Equals(UndoLinks.LinkSha(justMade), found.Sha, StringComparison.Ordinal);
-        if (stillHoldsIt && !UndoSwap.RemoveALink(justMade)) return found.Path;
-        return null;
-    }
-
-    /// <summary>
-    /// Whether the link move at <paramref name="index"/> (in the work's swap
-    /// order) can be the one whose swap was in flight (the mac's
-    /// <c>isTheOneInFlight</c>, review F of U4b3): it is a relink, it stands
-    /// both ways, every link move before it holds its end text at its end side
-    /// (<c>to</c> going forward, <c>from</c> for an Undo), and every link move
-    /// after it holds its start text at its start side.
-    /// </summary>
-    internal static bool IsTheOneInFlight(int index, IReadOnlyList<UndoLinkMoveRead> moves, bool goingForward)
-    {
-        UndoLinkMoveRead candidate = moves[index];
-        if (candidate.IsPlain) return false;
-        if (candidate.AtFrom != UndoMoveSide.HoldsTheContent || candidate.AtTo != UndoMoveSide.HoldsTheContent) return false;
-        for (int other = 0; other < moves.Count; other++)
-        {
-            UndoLinkMoveRead move = moves[other];
-            bool startHolds = (goingForward ? move.AtFrom : move.AtTo) == UndoMoveSide.HoldsTheContent;
-            bool endHolds = (goingForward ? move.AtTo : move.AtFrom) == UndoMoveSide.HoldsTheContent;
-            if (other < index && !endHolds) return false;
-            if (other > index && !startHolds) return false;
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// What a tidy says when it keeps an item of the teacher's, found under a
-    /// relink's staged name, under a visible name (W8b-21b3): the line "undo
-    /// kept a page under a visible name", naming the place and the visible
-    /// name, written just before the rename.
-    /// </summary>
-    internal static Action<string, string>? KeptVisibly(UndoStep step, string root, Action<UndoTrailLine>? trail) =>
-        trail is null
-            ? null
-            : (place, keptAs) => trail(new UndoTrailLine(ActivityTrail.Event.UndoKeptAPageUnderAVisibleName, step.Course, step.Section,
-                                                         UndoTrail.KeptAPageWords(InsideTheFolder(place, root), InsideTheFolder(keptAs, root))));
-
-    /// <summary>
     /// Where each file of a step stands now, by content, in the order its ops
     /// name them. U4b (opKinds.wholeOps' order; #899 W8-7): an edit a move of
     /// the step carries is read where its folder is now (<see cref="PlaceNow"/>),
@@ -1277,66 +1053,44 @@ internal static class UndoRecovery
     /// back, without the step's own staged and kept files inside it
     /// (<see cref="CarryingMoveState"/>), so a step killed between its move
     /// and its edits settles whole, by content (the mac's <c>fileStates</c>).
-    /// A handed-over place's two ops are judged together
-    /// (<see cref="JudgedTogether"/>), and a move that hands a place over is
-    /// named by its two places (<see cref="PlaceJudged"/>; W8b-21a3, the
-    /// mac's U4b3 door-3).
     /// </summary>
     /// <param name="blob">The list's content by sha, for taking a carried edit back; null: a carried edit is judged as it is.</param>
     internal static IReadOnlyList<(string Path, UndoOpState State)> FileStates(UndoStep step, string root, IUndoExternalPlaces? places = null,
                                                                                Func<string, byte[]?>? blob = null)
     {
-        Dictionary<string, UndoOp> carriers = UndoCheck.Carriers(step.Ops);
-        IUndoExternalPlaces where = places ?? new UndoAppSettingsPlaces();
-        // Each page is read once. A place that now leads outside the folder
-        // (a junction since) is read through nothing: it is in the way. A
-        // carried edit is read where its folder is now. A link at a page's
-        // place is not a file (W8b-21c2).
+        var order = new List<string>();
+        var states = new Dictionary<string, UndoOpState>(StringComparer.Ordinal);
         var currents = new Dictionary<string, UndoCurrent?>(StringComparer.Ordinal);
+        Dictionary<string, UndoOp> carriers = UndoCheck.Carriers(step.Ops);
         foreach (UndoOp op in step.Ops)
         {
-            if (op.IsWhole || op.Kind == UndoOp.Recompute || op.Path is not { } path || currents.ContainsKey(path)) continue;
-            string readPath = carriers.TryGetValue(path, out UndoOp? carrier) ? PlaceNow(path, carrier, root) : path;
-            currents[path] = UndoPlaces.StaysInside(root, readPath) ? UndoCurrent.ReadWithoutFollowingALink(UndoDoor.FullPath(root, readPath)) : null;
-        }
-        // A handed-over place's two ops are judged together (W8b-21a3).
-        IReadOnlyList<UndoHandover> handovers = UndoOp.Handovers(step.Ops);
-        UndoOpState?[] judged = JudgedTogether(step.Ops, handovers, (index, sides) =>
-        {
-            UndoOp op = step.Ops[index];
             if (op.IsWhole)
             {
                 // A move, a tree or an external op is one place of its own,
-                // judged whole (a move by its pair, never by one side); a
-                // place that now leads outside the folder is in the way. A
-                // side judged free for a handover is never resolved through
-                // what stands there now, only its folders above (review 1 of
-                // window D, LOW 1; the mac's fileStates has no such look).
-                if (LeadsOut(op, root, sides)) return UndoOpState.Neither;
-                if (carriers.Values.Any(carrier => ReferenceEquals(carrier, op))) return CarryingMoveState(op, step, carriers, root, where, blob);
-                return UndoCheck.WholeStateOf(op, root, where, toIsHandedOver: sides.ToIsFree, fromIsHandedOver: sides.FromIsFree);
-            }
-            if (op.Kind == UndoOp.Recompute || op.Path is not { } path) return null;
-            if (sides.IsAbsent) return UndoCheck.StateOf(op, new UndoCurrent.Absent());
-            return currents[path] is { } current ? UndoCheck.StateOf(op, current) : UndoOpState.Neither;
-        });
-        HashSet<int> moving = MovesHandingOver(handovers, step.Ops);
-        var order = new List<string>();
-        var states = new Dictionary<string, UndoOpState>(StringComparer.Ordinal);
-        var pagesSeen = new HashSet<string>(StringComparer.Ordinal);
-        for (int index = 0; index < step.Ops.Count; index++)
-        {
-            UndoOp op = step.Ops[index];
-            if (op.IsWhole)
-            {
-                // A move that hands a place over is named by its two places.
-                string place = PlaceJudged(op, index, moving);
+                // judged whole (a move by its pair, never by one side); a place
+                // that now leads outside the folder is in the way.
+                string place = op.PlaceName;
                 if (!states.ContainsKey(place)) order.Add(place);
-                states[place] = judged[index] ?? UndoOpState.Neither;
+                IUndoExternalPlaces where = places ?? new UndoAppSettingsPlaces();
+                states[place] = UndoPlaces.FirstPlaceLeadingOut(root, op) is not null
+                    ? UndoOpState.Neither
+                    : carriers.Values.Any(carrier => ReferenceEquals(carrier, op))
+                        ? CarryingMoveState(op, step, carriers, root, where, blob)
+                        : UndoCheck.WholeStateOf(op, root, where);
                 continue;
             }
-            if (judged[index] is not { } state || op.Path is not { } path) continue;
-            if (pagesSeen.Add(path)) order.Add(path);
+            if (op.Kind == UndoOp.Recompute || op.Path is not { } path) continue;
+            if (!currents.ContainsKey(path))
+            {
+                // A place that now leads outside the folder (a junction since)
+                // is read through nothing: it is in the way. A carried edit is
+                // read where its folder is now. A link at a page's place is
+                // not a file (W8b-21c2).
+                string readPath = carriers.TryGetValue(path, out UndoOp? carrier) ? PlaceNow(path, carrier, root) : path;
+                currents[path] = UndoPlaces.StaysInside(root, readPath) ? UndoCurrent.ReadWithoutFollowingALink(UndoDoor.FullPath(root, readPath)) : null;
+                order.Add(path);
+            }
+            UndoOpState state = currents[path] is { } current ? UndoCheck.StateOf(op, current) : UndoOpState.Neither;
             if (states.TryGetValue(path, out UndoOpState earlier))
             {
                 // A page another program holds with no read sharing stays IN
@@ -1353,24 +1107,6 @@ internal static class UndoRecovery
             }
         }
         return order.Select(path => (path, states[path])).ToList();
-    }
-
-    /// <summary>
-    /// Whether a whole op's place leads out of the working folder now, links
-    /// resolved (<see cref="UndoPlaces.StaysInside(string, string, UndoOp)"/>),
-    /// but for a side its handover judges free (<see cref="UndoHandedOverSides"/>):
-    /// that side is asked only of the folders above it
-    /// (<see cref="UndoPlaces.StaysInsideAbove"/>), as what fills it now (a
-    /// link leading out, say) is the other op's, never this op's.
-    /// </summary>
-    private static bool LeadsOut(UndoOp op, string root, UndoHandedOverSides sides)
-    {
-        foreach (string place in op.PathsNamed)
-        {
-            bool free = (sides.FromIsFree && place == op.From) || (sides.ToIsFree && place == op.To);
-            if (free ? !UndoPlaces.StaysInsideAbove(root, place) : !UndoPlaces.StaysInside(root, place, op)) return true;
-        }
-        return false;
     }
 
     /// <summary>Whether the folder (or file) a move carries edits with is at its old place now: nothing at <c>to</c> and something at <c>from</c> (the mac's <c>isAtItsOldPlace</c>). Looked at without following a link.</summary>
@@ -1484,7 +1220,7 @@ internal static class UndoRecovery
             // beside it, never deleted (W6).
             try
             {
-                UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root),
+                UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root),
                                        found => NoteAnAsideFolder(found, step, root, journal, trail), keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
@@ -1493,13 +1229,6 @@ internal static class UndoRecovery
 
         bool startedFromBefore = phase is UndoPhase.Begin or UndoPhase.Redoing;
         UndoOpState startState = startedFromBefore ? UndoOpState.Before : UndoOpState.After;
-        // A relinking move's swap killed with both links standing loses the
-        // link it had just made first, so the op stands where its swap began;
-        // only then is the step judged (W8b-21b3; the mac's U4b3 relink-3).
-        // Live only: shadow recovery never writes into a working folder, so
-        // there both links standing is neither and the step closes interrupted.
-        if (live && RemoveTheLinksJustMade(step, root, startedFromBefore) is { } unreadable)
-            return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow, unreadable));
         IReadOnlyList<(string Path, UndoOpState State)> files = FileStates(step, root, places, journal.Blob);
         // A teacher's folder still set aside after the tidying is IN THE WAY,
         // never settled as if it were gone; one whose place cannot be read stays
@@ -1519,33 +1248,15 @@ internal static class UndoRecovery
         {
             if (op.Kind == UndoOp.External && op.Target is { } target) targets.Add(target);
         }
-        // A move that hands a place over is judged under its two places
-        // ("from → to"), but the trail and a teacher are shown a plain path:
-        // its own place, as every other move is named, each path once (the
-        // mac's placesShown, U4b3 door-5; W8b-21a5).
-        IReadOnlyDictionary<string, string> shownAs = PlacesShown(step);
-        string Shown(string place) => shownAs.TryGetValue(place, out string? plain) ? plain : place;
-        List<string> PathsOnly(IEnumerable<string> places)
-        {
-            var named = new List<string>();
-            foreach (string place in places)
-            {
-                if (targets.Contains(place)) continue;
-                string plain = Shown(place);
-                if (!named.Contains(plain, StringComparer.Ordinal)) named.Add(plain);
-            }
-            return named;
-        }
-        // How many places a count on the trail names: each shown path once.
-        int CountShown(IEnumerable<string> places) => places.Select(Shown).Distinct(StringComparer.Ordinal).Count();
+        List<string> PathsOnly(IEnumerable<string> places) => places.Where(place => !targets.Contains(place)).ToList();
         // A file that could not be read now is never judged changed by hand:
         // tried again on the schedule, as for a file in use (ruling 4).
         foreach ((string path, UndoOpState state) in files)
         {
             if (state is UndoOpState.InUse)
-                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.FileIsInUse, Shown(path)));
+                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.FileIsInUse, path));
             if (state is UndoOpState.CannotTell or UndoOpState.NotReadable)
-                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow, Shown(path)));
+                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow, path));
         }
 
         int atStart = 0, atEnd = 0;
@@ -1625,7 +1336,7 @@ internal static class UndoRecovery
                         // change rolled back leaves the list.
                         try
                         {
-                            UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null,
+                            UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root), null,
                                                    keepingOnlyCopies: true, unlessTheListHolds: ListHolds(step, root, journal));
                         }
                         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
@@ -1667,7 +1378,7 @@ internal static class UndoRecovery
                         // Said after the tidy, so it names what is on the disk.
                         try
                         {
-                            UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null, keepingOnlyCopies: true);
+                            UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root), null, keepingOnlyCopies: true);
                         }
                         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
                         // A page the step removed or moved away whose place is now
@@ -1677,8 +1388,8 @@ internal static class UndoRecovery
                         if (live) KeepPagesWhosePlaceIsTaken(step, root, trail);
                         List<string> keptLeft = KeptOriginalsLeft(step, root);
                         trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoCouldNotPutBack, course, section,
-                                                        UndoTrail.CouldNotPutBackWords(phase, CountShown(leftPartWay), keptLeft), keptLeft));
-                        return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, UndoRecoveryOutcome.Interrupted, step, root, 0, CountShown(leftPartWay)), false, false);
+                                                        UndoTrail.CouldNotPutBackWords(phase, leftPartWay.Count, keptLeft), keptLeft));
+                        return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, UndoRecoveryOutcome.Interrupted, step, root, 0, leftPartWay.Count), false, false);
                     }
                 }
             }
@@ -1703,7 +1414,7 @@ internal static class UndoRecovery
                 // In shadow nothing was put back and nothing offered was
                 // cleared: the journal holds the outcome, the trail does not.
                 if (live)
-                    line = new UndoTrailLine(ActivityTrail.Event.UndoRolledBack, course, section, UndoTrail.InterruptedWords(phase, putBack, CountShown(inTheWay)));
+                    line = new UndoTrailLine(ActivityTrail.Event.UndoRolledBack, course, section, UndoTrail.InterruptedWords(phase, putBack, inTheWay.Count));
             }
         }
         if (seams?.Stops("recoveryBeforeWriting") == true) return SettleAnswer.Halted;
@@ -1723,7 +1434,7 @@ internal static class UndoRecovery
             // page and named on the trail (the third review of U3a, LOW 1).
             try
             {
-                UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null, keepingOnlyCopies: true,
+                UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root), null, keepingOnlyCopies: true,
                                        unlessTheListHolds: ListHolds(step, root, journal), keepingCopiesHolding: keptNotTaken);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
@@ -1743,16 +1454,14 @@ internal static class UndoRecovery
             // until the switch flips. Nothing took effect, so every staged
             // file is the journal's own; a kept original that differs from
             // its page still stays (W7a, the harness's w7-publish-kill,
-            // shadow beforeSwap@0). Nothing else on the trail, as shadow writes
-            // none; only a teacher's item kept under a visible name is said, as
-            // by every tidy (window E review 1, LOW 1).
+            // shadow beforeSwap@0). Nothing on the trail, as shadow writes none.
             try
             {
-                UndoSwap.TidyLeftovers(step, root, trail, AsideListings(step, root), null, keepingOnlyCopies: true);
+                UndoSwap.TidyLeftovers(step.Seq, step.PathsToTidy, root, AsideListings(step, root), null, keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
         }
-        return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, outcome, step, root, putBack, CountShown(inTheWay)), false, false);
+        return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, outcome, step, root, putBack, inTheWay.Count), false, false);
     }
 
     internal static JsonObject Interrupted(long seq, string phase, string reason, IReadOnlyList<string> paths)
@@ -1781,11 +1490,3 @@ internal static class UndoRecovery
         }
     }
 }
-
-/// <summary>
-/// How one op of a handed-over pair is judged (#899 W8b-21a3, the mac's
-/// U4b3 door-3): a move with its <c>from</c> side free (its filler stands
-/// on its after side there), or its <c>to</c> side free (its leaver still
-/// stands on its before side there); a file op with its page read as absent.
-/// </summary>
-internal readonly record struct UndoHandedOverSides(bool FromIsFree, bool ToIsFree, bool IsAbsent);

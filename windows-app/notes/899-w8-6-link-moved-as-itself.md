@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported; no link is moved as itself.
+
 # #899 W8-6: a link moved as itself, judged by its target's bytes
 
 Branch `issue/899-w8-6-link-moved-as-itself`, base `origin/issue/899-w8-5-case-only-move` 0b7ce258a (holds `origin/dev` 461ee3943). `origin/dev` had not moved at either merge point (461ee3943 both times), so there is no merge commit: dev is already in.

@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported; no link is moved as itself.
+
 # #899 W8b-21: a linked folder is renamed as a link (Windows #949)
 
 Branch `issue/899-w8b-21-a-linked-folder-is-renamed-as-a-link`, built on W8b-16's `origin/issue/899-w8b-16-trace-replay-lays-folder-moves` (08aa0bcf6; pieces 15a, 15b and 16, with `origin/dev` 8046ca2e8 merged in), as the director's prompt said (the brief named 15b's branch). `origin/dev` was still 8046ca2e8 at both merge points ("Already up to date" before proving, at a1c8e9e6e, and again before hand-back), so there is no merge commit.

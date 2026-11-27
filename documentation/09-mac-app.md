@@ -17705,7 +17705,7 @@ or a course another program is building (`whatBlocksABuild(afterTaking:
 false)`): a preview that is going to be refused is refused as before, with no
 question first, and the teacher's front page is never written while a build
 may be reading it. A front page that is a symbolic link, a Finder alias or
-locked is not asked about either — the build never writes through one (#276).
+locked is not asked about either (#276).
 `testOnlyThePreviewButtonAsks` pins where the question may be reached from.
 
 **It rides the preview alert; the window still has three.** A fourth `.alert`
@@ -23114,6 +23114,8 @@ days (the 40-day sweep case), and the second round's scan (11 checks).
 
 ### U4b2: linked-page-written-through
 
+Kept by #1055 (2026-11-27): Russell's rule, a page that is a link is written through it.
+
 With the switch off, a daily action whose page is a symbolic link writes
 the file the link leads to, and the link stays a link: Russell's ruling on
 #899, 2026-11-25, one rule on both platforms (`undo.rule.shadow`; Windows
@@ -23128,9 +23130,9 @@ says the change went ahead. `writeNew` and `remove` never follow a link
 (removing what a link leads to would leave the link pointing at nothing), and
 a link to a folder or to a file that cannot be read is still refused before
 anything changes. So Insert Class, which writes a later class's new name and
-removes its old one, is refused when that later class is a link, until the
-pieces that move a link (review 1, MEDIUM 1); Windows' Insert Class still
-goes ahead outside the door, a plain copy at the new name and the link
+removes its old one, is refused when that later class is a link (review 1, MEDIUM 1; no
+piece moves a link, #1055); Windows' Insert Class with the switch off
+goes ahead, a plain copy at the new name and the link
 deleted, which the contract names as the Mac's alone. A dangling link is
 written through: its file is made where it leads, and the file's folder too
 when that is missing, as Windows' `UndoSwap.MakeTheFolderOf` makes it
@@ -23264,7 +23266,7 @@ below). A record without `moved` (Windows', or one written before this) fell
 back at this review to the reading `looksLikeAnInterruptedRename` already
 trusts, a new-name place whose old name is absent beside it; since U4b2-6 it
 names no folder (below). The disk then decides: `lstat`, never followed;
-a folder counts; a link only where this run moved a link (`Move.isALink`, L3);
+a folder counts; a link never counts (L3; `Move.isALink` went in #1055 M7);
 a capitalisation-only rename asks the listing for the new spelling. Only "no
 such file" reads as absent: any other refusal, or a listing that fails, is
 returned as unreadable and told on the trail ("could not tell whether these
@@ -23555,6 +23557,8 @@ U7's). No product code changed.
 
 ### U4b2: a-moved-link-is-judged-by-its-bytes
 
+Removed by #1055 (2026-11-27), piece M6: the door moves no link as itself; a `move` carrying `linkSha` is unreadable, a barrier.
+
 A `move` whose item is a symbolic link now moves the link itself and is
 judged by `linkSha`, the SHA-256 of the target the link holds (read with
 `readlink`), exactly as a `link` line in a folder's listing already judged a
@@ -23595,6 +23599,8 @@ replay now asks the plan's stays-inside check of a move's places
 
 ### U4b2: a-linked-section-folder-is-renamed
 
+Removed by #1055 (2026-11-27), pieces M2 then M7: Rename Folder of a per-section or shared folder that is a link is refused before anything changes by the plan's general guard (a link has no listing), with the door's existing sentence; no link code is left in it.
+
 Rename folder renames a per-section or shared folder that is itself a
 symbolic link as it did before U4b, now in the one step: the LINK is moved
 (its name changed, its target as written), and what it leads to is never
@@ -23621,6 +23627,8 @@ Class on the Mac refused renaming a later class that is a link until U4b3
 (below). Review 1: the listing's `link` line takes its hash from the same `linkSha(at:)`; two `stackCases` rows (call `renameAPerSectionFolderThatIsALink`) run Rename folder's own plan on a linked section folder, held on Windows for W8; and a dangling link is skipped, as before U4b, while a link to another place of the same rename is moved as a link.
 
 ### U4b3: linked-class-page-moves-its-link
+
+Removed by #1055 (2026-11-27), piece M1: Insert Class and Duplicate Class move no link; past a later class that is a link the step is refused by the door's general guard (a file a step removes must be a plain file).
 
 Insert Class (Make Room, and Duplicate Class, which makes room through the
 same code) renames a later class page that is a symbolic link to a file by
@@ -23691,6 +23699,8 @@ before or whole after once recovery has run (`UndoMakeRoomLinkedPageTests`).
 Windows still saves a plain copy and deletes the link until W8b piece 22.
 
 ### U4b3 door: a place handed over within a step
+
+Removed by #1055 (2026-11-27), piece M5: no step gives one op's place to another; such a step is unreadable, a barrier. The kept page under a visible name stays, on a plain step.
 
 `undoJournal.opKinds.wholeOps` has a second exception (#899, 2026-11-26):
 a place HANDED OVER within one step. An earlier op leaves it (a file's or
@@ -23817,6 +23827,8 @@ for the next piece.
 
 ### U4b3 relink: a link's text changed within a step
 
+Removed by #1055 (2026-11-27), piece M4: the door knows no move that changes a link's text; such a `move` is unreadable, a barrier.
+
 A link's move may change the text the link holds (#899, 2026-11-26;
 `undoJournal.opKinds.move`): `linkShaBefore` is the text at `from` before
 the step, `linkShaAfter` the text at `to` after it, the two different, and
@@ -23877,6 +23889,8 @@ third party making an identical link at the other name during the downtime.
 
 ### U4b3 relink-5: Insert Class re-points a linked class
 
+Removed by #1055 (2026-11-27), piece M1: Insert Class re-points no link.
+
 Insert Class is the relinking move's first caller (`ClassInsertionPlanner.apply`,
 the four cases in "U4b3: linked-class-page-moves-its-link" above). It walks
 each later class that is a link once, on the disk as it stands, before
@@ -23898,6 +23912,8 @@ the first class's date); a renamed page's rename that cannot be done (its new
 name taken) leaves a link re-pointed at that new name.
 
 ### mac-1: a relink where the link stands
+
+Removed by #1055 (2026-11-27), piece M3: the door knows no change of a link's text where it stands; such a `move` is unreadable, a barrier.
 
 The door now reads, judges, swaps and recovers a relinking move whose `from`
 and `to` are one path byte for byte (`opKinds.move`'s second exception;
@@ -23975,6 +23991,8 @@ name hidden (see the notes' "For mac-2").
 
 ### mac-2: Insert Class re-points an in-between link where it stands
 
+Removed by #1055 (2026-11-27), piece M1 (and M3 for the door): Insert Class re-points no link, in between or otherwise.
+
 `ClassInsertionPlanner.apply` no longer refuses for where a later class's link
 leads (`firstLinkThatCannotBeMoved` and its refusal block are gone). A renamed
 class reaching a renamed class page only through a link inside the working
@@ -24018,6 +24036,20 @@ line's new `couldNotWrite` clause; all held on Windows by exact name. Still
 left: contract rows for the three re-date-only shapes (a numbered course's
 plan in the replay and the Python model), written for Windows in the piece's
 notes. What Windows was to copy of it is struck by Russell's ruling of 2026-11-27: a class page is never a symbolic link; not built.
+
+### Symbolic links in course content (#1055)
+
+Russell's rule (2026-11-27): "Plantoir can read OR write through a symbolic link BUT we're not writing any code to handle them for other operations"; asked whether a save to a linked page replaces the link or goes through it: "Truly write through". What the Mac does with a page or folder in course content that is a symbolic link:
+
+- **Read.** Through the link, as released.
+- **Write.** A daily action's page that is a link is written through it: the link stays a link and the file it leads to changes (`JournaledStep.placeALinkLeadsTo`, "U4b2: linked-page-written-through" above).
+- **Insert Class (Make Room).** Past a later class page that is a link, the step is refused before anything changes by the door's general guard, which is older than any link work: a file a step removes must be a plain file (`JournaledStep.remove` plans the link's own place, `UndoItem.read` looks with `lstat`, `writePlainly` refuses `.notAFile` as cannot tell now), said as the door's existing sentence ("The file “Unit 1, Day 3.md” couldn’t be saved."). Windows with the switch off writes a plain copy at the new name and deletes the link, as released; nothing makes the two agree.
+- **Duplicate Class.** Makes a plain copy (`testAClassPageThatIsALinkCanBeCopied`); making room past a linked later class is Insert Class's case above.
+- **Rename Folder.** A per-section or shared folder that is a link is refused before anything changes by the plan's general guard: a folder it moves is judged by its listing, and `UndoTreeReading` reads a link as `.notATree`, which has none (`SpecialFolderRenamer.swift`, the "cannot be judged as a pair" check), said as "“Tasks” was not renamed, and nothing was changed: The file “Tasks” couldn’t be saved." (`undo.wording.renameFolderNothingWasChanged`). A folder that only holds a link is renamed with the link inside it, as the fourth part of U4b says.
+- **Save Course Settings.** A linked `course_config.json` is saved through its link (`CourseConfiguration.fileALinkLeadsTo`).
+- **The site build's date and the front page's title.** Both write through a symbolic link (`_replace_the_page_safely` in `scripts/build_site.py` writes at the file the link leads to); a page with a second name (a hard link) is left as released (`_has_a_second_name`).
+- **The kept page.** A page recovery cannot put back is kept under a visible name (`UndoRecovery.keepPagesWhosePlaceIsTaken`); that is not link work and stays.
+- **Nothing else.** A journal `move` is readable with exactly one of `sha` and `listingSha` (`shapeIsKnown`, `UndoFormat.swift`), so a move carrying a link's own hash is unreadable, a barrier; a step in which one op takes another op's place is unreadable too (`wholeOpsStandAlone`), U4b's carried edit apart. The sections above marked "Removed by #1055" record the link work that was built and taken out.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
@@ -24244,6 +24276,8 @@ repetitive animations".
 `AutomationProperties.Name`; stage 3 of #975 mirrors this piece.
 
 ### #1048: a linked class page's date key follows the target's place
+
+Removed by #1055 (2026-11-27), piece S1, the first three paragraphs only: a class's date is read and written under its own page's key, no first class owns a shared lesson, and the site build's date pass is the released one. The paragraphs after them are not link work and stand.
 
 A class page that is a link is dated in the file it leads to, under the key that file's place calls for (#1048). The one rule is `ClassPages.dateKey(ofPageAt:forSection:in:)` (`Models/ClassPages.swift`): the place is decided by the file's real path, every link resolved (linked folders included), and the key is `createdSection<N>` when the file is a course-level page, plain `created` when it is inside the section's own folder, and nil when the link leads to nothing (no date is read and none is written). The class list (`ClassPages.summary`), the assistant's graph (`AssistSectionGraph.page`), Insert Class and Duplicate Class, Re-date, and publishing's date moves all use it; the visibility key (`AssistPageVisibility.isSectionLocal`) is a separate matter and is unchanged.
 

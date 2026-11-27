@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # W8b-21b1a (#899, Windows #949): where this PC cannot make a link, the page becomes a copy of the lesson and the link is set aside
 
 Brief `vm-tools/briefs/2026-11-27-899-w8b-21b1a-copy-the-lesson-where-a-link-cannot-be-made.md` (Russell's Q2, 2026-11-27: "Copy the lesson instead"; kept small, as he asked). Same branch as 21b1, `issue/899-w8b-21b-relink`, from its pushed head dc0ca0fab. Windows only: the Mac can always make a link. No `contracts/` or `mac-app/` change. Inert: no teacher action calls it until 21b5 wires it into `RelinkLink`.

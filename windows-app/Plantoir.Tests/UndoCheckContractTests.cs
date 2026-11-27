@@ -30,35 +30,9 @@ public sealed class UndoCheckContractTests : IDisposable
         try { Directory.Delete(_folder, recursive: true); } catch { }
     }
 
-    /// <summary>Every case but those that lay a link holding the case's own target (<see cref="LinkMoveCases"/>).</summary>
     public static IEnumerable<object[]> Cases() =>
         UndoContract.Undo.GetProperty("checkCases").EnumerateArray()
-            .Where(checkCase => !LaysALinkWithItsTarget(checkCase))
             .Select(checkCase => new object[] { checkCase.GetProperty("name").GetString()! });
-
-    /// <summary>
-    /// The link moves' cases that lay a link holding the target the case gives
-    /// (<c>../library</c>, U4b2-14; #899 W8-6): only a symbolic link holds a
-    /// relative target as written, so these run where this account may make
-    /// one and are SKIPPED, saying why, where it may not (a machine that cannot make links).
-    /// </summary>
-    public static IEnumerable<object[]> LinkMoveCases() =>
-        UndoContract.Undo.GetProperty("checkCases").EnumerateArray()
-            .Where(LaysALinkWithItsTarget)
-            .Select(checkCase => new object[] { checkCase.GetProperty("name").GetString()! });
-
-    /// <summary>
-    /// Whether a case lays a link holding the text the case gives: a link's
-    /// move (<c>linkTarget</c>) or a relinking one (<c>linkTargetBefore</c>,
-    /// <c>linkTargetAfter</c>; 21b2), with a link in its <c>current</c>. Each
-    /// side's link then holds that side's own text, as the case writes it.
-    /// </summary>
-    private static bool LaysALinkWithItsTarget(JsonElement checkCase)
-    {
-        JsonElement op = checkCase.GetProperty("op");
-        bool givesItsText = op.TryGetProperty("linkTarget", out _) || op.TryGetProperty("linkTargetBefore", out _) || op.TryGetProperty("linkTargetAfter", out _);
-        return givesItsText && checkCase.GetProperty("current").GetRawText().Contains("\"link\"", StringComparison.Ordinal);
-    }
 
     private static IEnumerable<string> EveryCaseName() =>
         UndoContract.Undo.GetProperty("checkCases").EnumerateArray().Select(checkCase => checkCase.GetProperty("name").GetString()!);
@@ -68,7 +42,7 @@ public sealed class UndoCheckContractTests : IDisposable
     {
         // 30 when W1 was written; fewer is a contract change to read.
         Assert.True(UndoContract.Undo.GetProperty("checkCases").GetArrayLength() >= 30);
-        Assert.Equal(UndoContract.Undo.GetProperty("checkCases").GetArrayLength(), Cases().Count() + LinkMoveCases().Count());
+        Assert.Equal(UndoContract.Undo.GetProperty("checkCases").GetArrayLength(), Cases().Count());
     }
 
     private static JsonElement CaseNamed(string name) =>
@@ -99,28 +73,6 @@ public sealed class UndoCheckContractTests : IDisposable
                 names.Add(hash);
             }
             op["blobs"] = names;
-        }
-        // A link's target as written → linkSha, the SHA-256 of its UTF-8 bytes (U4b2-14; W8-6).
-        if (op["linkTarget"] is { } linkTarget)
-        {
-            op.Remove("linkTarget");
-            op["linkSha"] = UndoCheck.Sha(Encoding.UTF8.GetBytes(linkTarget.GetValue<string>()));
-        }
-        // A relinking link's two texts → linkShaBefore and linkShaAfter, and
-        // both as its blobs unless the case gives its own (U4b3 relink; 21b2).
-        if (op["linkTargetBefore"] is not null || op["linkTargetAfter"] is not null)
-        {
-            var texts = new JsonArray();
-            foreach ((string text, string sha) in new[] { ("linkTargetBefore", "linkShaBefore"), ("linkTargetAfter", "linkShaAfter") })
-            {
-                JsonNode? value = op[text];
-                op.Remove(text);
-                if (value is null) continue;
-                string hash = UndoCheck.Sha(Encoding.UTF8.GetBytes(value.GetValue<string>()));
-                op[sha] = hash;
-                if (!texts.Any(name => name!.GetValue<string>() == hash)) texts.Add(hash);
-            }
-            if (op["blobs"] is null) op["blobs"] = texts;
         }
         if (op["contentText"] is { } content)
         {
@@ -176,21 +128,13 @@ public sealed class UndoCheckContractTests : IDisposable
     /// links inside), a link, or nothing. Returns whether the place is to be
     /// read as one that cannot be read just now (<c>cannotBeRead</c>).
     /// </summary>
-    private bool PlaceAt(JsonElement current, string full, bool withItsTarget = false)
+    private bool PlaceAt(JsonElement current, string full)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         if (current.TryGetProperty("text", out JsonElement text)) File.WriteAllBytes(full, Encoding.UTF8.GetBytes(text.GetString()!));
         else if (current.TryGetProperty("bytesHex", out JsonElement hex)) File.WriteAllBytes(full, Convert.FromHexString(hex.GetString()!));
         else if (current.TryGetProperty("folder", out _)) Directory.CreateDirectory(full);
-        else if (current.TryGetProperty("link", out JsonElement laidLink))
-        {
-            // A link's move is judged by the target it holds, so its link is
-            // made with THE CASE'S target, as written (W8-6): each side of a
-            // relink with the text the case gives that side (21b2), never the
-            // other side's; any other case's link is only "something else".
-            if (withItsTarget) Directory.CreateSymbolicLink(full, laidLink.GetString()!);
-            else UndoKindsForTheCases.MakeALink(full, _folder);
-        }
+        else if (current.TryGetProperty("link", out _)) UndoKindsForTheCases.MakeALink(full, _folder);
         else if (current.TryGetProperty("tree", out JsonElement tree))
         {
             Directory.CreateDirectory(full);
@@ -287,7 +231,7 @@ public sealed class UndoCheckContractTests : IDisposable
             if (UndoPath.IsWithinTheRules(from) && current.TryGetProperty("atFrom", out JsonElement atFrom))
             {
                 string place = UndoTreeReading.Under(root, from!);
-                if (PlaceAt(atFrom, place, LaysALinkWithItsTarget(checkCase))) unreadable.Add(place);
+                if (PlaceAt(atFrom, place)) unreadable.Add(place);
             }
             // listedAs (U4b2-9; W8-5): a third spelling the folder lists the
             // item under, neither from nor to: what atTo describes is made
@@ -297,7 +241,7 @@ public sealed class UndoCheckContractTests : IDisposable
             if (UndoPath.IsWithinTheRules(laidAt) && laidAt != from && current.TryGetProperty("atTo", out JsonElement atTo))
             {
                 string place = UndoTreeReading.Under(root, laidAt!);
-                if (UndoLinks.Look(place) == UndoLinks.What.Nothing && PlaceAt(atTo, place, LaysALinkWithItsTarget(checkCase))) unreadable.Add(place);
+                if (UndoLinks.Look(place) == UndoLinks.What.Nothing && PlaceAt(atTo, place)) unreadable.Add(place);
             }
         }
         else if (kind != "external")
@@ -311,7 +255,7 @@ public sealed class UndoCheckContractTests : IDisposable
 
         if (!op.Readable) return ("notReadable", "notReadable");
         // A move's places still inside the working folder, as the plan asks
-        // first (a link's move by the folder above the link alone; W8-6).
+        // first (W8-6).
         if (op.Kind == UndoOp.Move && UndoPlaces.FirstPlaceLeadingOut(root, op) is not null) return ("changedSince", "changedSince");
         UndoOpState state;
         if (op.IsWhole)

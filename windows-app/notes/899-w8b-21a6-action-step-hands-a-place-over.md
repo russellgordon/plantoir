@@ -1,3 +1,5 @@
+Its handing-over order removed by #1055 W3. Its link half removed by #1055 W4.
+
 # #899 W8b-21a6: an action step hands a link move's old place over (Windows #949)
 
 Brief `vm-tools/briefs/2026-11-27-899-w8b-21a6-action-step-hands-a-place-over.md`. Branch `issue/899-w8b-21a-handed-over-place`, on 02bac1c34 (21a1 to 21a5, 21c, 21c2), `origin/dev` 6dc36fcea already merged in; `git merge origin/dev` was up to date before proving and again before handing back (no merge commit needed). Tests first 441807abe; product ccc292a54.

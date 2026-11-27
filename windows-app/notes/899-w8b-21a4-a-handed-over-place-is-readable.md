@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported; no step hands a place over.
+
 # #899 W8b-21a4: a step that hands a place over is readable
 
 Brief: `vm-tools/briefs/2026-11-27-899-w8b-21a4-a-handed-over-place-is-readable.md` (COMMON `2026-11-26-899-w8-COMMON.md`, order `2026-11-27-899-w8b-ORDER.md`). Windows' copy of the mac's U4b3 door-4. Branch `issue/899-w8b-21a-handed-over-place`, worktree `wt-899-w8b-21a`, built on 21a3's head e82be81c4. `contracts/` untouched.

@@ -13,8 +13,7 @@ namespace Plantoir.Core.Undo;
 /// journal is otherwise handed its folder (the plan review's H1). Read only
 /// by the composition root, <see cref="UndoForThisProcess"/> (W4), in the
 /// window and in every <c>plantoir-mcp.exe</c>, after each has applied
-/// <c>--state-dir</c>; and by <see cref="UndoLinks.CanMakeALink"/>, which
-/// makes its one probe link there, once a process (#899 W8b-21b1a).</para>
+/// <c>--state-dir</c>.</para>
 /// </summary>
 internal static class UndoJournalLocation
 {

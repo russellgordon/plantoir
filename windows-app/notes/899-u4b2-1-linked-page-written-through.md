@@ -1,3 +1,5 @@
+Kept by #1055 (2026-11-27): a page that is a link is written through it (Russell's rule).
+
 # U4b2-1: a linked page is written through its link, switch off (#899)
 
 Branch `issue/899-u4b2-1-linked-page-written-through`, from `origin/dev` a03fecefd (U4b merged).

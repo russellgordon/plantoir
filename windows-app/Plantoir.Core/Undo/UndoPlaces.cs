@@ -65,49 +65,14 @@ internal static class UndoPlaces
     /// one place a leaves-the-folder refusal names, at the plan and again just
     /// before each change, never the other side of a move (the mac's
     /// <c>UndoCheck.placeLeavingTheFolder</c>, U4b2-2; #899 W8-1).
-    ///
-    /// <para><paramref name="judgedOnTheFoldersAbove"/> is true for a file op
-    /// at a handed-over place whose other op is a link's move (#899
-    /// W8b-21a1; the mac's <c>judgedOnTheFoldersAbove</c>, U4b3 door-1): the
-    /// link standing there is leaving or arriving, never written through, so
-    /// its place is judged as a link's move judges its own places, on the
-    /// folders above (<see cref="StaysInsideAbove"/>).</para>
     /// </summary>
-    internal static string? FirstPlaceLeadingOut(string root, UndoOp op, bool judgedOnTheFoldersAbove = false)
+    internal static string? FirstPlaceLeadingOut(string root, UndoOp op)
     {
         foreach (string place in op.PathsNamed)
         {
-            if (judgedOnTheFoldersAbove ? !StaysInsideAbove(root, place) : !StaysInside(root, place, op)) return place;
+            if (!StaysInside(root, place)) return place;
         }
         return null;
-    }
-
-    /// <summary>
-    /// <see cref="StaysInside(string, string)"/> for a place <paramref name="op"/>
-    /// names (the mac's <c>staysInside(_:_:namedBy:)</c>, U4b2-14; #899 W8-6).
-    /// A link's move names the link itself at its <c>from</c> and <c>to</c>,
-    /// so there the link is never followed: only the folder above it is
-    /// resolved, and a link leading out of the working folder, or nowhere,
-    /// is moved as a link like any other.
-    /// </summary>
-    internal static bool StaysInside(string root, string relative, UndoOp op)
-    {
-        if (!op.IsALinksMove || (relative != op.From && relative != op.To)) return StaysInside(root, relative);
-        return StaysInsideAbove(root, relative);
-    }
-
-    /// <summary>
-    /// Whether the folders above <paramref name="relative"/> stay inside the
-    /// working folder, links resolved, the place itself never followed (the
-    /// mac's <c>UndoPlaces.staysInsideAbove</c>): how a link's own place is
-    /// judged, by its move and by a file op handed a place a link leaves or
-    /// fills (#899 W8b-21a1). A place breaking the path rules never stays.
-    /// </summary>
-    internal static bool StaysInsideAbove(string root, string relative)
-    {
-        if (!UndoPath.IsWithinTheRules(relative)) return false;
-        int slash = relative.LastIndexOf('/');
-        return slash < 0 || StaysInside(root, relative[..slash]);
     }
 
     /// <summary>

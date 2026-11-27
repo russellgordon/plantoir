@@ -161,6 +161,40 @@ public sealed class UndoKeptPageUnderAVisibleNameTests
     }
 
     /// <summary>
+    /// The one link test (<see cref="UndoLinks.Look"/>, kept from
+    /// <c>UndoLinkMoveTests</c> when #1055 W4 removed the link move): a
+    /// WSL-style link (a name surrogate whose target .NET does not read) is a
+    /// link, so a page's place holding one is not a file and is never read
+    /// through.
+    /// </summary>
+    [ReparsePointFact]
+    public void AWslStyleLinkIsALinkAndNeverReadThrough()
+    {
+        string place = Path.Combine(RunOwnedTempFolders.Create("plantoir-undo-wsl-link-"), "Unit 1, Day 2.md");
+        Assert.Null(UndoReparsePoints.Make(place, UndoReparsePoints.WslLink, UndoReparsePoints.WslLinkData("../library")));
+
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(place));
+        Assert.IsType<UndoCurrent.NotAFile>(UndoCurrent.ReadWithoutFollowingALink(place));
+        Directory.Delete(Path.GetDirectoryName(place)!, recursive: true);
+    }
+
+    /// <summary>
+    /// A reparse point that is not a name surrogate (as OneDrive's
+    /// placeholders are not) is a file of the teacher's, never a link (kept
+    /// from <c>UndoLinkMoveTests</c>, #1055 W4).
+    /// </summary>
+    [ReparsePointFact]
+    public void AReparsePointThatIsNotANameSurrogateIsAFileNeverALink()
+    {
+        string place = Path.Combine(RunOwnedTempFolders.Create("plantoir-undo-not-a-link-"), "Unit 1, Day 2.md");
+        Assert.Null(UndoReparsePoints.Make(place, UndoReparsePoints.NotALink, new byte[16]));
+
+        Assert.Equal(UndoLinks.What.File, UndoLinks.Look(place));
+        Assert.IsNotType<UndoCurrent.NotAFile>(UndoCurrent.ReadWithoutFollowingALink(place));
+        Directory.Delete(Path.GetDirectoryName(place)!, recursive: true);
+    }
+
+    /// <summary>
     /// Through recovery: a step that died with Day 3's page removed and Day 5
     /// changed, the list's content gone and Day 5's kept original no longer
     /// what it held, so Day 5 cannot be put back (couldNotPutBack), and

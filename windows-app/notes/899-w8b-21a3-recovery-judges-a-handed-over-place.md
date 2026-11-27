@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported; no step hands a place over.
+
 # #899 W8b-21a3: recovery judges each op of a handed-over pair as the other leaves the place
 
 Brief: `vm-tools/briefs/2026-11-27-899-w8b-21a3-recovery-judges-a-handed-over-place.md` (COMMON `2026-11-26-899-w8-COMMON.md`, order `2026-11-27-899-w8b-ORDER.md`). Windows' copy of the mac's U4b3 door-3. Branch `issue/899-w8b-21a-handed-over-place` (one branch for 21a1 to 21a6 and 21c), worktree `wt-899-w8b-21a`, built on 21a2's head 485d44542. `contracts/` untouched. Still inert: no readable step holds a handed-over place (21a4 makes one readable).

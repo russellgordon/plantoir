@@ -314,24 +314,10 @@ internal sealed partial class UndoDoor
             if (op.Kind == UndoOp.Recompute && !CanRederive(op))
                 return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: new UndoRefusal(UndoRefusalKind.NotReadable));
         }
-        // 2. Every path inside the working folder, its links resolved (a
-        // link's move by the folders above the link alone, U4b2-14; W8-6). A
-        // file op at a place a link's move hands over is judged on the folders
-        // above it only, as the plan judges it: the link standing there is
-        // moved, never written through, wherever it leads (the mac's U4b3
-        // door-5, a link leading out of the working folder; W8b-21a5).
-        var judgedAbove = new HashSet<int>();
-        foreach (UndoHandover handover in UndoOp.Handovers(step.Ops))
+        // 2. Every path inside the working folder, its links resolved.
+        foreach (UndoOp op in step.Ops)
         {
-            if (!handover.ALinkMoves) continue;
-            judgedAbove.Add(handover.LeaverIndex);
-            judgedAbove.Add(handover.FillerIndex);
-        }
-        for (int index = 0; index < step.Ops.Count; index++)
-        {
-            UndoOp op = step.Ops[index];
-            bool aboveOnly = judgedAbove.Contains(index) && !op.IsWhole;
-            if (op.PathsNamed.Any() && (draft.WorkingFolder is null || UndoPlaces.FirstPlaceLeadingOut(draft.WorkingFolder, op, judgedOnTheFoldersAbove: aboveOnly) is not null))
+            if (op.PathsNamed.Any() && (draft.WorkingFolder is null || UndoPlaces.FirstPlaceLeadingOut(draft.WorkingFolder, op) is not null))
                 return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: new UndoRefusal(UndoRefusalKind.NotReadable));
         }
         // 3. Every blob it names, given or already held, hashing to its name.
@@ -543,12 +529,10 @@ internal sealed partial class UndoDoor
             UndoRefusal refusal = RefusalOf(plan);
             return new UndoOutcome(UndoOutcomeKind.Refused, seq, refusal, AnswerARefusal(refusal, seq, backward));
         }
-        // Every place inside the working folder, links resolved, at the plan;
-        // a file at a place a link's move hands over on the folders above it
-        // only, as the plan judged it (W8b-21a5, the mac's U4b3 door-5).
+        // Every place inside the working folder, links resolved, at the plan.
         foreach ((string path, _, _) in ready.InOrder)
         {
-            if (root.Length > 0 && !(ready.HandedOver.Contains(path) ? UndoPlaces.StaysInsideAbove(root, path) : UndoPlaces.StaysInside(root, path)))
+            if (root.Length > 0 && !UndoPlaces.StaysInside(root, path))
             {
                 var outside = new UndoRefusal(UndoRefusalKind.ChangedSince, path);
                 return new UndoOutcome(UndoOutcomeKind.Refused, seq, outside, AnswerARefusal(outside, seq, backward));
@@ -617,7 +601,7 @@ internal sealed partial class UndoDoor
             // holds the same: the second review of U3c, MEDIUM).
             try
             {
-                UndoSwap.TidyLeftovers(record.Step, root, _trail, UndoRecovery.AsideListings(record.Step, root), null,
+                UndoSwap.TidyLeftovers(seq, record.Step.PathsToTidy, root, UndoRecovery.AsideListings(record.Step, root), null,
                                        keepingOnlyCopies: true, keepingCopiesHolding: notTaken.KeptOriginalsHolding);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
@@ -969,27 +953,13 @@ internal sealed partial class UndoDoor
     /// The swap's targets in the plan's order: a move that carries edits first
     /// going forward (<see cref="UndoCheck.PlanResult.Ready.Leading"/>), then
     /// every file in the order the check met it, a carried one staged only at
-    /// its turn, then the other whole ops (#899 W8-2). A step with a
-    /// handed-over place goes in the order of the ops each target comes from
-    /// instead, so every filler goes in after its leaver, and going back
-    /// every leaver's taking-back after its filler's
-    /// (<see cref="UndoCheck.PlanResult.Ready.InTheStepsOrder"/>; #899 W8b-21a1, 21a2).
+    /// its turn, then the other whole ops (#899 W8-2).
     /// </summary>
     internal static List<UndoSwapTarget> TargetsOf(UndoCheck.PlanResult.Ready ready, string root)
     {
-        var files = new List<UndoSwapTarget>();
-        foreach ((string path, byte[]? expected, byte[]? replacement) in ready.InOrder)
-        {
-            files.Add(new UndoSwapTarget(FullPath(root, path), path, expected, replacement)
-            {
-                StagesAtItsTurn = ready.StagedAtItsTurn.Contains(path),
-                HandedOver = ready.HandedOver.Contains(path),
-            });
-        }
-        if (ready.InTheStepsOrder)
-            return UndoCheck.TargetsInTheStepsOrder([ready.Leading, files, ready.Whole], [ready.LeadingOps, ready.InOrderOps, ready.WholeOps]);
         var targets = new List<UndoSwapTarget>(ready.Leading);
-        targets.AddRange(files);
+        foreach ((string path, byte[]? expected, byte[]? replacement) in ready.InOrder)
+            targets.Add(new UndoSwapTarget(FullPath(root, path), path, expected, replacement) { StagesAtItsTurn = ready.StagedAtItsTurn.Contains(path) });
         targets.AddRange(ready.Whole);
         return targets;
     }

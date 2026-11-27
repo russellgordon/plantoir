@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # W8b-21b5 (#899, Windows #949): `UndoActionStep.RelinkLink` records a link's move that changes its text, or copies the lesson where no link can be made
 
 Brief `vm-tools/briefs/2026-11-27-899-w8b-21b5-action-step-records-a-relink.md`. Branch `issue/899-w8b-21b-relink` from 21b4's pushed head c1776f04e. `origin/dev` 454ef4c6f, already merged in; fetched before proving and again before handing back (see "Runs"). No `contracts/` or `mac-app/` change. Inert: no teacher action calls it until 22a. No ledger row.

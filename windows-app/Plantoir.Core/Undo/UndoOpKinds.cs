@@ -700,102 +700,6 @@ internal static class UndoLinks
     }
 
     /// <summary>
-    /// Whether the item at <paramref name="fullPath"/> is a link (<see cref="Look(string)"/>)
-    /// made as a folder's link, never followed (window E review 1, LOW 3): the
-    /// kind a link made in its place keeps.
-    /// </summary>
-    internal static bool IsAFolderLink(string fullPath)
-    {
-        if (Look(fullPath) != What.Link) return false;
-        try { return File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
-    }
-
-    private const uint MountPoint = 0xA0000003;
-
-    /// <summary>
-    /// Whether the item at <paramref name="fullPath"/> is a junction (a mount
-    /// point's reparse tag), never followed (window E review 2, LOW 5): a link
-    /// kind Undo cannot make, so a relink of one is refused before anything
-    /// changes rather than re-made as a symbolic link.
-    /// </summary>
-    internal static bool IsAJunction(string fullPath) =>
-        Look(fullPath) == What.Link && ReparseTag(fullPath) == MountPoint;
-
-    private static readonly Lazy<bool> ThisProcessCanMakeALink = new(() => CanMakeALinkIn(UndoJournalLocation.Folder));
-
-    /// <summary>
-    /// Whether this process can make a symbolic link (#899 W8b-21b1a;
-    /// Russell's Q2, 2026-11-27): answered ONCE per process by making one in
-    /// the Undo list's own folder (<see cref="CanMakeALinkIn"/>), never by
-    /// the registry's Developer Mode key (elevation and policy grant the
-    /// privilege too), never per file. Where it is false, a step that would
-    /// re-point a link copies its lesson instead
-    /// (<see cref="UndoActionStep.CopyTheLessonInsteadOfALink"/>).
-    /// </summary>
-    /// <param name="seams">A test's answer (<see cref="UndoSeams.CanMakeALinkAnswers"/>) in place of the probe.</param>
-    internal static bool CanMakeALink(UndoSeams? seams = null) => seams?.CanMakeALinkAnswers ?? ThisProcessCanMakeALink.Value;
-
-    /// <summary>
-    /// The text a link Windows makes holds (#899 W8b-21b5; the director's
-    /// reading of 21b1's parked point, kept in this ONE function so it can be
-    /// reversed): where <paramref name="wanted"/> differs from
-    /// <paramref name="textNow"/> only in its last path part (the parts
-    /// before it the same, either separator read as one), the text now is
-    /// kept byte for byte but that last part, so a link the mac made keeps its
-    /// spelling; any other text is written with backslashes, which the system
-    /// opens (measured on 21b1: a forward-slash text is stored but not opened).
-    /// </summary>
-    internal static string TextToWrite(string textNow, string wanted)
-    {
-        int nowCut = textNow.LastIndexOfAny(['/', '\\']) + 1;
-        int wantedCut = wanted.LastIndexOfAny(['/', '\\']) + 1;
-        string nowAbove = textNow[..nowCut].Replace('\\', '/');
-        string wantedAbove = wanted[..wantedCut].Replace('\\', '/');
-        if (string.Equals(nowAbove, wantedAbove, StringComparison.Ordinal)) return textNow[..nowCut] + wanted[wantedCut..];
-        return wanted.Replace('/', '\\');
-    }
-
-    /// <summary>The probe's own fixed name in the Undo list's folder (window E review 1, LOW 2).</summary>
-    internal const string ProbeName = ".can-make-a-link";
-
-    /// <summary>
-    /// Makes a file's symbolic link under the probe's fixed dot name
-    /// (<see cref="ProbeName"/>) in <paramref name="folder"/>, to a dot name
-    /// beside it that is never made, then removes it: true only when it was
-    /// both made and removed. A probe link a killed process left under that
-    /// name is removed first, as the link itself (window E review 1, LOW 2);
-    /// anything there that is not a link is left as it is. Where the fixed
-    /// name is taken (that item, or another process probing in the same
-    /// instant), the probe is made once more under a name of this process's
-    /// own.
-    /// </summary>
-    internal static bool CanMakeALinkIn(string folder)
-    {
-        string fixedProbe = Path.Combine(folder, ProbeName);
-        if (Look(fixedProbe) == What.Link) UndoSwap.RemoveALink(fixedProbe);
-        string ownProbe = Path.Combine(folder, ProbeName + "-" + Environment.ProcessId + "-" + Guid.NewGuid().ToString("N"));
-        string probe = Look(fixedProbe) == What.Nothing ? fixedProbe : ownProbe;
-        while (true)
-        {
-            try
-            {
-                Directory.CreateDirectory(folder);
-                File.CreateSymbolicLink(probe, ".can-make-a-link-target");
-                break;
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-            {
-                if (probe == ownProbe || Look(fixedProbe) == What.Nothing) return false;
-                probe = ownProbe;
-            }
-        }
-        try { File.Delete(probe); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
-        return Look(probe) == What.Nothing;
-    }
-
-    /// <summary>
     /// What the system said, short and with no path (the mac's
     /// <c>strerror</c>, #899 W8b window B, LOW 2): .NET's own message names
     /// the full path, the teacher's account folder included, and the
@@ -811,83 +715,6 @@ internal static class UndoLinks
             return new System.ComponentModel.Win32Exception(error.HResult & 0xFFFF).Message;
         string full = Path.TrimEndingDirectorySeparator(fullPath);
         return error.Message.Replace(full, Path.GetFileName(full), StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    /// A link's <c>linkSha</c> (<c>opKinds.move</c>, U4b2-14; #899 W8-6): the
-    /// SHA-256 of the target it holds, as stored (<see cref="FileSystemInfo.LinkTarget"/>,
-    /// never <c>ResolveLinkTarget</c>, so what it leads to is never opened),
-    /// as UTF-8, unchanged: separators are NOT normalised, so a link made on
-    /// the mac (<c>../library</c>) and one Windows stores with backslashes
-    /// differ, which is changed since, and safe. Null when the target cannot
-    /// be read: a reparse point .NET does not read as a link (WSL's own), or
-    /// an error.
-    /// </summary>
-    internal static string? LinkSha(string fullPath) =>
-        TextOf(fullPath) is { } target ? Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(target))) : null;
-
-    /// <summary>
-    /// The text a link holds, as stored (<see cref="FileSystemInfo.LinkTarget"/>,
-    /// never <c>ResolveLinkTarget</c>): the text <see cref="LinkSha"/> hashes
-    /// as UTF-8, read without opening what it leads to (#899 W8b-21b5). Null
-    /// when it cannot be read: not a link, a reparse point .NET does not read
-    /// as one (WSL's own), or an error.
-    /// </summary>
-    internal static string? TextOf(string fullPath)
-    {
-        try
-        {
-            FileSystemInfo link = File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory) ? new DirectoryInfo(fullPath) : new FileInfo(fullPath);
-            return link.LinkTarget;
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
-    }
-
-    /// <summary>
-    /// Whether the link at <paramref name="fullPath"/> is a link to a FOLDER
-    /// (a junction, or a symbolic link made as a folder's), told by the
-    /// link's OWN attributes, never by following it: so a link to a folder
-    /// that leads nowhere is still one (#899 W8b-21). Ask it only of a place
-    /// <see cref="Look"/> calls a link.
-    /// </summary>
-    internal static bool IsALinkToAFolder(string fullPath)
-    {
-        try { return File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
-    }
-
-    /// <summary>
-    /// The file a link at <paramref name="fullPath"/> leads to, followed link
-    /// by link (at most 32, as the mac's <c>MAXSYMLINKS</c>) from the target
-    /// each holds AS STORED (<see cref="FileSystemInfo.LinkTarget"/>), its
-    /// separators read either way and a relative one taken from the folder
-    /// above the link, the folders named as the caller named them; the place
-    /// itself when it is not a link (<see cref="Look(string)"/>) or its target
-    /// cannot be read (#899 W8b-21a6; the mac's
-    /// <c>CourseConfiguration.fileALinkLeadsTo</c>). So a link the mac writes
-    /// (<c>../library/Day 2.md</c>), which Windows does not open, leads to the
-    /// same file as one Windows writes. Nothing is opened: where it leads
-    /// need not exist.
-    /// </summary>
-    internal static string FileALinkLeadsTo(string fullPath)
-    {
-        string place = Path.GetFullPath(fullPath);
-        for (int hops = 0; hops < 32; hops++)
-        {
-            if (Look(place) != What.Link) return place;
-            string? target;
-            try
-            {
-                FileSystemInfo link = IsALinkToAFolder(place) ? new DirectoryInfo(place) : new FileInfo(place);
-                target = link.LinkTarget;
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return place; }
-            if (string.IsNullOrEmpty(target)) return place;
-            string spelled = target.Replace('/', Path.DirectorySeparatorChar);
-            string folder = Path.GetDirectoryName(place) ?? place;
-            place = Path.GetFullPath(Path.IsPathRooted(spelled) ? spelled : Path.Combine(folder, spelled));
-        }
-        return place;
     }
 
     /// <summary>A file's bytes, read sharing everything, or null when it cannot be read now.</summary>
@@ -1060,11 +887,9 @@ internal static class UndoMoveSides
     /// matched to the listing by <see cref="UndoOp.PartInside"/>, the one
     /// comparison, and keeps the disk's spelling.
     /// </summary>
-    /// <param name="isAtFrom">Which side <paramref name="fullPath"/> is, for a link's move: a relink reads <c>from</c> by
-    /// <c>linkShaBefore</c> and <c>to</c> by <c>linkShaAfter</c> (<see cref="UndoOp.LinkText"/>, #899 W8b-21b1).</param>
     internal static UndoMoveSide Read(UndoOp op, string fullPath, Func<string, bool>? cannotRead = null,
-                                      IReadOnlyDictionary<string, UndoCurrent>? overriding = null, bool isAtFrom = true) =>
-        ReadNamingFoldersLeftOut(op, fullPath, cannotRead, overriding, isAtFrom).Side;
+                                      IReadOnlyDictionary<string, UndoCurrent>? overriding = null) =>
+        ReadNamingFoldersLeftOut(op, fullPath, cannotRead, overriding).Side;
 
     /// <summary>
     /// <see cref="Read"/>, naming too the folders inside the place that were
@@ -1074,12 +899,9 @@ internal static class UndoMoveSides
     /// side that holds the content names any.
     /// </summary>
     internal static (UndoMoveSide Side, IReadOnlyList<string> FoldersLeftOut) ReadNamingFoldersLeftOut(
-        UndoOp op, string fullPath, Func<string, bool>? cannotRead = null, IReadOnlyDictionary<string, UndoCurrent>? overriding = null,
-        bool isAtFrom = true)
+        UndoOp op, string fullPath, Func<string, bool>? cannotRead = null, IReadOnlyDictionary<string, UndoCurrent>? overriding = null)
     {
         if (op.Sha is not null) return (ReadAFile(op, fullPath, cannotRead, overriding), []);
-        // A link's move, plain or relinking, by the one test; each side by its own text (#899 W8b-21b1).
-        if (op.IsALinksMove) return (op.LinkText(isAtFrom) is { } linkSha ? ReadALink(linkSha, fullPath, cannotRead) : UndoMoveSide.CannotRead, []);
         switch (UndoTreeReading.Read(fullPath, cannotRead: cannotRead))
         {
             case UndoTreeReading.Absent: return (UndoMoveSide.Free, []);
@@ -1217,31 +1039,6 @@ internal static class UndoMoveSides
 
     /// <summary>Whether <paramref name="path"/> is below <paramref name="folder"/> (never the folder itself), by the one comparison.</summary>
     private static bool IsBelow(string path, string folder) => UndoOp.PartInside(folder, path) is { Length: > 0 };
-
-    /// <summary>
-    /// One side of a link's move (U4b2-14; #899 W8-6; the mac's
-    /// <c>UndoMoveSide.readLink</c>), read on the link itself and never
-    /// followed, so what it leads to (outside the working folder, or nowhere)
-    /// is never read: the content is a link (<see cref="UndoLinks.Look"/>, a
-    /// name surrogate, never a OneDrive placeholder) whose target hashes to
-    /// <paramref name="linkSha"/>; a folder, a file or a link with another
-    /// target is something else; a link whose target cannot be read is
-    /// cannot tell now.
-    /// </summary>
-    private static UndoMoveSide ReadALink(string linkSha, string fullPath, Func<string, bool>? cannotRead)
-    {
-        switch (UndoLinks.Look(fullPath))
-        {
-            case UndoLinks.What.Nothing: return UndoMoveSide.Free;
-            case UndoLinks.What.Link:
-                if (cannotRead?.Invoke(fullPath) == true) return UndoMoveSide.CannotRead;
-                return UndoLinks.LinkSha(fullPath) is { } found
-                    ? string.Equals(found, linkSha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse
-                    : UndoMoveSide.CannotRead;
-            case UndoLinks.What.CannotLook: return UndoMoveSide.CannotRead;
-            default: return UndoMoveSide.HoldsSomethingElse;
-        }
-    }
 
     private static UndoMoveSide ReadAFile(UndoOp op, string fullPath, Func<string, bool>? cannotRead, IReadOnlyDictionary<string, UndoCurrent>? overriding)
     {

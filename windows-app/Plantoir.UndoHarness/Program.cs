@@ -57,12 +57,6 @@ internal static class Program
                 "w8-carrying-move-kill" => W8Runs.CarryingMoveKill(folder),
                 "child-w8-carry" => W8Runs.ChildCarry(folder, args[2], args[3], args[4]),
                 "child-w8-recover" => W8Runs.ChildRecover(folder, args[2]),
-                "w8b-handover-kill" => W8bRuns.HandoverKill(folder),
-                "child-w8b-handover" => W8bRuns.ChildHandover(folder, args[2], args[3], args[4]),
-                "child-w8b-handover-recover" => W8bRuns.ChildRecover(folder),
-                // #899 W8b-21b4: shapes (comma-separated or all), leads (in, out or all), teachers (yes or no).
-                "w8b-relink-chain-kill" => W8bRelinkRuns.RelinkChainKill(folder, args.Length > 2 ? args[2] : "all", args.Length > 3 ? args[3] : "all", args.Length > 4 ? args[4] : "yes"),
-                "child-w8b-relink-chain" => W8bRelinkRuns.ChildChain(folder, args[2], args[3], args[4], args[5]),
                 _ => Unknown(mode),
             };
         }

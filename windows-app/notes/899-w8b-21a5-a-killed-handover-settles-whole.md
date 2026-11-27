@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported; no step hands a place over.
+
 # #899 W8b-21a5: a killed step that hands a place over settles whole
 
 Brief: `vm-tools/briefs/2026-11-27-899-w8b-21a5-a-killed-handover-settles-whole.md` (COMMON `2026-11-26-899-w8-COMMON.md`). Windows' copy of the mac's U4b3 door-5. Branch `issue/899-w8b-21a-handed-over-place`, worktree `wt-899-w8b-21a`, built on 21a4's head 186d224ad. `contracts/` untouched.

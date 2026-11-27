@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # W8b-21b4 (#899, Windows #949): the harness kills every chained link move at every stop point and loses no link
 
 Brief `vm-tools/briefs/2026-11-27-899-w8b-21b4-the-relink-kill-table.md`, with the director's addition (Insert Class at a day whose page is a link). Branch `issue/899-w8b-21b-relink` from 21b3's pushed head 5447b07f4. `origin/dev` 454ef4c6f, already merged in, fetched before proving and again before handing back: unchanged, so no merge commit this piece. No `contracts/` or `mac-app/` change.
