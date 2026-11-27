@@ -1,0 +1,315 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Plantoir.Core.Undo;
+
+namespace Plantoir.Tests;
+
+/// <summary>
+/// W8b-21a1 of #899 (Windows' copy of the mac's U4b3 door-1): a HANDED-OVER
+/// place, one an earlier op of a step leaves (a file's or a link's move away,
+/// or a removal) and a later op fills (a move in, or a new file), at least one
+/// of the two a plain move with <c>sha</c> or <c>linkSha</c>. Insert Class
+/// makes such steps when a later class is a symbolic link: the link moves up a
+/// day and the class below it, or the new class, fills its place. No step
+/// readable today holds one (the step's shape check refuses it until
+/// 21a4), so the check and the swap are called directly here, with ops
+/// built in memory.
+/// </summary>
+public sealed class UndoHandedOverPlaceTests : IDisposable
+{
+    private const string Section = "courses/TST1O/section1";
+    private const string Library = "courses/TST1O/library";
+
+    private readonly string _root = RunOwnedTempFolders.Create("plantoir-undo-handed-over-");
+    private readonly string _outside;
+
+    public UndoHandedOverPlaceTests()
+    {
+        _outside = _root.TrimEnd(Path.DirectorySeparatorChar) + "-outside";
+        Directory.CreateDirectory(_outside);
+    }
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_root, recursive: true); } catch { }
+        try { Directory.Delete(_outside, recursive: true); } catch { }
+    }
+
+    private static string Day(int number) => Section + "/Unit 1, Day " + number + ".md";
+
+    private string Full(string relative) => Path.Combine(_root, relative.Replace('/', Path.DirectorySeparatorChar));
+
+    private static byte[] Bytes(string text) => Encoding.UTF8.GetBytes(text);
+
+    private static UndoOp Op(JsonObject json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json.ToJsonString());
+        return UndoFormat.ReadOp(document.RootElement);
+    }
+
+    private static UndoOp NewFile(string path, string text) =>
+        Op(new JsonObject { ["kind"] = "writeFile", ["path"] = path, ["afterSha"] = UndoCheck.Sha(Bytes(text)) });
+
+    private static UndoOp Removal(string path, string text) =>
+        Op(new JsonObject { ["kind"] = "writeFile", ["path"] = path, ["beforeSha"] = UndoCheck.Sha(Bytes(text)) });
+
+    private static UndoOp FileMove(string from, string to, string text) =>
+        Op(new JsonObject { ["kind"] = "move", ["from"] = from, ["to"] = to, ["sha"] = UndoCheck.Sha(Bytes(text)) });
+
+    private UndoOp LinkMove(string from, string to) =>
+        Op(new JsonObject { ["kind"] = "move", ["from"] = from, ["to"] = to, ["linkSha"] = UndoLinks.LinkSha(Full(from)) });
+
+    /// <summary>A link that holds no place on the disk, for the finder alone.</summary>
+    private static UndoOp LinkMoveInMemory(string from, string to) =>
+        Op(new JsonObject { ["kind"] = "move", ["from"] = from, ["to"] = to, ["linkSha"] = UndoLinkMoveTests.ShaOfTarget("../library/Day 3.md") });
+
+    private void WritePage(string relative, string text)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Full(relative))!);
+        File.WriteAllBytes(Full(relative), Bytes(text));
+    }
+
+    /// <summary>
+    /// A page's symbolic link at <paramref name="place"/>, to a library page
+    /// in the course (held as written, <c>../library/…</c>) or, leading out,
+    /// to a page outside the working folder by its full path.
+    /// </summary>
+    private void LayLink(string place, string libraryPage, bool leadingOut)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Full(place))!);
+        if (leadingOut)
+        {
+            string outsidePage = Path.Combine(_outside, libraryPage);
+            File.WriteAllBytes(outsidePage, Bytes("Linked.\n"));
+            File.CreateSymbolicLink(Full(place), outsidePage);
+            return;
+        }
+        WritePage(Library + "/" + libraryPage, "Linked.\n");
+        File.CreateSymbolicLink(Full(place), "../library/" + libraryPage);
+    }
+
+    private UndoCheck.PlanResult PlanForward(IReadOnlyList<UndoOp> ops)
+    {
+        var blobs = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (string text in new[] { "New.\n", "Three.\n", "A\n", "A2\n", "B\n", "C\n" }) blobs[UndoCheck.Sha(Bytes(text))] = Bytes(text);
+        return UndoCheck.Plan(ops, backward: false, relative => UndoCurrent.Read(Full(relative)),
+                              sha => blobs.TryGetValue(sha, out byte[]? bytes) ? bytes : null,
+                              whole: new UndoWholeReads(_root, new UndoMemoryPlaces()));
+    }
+
+    private static List<string> PlacesOf(IReadOnlyList<UndoSwapTarget> targets)
+    {
+        var places = new List<string>();
+        foreach (UndoSwapTarget target in targets) places.Add(target.RelativePath);
+        return places;
+    }
+
+    private static string Described(UndoCheck.PlanResult plan) => plan switch
+    {
+        UndoCheck.PlanResult.ChangedSince changed => "changedSince " + changed.First,
+        _ => plan.GetType().Name,
+    };
+
+    private static string Described(UndoSwapResult result) => result switch
+    {
+        UndoSwapResult.Refused refused => "refused " + refused.Refusal.Kind + " " + refused.Refusal.Path,
+        _ => result.GetType().Name,
+    };
+
+    // ---- The one finder ---------------------------------------------------
+
+    /// <summary>Shape A: a link's move away from Day 3, then a new file at Day 3: Day 3 is handed over, from op 0 to op 1.</summary>
+    [Fact]
+    public void ALinksMoveAwayThenANewFileHandsThePlaceOver()
+    {
+        IReadOnlyList<UndoHandover> found = UndoOp.Handovers([LinkMoveInMemory(Day(3), Day(4)), NewFile(Day(3), "New.\n")]);
+
+        UndoHandover handover = Assert.Single(found);
+        Assert.Equal(0, handover.LeaverIndex);
+        Assert.Equal(1, handover.FillerIndex);
+        Assert.Equal(Day(3), handover.Place);
+        Assert.True(handover.ALinkMoves);
+    }
+
+    /// <summary>Shape B: a removal at Day 3, then a link's move from Day 2 into Day 3.</summary>
+    [Fact]
+    public void ARemovalThenALinksMoveInHandsThePlaceOver()
+    {
+        UndoHandover handover = Assert.Single(UndoOp.Handovers([Removal(Day(3), "Three.\n"), LinkMoveInMemory(Day(2), Day(3))]));
+
+        Assert.Equal((0, 1, Day(3), true), (handover.LeaverIndex, handover.FillerIndex, handover.Place, handover.ALinkMoves));
+    }
+
+    /// <summary>The place is compared part by part without regard to case (<see cref="UndoOp.PartInside"/>): a file's move hands it to a filler spelled otherwise.</summary>
+    [Fact]
+    public void AFilesMoveHandsItsPlaceToAFillerSpelledInAnotherCase()
+    {
+        UndoHandover handover = Assert.Single(UndoOp.Handovers([FileMove(Day(3), Day(4), "Three.\n"), NewFile(Day(3).ToLowerInvariant(), "New.\n")]));
+
+        Assert.Equal((0, 1, Day(3), false), (handover.LeaverIndex, handover.FillerIndex, handover.Place, handover.ALinkMoves));
+    }
+
+    /// <summary>Each leaver hands its place to the FIRST filler after it, and a filler before the leaver is none.</summary>
+    [Fact]
+    public void ALeaverHandsItsPlaceToTheFirstFillerAfterIt()
+    {
+        IReadOnlyList<UndoHandover> found = UndoOp.Handovers([
+            NewFile(Day(3), "B\n"), LinkMoveInMemory(Day(3), Day(4)), NewFile(Day(3), "New.\n"), LinkMoveInMemory(Day(2), Day(3)),
+        ]);
+
+        UndoHandover handover = Assert.Single(found);
+        Assert.Equal((1, 2), (handover.LeaverIndex, handover.FillerIndex));
+    }
+
+    /// <summary>A removal and a new file at one place, no move between them: never a handover (at least one of the two is a move).</summary>
+    [Fact]
+    public void TwoWritesWithNoMoveNeverHandOver()
+    {
+        Assert.Empty(UndoOp.Handovers([Removal(Day(3), "Three.\n"), NewFile(Day(3), "New.\n")]));
+    }
+
+    /// <summary>A folder's move (<c>listingSha</c>) never hands its place over.</summary>
+    [Fact]
+    public void AFoldersMoveNeverHandsOver()
+    {
+        UndoOp folderMove = Op(new JsonObject
+        {
+            ["kind"] = "move", ["from"] = Section + "/media", ["to"] = Section + "/renamed", ["listingSha"] = new UndoTreeListing([], []).Sha,
+        });
+        Assert.True(folderMove.Readable);
+
+        Assert.Empty(UndoOp.Handovers([folderMove, NewFile(Section + "/media", "New.\n")]));
+        Assert.Empty(UndoOp.Handovers([Removal(Section + "/renamed", "Three.\n"), folderMove]));
+    }
+
+    /// <summary>A capitalisation-only move never hands its place over: its two spellings are one place.</summary>
+    [Fact]
+    public void ACaseOnlyMoveNeverHandsOver()
+    {
+        UndoOp caseOnly = FileMove(Section + "/day.md", Section + "/Day.md", "Three.\n");
+        Assert.True(caseOnly.IsCaseOnlyMove);
+
+        Assert.Empty(UndoOp.Handovers([caseOnly, NewFile(Section + "/day.md", "New.\n")]));
+    }
+
+    /// <summary>A <c>moveApart</c> or a <c>setAside</c>, read as a later version would, never hands its place over: only a plain <c>move</c> does.</summary>
+    [Theory]
+    [InlineData("moveApart")]
+    [InlineData("setAside")]
+    public void AMoveApartOrASetAsideNeverHandsOver(string kind)
+    {
+        var apart = new UndoOp { Kind = kind, Readable = true, From = Day(3), To = Day(4), Sha = UndoCheck.Sha(Bytes("Three.\n")) };
+
+        Assert.Empty(UndoOp.Handovers([apart, NewFile(Day(3), "New.\n")]));
+        Assert.Empty(UndoOp.Handovers([Removal(Day(4), "Three.\n"), apart with { From = Day(5) }]));
+    }
+
+    // ---- Going forward: the plan and the swap --------------------------------
+
+    private List<UndoSwapTarget> ReadyTargets(UndoCheck.PlanResult plan)
+    {
+        var ready = Assert.IsType<UndoCheck.PlanResult.Ready>(plan);
+        return UndoDoor.TargetsOf(ready, _root);
+    }
+
+    private void CheckShapeA(bool leadingOut)
+    {
+        LayLink(Day(3), "Day 3.md", leadingOut);
+        List<UndoOp> ops = [LinkMove(Day(3), Day(4)), NewFile(Day(3), "New.\n")];
+        string linkTarget = new FileInfo(Full(Day(3))).LinkTarget!;
+
+        UndoCheck.PlanResult plan = PlanForward(ops);
+        Assert.True(plan is UndoCheck.PlanResult.Ready, "shape A was planned " + Described(plan));
+        List<UndoSwapTarget> targets = ReadyTargets(plan);
+        // The leaver before its filler: the link's move, then the new page.
+        Assert.Equal([Day(4), Day(3)], PlacesOf(targets));
+
+        UndoSwapResult result = UndoSwap.Swap(targets, "1-apply", _root);
+
+        Assert.True(result is UndoSwapResult.Swapped, "shape A was swapped " + Described(result));
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(Full(Day(4))));
+        Assert.Equal(linkTarget, new FileInfo(Full(Day(4))).LinkTarget);
+        Assert.Equal(UndoLinks.What.File, UndoLinks.Look(Full(Day(3))));
+        Assert.Equal("New.\n", File.ReadAllText(Full(Day(3))));
+        string linkedPage = leadingOut ? Path.Combine(_outside, "Day 3.md") : Full(Library + "/Day 3.md");
+        Assert.Equal("Linked.\n", File.ReadAllText(linkedPage));
+    }
+
+    private void CheckShapeB(bool leadingOut)
+    {
+        LayLink(Day(2), "Day 2.md", leadingOut);
+        WritePage(Day(3), "Three.\n");
+        List<UndoOp> ops = [Removal(Day(3), "Three.\n"), LinkMove(Day(2), Day(3))];
+        string linkTarget = new FileInfo(Full(Day(2))).LinkTarget!;
+
+        UndoCheck.PlanResult plan = PlanForward(ops);
+        Assert.True(plan is UndoCheck.PlanResult.Ready, "shape B was planned " + Described(plan));
+        List<UndoSwapTarget> targets = ReadyTargets(plan);
+        Assert.Equal([Day(3), Day(3)], PlacesOf(targets));
+        Assert.Null(targets[0].Change);
+        Assert.IsType<UndoSwapChange.MoveHere>(targets[1].Change);
+
+        UndoSwapResult result = UndoSwap.Swap(targets, "1-apply", _root);
+
+        Assert.True(result is UndoSwapResult.Swapped, "shape B was swapped " + Described(result));
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(Day(2))));
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(Full(Day(3))));
+        Assert.Equal(linkTarget, new FileInfo(Full(Day(3))).LinkTarget);
+    }
+
+    /// <summary>Shape A, the link leading to a library page in the course: the new page at Day 3 is judged against the place free, and goes in after the link has left.</summary>
+    [SymbolicLinkFact]
+    public void ShapeAAfterALinksMoveIsPlannedAsReadyAndSwapped() => CheckShapeA(leadingOut: false);
+
+    /// <summary>Shape A, the link leading out of the working folder: the new page's place is judged on the folders above it, at the plan and before staging, and never refused for the link standing there.</summary>
+    [SymbolicLinkFact]
+    public void ShapeAWithTheLinkLeadingOutIsNeverRefusedAtThePlanOrAtStaging() => CheckShapeA(leadingOut: true);
+
+    /// <summary>Shape B: a removal at Day 3, then the link's move from Day 2 into it, whose destination counts as free.</summary>
+    [SymbolicLinkFact]
+    public void ShapeBBeforeALinksMoveIsPlannedAsReadyAndSwapped() => CheckShapeB(leadingOut: false);
+
+    /// <summary>Shape B with the link leading out of the working folder.</summary>
+    [SymbolicLinkFact]
+    public void ShapeBWithTheLinkLeadingOutIsPlannedAsReadyAndSwapped() => CheckShapeB(leadingOut: true);
+
+    /// <summary>
+    /// A step with no handed-over place keeps today's order exactly: every
+    /// file in the order the check met it, then the whole ops, never the
+    /// step's op order.
+    /// </summary>
+    [Fact]
+    public void AStepWithNoHandoverKeepsTodaysOrder()
+    {
+        WritePage(Section + "/a.md", "A\n");
+        WritePage(Section + "/b.md", "B\n");
+        List<UndoOp> ops =
+        [
+            Op(new JsonObject { ["kind"] = "writeFile", ["path"] = Section + "/a.md", ["beforeSha"] = UndoCheck.Sha(Bytes("A\n")), ["afterSha"] = UndoCheck.Sha(Bytes("A2\n")) }),
+            FileMove(Section + "/b.md", Section + "/e.md", "B\n"),
+            NewFile(Section + "/c.md", "C\n"),
+        ];
+        Assert.Empty(UndoOp.Handovers(ops));
+
+        List<UndoSwapTarget> targets = ReadyTargets(PlanForward(ops));
+
+        Assert.Equal([Section + "/a.md", Section + "/c.md", Section + "/e.md"], PlacesOf(targets));
+        Assert.False(targets[0].HandedOver);
+        Assert.False(targets[1].HandedOver);
+    }
+
+    /// <summary>A file op in a handover where a link moves carries the mark the swap's look before staging reads; one in a handover of a file's move does not.</summary>
+    [SymbolicLinkFact]
+    public void OnlyAFileOpInAHandoverWithALinkIsJudgedOnTheFoldersAbove()
+    {
+        LayLink(Day(3), "Day 3.md", leadingOut: false);
+        List<UndoSwapTarget> withALink = ReadyTargets(PlanForward([LinkMove(Day(3), Day(4)), NewFile(Day(3), "New.\n")]));
+        Assert.True(withALink[1].HandedOver);
+
+        WritePage(Day(7), "Three.\n");
+        List<UndoSwapTarget> withAFile = ReadyTargets(PlanForward([FileMove(Day(7), Day(8), "Three.\n"), NewFile(Day(7), "New.\n")]));
+        Assert.Equal([Day(8), Day(7)], PlacesOf(withAFile));
+        Assert.False(withAFile[1].HandedOver);
+    }
+}

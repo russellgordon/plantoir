@@ -255,6 +255,13 @@ internal sealed record UndoOp
         }
         return string.Join('/', pathParts, placeParts.Length, pathParts.Length - placeParts.Length);
     }
+
+    /// <summary>
+    /// The handed-over places of a step, in the step's order (#899 W8b-21a1;
+    /// the mac's <c>UndoCheck.handovers(in:)</c>, U4b3 door-1). STUB until
+    /// the piece's product commit: none.
+    /// </summary>
+    internal static IReadOnlyList<UndoHandover> Handovers(IReadOnlyList<UndoOp> ops) => [];
 }
 
 /// <summary>
@@ -948,3 +955,11 @@ internal static class UndoFormat
         return found;
     }
 }
+
+/// <summary>
+/// A place an earlier op of a step leaves and a later op fills (#899
+/// W8b-21a1; the mac's <c>UndoHandover</c>): the leaver's and the filler's
+/// index in the step, the place as the leaver names it, and whether either of
+/// the two is a link's move.
+/// </summary>
+internal sealed record UndoHandover(int LeaverIndex, int FillerIndex, string Place, bool ALinkMoves);

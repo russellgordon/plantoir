@@ -48,6 +48,15 @@ internal sealed record UndoSwapTarget(string FullPath, string RelativePath, byte
 
     /// <summary>A file a move carries, going forward: staged only at its turn, once the move has made its folder, never before (#899 W8-2; the mac's <c>stagesAtItsTurn</c>).</summary>
     internal bool StagesAtItsTurn { get; init; }
+
+    /// <summary>
+    /// A file op at a handed-over place whose other op is a link's move
+    /// (#899 W8b-21a1; the mac's <c>handedOver</c>, U4b3 door-1): the look
+    /// before STAGING judges its place on the folders above it only, as the
+    /// link leaving it, or arriving at it, still stands there and is never
+    /// written through. The look before its own change judges the place whole.
+    /// </summary>
+    internal bool HandedOver { get; init; }
 }
 
 /// <summary>How a swap went.</summary>
