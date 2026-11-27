@@ -57,6 +57,17 @@ internal sealed class UndoStepLeftPartWayException(UndoRefusal refusal, IReadOnl
 }
 
 /// <summary>
+/// A step stopped at a kill point of a test or the harness
+/// (<see cref="UndoOutcomeKind.StoppedByATest"/>; the mac's
+/// <c>JournaledStepError.stoppedByATest</c>): as a process that died there,
+/// which may be after the swap. Its own type so a caller can keep what a
+/// process that died would leave (Rename folder's record) and treat every
+/// other exception as nothing changed (#899 W8b window B, LOW 1).
+/// </summary>
+internal sealed class UndoStepStoppedByATestException()
+    : InvalidOperationException("The step was stopped by a test.");
+
+/// <summary>
 /// ONE action's writes, gathered and then made through the door as ONE step
 /// (#899 W7a; the mac's <c>JournaledStep</c>, U3a). The action plans every
 /// file it will write here instead of writing it (<see cref="Write"/>); it
@@ -704,7 +715,7 @@ internal sealed class UndoActionStep
                 // A kill point of a test or the harness, which may fall after
                 // the swap: never said in the "Nothing was changed" family
                 // (review 1, LOW).
-                throw new InvalidOperationException("The step was stopped by a test.");
+                throw new UndoStepStoppedByATestException();
             case UndoOutcomeKind.AnotherChangeIsUnderWay:
                 throw new UndoStepRefusedException(new UndoRefusal(UndoRefusalKind.FileIsInUse), "another change to this folder is under way");
             default:

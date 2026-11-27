@@ -686,7 +686,7 @@ internal static class UndoLinks
         try { attributes = File.GetAttributes(fullPath); }
         catch (FileNotFoundException) { return What.Nothing; }
         catch (DirectoryNotFoundException) { return What.Nothing; }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { said = error.Message; return What.CannotLook; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { said = ShortReason(error, fullPath); return What.CannotLook; }
         if (attributes.HasFlag(FileAttributes.ReparsePoint))
         {
             if (ReparseTag(fullPath) is not { } tag)
@@ -697,6 +697,24 @@ internal static class UndoLinks
             if ((tag & NameSurrogate) != 0) return What.Link;
         }
         return attributes.HasFlag(FileAttributes.Directory) ? What.Folder : What.File;
+    }
+
+    /// <summary>
+    /// What the system said, short and with no path (the mac's
+    /// <c>strerror</c>, #899 W8b window B, LOW 2): .NET's own message names
+    /// the full path, the teacher's account folder included, and the
+    /// sentence it goes into already names the place as the course does. An
+    /// error of the system's carries its code, said as the system says it
+    /// ("Access is denied."); any other keeps .NET's message with
+    /// <paramref name="fullPath"/> said as its last name.
+    /// </summary>
+    internal static string ShortReason(Exception error, string fullPath)
+    {
+        const int FacilityWin32 = unchecked((int)0x80070000);
+        if ((error.HResult & unchecked((int)0xFFFF0000)) == FacilityWin32)
+            return new System.ComponentModel.Win32Exception(error.HResult & 0xFFFF).Message;
+        string full = Path.TrimEndingDirectorySeparator(fullPath);
+        return error.Message.Replace(full, Path.GetFileName(full), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
