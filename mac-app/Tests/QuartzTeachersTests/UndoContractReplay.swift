@@ -1626,7 +1626,7 @@ nonisolated enum UndoContractReplay {
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
         "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored", "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
-        "withAHandedOverPlace", "handedOver",
+        "withAHandedOverPlace", "handedOver", "withAPlainPageMove",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1722,11 +1722,18 @@ nonisolated enum UndoContractReplay {
             let handedOverCalls: [String: String] = [
                 "afterALinksMove": "handAPlaceOverAfterALinksMove",
                 "beforeALinksMove": "handAPlaceOverBeforeALinksMove",
+                "plainPageMove": "movePlainPageAwayFromDay3",
             ]
             var handedOverCall: String? = nil
             var handedOverBefore: String = ""
             var handedOverAfter: String = ""
-            if let shape = string(testCase["withAHandedOverPlace"]) {
+            var handedOverShape: String? = string(testCase["withAHandedOverPlace"])
+            if testCase["withAPlainPageMove"] as? Bool == true {
+                // #1055 M5: the kept-page guard's plain step, laid the way a
+                // handed-over step is, with its own call.
+                handedOverShape = "plainPageMove"
+            }
+            if let shape = handedOverShape {
                 guard let call = handedOverCalls[shape] else {
                     failures.append("recoveryCases '\(name)': withAHandedOverPlace '\(shape)' is not a value this replay knows")
                     continue
@@ -1998,6 +2005,15 @@ nonisolated enum UndoContractReplay {
                 let page: URL = root.appendingPathComponent(UndoContractKinds.mediaFolder + "/a.md")
                 let held: String = (UndoContractKinds.mediaFiles["a.md"] ?? "").replacingOccurrences(of: "Line one: old.", with: "Line one: new.")
                 try Data(held.utf8).write(to: UndoSwap.besideURL(for: page, label: "\(workSeq)-undo", role: "orig"))
+            }
+            if testCase["withAPlainPageMove"] as? Bool == true {
+                // #1055 M5: someone's page written at Day 3, where the
+                // plain step removed a page.
+                let day3: URL = root.appendingPathComponent(UndoContractKinds.classPage(3))
+                if UndoItem.read(at: day3) != .absent {
+                    try FileManager.default.removeItem(at: day3)
+                }
+                try write("Someone else's.\n", to: UndoContractKinds.classPage(3), in: root)
             }
             if testCase["visibleNameTaken"] as? Bool == true {
                 if handedOverCall != nil {

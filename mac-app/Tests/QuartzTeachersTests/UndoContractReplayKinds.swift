@@ -45,6 +45,7 @@ nonisolated enum UndoContractKinds {
         "moveALinkToAFolder", "stepEditingInsideALinksMove",
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
         "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
+        "movePlainPageAwayFromDay3",
     ]
 
     /// U4b: the three spellings of the folder a capitalisation-only rename
@@ -517,6 +518,21 @@ nonisolated enum UndoContractKinds {
                 UndoOp.writeFile(path: classPage(2), beforeSha: nil, afterSha: UndoHash.sha256(of: new)),
             ]
             return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [three, new], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
+        case "movePlainPageAwayFromDay3":
+            // #1055 M5: the kept-page guard's plain step, no link anywhere:
+            // Day 3's page to Day 4 (a new file, Day 3 removed), then a new
+            // page at Day 5, as Insert Class moves an ordinary class.
+            if !somethingIsAt(classPage(3), in: root) && !somethingIsAt(classPage(4), in: root) {
+                try UndoContractReplay.write("Three.\n", to: classPage(3), in: root)
+            }
+            let three: Data = Data("Three.\n".utf8)
+            let five: Data = Data("Five.\n".utf8)
+            let ops: [UndoOp] = [
+                UndoOp.writeFile(path: classPage(4), beforeSha: nil, afterSha: UndoHash.sha256(of: three)),
+                UndoOp.writeFile(path: classPage(3), beforeSha: UndoHash.sha256(of: three), afterSha: nil),
+                UndoOp.writeFile(path: classPage(5), beforeSha: nil, afterSha: UndoHash.sha256(of: five)),
+            ]
+            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [three, five], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
         case "editTheHandedOverPageByHand":
             try? FileManager.default.removeItem(at: root.appendingPathComponent(classPage(3)))
             try UndoContractReplay.write("Hand.\n", to: classPage(3), in: root)

@@ -1638,6 +1638,39 @@ class ContractCaseTests(unittest.TestCase):
                 self.assertEqual(self.handed_over(settled_model), case["handedOver"])
                 self.assertEqual(named, case.get("pathsNamed", []))
 
+    def test_recovery_cases_with_a_plain_page_move(self):
+        """undo.recoveryCases' two kept-page rows re-laid by #1055 M5
+        (withAPlainPageMove): a plain step with no link, Day 3's page moved
+        to Day 4 and a new page at Day 5, stopped before its third swap,
+        someone's page then written at Day 3: the removed page is kept under
+        a visible name, named once, never over anything."""
+        cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAPlainPageMove")]
+        self.assertEqual(len(cases), 2)
+        for case in cases:
+            with self.subTest(case["name"]):
+                pages = {self.day(3): "Three.\n"}
+                ops = (traces.ops_for_change(self.day(4), None, "Three.\n")
+                       + traces.ops_for_change(self.day(3), "Three.\n", None)
+                       + traces.ops_for_change(self.day(5), None, "Five.\n"))
+                self.assertFalse(traces.handovers(ops))
+                self.assertEqual(case["work"], "step")
+                swapped = int(case["stopAt"].split(":")[1])
+                stopped = traces.stopped_part_way(ops, False, pages, swapped)
+                left = dict(stopped)
+                left[self.day(3)] = "Someone else's.\n"
+                taken = "courses/TST1O/section1/Unit 1, Day 3 (kept by Undo).md"
+                if case.get("visibleNameTaken"):
+                    left[taken] = "earlier\n"
+                outcome, settled, named = traces.recover(ops, left, True)
+                settled, kept_lines = traces.keep_pages_whose_place_is_taken(ops, pages, stopped, settled, outcome)
+                self.assertEqual(outcome, case["phase"])
+                self.assertEqual(len(kept_lines), case["keptPageLines"])
+                self.assertEqual(kept_lines, [(self.day(3), case["keptVisibleAs"])])
+                self.assertEqual(settled.get(case["keptVisibleAs"]), "Three.\n")
+                self.assertEqual(settled.get(self.day(3)), "Someone else's.\n")
+                if case.get("visibleNameTaken"):
+                    self.assertEqual(settled.get(taken), "earlier\n")
+
     def edited_by_hand(self, pages, page, first, second):
         """recoveryCasesHow's handEdit: `first` or `second`, the publish line
         changed by hand (the traces' sameLine edit); `carried`, the line

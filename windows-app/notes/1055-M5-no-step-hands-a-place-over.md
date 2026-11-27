@@ -1,17 +1,18 @@
 # #1055 M5: no step hands a place over; the kept-page guard re-laid on a plain step
 
-Branch `issue/1055-M5-no-step-hands-a-place-over`, stacked on M4's pushed head 93406dce2 (no merge needed: `origin/dev` and M4's head had not moved at 14:22, both already in). Touches `contracts/`: NOT YET (nothing under `contracts/` changed in what is pushed).
+Branch `issue/1055-M5-no-step-hands-a-place-over`, stacked on M4's pushed head 93406dce2 (no merge needed: `origin/dev` and M4's head had not moved at 14:22, both already in). Touches `contracts/` (`shared-rules.json`, two rows and one `recoveryCasesHow` sentence added): both gates (the director's).
 
 ## State at hand-back (2026-11-27, about 14:25): NOT FINISHED
 
-Done and pushed (every pushed commit builds, its class green):
+Done and pushed (every pushed commit builds, its classes green):
 
 1. The four guard tests, re-laid on a plain step with no link, in the new `mac-app/Tests/QuartzTeachersTests/UndoKeptPageUnderAVisibleNameTests.swift` under `// MARK: - The kept-page guard on a plain step (#1055 M5)`: green on M4's head (commit 3b4f345d4), all four RED on the throwaway mutant (below), the mutant reverted, never committed.
+2. The two re-laid recovery rows in `undo.recoveryCases`, after the two old kept rows (which stay until the removal): "U4b3 kept-original-named, re-laid (#1055 M5): a step that removes Day 3's page ..." and "... re-laid (#1055 M5): the same, with Unit 1, Day 3 (kept by Undo).md already taken: ...". Same `work`, `stopAt` (beforeSwap:2), `files` (unchecked), `phase` (interrupted), `head` (null), `cleared` (interrupted), `keptVisibleAs`, `keptPageLines` (1), `visibleNameTaken` as the old rows; no `handEdit`, no `handedOver`, no `pathsNamed` (both keys go with the handover). ONE new key, `withAPlainPageMove` (true), defined in one sentence at the end of `recoveryCasesHow`: the plain step (Day 3 `Three.` to Day 4, Day 3 removed, `Five.` at Day 5) and `Someone else's.` written at Day 3 before recovery. Laid by the Mac replay (`UndoContractReplay.swift`: the key, a `plainPageMove` shape through the handed-over path's twin and call; `UndoContractReplayKinds.swift`: the call `movePlainPageAwayFromDay3`) and by the Python model (`test_recovery_cases_with_a_plain_page_move`). `UndoJournalContractTests` recovery count 72 -> 74. Both rows green on the Mac replay, and both RED (three failures each, as the old rows) with `keepPagesWhosePlaceIsTaken` returning at once (mutant reverted). When the removal takes out the handed-over path, the plain step's laying in the replay must be kept (re-homed off `handedOverCall`).
+3. Windows: both re-laid rows held by exact name (`Reason1055KeptPageReLaid`, one `Owed(UndoRecoveryCases, 1055, V200, ...)` above the U4b3 relink comment in `NamedGapLedger.cs`): `withAPlainPageMove` is not in `UndoRecoveryContractTests.KeysChecked`, so each held row stops at "a key this replay does not check". Edited by reading only: `windows-app/Plantoir.Tests/NamedGapLedger.cs` (one constant, one entry; quotes, commas, parentheses read back).
 
 Left (nothing of it started; no half-removed state anywhere):
 
-- The two re-laid recovery rows in `undo.recoveryCases` ("... re-laid (#1055 M5): ..."). They need one new key for the plain step (the old rows' step is `withAHandedOverPlace: beforeALinksMove`, which is to go), defined in `recoveryCasesHow`, laid by the Mac replay (`UndoContractReplay.swift` about 1720 to 2230: a new call in `UndoContractKinds`, the twin, `files`, `handEdit`, `keptVisibleAs`, `visibleNameTaken`, `keptPageLines`) and by the Python model (`scripts/test_make_undo_traces.py` `test_recovery_cases_with_a_handed_over_place`, `traces.recover`, `traces.keep_pages_whose_place_is_taken`). Then the Windows hold (`NamedGapLedger.cs`, `Reason1055KeptPageReLaid`), since the key would be new to Windows.
-- The whole Remove list of the brief (product, tests, `shared-rules.json`, `file-formats.json`, Python, notes top lines), and the done-means greps.
+- The whole Remove list of the brief (product, tests, `shared-rules.json` door rows and the two OLD kept rows, `file-formats.json`, Python, notes top lines), the row-count script, and the done-means greps.
 
 ## The plain step chosen, and why it reaches the state
 
@@ -30,10 +31,16 @@ Differences from the old tests, said plainly: the swap's refusal is `fileIsInUse
 - `run-guard1`: 3 of 4 green; test 2's step ordered so Day 3 was swapped last (fixed by ordering the ops).
 - `run-guard2`: 4 of 4 green on M4's head.
 - `run-mutant`: 4 of 4 red, 9 failures; mutant reverted (`git status` clean after).
+- `run-rows`: `UndoJournalContractTests` 19 of 19 green with the two rows (74 recovery cases).
+- `run-rows-mutant`: `testRecoveryCases` red on both re-laid rows (and the old two) with `keepPagesWhosePlaceIsTaken` returning at once; reverted.
+- `run-rows2`: `UndoJournalContractTests`, `SharedRulesContractTests`, `UndoKeptPageUnderAVisibleNameTests`: 90 green.
+- `run-readers`: `UndoOpKindsTests`, `RestoreWholeCourseContractTests`, `JournaledStepTests`, `FileFormatsContractTests`: 85 green.
+- Plain Debug build: succeeded.
+- `python3 scripts/test_make_undo_traces.py`: 40 OK (traces not stale).
 
 ## Windows
 
-No Windows file edited.
+Edited: `windows-app/Plantoir.Tests/NamedGapLedger.cs` only (the hold above). The Windows suite should stay at its six known failures.
 
 ## COMMON's self-check
 
@@ -43,4 +50,4 @@ No Windows file edited.
 
 ## Parked
 
-- None.
+- The replay also accepts `withAHandedOverPlace: plainPageMove` as an alias of the new key (a side effect of reusing the handed-over path); it goes with the removal.
