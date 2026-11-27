@@ -124,6 +124,8 @@ internal sealed class UndoActionStep
     /// when planned: exactly one of the two is set.
     /// </summary>
     private readonly List<(string FromFull, string ToFull, string? ListingSha, string? LinkSha)> _folderMoves = [];
+    /// <summary>Each copy planned in place of a link this PC cannot make (<see cref="CopyTheLessonInsteadOfALink"/>), by its full path.</summary>
+    private readonly List<string> _copiedInsteadOfLinks = [];
 
     // ---- Initializer ---------------------------------------------------------------
 
@@ -349,9 +351,84 @@ internal sealed class UndoActionStep
         _folderMoves.Add((from, to, null, linkSha));
     }
 
-    internal IReadOnlyList<string> CopiedInsteadOfLinks => [];
+    /// <summary>
+    /// The full path of each copy <see cref="CopyTheLessonInsteadOfALink"/>
+    /// planned, in the order planned, so its caller can say that a page is
+    /// now a copy because this PC cannot make links (W8b piece 22b).
+    /// </summary>
+    internal IReadOnlyList<string> CopiedInsteadOfLinks => _copiedInsteadOfLinks;
 
-    internal bool CopyTheLessonInsteadOfALink(string linkFull, string newFull) => throw new NotImplementedException("W8b-21b1a");
+    /// <summary>
+    /// Where this PC cannot make a link (<see cref="UndoLinks.CanMakeALink"/>;
+    /// #899 W8b-21b1a, Russell's Q2, 2026-11-27, "Copy the lesson instead"),
+    /// plans what a re-pointing of the link at <paramref name="linkFull"/> to
+    /// <paramref name="newFull"/> becomes, with plain ops only, so making,
+    /// Undo and Redo need no privilege: the bytes of the file the link leads
+    /// to NOW are read (<see cref="UndoLinks.FileALinkLeadsTo"/>, read only,
+    /// from the disk, so plan this before any write of that file), then (1)
+    /// the link is moved AS ITSELF (<see cref="MoveLink"/>), text and all,
+    /// to <see cref="SetAsideName"/> beside it, and (2) a new file at
+    /// <paramref name="newFull"/> holds those bytes. The place the link
+    /// leaves is handed over as for any link's move. Undo removes the copy
+    /// (judged by its content: a copy edited since is changed since) and
+    /// moves the link back; Redo does both again. The set-aside link is never
+    /// removed. A link leading nowhere (or to a folder) has no lesson: false,
+    /// nothing planned, and its caller moves it as itself. A place that is not
+    /// a link refuses the action, <c>cannotTellNow</c>, as <see cref="MoveLink"/>.
+    /// </summary>
+    internal bool CopyTheLessonInsteadOfALink(string linkFull, string newFull)
+    {
+        string link = Path.GetFullPath(linkFull);
+        if (UndoLinks.Look(link) != UndoLinks.What.Link) RefuseCannotTellNow(link);
+        string lessonFile = UndoLinks.FileALinkLeadsTo(link);
+        if (UndoLinks.Look(lessonFile) != UndoLinks.What.File) return false;
+        if (UndoLinks.ReadAll(lessonFile) is not { } lesson)
+        {
+            RefuseCannotTellNow(lessonFile);
+            return false;
+        }
+        MoveLink(link, SetAsideName(link));
+        WriteBytes(newFull, lesson);
+        _copiedInsteadOfLinks.Add(Path.GetFullPath(newFull));
+        return true;
+    }
+
+    /// <summary>
+    /// The name a link is set aside under beside itself
+    /// (<see cref="CopyTheLessonInsteadOfALink"/>): <c>.&lt;name&gt;.link-kept-by-undo</c>,
+    /// then <c>-2</c>, <c>-3</c> and on, the first neither on the disk nor
+    /// chosen in this step. A dot file, which Obsidian and the site build
+    /// pass over, and never one holding <see cref="UndoSwap.StagedMarker"/>,
+    /// so <c>TidyLeftovers</c> never removes the only link.
+    /// </summary>
+    private string SetAsideName(string link)
+    {
+        string folder = Path.GetDirectoryName(link)!;
+        string first = "." + Path.GetFileName(link) + ".link-kept-by-undo";
+        for (int number = 1; ; number++)
+        {
+            string candidate = Path.Combine(folder, number == 1 ? first : first + "-" + number);
+            if (UndoLinks.Look(candidate) == UndoLinks.What.Nothing && !IsChosenInThisStep(candidate)) return candidate;
+        }
+    }
+
+    /// <summary>Whether a place is already named in this step: planned as a file, or a folder's or link's move ends or starts there.</summary>
+    private bool IsChosenInThisStep(string fullPath)
+    {
+        if (_before.ContainsKey(fullPath)) return true;
+        string place = Slashed(fullPath);
+        foreach ((string from, string to, _, _) in _folderMoves)
+        {
+            if (UndoOp.PartInside(Slashed(to), place) is "" || UndoOp.PartInside(Slashed(from), place) is "") return true;
+        }
+        return false;
+    }
+
+    private void RefuseCannotTellNow(string fullPath)
+    {
+        var refusal = new UndoRefusal(UndoRefusalKind.CannotTellNow, RelativeOf(fullPath) ?? fullPath);
+        throw new UndoStepRefusedException(refusal, Reason(refusal));
+    }
 
     /// <summary>
     /// Where a place is on the disk while the step is planned (the mac's

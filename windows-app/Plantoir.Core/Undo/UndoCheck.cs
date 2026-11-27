@@ -114,7 +114,18 @@ internal abstract record UndoCurrent
     /// </summary>
     /// <param name="look">A seam for tests (a reparse tag that cannot be read); <see cref="UndoLinks.Look(string)"/> by default.</param>
     internal static UndoCurrent ReadWithoutFollowingALink(string fullPath, Func<string, UndoLinks.What>? look = null) =>
-        (look is null ? UndoLinks.Look(fullPath) : look(fullPath)) == UndoLinks.What.Link ? new NotAFile() : Read(fullPath);
+        (look is null ? UndoLinks.Look(fullPath) : look(fullPath)) switch
+        {
+            UndoLinks.What.Link => new NotAFile(),
+            // A reparse point whose tag cannot be read is never read through
+            // (review 3 of the 21a line, LOW 1; the mac's failing lstat):
+            // ERROR_CANT_ACCESS_FILE, cannot tell, never a copy or a state.
+            UndoLinks.What.CannotLook => new CannotReadNow(CannotLookAtIt),
+            _ => Read(fullPath),
+        };
+
+    /// <summary>ERROR_CANT_ACCESS_FILE: a place whose reparse tag cannot be read.</summary>
+    private const int CannotLookAtIt = 1920;
 
     private static bool IsNotFound(IOException exception) => (exception.HResult & 0xFFFF) is 2 or 3;
 }

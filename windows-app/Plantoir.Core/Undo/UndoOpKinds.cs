@@ -699,9 +699,38 @@ internal static class UndoLinks
         return attributes.HasFlag(FileAttributes.Directory) ? What.Folder : What.File;
     }
 
-    internal static bool CanMakeALink(UndoSeams? seams = null) => throw new NotImplementedException("W8b-21b1a");
+    private static readonly Lazy<bool> ThisProcessCanMakeALink = new(() => CanMakeALinkIn(UndoJournalLocation.Folder));
 
-    internal static bool CanMakeALinkIn(string folder) => throw new NotImplementedException("W8b-21b1a");
+    /// <summary>
+    /// Whether this process can make a symbolic link (#899 W8b-21b1a;
+    /// Russell's Q2, 2026-11-27): answered ONCE per process by making one in
+    /// the Undo list's own folder (<see cref="CanMakeALinkIn"/>), never by
+    /// the registry's Developer Mode key (elevation and policy grant the
+    /// privilege too), never per file. Where it is false, a step that would
+    /// re-point a link copies its lesson instead
+    /// (<see cref="UndoActionStep.CopyTheLessonInsteadOfALink"/>).
+    /// </summary>
+    /// <param name="seams">A test's answer (<see cref="UndoSeams.CanMakeALinkAnswers"/>) in place of the probe.</param>
+    internal static bool CanMakeALink(UndoSeams? seams = null) => seams?.CanMakeALinkAnswers ?? ThisProcessCanMakeALink.Value;
+
+    /// <summary>
+    /// Makes a file's symbolic link under a dot name in <paramref name="folder"/>,
+    /// to a dot name beside it that is never made, then removes it: true only
+    /// when it was both made and removed.
+    /// </summary>
+    internal static bool CanMakeALinkIn(string folder)
+    {
+        string probe = Path.Combine(folder, ".can-make-a-link-" + Environment.ProcessId + "-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(folder);
+            File.CreateSymbolicLink(probe, ".can-make-a-link-target");
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+        try { File.Delete(probe); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+        return Look(probe) == What.Nothing;
+    }
 
     /// <summary>
     /// A link's <c>linkSha</c> (<c>opKinds.move</c>, U4b2-14; #899 W8-6): the
