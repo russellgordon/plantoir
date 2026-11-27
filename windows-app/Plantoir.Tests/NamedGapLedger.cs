@@ -480,7 +480,6 @@ internal static class NamedGapLedger
     private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
     private const string Reason899Measured = "Windows refuses these editJSON cases until its key order and number reading are measured to match the mac's Foundation (#899 W6 review 2): the mac sorts keys beyond ASCII by Unicode collation, takes canonically equivalent keys (an accent written two ways, the Kelvin sign and K) and a key or text with a byte-order mark in front for one, and reads a number with an exponent and more than 17 digits, or more than 38 without, as a decimal number or not at all; Windows answers cannot tell, or refuses to write, rather than guess";
     private const string Reason1004JournalReading = "the mac's #1004 (2026-11-26): the newest segment gone between the listing and its reading is an unreadable list; Windows reads it so already (UndoJournal.cs, the newest is never passed over) but its replay has no call for it; and (#1004-b) a segment name with a digit that is not ASCII is not a segment (Windows' SegmentName pattern uses \\d, which matches any Unicode digit, and int.Parse then meets it), and a step whose madeAt is not a moment is a barrier that carries the previous step's time (Windows matches; its replay has no call for it)";
-    private const string Reason899W8RelinkedLink = "the mac's relink for #899 (2026-11-26 and mac-1 and mac-2, 2026-11-27): a move of a symbolic link that changes the text it holds, including one made where the link stands, as the check, recovery and trail rows for a link standing in place, and the line an undo says when it keeps an item found where a link was being changed. Struck by Russell's ruling of 2026-11-27 (a class page is never a symbolic link): Windows will not build this; the rows stay held.";
     private const string Reason899W4cWithW7 = "the merge of the mac's U3b and U3c for #899 (2026-11-20): a rollover's Undo needs no content from the list, so no kept original is looked for for a moveApart or a setAside, and a rollover's Undo that leaves its record apart never touches another step's kept original, which is still used by its hash; Windows runs these once both W4c (kept-original recovery) and W7 (the rollover as a step) have landed, whichever is later; until then this replay does not know the calls and keys those cases use";
     private const string Reason899W7U3b = "the mac's U3b for #899 (2026-11-20): the rollover as one step, whose site markers are the op kind moveApart (judged as move, but an Undo or Redo that finds it changed since leaves it and goes on with the rest: Russell's ruling of 2026-11-19 on Q3, #959), and a step's moveApart ops move as a group, all left apart when any one is changed since (the director's decision of 2026-11-20), as is a deploy set for later the swap cannot set at an Undo or Redo (the U3b review's LOW 3); a leftover no deploy reads is the op kind setAside, judged as move and standing apart ON ITS OWN, never one of that group, and a deploy set for later put back whose job will start only at the next login is named in startsAtTheNextLogin with its own sentence, undoScheduleStartsAtTheNextLogin (U3b's fix round three, 2026-11-20; which record a deploy reads is undo.netlifyRecordCases, which W7 runs as well); Windows' W7 for #899 builds it (documentation 12, the W7 row); until it lands this app's reader takes moveApart for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
     private const string Reason899MenuCopy = "the menu's copy of a class as the next class (#927, the mac's #897 piece A) is ONE undo entry on the mac's old in-memory list; the night-3 ruling (no new action gets an entry in the old lists, no interim states) leaves it to the journal step the mac's U3a defines, so Windows records no entry for it on the old list, and Undo Last Change does not take the copy back: it takes back the change BEFORE the copy, the menu's last change with an entry (an Add Class… as the next class, say, whose page it removes unless edited since; the course copy saved before the copy is the way back). Since W7b2-3 the copy IS that journal step (duplicateAsTheNextClass, made by the menu); Edit ▸ Undo offering it is W11b's, and until then no Windows control takes it back";
@@ -629,14 +628,6 @@ internal static class NamedGapLedger
              "editJSON: a member holding text that starts with a byte-order mark (written \\ufeff), which the mac reads without it",
              "editJSON: a file's key that is the Kelvin sign, the key path the letter K, the step having added the member",
              "editJSON: another member's number written with 168 digits after the point, which the mac cannot read: the file is not JSON there"),
-        Owed(UndoCheckCases, 899, V200, Reason899W8RelinkedLink,
-             "mac-1, a relink where the link stands: the link holding the new text: as the step left it",
-             "mac-1, a relink where the link stands: the link holding the old text: as before",
-             "mac-1, a relink where the link stands: nothing there: changed since",
-             "mac-1, a relink where the link stands: a link holding another text: changed since",
-             "mac-1, a relink where the link stands: a plain file there: changed since",
-             "mac-1, a relink where the link stands: a folder there: changed since",
-             "mac-1, a relink where the link stands: the place cannot be read just now: cannot tell"),
         // ---- U2b (the mac's U2b for #899, 2026-11-19): the six op kinds and
         // recompute run were held here from 2026-11-19 (60 checkCases, 19
         // stackCases, 15 traces, 21 recoveryCases) and went when Windows' W6
@@ -683,15 +674,6 @@ internal static class NamedGapLedger
         // ---- U4b3 relink-3 and reviews D and F (#899): the 13 recoveryCases
         // rows held here under Reason899W8RelinkedLink went when Windows'
         // W8b-21b3 built a killed relink's recovery (2026-11-27).
-        Owed(UndoRecoveryCases, 899, V200, Reason899W8RelinkedLink,
-             "mac-1, a relink where the link stands: a step that re-points Day 4's link where it stands dies with the new link made under its staged name and not yet swapped in: the staged link removed, the old text at Day 4, failed",
-             "mac-1, a relink where the link stands: the same step dies just after its one swap, the old link under the staged name and not yet removed: the staged link removed by the text it holds, the new text at Day 4, done",
-             "mac-1, a relink where the link stands: the undo of that step dies with the old link made under its staged name and not yet swapped in: the staged link removed, the new text at Day 4, the step done",
-             "mac-1, a relink where the link stands: the same undo dies just after its one swap, the new link under the staged name and not yet removed: the staged link removed by the text it holds, the old text at Day 4, undone",
-             "mac-1, a relink where the link stands, on Windows: a step that re-points Day 4's link where it stands dies with the old link renamed aside and the place empty: the old link renamed back, the staged new link removed by the text it holds, the old text at Day 4, failed",
-             "mac-1, a relink where the link stands, on Windows: the same step dies with the new link renamed in and the old one still set aside: the old link removed by the text it holds, the new text at Day 4, done",
-             "mac-1, a relink where the link stands, on Windows: the undo of that step dies with the new link renamed aside and the place empty: the new link renamed back, the staged old link removed by the text it holds, the new text at Day 4, the step done",
-             "mac-1, a relink where the link stands, on Windows: the same undo dies with the old link renamed in and the new one still set aside: the new link removed by the text it holds, the old text at Day 4, undone"),
         // ---- U3c (the mac's U3c for #899, 2026-11-20): its 4 trail events, 12
         // stackCases and 10 recoveryCases were held here under a reason then
         // named Reason899W4c (later named Reason899U4aContentGone, which held
@@ -739,8 +721,6 @@ internal static class NamedGapLedger
              "unfinished restore settled", "course restore kept files",
              // The mac's #909 (2026-11-26): a one-section restore keeps the left-out folders beside the backups.
              "section restore kept files"),
-        // The mac's mac-2 (2026-11-27): the keep a relink makes is said by its own line.
-        Owed(ActivityTrailEvents, 899, V200, Reason899W8RelinkedLink, "undo kept an item found where a link was being changed"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")

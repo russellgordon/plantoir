@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # #899 U4b3, third fix round: reviews D and E, the two MEDIUMs (2026-11-26)
 
 Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from 651692841. Commits: fix 1 03033c410, fix 2 4af7595af, lows and these notes after. `origin/dev` 96a3d2b73 was already in the branch; no new merge was made.

@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # U4b3 relink-2 (#899): a relinking move is readable, and the contract says how it is judged and made
 
 Brief `vm-tools/briefs/2026-11-26-899-u4b3-relink-2-a-relink-is-readable.md`, from relink-1's pushed head c2700e2c0 on `issue/899-u4b3-linked-class-page-moves-its-link`. `origin/dev` still 06e067fbe (already merged in) before proving and before handing back: no merge needed. **`contracts/` touched: both gates.**

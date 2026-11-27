@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # U4b3 relink-3 (#899): a step with a relinking move, killed at any moment of its swaps, is settled whole
 
 Brief `vm-tools/briefs/2026-11-26-899-u4b3-relink-3-a-killed-relink-settles-whole.md`, from relink-2's pushed head 48693cee0 on `issue/899-u4b3-linked-class-page-moves-its-link` (clean). `origin/dev` still 06e067fbe (already merged in) before proving and before handing back: no merge needed. **`contracts/` touched: both gates.**
