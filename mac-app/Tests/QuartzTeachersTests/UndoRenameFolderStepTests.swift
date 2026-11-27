@@ -1128,19 +1128,19 @@ final class UndoRenameFolderStepTests: XCTestCase {
     /// changed by the revert.
     func testAPlainPerSectionRenameStillPlansTheSameMoves() async throws {
         let course: Course = try course()
-        let prefix: String = course.directoryURL.path + "/"
+        let prefix: String = UndoFolderPlaces.canonicalPath(of: course.directoryURL) + "/"
         let planned: FolderRenamePlan = try SpecialFolderRenamer.plan(
             "Tasks", to: "Assessments", scope: .perSection,
             courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
         )
         var plannedLines: [String] = []
         for move in planned.moves {
-            let from: String = String(move.from.path.dropFirst(prefix.count))
-            let to: String = String(move.to.path.dropFirst(prefix.count))
+            let from: String = String(UndoFolderPlaces.canonicalPath(of: move.from).dropFirst(prefix.count))
+            let to: String = String(UndoFolderPlaces.canonicalPath(of: move.to).dropFirst(prefix.count))
             plannedLines.append("move " + from + " -> " + to + " link " + String(move.isALink))
         }
         for page in planned.pages {
-            let path: String = String(page.url.path.dropFirst(prefix.count))
+            let path: String = String(UndoFolderPlaces.canonicalPath(of: page.url).dropFirst(prefix.count))
             plannedLines.append("page " + path + " = " + (String(data: page.rewritten, encoding: .utf8) ?? "?"))
         }
         XCTAssertEqual(plannedLines, [
@@ -1168,11 +1168,21 @@ final class UndoRenameFolderStepTests: XCTestCase {
             if let keyPath = op.keyPath {
                 line += " key " + keyPath.joined(separator: ".")
             }
-            line += op.listingSha == nil ? "" : " listing"
+            if let listingSha = op.listingSha {
+                line += " listing " + listingSha
+            }
             line += op.linkSha == nil ? "" : " link"
             opLines.append(line)
         }
-        XCTAssertEqual(opLines, ["RECORD ME"])
+        XCTAssertEqual(opLines, [
+            "move from courses/ICS3U/section1/Tasks to courses/ICS3U/section1/Assessments listing 23dc9b20edc443f6a84df5c3cee6945e26e2916d80cebb537b821091f00992df",
+            "move from courses/ICS3U/section2/Tasks to courses/ICS3U/section2/Assessments listing 27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b",
+            "writeFile path courses/ICS3U/section1/Assessments/Quiz 1.md",
+            "writeFile path courses/ICS3U/section1/index.md",
+            "editJSON path courses/ICS3U/course_config.json key expandable",
+            "editJSON path courses/ICS3U/course_config.json key hidden",
+            "editJSON path courses/ICS3U/course_config.json key per_section_folders",
+        ])
     }
 
     // MARK: - Part six: one piece of work the whole app knows about
