@@ -878,7 +878,7 @@ class ContractCaseTests(unittest.TestCase):
                   "keptWhatItReplacedSays",
                   # Review 1 of U4b2-10: empty folders, which the model does
                   # not hold (folder_of_pages); the Swift replay checks it.
-                  "foldersInside", "linkedFolder", "linkedPage", "laterLinks"}
+                  "foldersInside", "linkedFolder", "linkedPage", "laterLinks", "hopLink"}
 
     # U4b2-4: the two pages wholeFileStepOnTwoPagesNamedIndex writes.
     TWO_PAGES_NAMED_INDEX = ("courses/TST1O/Section 1/Classes/index.md", "courses/TST1O/Section 2/Classes/index.md")
@@ -1207,6 +1207,32 @@ class ContractCaseTests(unittest.TestCase):
                 ops += traces.ops_for_change(self.LINKED_FILE, pages[self.LINKED_FILE], self.linked_redated())
                 ops += traces.ops_for_change(self.linked_day(3), None, self.linked_text(3, 3, body=2))
             return self.vetted_ops_step(model, ops + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
+        if call == "makeRoomWithALaterClassLinkedThroughALinkInside":
+            # mac-2 (U4b3 ruling 6, "re-point the in-between link"): Day 4 a
+            # link to hop.md, a link inside the working folder that is not a
+            # class page, holding Day 3's page, which the plan renames: Day
+            # 4's link moved as itself to Day 5, its text kept, and hop.md
+            # re-pointed where it stands (one relinking move naming the one
+            # place twice), nothing written through either link.
+            old, new = self.HOP_BEFORE, self.HOP_AFTER
+            if pages.get(self.linked_day(3)) is None and pages.get(self.linked_day(4)) is None:
+                for number in (1, 2):
+                    pages[self.linked_day(number)] = self.linked_text(number, number)
+                pages[self.LINKED_FILE] = self.linked_text(3, 3)
+                pages[self.linked_day(3)] = self.linked_text(3, 3)
+                pages[self.HOP] = ("link", old)
+                pages[self.linked_day(4)] = ("link", self.HOP_FROM_DAY4)
+            two, three = pages.get(self.linked_day(2)), pages.get(self.linked_day(3))
+            ops = [{"kind": "move", "from": self.linked_day(4), "to": self.linked_day(5),
+                    "linkSha": traces.sha(self.HOP_FROM_DAY4)},
+                   {"kind": "move", "from": self.HOP, "to": self.HOP,
+                    "linkShaBefore": traces.sha(old), "linkShaAfter": traces.sha(new),
+                    "blobs": [traces.sha(old), traces.sha(new)],
+                    "linkTexts": {traces.sha(old): old, traces.sha(new): new}}]
+            self.assertTrue(traces.is_a_relink_in_place(ops[1]))
+            ops += traces.ops_for_change(self.linked_day(4), None, self.linked_text(4, 4, body=3))
+            ops += traces.ops_for_change(self.linked_day(3), three, self.linked_text(3, 3, body=2))
+            return self.vetted_ops_step(model, ops + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
         if call == "handAPlaceOverAfterALinksMove":
             # U4b3 door-4, shape A: the link leaves Day 3, a new page fills it.
             if pages.get(self.day(3)) is None and pages.get(self.day(4)) is None:
@@ -1289,6 +1315,22 @@ class ContractCaseTests(unittest.TestCase):
     LINKED_DATES = ("2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16", "2026-09-18", "2026-09-22")
     LINKED_TARGET = "../../elsewhere/Unit 1, Day 3.md"
     LINKED_FILE = "courses/TST1O/elsewhere/Unit 1, Day 3.md"
+
+    # mac-2: the in-between link of makeRoomWithALaterClassLinkedThroughALinkInside.
+    HOP = "courses/TST1O/elsewhere/hop.md"
+    HOP_FROM_DAY4 = "../../elsewhere/hop.md"
+    HOP_BEFORE = "../section1/All Classes/Unit 1, Day 3.md"
+    HOP_AFTER = "../section1/All Classes/Unit 1, Day 4.md"
+
+    def hop_link(self, model):
+        """mac-2's hopLink: the text hop.md holds as a link, notALink, or
+        nothing."""
+        held = model.pages.get(self.HOP)
+        if held is None:
+            return "nothing"
+        if isinstance(held, tuple) and held[0] == "link":
+            return held[1]
+        return "notALink"
 
     def linked_day(self, number):
         return self.LINKED_CLASSES + "/Unit 1, Day %d.md" % number
@@ -1455,7 +1497,7 @@ class ContractCaseTests(unittest.TestCase):
                   "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
                   "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass",
                   "makeRoomWithALaterClassThatIsABrokenLink", "makeRoomWithALaterClassLinkedToAClassItRenames",
-                  "makeRoomWithALaterClassLinkedToALinkedClass")
+                  "makeRoomWithALaterClassLinkedToALinkedClass", "makeRoomWithALaterClassLinkedThroughALinkInside")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -1747,6 +1789,8 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(self.linked_page(model), case["linkedPage"])
                 if "laterLinks" in case:
                     self.assertEqual(self.later_links(model), case["laterLinks"])
+                if "hopLink" in case:
+                    self.assertEqual(self.hop_link(model), case["hopLink"])
                 if "caseOnlyFolder" in case:
                     self.assertEqual(self.case_only_folder(model), case["caseOnlyFolder"])
                 if "folderKept" in case:

@@ -755,6 +755,51 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         try checkUndoAndRedoAreExact(made, before: before)
     }
 
+    /// The day27b-2 sweep, point 3: Insert Class on a volume that refuses
+    /// the one exchange the in-between link's re-point needs is refused
+    /// `couldNotWrite` naming the in-between link, nothing changed and no
+    /// step, and the reason said for it is true: the teacher's sentence is
+    /// the file that could not be saved, and the trail's clause never says
+    /// the disk may be full alone (the old "nothing could be written
+    /// beside … (the disk may be full)"). Through `relinkRenameInFails`.
+    func testInsertClassOnAVolumeThatRefusesTheExchangeIsRefusedWithATrueReason() throws {
+        let made = try makeCourse()
+        try page(title: "Unit 1, Day 4", date: "2026-09-16", body: "Four.").write(
+            to: made.classes.appendingPathComponent("Unit 1, Day 4.md"), atomically: true, encoding: .utf8
+        )
+        let hop: URL = made.course.directoryURL.appendingPathComponent("elsewhere/hop.md")
+        try FileManager.default.createSymbolicLink(atPath: hop.path, withDestinationPath: "../section1/All Classes/Unit 1, Day 4.md")
+        try replaceWithALink("Unit 1, Day 5", holding: "../../elsewhere/hop.md", in: made)
+        let before: [String: String] = everything(under: made)
+        let stepsBefore: Int = try stepCount()
+        UndoKillPoints.relinkRenameInFails = { url in
+            return url.lastPathComponent == "hop.md"
+        }
+        defer {
+            UndoKillPoints.relinkRenameInFails = nil
+        }
+        let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(unit: 1, atDay: 2, count: 1, forSection: 1, in: made.course)
+        do {
+            _ = try ClassInsertionPlanner.apply(plan, in: made.course)
+            XCTFail("Insert Class went ahead on a volume that refuses the exchange")
+        } catch let error as JournaledStepError {
+            guard case .refused(let refusal, let fileName) = error else {
+                return XCTFail("refused as \(error), not before anything changed")
+            }
+            XCTAssertEqual(refusal, .couldNotWrite(path: "courses/ICS3U/elsewhere/hop.md"))
+            XCTAssertEqual(fileName, "hop.md")
+            XCTAssertEqual(
+                error.localizedDescription,
+                CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: "hop.md"]).localizedDescription
+            )
+            let line: String = UndoTrail.leftNewestLine(course: "ICS3U", section: 1, isUndo: true, refusal: refusal)
+            XCTAssertTrue(line.contains("courses/ICS3U/elsewhere/hop.md could not be changed in its folder, which may be full or may not allow the change"), line)
+            XCTAssertFalse(line.contains("(the disk may be full)"), line)
+        }
+        XCTAssertEqual(everything(under: made), before, "nothing changed")
+        XCTAssertEqual(try stepCount(), stepsBefore, "no step recorded")
+    }
+
     // MARK: - Tests: a class only re-dated (mac-2)
 
     /// A numbered course (#267): Week 1 to Week 3 on the first three days

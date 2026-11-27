@@ -85,6 +85,12 @@ nonisolated enum UndoTrail {
                 UndoTrail.keptAPageLine(course: course, section: section, place: place, keptAs: keptAs)
             )
         }
+        UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = { course, section, place, keptAs in
+            ActivityTrail.note(
+                .undoKeptAnItemFoundWhereALinkWasChanged,
+                UndoTrail.keptAnItemFoundWhereALinkWasChangedLine(course: course, section: section, place: place, keptAs: keptAs)
+            )
+        }
         UndoTrailHook.setAsideByARestoreLine = { course, section, phase, files, stillJudged, closed in
             ActivityTrail.note(
                 .undoSetAsideByARestore,
@@ -412,6 +418,16 @@ nonisolated enum UndoTrail {
             line += "/\(section)"
         }
         return line + " · the undo list keeps the page \(place), removed or moved away by a change that stopped, as \(keptAs), because something else now holds \(place)"
+    }
+
+    /// `ICS3U/1 · an item that was not Plantoir's was found where a link
+    /// was being changed, at courses/ICS3U/section1/Unit 1, Day 4.md, and
+    /// is kept as courses/ICS3U/section1/Unit 1, Day 4 (kept by Undo).md`
+    /// (mac-2). True live and in recovery: nothing removed, moved or set
+    /// the item aside. Written just before the rename. Never page text.
+    static func keptAnItemFoundWhereALinkWasChangedLine(course: String, section: Int?, place: String, keptAs: String) -> String {
+        return UndoTrail.prefix(course: course, section: section)
+            + "an item that was not Plantoir's was found where a link was being changed, at \(place), and is kept as \(keptAs)"
     }
 
     /// `ICS3U/1 · the undo list set aside a change that stopped part way

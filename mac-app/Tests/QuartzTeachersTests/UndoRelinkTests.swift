@@ -1572,16 +1572,30 @@ final class UndoRelinkTests: XCTestCase {
         XCTAssertEqual(said, [section + "Unit 1, Day 4.md -> " + section + "Unit 1, Day 4 (kept by Undo).md"])
     }
 
-    /// Runs `body` with the kept-page trail line caught: each line said as
-    /// `<place> -> <kept as>`, in order.
+    /// Runs `body` with the kept-item trail line caught (mac-2: "undo kept
+    /// an item found where a link was being changed"): each line said as
+    /// `<place> -> <kept as>`, in order. The kept-page and kept-folder
+    /// lines are caught too, each said as `untrue: …`, as nothing of the
+    /// change removed, moved or set the item aside (the day27b-2 sweep,
+    /// finding 1). MUST FAIL with a relink's keep said on either.
     func withTheKeptPageLine(_ body: () throws -> Void) throws -> [String] {
         var said: [String] = []
-        let hookBefore = UndoTrailHook.keptAPageLine
-        UndoTrailHook.keptAPageLine = { _, _, place, keptAs in
+        let itemBefore = UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine
+        let pageBefore = UndoTrailHook.keptAPageLine
+        let folderBefore = UndoTrailHook.foundAFolderSetAsideLine
+        UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = { _, _, place, keptAs in
             said.append(place + " -> " + keptAs)
         }
+        UndoTrailHook.keptAPageLine = { _, _, place, keptAs in
+            said.append("untrue: " + place + " -> " + keptAs)
+        }
+        UndoTrailHook.foundAFolderSetAsideLine = { _, _, place, _, keptAs, _ in
+            said.append("untrue: " + place + " -> " + (keptAs ?? ""))
+        }
         defer {
-            UndoTrailHook.keptAPageLine = hookBefore
+            UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = itemBefore
+            UndoTrailHook.keptAPageLine = pageBefore
+            UndoTrailHook.foundAFolderSetAsideLine = folderBefore
         }
         try body()
         return said
@@ -1670,6 +1684,57 @@ final class UndoRelinkTests: XCTestCase {
     }
 
     // MARK: - The lows riding with mac-2
+
+    /// The day27b-2 sweep, finding 1: the line said when an item that was
+    /// not Plantoir's is kept where a link was being changed is the
+    /// contract's own (`activityTrail.mustRecord`, "undo kept an item found
+    /// where a link was being changed"), and says nothing of a change that
+    /// stopped or of anything removed, moved or set aside.
+    func testTheKeptItemLineIsTheContractsAndTrueOnTheLivePath() throws {
+        let rules: [String: Any] = try UndoContractReplay.contract("shared-rules.json")
+        let trail: [String: Any] = rules["activityTrail"] as? [String: Any] ?? [:]
+        var example: String? = nil
+        for row in trail["mustRecord"] as? [[String: Any]] ?? [] {
+            if row["event"] as? String == ActivityTrail.Event.undoKeptAnItemFoundWhereALinkWasChanged.rawValue {
+                example = row["line"] as? String
+            }
+        }
+        let line: String = UndoTrail.keptAnItemFoundWhereALinkWasChangedLine(
+            course: "ICS3U", section: 1,
+            place: "courses/ICS3U/section1/Unit 1, Day 4.md",
+            keptAs: "courses/ICS3U/section1/Unit 1, Day 4 (kept by Undo).md"
+        )
+        XCTAssertEqual(line, example)
+        for untrue in ["stopped", "removed", "moved away", "set aside", "staged", "exchange", "journal"] {
+            XCTAssertFalse(line.contains(untrue), "\(untrue): \(line)")
+        }
+    }
+
+    /// The day27b-2 sweep, point 3: a volume that refuses the exchange is
+    /// refused `couldNotWrite`, and the reason said for it is true: never
+    /// "the disk may be full" alone, as the disk is not full. MUST FAIL
+    /// with the old clause ("nothing could be written beside … (the disk
+    /// may be full)").
+    func testAVolumeThatRefusesTheExchangeIsSaidTruly() throws {
+        let laid: LaidRelink = try layARelinkWhereItStands(named: "refused-exchange-said", leads: .inside)
+        let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 4.md")
+        let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
+        UndoKillPoints.relinkRenameInFails = { url in
+            return url.standardizedFileURL.path == place.standardizedFileURL.path
+        }
+        let result: UndoSwapResult = UndoSwap.swap(forward, label: "1-apply", root: laid.root)
+        UndoKillPoints.relinkRenameInFails = nil
+        guard case .refused(let refusal) = result else {
+            return XCTFail("not refused: \(result)")
+        }
+        let line: String = UndoTrail.leftNewestLine(course: "ICS3U", section: 1, isUndo: true, refusal: refusal)
+        XCTAssertTrue(
+            line.contains("because " + section + "Unit 1, Day 4.md could not be changed in its folder, which may be full or may not allow the change."),
+            line
+        )
+        XCTAssertFalse(line.contains("nothing could be written beside"), line)
+        XCTAssertFalse(line.contains("(the disk may be full)"), line)
+    }
 
     /// Review 3 of mac-1, LOW 5: a teacher's file under the TWO-place
     /// relink's own staged name (`-new` beside `to`). The pre-clean follows
@@ -1781,8 +1846,8 @@ final class UndoRelinkTests: XCTestCase {
                 processIsAlive: { process in process.pid != 2_000_000_001 }
             )
             var said: [String] = []
-            let hookBefore = UndoTrailHook.keptAPageLine
-            UndoTrailHook.keptAPageLine = { _, _, place, keptAs in
+            let hookBefore = UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine
+            UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = { _, _, place, keptAs in
                 said.append(place + " -> " + keptAs)
             }
             if let point {
@@ -1801,7 +1866,7 @@ final class UndoRelinkTests: XCTestCase {
                     UndoJournal(folderURL: laid.journalFolder), resolveRoot: { _ in root }, places: UndoMemoryPlaces()
                 )
             }
-            UndoTrailHook.keptAPageLine = hookBefore
+            UndoTrailHook.keptAnItemFoundWhereALinkWasChangedLine = hookBefore
             var visibleHolders: [String] = []
             let asFound: String = "file " + Data(teachers.utf8).base64EncodedString()
             for (name, held) in try classPagesNow(laid.root) where held == asFound && !name.hasPrefix(".") {
