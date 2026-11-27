@@ -1046,7 +1046,7 @@ nonisolated enum UndoRecovery {
         // `opKinds.move`) can be. Nor is a relink where the link stands
         // (mac-1): its swap is one atomic exchange at one place, so two
         // links never stand for it; it is read as a constraint only.
-        if candidate.before == candidate.after || candidate.from == candidate.to {
+        if candidate.before == candidate.after || UndoOp.isOnePathByteForByte(candidate.from, candidate.to) {
             return false
         }
         if candidate.atFrom != .holdsTheContent || candidate.atTo != .holdsTheContent {
@@ -1265,7 +1265,7 @@ nonisolated enum UndoRecovery {
             UndoSwap.tidyLeftovers(
                 label: label, beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) },
-                root: root, keepingOnlyCopies: true
+                root: root, keepingOnlyCopies: true, linkTextsOfTheStep: UndoRecovery.linkTexts(of: step)
             )
             if UndoKillPoints.stopsHere(.afterRecoveryTidied) {
                 return nil
@@ -1447,8 +1447,11 @@ nonisolated enum UndoRecovery {
                     // under its hidden name (the list cannot put the page
                     // back, so `tidyClosedSteps` keeps it too). Only the
                     // staged new content and copies go.
-                    UndoSwap.tidyLeftovers(label: label, beside: urls, root: root, keepingOnlyCopies: true)
-                    UndoSwap.tidyLeftovers(label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true)
+                    let linkTexts: Set<String> = UndoRecovery.linkTexts(of: step)
+                    UndoSwap.tidyLeftovers(label: label, beside: urls, root: root, keepingOnlyCopies: true, linkTextsOfTheStep: linkTexts)
+                    UndoSwap.tidyLeftovers(
+                        label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true, linkTextsOfTheStep: linkTexts
+                    )
                     // A page the step removed or moved away whose place is now
                     // taken is kept under a visible name, never left hidden.
                     UndoRecovery.keepPagesWhosePlaceIsTaken(of: step, root: root)
@@ -1473,7 +1476,8 @@ nonisolated enum UndoRecovery {
                 // in the list yet.
                 UndoSwap.tidyLeftovers(
                     label: label, beside: urls, root: root, keepingOnlyCopies: true,
-                    unlessTheListHolds: UndoRecovery.listHolds(step, root: root, from: writer.journal)
+                    unlessTheListHolds: UndoRecovery.listHolds(step, root: root, from: writer.journal),
+                    linkTextsOfTheStep: UndoRecovery.linkTexts(of: step)
                 )
                 let notTaken: UndoWhatTheListCouldNotTake = UndoRecovery.storeWhatKeptOriginalsGive(uses, writer)
                 var keepingTheOriginalsOf: Set<String> = []
@@ -1537,11 +1541,13 @@ nonisolated enum UndoRecovery {
                 let listHolds: (URL, URL) -> Bool = UndoRecovery.listHolds(step, root: root, from: writer.journal)
                 UndoSwap.tidyLeftovers(
                     label: label, beside: urls, root: root, keepingOnlyCopies: true,
-                    unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken
+                    unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken,
+                    linkTextsOfTheStep: UndoRecovery.linkTexts(of: step)
                 )
                 UndoSwap.tidyLeftovers(
                     label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true,
-                    unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken
+                    unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken,
+                    linkTextsOfTheStep: UndoRecovery.linkTexts(of: step)
                 )
                 let kept: [String] = UndoRecovery.keptOriginalsLeft(of: step, root: root)
                 if !kept.isEmpty {

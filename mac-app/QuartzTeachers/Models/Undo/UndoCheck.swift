@@ -963,6 +963,14 @@ nonisolated enum UndoRelinkOutcome: Equatable, Sendable {
     case made
     case failed
     case stoppedByATest
+    /// mac-1's fix round: the volume will not exchange two links in one
+    /// call (`RENAME_SWAP` refused with `ENOTSUP` or `EINVAL`, as SMB may):
+    /// nothing moved; refused `couldNotWrite`, never `fileIsInUse`.
+    case refusedByTheVolume
+    /// mac-1's fix round: the place held something else when it was
+    /// exchanged (changed under the swap): given back, refused changed
+    /// since.
+    case changedUnderTheSwap
 }
 
 /// A relinking move's two texts as one swap goes (U4b3 relink-1): the
@@ -1494,6 +1502,15 @@ nonisolated enum UndoSwap {
                     if relinked == .failed {
                         refusal = .fileIsInUse(path: namedAs)
                     }
+                    if relinked == .refusedByTheVolume {
+                        // mac-1's fix round: the volume will not exchange
+                        // two links; the change cannot be made in that
+                        // folder, which is no file in use (review 1, LOW 1).
+                        refusal = .couldNotWrite(path: namedAs)
+                    }
+                    if relinked == .changedUnderTheSwap {
+                        refusal = .changedSince(firstPath: namedAs, others: 0)
+                    }
                 } else {
                     makeTheFolder(for: target.url)
                     if !UndoSwap.renameExclusively(from, onto: target.url) {
@@ -1838,13 +1855,13 @@ nonisolated enum UndoSwap {
         leaving old: URL, holding oldText: Data, onto new: URL, holding newText: Data, label: String,
         stoppingAt index: Int? = nil
     ) -> UndoRelinkOutcome {
-        if old.standardizedFileURL.path == new.standardizedFileURL.path {
+        if UndoOp.isOnePathByteForByte(old.standardizedFileURL.path, new.standardizedFileURL.path) {
             return UndoSwap.relinkWhereItStands(old, holding: oldText, to: newText, label: label, stoppingAt: index)
         }
         let stagedURL: URL = UndoSwap.besideURL(for: new, label: label, role: "new")
-        _ = UndoSwap.removeStaged(stagedURL)
+        _ = UndoSwap.removeAStagedLink(stagedURL, holdingOneOf: [oldText, newText])
         if !UndoSwap.makeALink(at: stagedURL, holding: newText) {
-            _ = UndoSwap.removeStaged(stagedURL)
+            _ = UndoSwap.removeAStagedLink(stagedURL, holdingOneOf: [oldText, newText])
             return .failed
         }
         if let index, UndoKillPoints.stopsHere(.relinkStaged(index)) {
@@ -1852,7 +1869,7 @@ nonisolated enum UndoSwap {
         }
         let renameFails: Bool = UndoKillPoints.relinkRenameInFails?(new) == true
         if renameFails || !UndoSwap.renameExclusively(stagedURL, onto: new) {
-            _ = UndoSwap.removeStaged(stagedURL)
+            _ = UndoSwap.removeAStagedLink(stagedURL, holdingOneOf: [oldText, newText])
             return .failed
         }
         if let index, UndoKillPoints.stopsHere(.relinkRenamedIn(index)) {
@@ -1875,13 +1892,24 @@ nonisolated enum UndoSwap {
     /// `RENAME_SWAP`, measured on APFS: both names must exist, and the two
     /// items trade places), so there is never a moment with no link at the
     /// place, nor with both standing there: `relinkRenamedIn` does not
-    /// arise and is never stopped at. The old link, now under the staged
-    /// name, is re-read: holding `oldText` it is removed (`.made`); holding
-    /// anything else the place had changed under the swap, so the two are
-    /// exchanged back, the swap's own new link removed, and `.failed`:
-    /// nothing of the teacher's lost or changed. There is no window between
-    /// the check and the replacement, since what was replaced is judged
-    /// after the exchange and can still be put back. Neither link is ever
+    /// arise on the Mac and is never stopped at (it is a stop point of
+    /// Windows' mechanism, opKinds.move). The old link, now under the
+    /// staged name, is re-read: holding `oldText` it is removed (`.made`).
+    /// Holding anything else, the place had changed under the swap, and the
+    /// teacher's item is given back to the place: exchanged back in one
+    /// call, then the swap's own new link (under the staged name again)
+    /// removed by its text; if the exchange back is refused, the swap's own
+    /// link is taken out of the place by its text and the item renamed
+    /// back exclusively (`.changedUnderTheSwap`, refused changed since). If
+    /// even that cannot be done, the item is left under the staged name and
+    /// `.failed` says the swap failed; every tidy then leaves it unless it
+    /// is a link holding one of the step's own texts (`tidyLeftovers`'
+    /// `linkTextsOfTheStep`), so it is never removed for its name. A volume
+    /// that refuses the exchange (`ENOTSUP`, `EINVAL`: SMB may) moved
+    /// nothing: the staged link is removed by its text and the swap is
+    /// `.refusedByTheVolume`. There is no fallback to a plain rename over
+    /// the old link: it would be a second mechanism with its own window
+    /// (the director's ruling on review 1, LOW 1). Neither link is ever
     /// followed or written through. A swap going in passes its index, so a
     /// test can stop it with the new link staged (`relinkStaged`) or just
     /// after the exchange, the old link under the staged name
@@ -1890,38 +1918,60 @@ nonisolated enum UndoSwap {
         _ place: URL, holding oldText: Data, to newText: Data, label: String, stoppingAt index: Int?
     ) -> UndoRelinkOutcome {
         let stagedURL: URL = UndoSwap.besideURL(for: place, label: label, role: "new")
-        _ = UndoSwap.removeStaged(stagedURL)
+        let texts: [Data] = [oldText, newText]
+        if !UndoSwap.removeAStagedLink(stagedURL, holdingOneOf: texts) {
+            return .failed
+        }
         if !UndoSwap.makeALink(at: stagedURL, holding: newText) {
-            _ = UndoSwap.removeStaged(stagedURL)
+            _ = UndoSwap.removeAStagedLink(stagedURL, holdingOneOf: texts)
             return .failed
         }
         if let index, UndoKillPoints.stopsHere(.relinkStaged(index)) {
             return .stoppedByATest
         }
-        let swapFails: Bool = UndoKillPoints.relinkRenameInFails?(place) == true
-        if swapFails || !UndoSwap.exchange(stagedURL, place) {
-            _ = UndoSwap.removeStaged(stagedURL)
+        // A test fakes a volume that refuses the exchange: nothing moves.
+        var refusal: Int32 = ENOTSUP
+        if UndoKillPoints.relinkRenameInFails?(place) != true {
+            refusal = UndoSwap.exchange(stagedURL, place)
+        }
+        if refusal != 0 {
+            _ = UndoSwap.removeAStagedLink(stagedURL, holdingOneOf: texts)
+            if refusal == ENOTSUP || refusal == EINVAL {
+                return .refusedByTheVolume
+            }
             return .failed
         }
         if let index, UndoKillPoints.stopsHere(.relinkSwapped(index)) {
             return .stoppedByATest
         }
-        if UndoSwap.linkHolds(stagedURL, oldText) && UndoSwap.removeALink(at: stagedURL) {
-            return .made
+        if UndoSwap.linkHolds(stagedURL, oldText) {
+            if UndoSwap.removeALink(at: stagedURL) {
+                return .made
+            }
+            // The old link would not go: the swap is given back whole.
         }
-        // The place held something else when it was exchanged, or the old
-        // link would not go: exchanged back, the new link (this call's own)
-        // then under the staged name and removed.
-        if UndoSwap.exchange(stagedURL, place) && UndoSwap.linkHolds(stagedURL, newText) {
-            _ = UndoSwap.removeALink(at: stagedURL)
+        // The place held something else when it was exchanged (or the old
+        // link would not go): what was there is given back to the place.
+        let backRefused: Bool = UndoKillPoints.relinkExchangeBackFails?(place) == true
+        if !backRefused && UndoSwap.exchange(stagedURL, place) == 0 {
+            if UndoSwap.linkHolds(stagedURL, newText) {
+                _ = UndoSwap.removeALink(at: stagedURL)
+            }
+            return UndoSwap.linkHolds(place, oldText) ? .failed : .changedUnderTheSwap
+        }
+        if UndoSwap.linkHolds(place, newText) && UndoSwap.removeALink(at: place)
+            && UndoSwap.renameExclusively(stagedURL, onto: place) {
+            return UndoSwap.linkHolds(place, oldText) ? .failed : .changedUnderTheSwap
         }
         return .failed
     }
 
     /// Exchanges the two items at `first` and `second` in one atomic call
-    /// (`renamex_np` with `RENAME_SWAP`): false when either is missing or
-    /// the volume refuses it, and then neither has moved.
-    static func exchange(_ first: URL, _ second: URL) -> Bool {
+    /// (`renamex_np` with `RENAME_SWAP`): 0 when they traded places, else
+    /// the `errno` it was refused with (`ENOENT` when either is missing,
+    /// `ENOTSUP` or `EINVAL` when the volume will not), and then neither
+    /// has moved.
+    static func exchange(_ first: URL, _ second: URL) -> Int32 {
         let result: Int32 = first.withUnsafeFileSystemRepresentation { firstPath in
             return second.withUnsafeFileSystemRepresentation { secondPath in
                 guard let firstPath, let secondPath else {
@@ -1930,7 +1980,26 @@ nonisolated enum UndoSwap {
                 return renamex_np(firstPath, secondPath, UInt32(RENAME_SWAP))
             }
         }
-        return result == 0
+        if result == 0 {
+            return 0
+        }
+        return errno == 0 ? EIO : errno
+    }
+
+    /// Removes what stands under a staged name only when it is nothing or
+    /// a link holding one of `texts` (review 1 of mac-1, LOW 2: a staged
+    /// link is removed by the text it holds, never by its name alone).
+    /// True when the name is then free.
+    static func removeAStagedLink(_ stagedURL: URL, holdingOneOf texts: [Data]) -> Bool {
+        if UndoItem.read(at: stagedURL) == .absent && !UndoSwap.isALink(stagedURL) {
+            return true
+        }
+        for text in texts {
+            if UndoSwap.linkHolds(stagedURL, text) {
+                return UndoSwap.removeALink(at: stagedURL)
+            }
+        }
+        return false
     }
 
     /// A symbolic link at `url` holding exactly `text`, made with

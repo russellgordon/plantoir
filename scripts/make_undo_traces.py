@@ -36,6 +36,7 @@ import math
 import os
 import random
 import sys
+import unicodedata
 from pathlib import Path
 
 SEED = 899
@@ -1335,12 +1336,15 @@ def part_inside(place, path):
     spelled as `path` spells it ("" for the place itself), or None when it
     is neither the place nor inside it. Part by part, without regard to
     case: the ONE comparison for "at or inside" (places overlapping, a
-    move carrying an edit, a carried page's place before the move)."""
+    move carrying an edit, a carried page's place before the move). Two
+    parts that differ only in Unicode normalisation are one part, as
+    Swift's String comparison (canonical equivalence) and APFS hold them
+    (review 1 of mac-1, MEDIUM 1)."""
     place_parts, path_parts = place.split("/"), path.split("/")
     if len(path_parts) < len(place_parts):
         return None
     for mine, theirs in zip(place_parts, path_parts):
-        if mine.lower() != theirs.lower():
+        if unicodedata.normalize("NFC", mine).lower() != unicodedata.normalize("NFC", theirs).lower():
             return None
     return "/".join(path_parts[len(place_parts):])
 
@@ -1385,9 +1389,13 @@ def move_carries(move, edit):
 def is_a_relink_in_place(op):
     """UndoOp.isARelinkWhereItStands (mac-1, #899): a `move`, never a
     moveApart or a setAside, whose from and to are one path byte for byte,
-    carrying the relinking pair: the link's text changed where it stands."""
+    carrying the relinking pair: the link's text changed where it stands.
+    Compared as UTF-8 bytes (review 1 of mac-1, MEDIUM 1): the same place
+    in another Unicode normalisation is not one path, so it overlaps and
+    is not readable."""
     return (op.get("kind") == "move" and "linkShaBefore" in op
-            and isinstance(op.get("from"), str) and op.get("from") == op.get("to"))
+            and isinstance(op.get("from"), str) and isinstance(op.get("to"), str)
+            and op["from"].encode("utf-8") == op["to"].encode("utf-8"))
 
 
 def is_case_only_move(op):
@@ -1466,9 +1474,15 @@ def stopped_part_way(ops, backward, pages, swapped, inside=None):
     (its new link made under its staged name, which the model, holding no
     staged files, does not show) or relinkRenamedIn (the new link renamed
     in at its destination, the old one not yet removed: both stand). For a
-    relink where the link stands (mac-1) relinkRenamedIn never arises, and
-    relinkSwapped is the moment after its one atomic swap: the place holds
-    the new text, the old link waits under the staged name (not shown)."""
+    relink where the link stands (mac-1) each platform has its own
+    mechanism and its own stop points (opKinds.move): the Mac's
+    relinkSwapped is the moment after its one atomic exchange (the place
+    holds the new text, the old link waits under the staged name, not
+    shown); Windows' relinkSetAside is the moment after the standing item
+    is renamed aside (the place empty, the item set aside shown at
+    `place + SET_ASIDE`) and its relinkRenamedIn the moment after the
+    staged new link is renamed in (the new text at the place, the item
+    set aside still shown)."""
     pages = dict(pages)
     groups = swap_groups(ops, backward)
     for group in groups[:len(groups) if swapped is None else swapped]:
@@ -1481,13 +1495,47 @@ def stopped_part_way(ops, backward, pages, swapped, inside=None):
                 pages[path] = text
     if inside is not None:
         op = groups[swapped][0]
-        assert "linkShaBefore" in op and inside in ("relinkStaged", "relinkRenamedIn", "relinkSwapped"), (op, inside)
-        assert (inside == "relinkSwapped") == is_a_relink_in_place(op) or inside == "relinkStaged", (op, inside)
-        if inside in ("relinkRenamedIn", "relinkSwapped"):
+        assert "linkShaBefore" in op and inside in ("relinkStaged", "relinkRenamedIn", "relinkSwapped", "relinkSetAside"), (op, inside)
+        assert inside not in ("relinkSwapped", "relinkSetAside") or is_a_relink_in_place(op), (op, inside)
+        if is_a_relink_in_place(op) and inside in ("relinkSetAside", "relinkRenamedIn"):
+            # Windows (mac-1's fix round): the standing item renamed aside
+            # exclusively, then (relinkRenamedIn) the new link renamed in.
+            place = op["from"]
+            pages[place + SET_ASIDE] = pages.pop(place, None)
+            if inside == "relinkRenamedIn":
+                pages[place] = whole_moved(op, backward, pages)[place]
+        elif inside in ("relinkRenamedIn", "relinkSwapped"):
             made = whole_moved(op, backward, pages)
             for path, value in made.items():
                 if value is not None:
                     pages[path] = value
+    return pages
+
+
+# Windows' staged name for the item a relink where the link stands renamed
+# aside (mac-1's fix round): a key the model's pages never otherwise hold.
+SET_ASIDE = "\u0000set-aside"
+
+
+def settle_what_was_set_aside(ops, pages, started_from_before):
+    """Windows' recovery of a relink where the link stands killed inside
+    its swap (opKinds.move, mac-1's fix round): an item set aside goes back
+    to an empty place; where the new link stands, the item set aside is
+    removed only when it is the link the swap started from, by its text,
+    and otherwise the step is settled back (the new link taken out, the
+    item renamed back). The staged new link is never shown by the model."""
+    pages = dict(pages)
+    for op in ops:
+        if not is_a_relink_in_place(op) or op["from"] + SET_ASIDE not in pages:
+            continue
+        place = op["from"]
+        held = pages.pop(place + SET_ASIDE)
+        if pages.get(place) is None:
+            pages[place] = held
+            continue
+        start = op["linkShaBefore"] if started_from_before else op["linkShaAfter"]
+        if not (isinstance(held, tuple) and held[0] == "link" and sha(held[1]) == start):
+            pages[place] = held
     return pages
 
 
@@ -1695,6 +1743,7 @@ def recover(ops, pages, started_from_before):
     start, end = ("before", "after") if started_from_before else ("after", "before")
     # U4b3 relink-3: the link an interrupted relink had just made goes
     # first, so its op stands where its swap began.
+    pages = settle_what_was_set_aside(ops, pages, started_from_before)
     pages = remove_the_links_just_made(ops, pages, started_from_before)
     states = recovery_states(ops, pages)
     in_the_way = [place for place, state in states.items() if state == "neither"]

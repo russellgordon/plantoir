@@ -1195,10 +1195,11 @@ final class UndoRelinkTests: XCTestCase {
     /// The same place spelled in another Unicode normalisation (`Café`
     /// composed in `from`, decomposed in `to`) is not ONE path byte for
     /// byte, so the op is not a relink where the link stands, and its two
-    /// places overlap on the Mac: not readable. The swap's own dispatch asks
-    /// the same question by bytes: two spellings are never swapped as one
-    /// place. MUST FAIL with Swift's `==` (canonical equivalence) as the
-    /// test (review 1, MEDIUM 1).
+    /// places overlap on the Mac: not readable. MUST FAIL with Swift's `==`
+    /// (canonical equivalence) as the test (review 1, MEDIUM 1). (At the
+    /// swap, Foundation's file URLs already give both spellings one `path`,
+    /// measured: the two are one item on APFS, so the dispatch's question
+    /// by URL is never asked of such an op, which is refused unread.)
     func testTheSamePlaceInAnotherUnicodeNormalisationIsNotARelinkWhereItStands() throws {
         let laid: LaidRelink = try layARelinkWhereItStands(named: "normalisation", leads: .inside)
         var op: UndoOp = laid.op
@@ -1209,15 +1210,6 @@ final class UndoRelinkTests: XCTestCase {
         let encoded: Data = try JSONEncoder().encode(op)
         XCTAssertFalse(try JSONDecoder().decode(UndoOp.self, from: encoded).isReadable)
 
-        let composed: URL = laid.root.appendingPathComponent(section + "Caf\u{E9}.md")
-        let decomposed: URL = laid.root.appendingPathComponent(section + "Cafe\u{301}.md")
-        try FileManager.default.createSymbolicLink(atPath: composed.path, withDestinationPath: laid.oldText)
-        let outcome: UndoRelinkOutcome = UndoSwap.relinkLink(
-            leaving: composed, holding: Data(laid.oldText.utf8), onto: decomposed, holding: Data(laid.newText.utf8), label: "1-apply"
-        )
-        XCTAssertNotEqual(outcome, .made)
-        XCTAssertEqual(UndoTreeReading.linkTarget(at: composed), Data(laid.oldText.utf8))
-        XCTAssertEqual(stagedLeft(under: laid.root), [])
     }
 
     /// A volume that refuses the one exchange (`RENAME_SWAP`, as SMB may):

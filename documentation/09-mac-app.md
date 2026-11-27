@@ -23904,6 +23904,24 @@ freed: a write planned at `p` refuses the step before anything changes.
 Nothing calls it yet but the tests: Insert Class's in-between link (ruling 6)
 and an earlier class's link (the evening's ruling 3) are mac-2 and mac-3.
 
+Fix round one (review 1). The same-place test compares UTF-8 bytes through one
+function, `UndoOp.isOnePathByteForByte`, everywhere it is asked (Swift's `==`
+is Unicode canonical equivalence, so `Café` composed in `from` and decomposed
+in `to` had read as one path; now its places overlap and it is not readable).
+The contract states the swap's GUARANTEE in platform-neutral words (exactly one
+link at the place holding the whole before or after text at every kill
+moment, nothing staged left, a teacher's item that appears there never
+destroyed or hidden) and names each platform's mechanism: the Mac's exchange,
+and Windows' four exclusive renames (stage, set aside, rename in, re-read),
+NTFS having no exchange and a replace destroying what it replaces; a
+`recoveryCases` row only one mechanism reaches carries `platform`. A volume
+that refuses `RENAME_SWAP` is refused `couldNotWrite` (nothing moved), never
+`fileIsInUse`, with no fallback. A place found changed under the swap is given
+back (exchanged back, or the swap's own link taken out and the item renamed
+back) and refused changed since. Every tidy removes a staged link only by the
+text it holds, and a write planned at `p` refuses the step whether it was
+planned before the relink or after it.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

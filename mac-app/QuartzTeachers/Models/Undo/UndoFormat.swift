@@ -802,7 +802,18 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         guard knownKind == .move, isARelink, let from, let to else {
             return false
         }
-        return from == to
+        return UndoOp.isOnePathByteForByte(from, to)
+    }
+
+    /// Whether two paths are ONE path byte for byte: their UTF-8 bytes
+    /// equal, never Swift's `==`, which is Unicode canonical equivalence
+    /// (`Café` composed equals `Café` decomposed). The one same-place test a
+    /// relink where the link stands is asked by (review 1 of mac-1, MEDIUM
+    /// 1): the op, `JournaledStep`, the swap's dispatch and recovery.
+    /// (`isCaseOnlyMove`'s `from != to` is older and still compares by
+    /// canonical equivalence; noted, not changed here.)
+    static func isOnePathByteForByte(_ first: String, _ second: String) -> Bool {
+        return first.utf8.elementsEqual(second.utf8)
     }
 
     /// The SHA-256 of the text a link's move holds at `from` (`isAtFrom`)

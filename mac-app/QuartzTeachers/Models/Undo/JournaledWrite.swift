@@ -143,7 +143,10 @@ nonisolated enum UndoRefusal: Equatable, Sendable {
     /// permission). Nothing was swapped and nothing of the step is left
     /// beside any page (`undo.rule.stagedThenSwapped`; the Fable sweep of
     /// U1, F1). Never `fileIsInUse`, which would tell the teacher a file is
-    /// open somewhere when it is not.
+    /// open somewhere when it is not. Also a relink where the link stands on
+    /// a volume that will not exchange two links in one call (`RENAME_SWAP`
+    /// refused, as SMB may: mac-1's fix round): the change cannot be made
+    /// in that folder, and nothing was changed.
     case couldNotWrite(path: String)
 
     /// Content the step needs is missing from the list.
