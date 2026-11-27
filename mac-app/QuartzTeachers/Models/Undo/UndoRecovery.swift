@@ -276,39 +276,47 @@ nonisolated enum UndoRecovery {
     /// mac-1: what a tidy needs of the step's links (review 2's one rule,
     /// `UndoSwap.settleUnderARelinksStagedName`): every text a link's move
     /// of the step holds on either side (`linkSha`, `linkShaBefore`,
-    /// `linkShaAfter`, by SHA-256), each place a relinking move stages its
-    /// new link beside (its `to`, for either direction of a relink where
-    /// the link stands, and its `from` and `to` for a two-place relink,
-    /// whose reversal stages beside `from`), and the trail line said before
-    /// a teacher's item found there is kept under a visible name.
+    /// `linkShaAfter`, by SHA-256), each relinking move's `from` and `to`
+    /// (from which a tidy derives the relink's own staged name for its
+    /// label, review 3's MEDIUM), and the trail line said before a
+    /// teacher's item found there is kept under a visible name.
     static func links(of step: UndoStep, root: URL) -> UndoStepLinks {
         var texts: Set<String> = []
-        var relinkPlaces: Set<String> = []
+        var relinks: [UndoStepRelink] = []
         for op in step.ops where op.isALinksMove {
             for text in [op.linkSha, op.linkShaBefore, op.linkShaAfter] {
                 if let text {
                     texts.insert(text)
                 }
             }
-            if op.isARelink {
-                for path in [op.from, op.to] {
-                    if let path {
-                        relinkPlaces.insert(root.appendingPathComponent(path).standardizedFileURL.path)
-                    }
-                }
+            if op.isARelink, let from = op.from, let to = op.to {
+                relinks.append(UndoStepRelink(
+                    from: root.appendingPathComponent(from), to: root.appendingPathComponent(to),
+                    isOnePlace: UndoOp.isOnePathByteForByte(from, to)
+                ))
             }
         }
-        let course: String = step.course ?? ""
-        let section: Int? = step.section
-        return UndoStepLinks(texts: texts, relinkPlaces: relinkPlaces, onKept: { place, foundAt, keptAs, isAFolder in
+        return UndoStepLinks(texts: texts, relinks: relinks, onKept: UndoRecovery.tellingWhatIsKept(course: step.course, section: step.section, root: root))
+    }
+
+    /// The trail line said just before a teacher's item found under a
+    /// relink's staged name is kept under a visible name beside its place:
+    /// the kept-page line, or the kept-folder line for a folder. Said by
+    /// recovery's tidies and by a live swap alike (review 3 of mac-1,
+    /// LOW 1).
+    static func tellingWhatIsKept(
+        course: String?, section: Int?, root: URL
+    ) -> (_ place: URL, _ foundAt: URL, _ keptAs: URL, _ isAFolder: Bool) -> Void {
+        let courseCode: String = course ?? ""
+        return { place, foundAt, keptAs, isAFolder in
             let placeInside: String = UndoRecovery.insideTheFolder(place, root: root)
             let keptInside: String = UndoRecovery.insideTheFolder(keptAs, root: root)
             if isAFolder {
-                UndoTrailHook.foundAFolderSetAsideLine?(course, section, placeInside, foundAt.lastPathComponent, keptInside, "")
+                UndoTrailHook.foundAFolderSetAsideLine?(courseCode, section, placeInside, foundAt.lastPathComponent, keptInside, "")
             } else {
-                UndoTrailHook.keptAPageLine?(course, section, placeInside, keptInside)
+                UndoTrailHook.keptAPageLine?(courseCode, section, placeInside, keptInside)
             }
-        })
+        }
     }
 
     /// Whether a kept original's bytes are exactly what the list gives for
@@ -1510,7 +1518,8 @@ nonisolated enum UndoRecovery {
                 }
                 switch UndoSwap.swap(
                     targets, label: label + "-recover", places: places, root: root,
-                    keepingTheOriginalsOf: keepingTheOriginalsOf
+                    keepingTheOriginalsOf: keepingTheOriginalsOf,
+                    tellingKept: UndoRecovery.tellingWhatIsKept(course: step.course, section: step.section, root: root)
                 ) {
                 case .swapped:
                     break

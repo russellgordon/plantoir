@@ -971,6 +971,9 @@ nonisolated enum UndoRelinkOutcome: Equatable, Sendable {
     /// exchanged (changed under the swap): given back, refused changed
     /// since.
     case changedUnderTheSwap
+    /// Review 3 of mac-1, LOW 3: what stands under the staged name, or at
+    /// the place, cannot be read just now: refused `cannotTellNow`.
+    case cannotReadNow
 }
 
 /// A relinking move's two texts as one swap goes (U4b3 relink-1): the
@@ -1071,7 +1074,8 @@ nonisolated enum UndoSwap {
         root: URL? = nil,
         keepingTheOriginalsOf keptPaths: Set<String> = [],
         leaveApart: ((String) -> Void)? = nil,
-        startsAtTheNextLogin: ((String) -> Void)? = nil
+        startsAtTheNextLogin: ((String) -> Void)? = nil,
+        tellingKept: ((_ place: URL, _ foundAt: URL, _ keptAs: URL, _ isAFolder: Bool) -> Void)? = nil
     ) -> UndoSwapResult {
         var staged: [URL?] = []
         var originals: [URL?] = []
@@ -1302,7 +1306,7 @@ nonisolated enum UndoSwap {
                         // link this swap made removed (U4b3 relink-1).
                         if failsHere || UndoSwap.relinkLink(
                             leaving: target.url, holding: relink.destinationText,
-                            onto: from, holding: relink.sourceText, label: label
+                            onto: from, holding: relink.sourceText, label: label, tellingKept: tellingKept
                         ) != .made {
                             everyOnePutBack = false
                         }
@@ -1494,7 +1498,7 @@ nonisolated enum UndoSwap {
                     let relinked: UndoRelinkOutcome = UndoSwap.relinkLink(
                         leaving: from, holding: relink.sourceText,
                         onto: target.url, holding: relink.destinationText, label: label,
-                        stoppingAt: index
+                        stoppingAt: index, tellingKept: tellingKept
                     )
                     if relinked == .stoppedByATest {
                         return .stoppedByATest
@@ -1510,6 +1514,12 @@ nonisolated enum UndoSwap {
                     }
                     if relinked == .changedUnderTheSwap {
                         refusal = .changedSince(firstPath: namedAs, others: 0)
+                    }
+                    if relinked == .cannotReadNow {
+                        // Review 3 of mac-1, LOW 3: what stands under the
+                        // staged name, or at the place, cannot be read just
+                        // now; nothing moved.
+                        refusal = .cannotTellNow(path: namedAs)
                     }
                 } else {
                     makeTheFolder(for: target.url)
@@ -1853,10 +1863,13 @@ nonisolated enum UndoSwap {
     /// beside the old (`relinkRenamedIn`); a reversal passes none.
     static func relinkLink(
         leaving old: URL, holding oldText: Data, onto new: URL, holding newText: Data, label: String,
-        stoppingAt index: Int? = nil
+        stoppingAt index: Int? = nil,
+        tellingKept: ((_ place: URL, _ foundAt: URL, _ keptAs: URL, _ isAFolder: Bool) -> Void)? = nil
     ) -> UndoRelinkOutcome {
         if UndoOp.isOnePathByteForByte(old.standardizedFileURL.path, new.standardizedFileURL.path) {
-            return UndoSwap.relinkWhereItStands(old, holding: oldText, to: newText, label: label, stoppingAt: index)
+            return UndoSwap.relinkWhereItStands(
+                old, holding: oldText, to: newText, label: label, stoppingAt: index, tellingKept: tellingKept
+            )
         }
         let stagedURL: URL = UndoSwap.besideURL(for: new, label: label, role: "new")
         _ = UndoSwap.removeAStagedLink(stagedURL, holdingOneOf: [oldText, newText])
@@ -1916,9 +1929,15 @@ nonisolated enum UndoSwap {
     /// after the exchange, the old link under the staged name
     /// (`relinkSwapped`).
     static func relinkWhereItStands(
-        _ place: URL, holding oldText: Data, to newText: Data, label: String, stoppingAt index: Int?
+        _ place: URL, holding oldText: Data, to newText: Data, label: String, stoppingAt index: Int?,
+        tellingKept: ((_ place: URL, _ foundAt: URL, _ keptAs: URL, _ isAFolder: Bool) -> Void)? = nil
     ) -> UndoRelinkOutcome {
         let stagedURL: URL = UndoSwap.besideURL(for: place, label: label, role: "new")
+        // Review 3 of mac-1, LOW 1: every keep under a visible name says the
+        // kept-page or kept-folder line first, live as in recovery.
+        let tellingFirst: (_ keptAs: URL, _ isAFolder: Bool) -> Void = { keptAs, isAFolder in
+            tellingKept?(place, stagedURL, keptAs, isAFolder)
+        }
         let texts: [Data] = [oldText, newText]
         var shas: Set<String> = []
         for text in texts {
@@ -1929,10 +1948,16 @@ nonisolated enum UndoSwap {
         // goes; anything else is the teacher's and is kept under a visible
         // name beside the place, never exchanged with the link standing
         // there (which is the step's starting point), never removed.
-        switch UndoSwap.settleUnderARelinksStagedName(stagedURL, place: place, ours: shas, givingBackOverOurs: false) {
+        switch UndoSwap.settleUnderARelinksStagedName(
+            stagedURL, place: place, ours: shas, givingBackOverOurs: false, tellingFirst: tellingFirst
+        ) {
         case .free, .givenBack, .keptVisible:
             break
-        case .notNow:
+        case .cannotReadNow:
+            // Review 3 of mac-1, LOW 3: not known, so refused "cannot tell
+            // now"; only a refused move is "could not write".
+            return .cannotReadNow
+        case .couldNotMove:
             return .refusedByTheVolume
         }
         if !UndoSwap.makeALink(at: stagedURL, holding: newText) {
@@ -1975,10 +2000,21 @@ nonisolated enum UndoSwap {
         // is and the older item is kept under a visible name beside it.
         let shasOfTheNewLink: Set<String> = [UndoHash.sha256(of: newText)]
         let backRefused: Bool = UndoKillPoints.relinkExchangeBackFails?(place) == true
-        _ = UndoSwap.settleUnderARelinksStagedName(
+        let settled: StagedNameSettled = UndoSwap.settleUnderARelinksStagedName(
             stagedURL, place: place, ours: shas, givingBackOverOurs: true,
-            exchangingOnlyOver: shasOfTheNewLink, exchangeRefused: backRefused
+            exchangingOnlyOver: shasOfTheNewLink, exchangeRefused: backRefused, tellingFirst: tellingFirst
         )
+        // Review 3 of mac-1, LOW 2: an item that could not be settled is
+        // never dropped unsaid: the refusal names the place with the true
+        // reason (it cannot be read just now, or it would not move).
+        switch settled {
+        case .cannotReadNow:
+            return .cannotReadNow
+        case .couldNotMove:
+            return .refusedByTheVolume
+        case .free, .givenBack, .keptVisible:
+            break
+        }
         return UndoSwap.linkHolds(place, oldText) ? .failed : .changedUnderTheSwap
     }
 
@@ -1993,8 +2029,18 @@ nonisolated enum UndoSwap {
         /// The teacher's item is kept under this visible name beside its
         /// place, which something else holds.
         case keptVisible(URL)
-        /// It could not be read or moved just now: left as it is.
-        case notNow
+        /// It, or its place, could not be read just now: left as it is
+        /// for a later try (review 3 of mac-1, LOW 3: refused "cannot tell
+        /// now").
+        case cannotReadNow
+        /// It could not be moved or removed just now: left as it is for a
+        /// later try (refused "could not write").
+        case couldNotMove
+
+        /// Whether it is left under the staged name for a later try.
+        var isLeftForALaterTry: Bool {
+            return self == .cannotReadNow || self == .couldNotMove
+        }
     }
 
     /// THE rule for what stands under a relink's staged name, asked by
@@ -2010,7 +2056,11 @@ nonisolated enum UndoSwap {
     /// visible name beside the place, `<name> (kept by Undo)`, told first
     /// through `tellingFirst`. Nothing of the teacher's is deleted by name,
     /// and nothing is left under the hidden name unless it cannot be read
-    /// or moved just now (`.notNow`, for a later try).
+    /// or moved just now (`.cannotReadNow`, `.couldNotMove`, for a later
+    /// try). A rename back refused because the place filled meanwhile goes
+    /// to the visible name. Review 3, MEDIUM: the caller hands over the
+    /// exact staged name it may judge, the relink's own, never a name
+    /// found beside a relink's place.
     static func settleUnderARelinksStagedName(
         _ stagedURL: URL,
         place: URL,
@@ -2027,14 +2077,14 @@ nonisolated enum UndoSwap {
                 return .free
             }
             if there == .cannotRead {
-                return .notNow
+                return .cannotReadNow
             }
         } else {
             guard let held = UndoTreeReading.linkSha(at: stagedURL) else {
-                return .notNow
+                return .cannotReadNow
             }
             if ours.contains(held) {
-                return UndoSwap.removeALink(at: stagedURL) ? .free : .notNow
+                return UndoSwap.removeALink(at: stagedURL) ? .free : .couldNotMove
             }
         }
         // The teacher's. Back to its place if the place holds only a link
@@ -2051,15 +2101,20 @@ nonisolated enum UndoSwap {
                 return .givenBack
             }
             if !UndoSwap.removeALink(at: place) {
-                return .notNow
+                return .couldNotMove
             }
         }
         let atThePlace: UndoTreeReading = UndoTreeReading.read(at: place)
         if atThePlace == .absent && !UndoSwap.isALink(place) {
-            return UndoSwap.renameExclusively(stagedURL, onto: place) ? .givenBack : .notNow
-        }
-        if atThePlace == .cannotRead && !UndoSwap.isALink(place) {
-            return .notNow
+            UndoKillPoints.beforeARenameBack?(place)
+            if UndoSwap.renameExclusively(stagedURL, onto: place) {
+                return .givenBack
+            }
+            // Review 3 of mac-1, LOW 2: the rename back refused (another
+            // program filled the place in that instant): never left hidden,
+            // it is kept under a visible name beside the place, below.
+        } else if atThePlace == .cannotRead && !UndoSwap.isALink(place) {
+            return .cannotReadNow
         }
         let isAFolder: Bool = !stagedIsALink && UndoSwap.isAFolder(stagedURL)
         var keptAs: URL? = nil
@@ -2070,7 +2125,7 @@ nonisolated enum UndoSwap {
         if kept, let keptAs {
             return .keptVisible(keptAs)
         }
-        return .notNow
+        return .couldNotMove
     }
 
     /// Whether a folder stands at `url` (`lstat`, never followed).
@@ -2511,6 +2566,7 @@ nonisolated enum UndoSwap {
         linksOfTheStep: UndoStepLinks? = nil
     ) -> Bool {
         var allGone: Bool = true
+        let relinksOwnNames: Set<String> = linksOfTheStep?.ownStagedNames(label: label) ?? []
         var folders: [URL] = []
         for url in urls {
             let folder: URL = url.deletingLastPathComponent()
@@ -2548,8 +2604,13 @@ nonisolated enum UndoSwap {
                 // here: a tidy cannot tell which way the stopped swap went,
                 // so the place is read as taken and the item is kept under a
                 // visible name beside it, said on the trail first.
-                if let linksOfTheStep, let place = UndoSwap.placeOfStagedName(name),
-                   linksOfTheStep.relinkPlaces.contains(folder.appendingPathComponent(place).standardizedFileURL.path) {
+                // Review 3, MEDIUM: only the relink's OWN staged name for
+                // the direction this label moves is judged so, handed over
+                // exactly (`ownStagedNames`); any other staged name beside a
+                // relink's place (a write's staged page, a kept original) is
+                // the step's and goes through the tidy below.
+                if let linksOfTheStep, relinksOwnNames.contains(stagedURL.standardizedFileURL.path),
+                   let place = UndoSwap.placeOfStagedName(name) {
                     let placeURL: URL = folder.appendingPathComponent(place)
                     let settled: StagedNameSettled = UndoSwap.settleUnderARelinksStagedName(
                         stagedURL, place: placeURL, ours: linksOfTheStep.texts, givingBackOverOurs: false,
@@ -2557,7 +2618,7 @@ nonisolated enum UndoSwap {
                             linksOfTheStep.onKept?(placeURL, stagedURL, keptAs, isAFolder)
                         }
                     )
-                    if settled == .notNow {
+                    if settled.isLeftForALaterTry {
                         allGone = false
                     }
                     continue
@@ -2618,8 +2679,10 @@ nonisolated enum UndoSwap {
                 // inside its swap, leaves its new link (staged) or the old
                 // one (just exchanged out) under the staged name; each holds
                 // one of the step's texts, both in the list, so it is never
-                // an only copy and goes. A link holding any other text is
-                // not this step's and is left as it is.
+                // an only copy and goes. Under any staged name that is not a
+                // relink's own (those are settled above, review 2's one
+                // rule), a link holding any other text is not this step's
+                // and is left as it is.
                 if let linksOfTheStep, UndoSwap.isALink(stagedURL) {
                     guard let held = UndoTreeReading.linkSha(at: stagedURL) else {
                         allGone = false
@@ -2973,7 +3036,8 @@ nonisolated extension UndoJournal {
             },
             startsAtTheNextLogin: { place in
                 everyScheduleStartingAtTheNextLogin.append(place)
-            }
+            },
+            tellingKept: UndoRecovery.tellingWhatIsKept(course: record.step.course, section: record.step.section, root: root)
         )
         switch swapped {
         case .refused(let refusal):
@@ -3152,7 +3216,11 @@ nonisolated extension UndoJournal {
 
 /// mac-1 (#899), review 2: what a tidy needs to know of a step's links to
 /// apply the one rule under a relink's staged name
-/// (`UndoSwap.settleUnderARelinksStagedName`).
+/// (`UndoSwap.settleUnderARelinksStagedName`). Review 3, MEDIUM: the rule
+/// governs ONLY the relink's own staged name for the direction a label
+/// names (`ownStagedNames(label:)`), never a name that merely stands beside
+/// a relink's place: another op's staged page or kept original there is
+/// the step's, and is tidied by the rule it had before.
 nonisolated struct UndoStepLinks {
 
     // MARK: - Stored properties
@@ -3161,12 +3229,69 @@ nonisolated struct UndoStepLinks {
     /// SHA-256: what a staged link of the step's may hold.
     let texts: Set<String>
 
-    /// Each place (a standardised path) a relinking move of the step stages
-    /// its new link beside: the names the one rule governs.
-    let relinkPlaces: Set<String>
+    /// Each relinking move of the step: its `from` and `to` places, and
+    /// whether they are one place byte for byte (a relink where the link
+    /// stands).
+    let relinks: [UndoStepRelink]
 
     /// Told just before a teacher's item found under a relink's staged name
     /// is kept under a visible name: its place, where it was found, the
     /// visible name, and whether it is a folder.
     let onKept: ((_ place: URL, _ foundAt: URL, _ keptAs: URL, _ isAFolder: Bool) -> Void)?
+
+    // MARK: - Functions
+
+    /// The exact staged names (standardised paths) the one rule may judge
+    /// in a tidy of `label`, which also finds that label's `-recover`
+    /// names: each relink's own `-new` name for the direction each label
+    /// moves. A relink where the link stands stages beside its one place
+    /// either way; a two-place relink stages beside `to` going forward (an
+    /// apply or a redo) and beside `from` going back (an Undo); a recovery's
+    /// put-back (`-recover`) goes the other way from the work it puts back.
+    func ownStagedNames(label: String) -> Set<String> {
+        var names: Set<String> = []
+        for eachLabel in [label, label + "-recover"] {
+            let forward: Bool = UndoStepLinks.goesForward(eachLabel)
+            for relink in relinks {
+                var place: URL = forward ? relink.to : relink.from
+                if relink.isOnePlace {
+                    place = relink.from
+                }
+                names.insert(UndoSwap.besideURL(for: place, label: eachLabel, role: "new").standardizedFileURL.path)
+            }
+        }
+        return names
+    }
+
+    /// Whether a swap under `label` moves a step forward: `<seq>-apply` and
+    /// `<seq>-redo` do, `<seq>-undo` does not, and a `-recover` label puts
+    /// back the work it names, so goes the other way (`<seq>-recover`
+    /// alone puts back an apply).
+    static func goesForward(_ label: String) -> Bool {
+        var work: String = label
+        var puttingBack: Bool = false
+        if work.hasSuffix("-recover") {
+            work = String(work.dropLast("-recover".count))
+            puttingBack = true
+        }
+        // `-apply`, `-redo`, and the bare `<seq>` of `<seq>-recover` (an
+        // apply put back) go forward; only `-undo` goes back.
+        let forward: Bool = !work.hasSuffix("-undo")
+        return puttingBack ? !forward : forward
+    }
+}
+
+/// One relinking move of a step, as a tidy needs it (review 3 of mac-1).
+nonisolated struct UndoStepRelink {
+
+    // MARK: - Stored properties
+
+    /// Where the link stands before the step.
+    let from: URL
+
+    /// Where it stands after.
+    let to: URL
+
+    /// Whether `from` and `to` are one place byte for byte.
+    let isOnePlace: Bool
 }

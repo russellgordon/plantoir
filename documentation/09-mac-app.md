@@ -23922,6 +23922,23 @@ back) and refused changed since. Every tidy removes a staged link only by the
 text it holds, and a write planned at `p` refuses the step whether it was
 planned before the relink or after it.
 
+Fix round four (review 3). The one rule for what stands under a relink's
+staged name (review 2: only a link holding one of the step's texts is
+removed; anything else is the teacher's, given back or kept visible) is
+handed the EXACT name it may judge, `UndoStepLinks.ownStagedNames(label:)`:
+the relink's own `-new` name for the direction the label moves (beside the
+one place for a relink where the link stands; beside `to` for an apply or
+redo of a two-place relink, beside `from` for its Undo; a `-recover` label
+the other way). It no longer catches every staged name beside a relink's
+place: in Insert Class's shape (a new page written at the relink's `from`)
+the write's staged page and its kept original had been read as the
+teacher's, kept as `Unit 1, Day 4 (kept by Undo).md` and reported as a kept
+page. The live swap now says the kept-page or kept-folder line wherever it
+keeps an item visible (`tellingKept`, threaded through `UndoSwap.swap`); a
+rename back refused because the place filled meanwhile keeps the item
+visible rather than hidden; and an item that cannot be read refuses
+`cannotTellNow`, only a refused move `couldNotWrite`.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

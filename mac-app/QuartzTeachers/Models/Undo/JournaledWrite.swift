@@ -168,6 +168,16 @@ nonisolated enum JournaledWrite {
 
     // MARK: - Functions
 
+    /// The trail line said when an apply's relink keeps a teacher's item
+    /// under a visible name (review 3 of mac-1, LOW 1): none without a
+    /// working folder to name the place inside.
+    static func tellingWhatIsKept(of draft: UndoOpsDraft) -> ((_ place: URL, _ foundAt: URL, _ keptAs: URL, _ isAFolder: Bool) -> Void)? {
+        guard let root = draft.workingFolderURL else {
+            return nil
+        }
+        return UndoRecovery.tellingWhatIsKept(course: draft.course, section: draft.section, root: root)
+    }
+
     /// The ops that describe one file's change: `editLine` for each
     /// front-matter entry it changed when that is ALL it changed, otherwise
     /// one `writeFile`. The line form is only chosen when applying its ops to
@@ -270,7 +280,10 @@ nonisolated enum JournaledWrite {
             return .stoppedByATest
         }
 
-        switch UndoSwap.swap(targets, label: "\(seq)-apply", root: draft.workingFolderURL) {
+        switch UndoSwap.swap(
+            targets, label: "\(seq)-apply", root: draft.workingFolderURL,
+            tellingKept: UndoRecovery.tellingWhatIsKept(course: draft.course, section: draft.section, root: draft.workingFolderURL)
+        ) {
         case .refused(let refusal):
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             return .refused(refusal)
@@ -447,7 +460,10 @@ nonisolated enum JournaledWrite {
             // now: nothing was changed, and the step is not made.
             return .couldNotRecordTheStep
         }
-        switch UndoSwap.swap(targets, label: "\(seq)-apply", places: places, root: draft.workingFolderURL) {
+        switch UndoSwap.swap(
+            targets, label: "\(seq)-apply", places: places, root: draft.workingFolderURL,
+            tellingKept: JournaledWrite.tellingWhatIsKept(of: draft)
+        ) {
         case .refused(let refusal):
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             return .refused(refusal)
@@ -1225,6 +1241,12 @@ nonisolated enum UndoKillPoints {
     /// BACK (the place found changed under the swap) is refused, as on a
     /// volume that stopped taking it. Set only by tests.
     nonisolated(unsafe) static var relinkExchangeBackFails: ((URL) -> Bool)?
+
+    /// Review 3 of mac-1, LOW 2: called with the place just before a
+    /// teacher's item under a relink's staged name is renamed back into
+    /// it, so a test can fill the place in that instant, as another
+    /// program might. Set only by tests.
+    nonisolated(unsafe) static var beforeARenameBack: ((URL) -> Void)?
 
     /// Called with the list's folder once its segments are listed and
     /// before any of them is opened: a test takes a segment away there, as
