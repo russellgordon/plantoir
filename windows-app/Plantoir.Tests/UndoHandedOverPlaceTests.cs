@@ -775,4 +775,72 @@ public sealed class UndoHandedOverPlaceTests : IDisposable
         Assert.Equal(new UndoOpState?[] { UndoOpState.After, UndoOpState.After, UndoOpState.After }, judged);
         Assert.Equal(new[] { 2, 2, 1 }, calls);
     }
+
+    // ---- door-5 (W8b-21a5): the door's vet, and the plain path a settle shows
+
+    /// <summary>
+    /// Shape A through the door, the link at Day 3 spelled as Windows writes it
+    /// and leading OUT of the working folder (to a page by its full path), in a
+    /// scribe's working folder: the door's vet judges the new page at Day 3 on
+    /// the folders above it, as the plan does, so the step is made, undone and
+    /// redone, never refused, and the page outside is never read or written.
+    /// </summary>
+    [Fact]
+    public void AStepHandingOverALinkLeadingOutIsMadeUndoneAndRedone()
+    {
+        using var scribe = new UndoScribe();
+        string outsidePage = Path.Combine(_outside, "Day 3.md");
+        File.WriteAllBytes(outsidePage, Bytes("Linked.\n"));
+        string dayThree = scribe.FullPath("A", Day(3));
+        Directory.CreateDirectory(Path.GetDirectoryName(dayThree)!);
+        File.CreateSymbolicLink(dayThree, outsidePage);
+        var ops = new JsonArray(
+            new JsonObject { ["kind"] = "move", ["from"] = Day(3), ["to"] = Day(4), ["linkSha"] = UndoLinks.LinkSha(dayThree) },
+            scribe.OpsFor(Day(3), null, Bytes("New.\n"))[0]!.DeepClone());
+
+        UndoOutcome made = scribe.Door().Perform(scribe.OpsDraft("A", ops, [Bytes("New.\n")], action: "insertClass"));
+        Assert.True(made.Kind == UndoOutcomeKind.Applied, "the step was refused: " + made.Word);
+        Assert.Equal("New.\n", File.ReadAllText(dayThree));
+        Assert.Equal(outsidePage, new FileInfo(scribe.FullPath("A", Day(4))).LinkTarget);
+
+        UndoOutcome undone = scribe.Door().Undo();
+        Assert.True(undone.Kind == UndoOutcomeKind.Undone, "the Undo was refused: " + undone.Word);
+        Assert.Equal(outsidePage, new FileInfo(dayThree).LinkTarget);
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(scribe.FullPath("A", Day(4))));
+
+        UndoOutcome redone = scribe.Door().Redo();
+        Assert.True(redone.Kind == UndoOutcomeKind.Redone, "the Redo was refused: " + redone.Word);
+        Assert.Equal("New.\n", File.ReadAllText(dayThree));
+        Assert.Equal(outsidePage, new FileInfo(scribe.FullPath("A", Day(4))).LinkTarget);
+        Assert.Equal("Linked.\n", File.ReadAllText(outsidePage));
+        Assert.Single(Directory.EnumerateFileSystemEntries(_outside));
+    }
+
+    /// <summary>
+    /// Shape A killed with the link moved and the new page not written, then
+    /// someone's page written at Day 3: both of the pair are in the way, and
+    /// the settle counts Day 3 once, as the trail and a teacher are shown it,
+    /// never the move and the page as two places.
+    /// </summary>
+    [Fact]
+    public void ASettleCountsAHandedOverPlaceOnce()
+    {
+        using var scribe = new UndoScribe();
+        var handover = new UndoHandoverForTheCases(scribe);
+        handover.LayAfterALinksMove();
+        (JsonArray ops, List<byte[]> blobs) = handover.HandAPlaceOverAfterALinksMove();
+        var stopping = new UndoSeams { StopsHere = (at, where) => at == "beforeSwap" && where == 1 };
+        Assert.Equal(UndoOutcomeKind.StoppedByATest, scribe.Door(stopping, UndoScribe.AProcessThatIsGone).Perform(scribe.OpsDraft("A", ops, blobs)).Kind);
+        scribe.WritePage("A", Day(3), Bytes("Someone else's.\n"));
+        lock (scribe.TrailLines) scribe.TrailLines.Clear();
+
+        UndoRecoveryRun run = scribe.Door().Recover();
+
+        UndoRecoveryResult settled = Assert.Single(run.Settled);
+        Assert.Equal(UndoRecoveryOutcome.Interrupted, settled.Outcome);
+        Assert.Equal(1, settled.FilesInTheWay);
+        UndoTrailLine line;
+        lock (scribe.TrailLines) line = Assert.Single(scribe.TrailLines, said => said.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoRolledBack);
+        Assert.Equal(UndoTrail.InterruptedWords(UndoPhase.Begin, 0, 1), line.Words);
+    }
 }

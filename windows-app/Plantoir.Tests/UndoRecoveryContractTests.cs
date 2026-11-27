@@ -35,6 +35,8 @@ public sealed class UndoRecoveryContractTests
         "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored",
         // U4b's (W8-7)
         "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
+        // U4b3 door-5's (W8b-21a5)
+        "withAHandedOverPlace", "handedOver",
     };
 
     private const string First = "courses/TST1O/Section 1/Classes/first.md";
@@ -133,7 +135,14 @@ public sealed class UndoRecoveryContractTests
         // pages, then a replaceText on renamed/a.md inside it, in that order
         // (opKinds.wholeOps' one exception: the edit carried by the move).
         bool withAMovedFolder = Flag(recoveryCase, "withAMovedFolder");
-        bool byOps = withAMove || withATree || withAPreference || withAMovedFolder;
+        // U4b3 door-5 (W8b-21a5): in place of the two pages, a step that
+        // hands a place over (opKinds.wholeOps' second exception), made as
+        // stackCases' call of the same name makes it.
+        string? handoverShape = recoveryCase.TryGetProperty("withAHandedOverPlace", out JsonElement shapeNamed) ? shapeNamed.GetString()! : null;
+        if (handoverShape is not (null or "afterALinksMove" or "beforeALinksMove"))
+            Assert.Fail("a key this replay does not check: withAHandedOverPlace " + handoverShape);
+        var handover = new UndoHandoverForTheCases(scribe);
+        bool byOps = withAMove || withATree || withAPreference || withAMovedFolder || handoverShape is not null;
         scribe.Places.Write(UndoKindsForTheCases.Preference, new UndoJson.Text("a"));
         JsonArray? ops = null;
         var blobs = new List<byte[]>();
@@ -145,9 +154,22 @@ public sealed class UndoRecoveryContractTests
                 UndoKindsForTheCases.LayTheMediaFolder(scribe);
                 ops.Add(UndoKindsForTheCases.MoveTheMediaFolder(scribe));
             }
-            foreach (string path in new[] { First, Second })
+            if (handoverShape is not null)
             {
-                foreach (JsonNode? op in scribe.OpsFor(path, Before(path), After(path))) ops.Add(op!.DeepClone());
+                if (handoverShape == "afterALinksMove") handover.LayAfterALinksMove();
+                else handover.LayBeforeALinksMove();
+                (JsonArray handingOver, List<byte[]> handoverBlobs) = handoverShape == "afterALinksMove"
+                    ? handover.HandAPlaceOverAfterALinksMove()
+                    : handover.HandAPlaceOverBeforeALinksMove();
+                foreach (JsonNode? op in handingOver) ops.Add(op!.DeepClone());
+                blobs.AddRange(handoverBlobs);
+            }
+            else
+            {
+                foreach (string path in new[] { First, Second })
+                {
+                    foreach (JsonNode? op in scribe.OpsFor(path, Before(path), After(path))) ops.Add(op!.DeepClone());
+                }
             }
             if (withAPreference) ops.Add(UndoKindsForTheCases.External(UndoKindsForTheCases.Preference, "a", "b"));
             if (withATree)
@@ -167,6 +189,10 @@ public sealed class UndoRecoveryContractTests
             if (withAMove) ops.Add(UndoKindsForTheCases.FrontPageRecompute());
             if (withAMovedFolder) ops.Add(UndoKindsForTheCases.EditInside(UndoKindsForTheCases.RenamedFolder + "/a.md"));
         }
+        // The class pages and the library as laid, and as the step leaves them
+        // made whole (made in a scribe of its own, so this one is untouched).
+        string? handoverBefore = handoverShape is null ? null : UndoHandoverForTheCases.Snapshot(scribe);
+        string? handoverAfter = handoverShape is null ? null : UndoHandoverForTheCases.MadeWhole(handoverShape);
         UndoOutcome MakeTheStep(UndoDoor door) => byOps ? door.Perform(scribe.OpsDraft("A", (JsonArray)ops!.DeepClone(), blobs)) : door.Perform(draft);
 
         UndoOutcome stopped;
@@ -219,6 +245,12 @@ public sealed class UndoRecoveryContractTests
             if (handEdited == "carried" && withAMovedFolder)
             {
                 Assert.True(UndoKindsForTheCases.EditTheCarriedPageByHand(scribe), "no page inside the moved folder to change by hand");
+            }
+            else if (handEdited == "handedOverPlace" && handoverShape is not null)
+            {
+                // Someone's page written at Day 3, the place the step hands over.
+                Assert.True(handover.Nothing(UndoHandoverForTheCases.ClassPage(3)), "Day 3 is not free to write someone's page at");
+                scribe.WritePage("A", UndoHandoverForTheCases.ClassPage(3), "Someone else's.\n"u8.ToArray());
             }
             else
             {
@@ -392,6 +424,8 @@ public sealed class UndoRecoveryContractTests
             var said = keptLines.SelectMany(line => line.NoLongerInTheList ?? []).OrderBy(name => name, StringComparer.Ordinal).ToList();
             Assert.Equal(noLonger.GetBoolean() ? keptNamedOnTheTrail : [], said);
         }
+        if (recoveryCase.TryGetProperty("handedOver", out JsonElement handedOver))
+            Assert.Equal(handedOver.GetString(), handover.HandedOver());
         if (recoveryCase.TryGetProperty("movedFolder", out JsonElement movedFolder))
             Assert.Equal(movedFolder.GetString(), UndoKindsForTheCases.MovedFolder(scribe));
         if (recoveryCase.TryGetProperty("keptAside", out JsonElement keptAside))
@@ -414,7 +448,13 @@ public sealed class UndoRecoveryContractTests
 
         // The pages.
         string files = recoveryCase.GetProperty("files").GetString()!;
-        if (files != "unchecked")
+        if (handoverShape is not null && files != "unchecked")
+        {
+            // handAPlaceOver's pages and the library, not first and second.
+            Assert.True(files is "before" or "after", "a files value this replay does not know with withAHandedOverPlace: " + files);
+            Assert.Equal(files == "before" ? handoverBefore : handoverAfter, UndoHandoverForTheCases.Snapshot(scribe));
+        }
+        else if (files != "unchecked")
         {
             (byte[]? first, byte[]? second) = files switch
             {

@@ -689,23 +689,19 @@ public sealed class UndoStackContractTests
                 // U4b3 door-4 (W8b-21a4): a place handed over within one step
                 // (opKinds.wholeOps' second exception), through the door.
                 case "handAPlaceOverAfterALinksMove":
-                    if (Nothing(ClassPage(3)) && Nothing(ClassPage(4)))
-                    {
-                        LayALibraryPage(3, "Linked.\n");
-                        LayAClassLink(3);
-                    }
-                    Ops(new JsonArray(TheClassLinksMove(3, 4), ClassPageOp(3, null, "New.\n")), [Encoding.UTF8.GetBytes("New.\n")]);
+                {
+                    if (Nothing(ClassPage(3)) && Nothing(ClassPage(4))) Handover.LayAfterALinksMove();
+                    (JsonArray ops, List<byte[]> blobs) = Handover.HandAPlaceOverAfterALinksMove();
+                    Ops(ops, blobs);
                     return;
+                }
                 case "handAPlaceOverBeforeALinksMove":
-                    if (Nothing(ClassPage(2)) && Nothing(ClassPage(3)))
-                    {
-                        LayALibraryPage(2, "Two.\n");
-                        LayAClassLink(2);
-                        _scribe.WritePage("A", ClassPage(3), "Three.\n"u8.ToArray());
-                    }
-                    Ops(new JsonArray(ClassPageOp(4, null, "Three.\n"), ClassPageOp(3, "Three.\n", null), TheClassLinksMove(2, 3), ClassPageOp(2, null, "New.\n")),
-                        [Encoding.UTF8.GetBytes("Three.\n"), Encoding.UTF8.GetBytes("New.\n")]);
+                {
+                    if (Nothing(ClassPage(2)) && Nothing(ClassPage(3))) Handover.LayBeforeALinksMove();
+                    (JsonArray ops, List<byte[]> blobs) = Handover.HandAPlaceOverBeforeALinksMove();
+                    Ops(ops, blobs);
                     return;
+                }
                 case "editTheHandedOverPageByHand":
                     _scribe.WritePage("A", ClassPage(3), "Hand.\n"u8.ToArray());
                     return;
@@ -860,76 +856,22 @@ public sealed class UndoStackContractTests
         }
 
         // ---- U4b3 door-4 (stackCasesHow): the class pages and their links --
+        // Laid and read by UndoHandoverForTheCases, which the recovery replay
+        // shares (W8b-21a5).
 
-        private const string ClassSection = "courses/TST1O/section1";
-        private readonly Dictionary<string, byte[]> _libraryLaid = new(StringComparer.Ordinal);
+        private UndoHandoverForTheCases? _handover;
+        private UndoHandoverForTheCases Handover => _handover ??= new UndoHandoverForTheCases(_scribe);
 
-        /// <summary>courses/TST1O/section1/Unit 1, Day &lt;n&gt;.md.</summary>
-        private static string ClassPage(int day) => ClassSection + "/Unit 1, Day " + day + ".md";
+        private static string ClassPage(int day) => UndoHandoverForTheCases.ClassPage(day);
 
-        /// <summary>The target each class link holds, as written: <c>../library/Day &lt;n&gt;.md</c>.</summary>
-        private static string ClassLinkTarget(int day) => "../library/Day " + day + ".md";
+        private static JsonObject TheClassLinksMove(int from, int to) => UndoHandoverForTheCases.TheClassLinksMove(from, to);
 
-        private bool Nothing(string relative) => UndoLinks.Look(_scribe.FullPath("A", relative)) == UndoLinks.What.Nothing;
+        private JsonNode ClassPageOp(int day, string? before, string? after) => Handover.ClassPageOp(day, before, after);
 
-        /// <summary>courses/TST1O/library/Day &lt;n&gt;.md holding <paramref name="text"/>, remembered for <c>library: untouched</c>.</summary>
-        private void LayALibraryPage(int day, string text)
-        {
-            string relative = LinkLibrary + "/Day " + day + ".md";
-            byte[] bytes = Encoding.UTF8.GetBytes(text);
-            _scribe.WritePage("A", relative, bytes);
-            _libraryLaid[relative] = bytes;
-        }
+        private bool Nothing(string relative) => Handover.Nothing(relative);
 
-        /// <summary>A symbolic link at Day &lt;n&gt; holding its library target as written (forward slash kept, as the mac writes it).</summary>
-        private void LayAClassLink(int day)
-        {
-            string place = _scribe.FullPath("A", ClassPage(day));
-            Directory.CreateDirectory(Path.GetDirectoryName(place)!);
-            File.CreateSymbolicLink(place, ClassLinkTarget(day));
-        }
-
-        /// <summary>The link's <c>move</c> from Day <paramref name="from"/> to Day <paramref name="to"/>, its linkSha the SHA-256 of the target it holds as written.</summary>
-        private static JsonObject TheClassLinksMove(int from, int to) => new()
-        {
-            ["kind"] = "move", ["from"] = ClassPage(from), ["to"] = ClassPage(to),
-            ["linkSha"] = UndoCheck.Sha(Encoding.UTF8.GetBytes(ClassLinkTarget(from))),
-        };
-
-        /// <summary>A writeFile at Day <paramref name="day"/>: no before (a new page) or no after (a removal), as the door works it out.</summary>
-        private JsonNode ClassPageOp(int day, string? before, string? after) =>
-            _scribe.OpsFor(ClassPage(day), before is null ? null : Encoding.UTF8.GetBytes(before), after is null ? null : Encoding.UTF8.GetBytes(after))[0]!.DeepClone();
-
-        /// <summary>
-        /// <c>handedOver</c>: what Day 2, Day 3 and Day 4 hold (<c>page &lt;text&gt;</c>
-        /// without its last line end, <c>link &lt;target as written&gt;</c> or
-        /// <c>nothing</c>), then whether the library holds what the calls laid.
-        /// </summary>
-        internal string HandedOver()
-        {
-            var parts = new List<string>();
-            foreach (int day in new[] { 2, 3, 4 })
-            {
-                string full = _scribe.FullPath("A", ClassPage(day));
-                string holds = UndoLinks.Look(full) switch
-                {
-                    UndoLinks.What.Nothing => "nothing",
-                    UndoLinks.What.Link => "link " + (new FileInfo(full).LinkTarget ?? "notALink"),
-                    UndoLinks.What.File => "page " + WithoutItsLastLineEnd(UndoKindsForTheCases.Text(_scribe.Page("A", ClassPage(day))) ?? ""),
-                    UndoLinks.What other => other.ToString(),
-                };
-                parts.Add("Day " + day + ": " + holds);
-            }
-            bool untouched = true;
-            foreach ((string relative, byte[] bytes) in _libraryLaid)
-            {
-                if (_scribe.Page("A", relative) is not { } now || !now.AsSpan().SequenceEqual(bytes)) untouched = false;
-            }
-            parts.Add("library: " + (untouched ? "untouched" : "changed"));
-            return string.Join("; ", parts);
-        }
-
-        private static string WithoutItsLastLineEnd(string text) => text.EndsWith('\n') ? text[..^1] : text;
+        /// <summary><c>handedOver</c>, as <see cref="UndoHandoverForTheCases.HandedOver"/> reads it.</summary>
+        internal string HandedOver() => Handover.HandedOver();
 
         /// <summary>The spelling courses/TST1O lists for the media folder, as spelled, or null when it lists none.</summary>
         private string? CaseOnlySpellingListed()
