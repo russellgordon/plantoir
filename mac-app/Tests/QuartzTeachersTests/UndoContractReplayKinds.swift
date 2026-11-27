@@ -45,7 +45,6 @@ nonisolated enum UndoContractKinds {
         "moveALinkToAFolder", "stepEditingInsideALinksMove",
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
         "relinkALink", "relinkALinkLeavingAHandedOverPlace", "relinkTwoChainedLinks", "relinkThreeChainedLinks", "relinkThenMoveALinkIntoItsPlace",
-        "relinkALinkWhereItStands",
         "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
     ]
 
@@ -553,20 +552,6 @@ nonisolated enum UndoContractKinds {
                 blobs.append(new)
             }
             return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: blobs, root: root, action: "insertClass"), in: journal, mode: .live, places: places))
-        case "relinkALinkWhereItStands":
-            // mac-1: Day 3 a page, Day 4 a link holding `Unit 1, Day 3.md`;
-            // ONE step: the link re-pointed where it stands to hold `Unit 1,
-            // Day 5.md` (a move whose from and to are that one place).
-            let oldText: Data = Data("Unit 1, Day 3.md".utf8)
-            let newText: Data = Data("Unit 1, Day 5.md".utf8)
-            if !somethingIsAt(classPage(3), in: root) && !somethingIsAt(classPage(4), in: root) {
-                try UndoContractReplay.write("Three.\n", to: classPage(3), in: root)
-                try layALink(classPage(4), leadingTo: "Unit 1, Day 3.md", root: root)
-            }
-            let ops: [UndoOp] = [
-                UndoOp.relinkLink(from: classPage(4), to: classPage(4), linkShaBefore: UndoHash.sha256(of: oldText), linkShaAfter: UndoHash.sha256(of: newText)),
-            ]
-            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [oldText, newText], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
         case "relinkTwoChainedLinks":
             // Review D of U4b3, MEDIUM: Day 4 a link holding `Unit 1, Day
             // 1.md`, Day 5 one holding `Unit 1, Day 2.md`; ONE step, as

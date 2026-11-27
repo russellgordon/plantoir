@@ -162,12 +162,6 @@ nonisolated final class JournaledStep {
 
     private var plannedURL: [String: URL] = [:]
 
-    /// Every place a write, a new file or a removal was planned at, as the
-    /// caller named it, a link's own place included when the write went
-    /// through it to the file it leads to: what a relink where the link
-    /// stands planned later looks back at (review 1 of mac-1, LOW 3).
-    private var placesNamedByAWrite: Set<String> = []
-
     /// The bytes each planned file is left holding (nil: removed).
     private var plannedAfter: [String: Data?] = [:]
 
@@ -428,32 +422,13 @@ nonisolated final class JournaledStep {
     /// write planned at `to` refuses the step before anything changes, as
     /// the link there holds a text the step is changing. False, planning
     /// nothing, when the link cannot be read now. A `textAfter` equal to
-    /// the text now is the link's plain move (`moveLink`). With `to` the
-    /// same place as `from` (mac-1) the link is re-pointed where it stands:
-    /// the op names the one place twice, it is never handed over, and a
-    /// write, a new file or a removal planned there refuses the step before
-    /// anything changes, whether it was planned before the relink or after
-    /// it (review 1 of mac-1, LOW 3).
+    /// the text now is the link's plain move (`moveLink`).
     @discardableResult
     func relinkLink(_ from: URL, to: URL, textAfter: Data) -> Bool {
         guard let textBefore = UndoTreeReading.linkTarget(at: from) else {
             return false
         }
-        let whereItStands: Bool = UndoOp.isOnePathByteForByte(JournaledStep.key(of: from), JournaledStep.key(of: to))
-        if whereItStands && textBefore != textAfter && placesNamedByAWrite.contains(JournaledStep.key(of: from)) {
-            // A write planned at the one place earlier went through the
-            // link to the file it leads to: the step is refused before
-            // anything changes, as one planned after the relink is.
-            if refusedBeforeMaking == nil {
-                refusedBeforeMaking = .cannotTellNow(path: from.path)
-            }
-        }
         if textBefore == textAfter {
-            // Where the link stands with its text unchanged there is
-            // nothing to do (mac-1): nothing is planned.
-            if whereItStands {
-                return true
-            }
             moveLink(from, to: to, linkSha: UndoHash.sha256(of: textBefore))
             return true
         }
@@ -474,13 +449,6 @@ nonisolated final class JournaledStep {
     /// (`relinkLink`).
     static func isARelink(_ planned: PlannedFolderMove) -> Bool {
         return planned.textBefore != nil && planned.textAfter != nil
-    }
-
-    /// Whether a planned relinking move re-points its link where it stands
-    /// (mac-1): `relinkLink(p, to: p, textAfter:)`, one place for both.
-    static func isARelinkWhereItStands(_ planned: PlannedFolderMove) -> Bool {
-        return JournaledStep.isARelink(planned)
-            && UndoOp.isOnePathByteForByte(JournaledStep.key(of: planned.from), JournaledStep.key(of: planned.to))
     }
 
     /// The blobs a planned folder move needs in the list: a relinking
@@ -1284,7 +1252,6 @@ nonisolated final class JournaledStep {
         if refusesAWrite(at: url) {
             return
         }
-        placesNamedByAWrite.insert(JournaledStep.key(of: url))
         var place: URL = url
         // A link's new place is always the file it leads to, even where the
         // step removes the page the link moves over (U4b3 door-6).
@@ -1432,16 +1399,10 @@ nonisolated final class JournaledStep {
     }
 
     /// The planned move of a symbolic link whose `from` is exactly `url`,
-    /// or nil: the place it leaves, handed over. Never a relink where the
-    /// link stands (mac-1): it leaves no place, so its one place is never
-    /// read as free or handed over, and a write there is refused
-    /// (`refusesAWrite`, as at any relink's new name).
+    /// or nil.
     func plannedLinkMove(startingAt url: URL) -> (from: URL, to: URL)? {
         let key: String = JournaledStep.key(of: url)
         for move in plannedFolderMoves where JournaledStep.isALinksMove(move) {
-            if JournaledStep.isARelinkWhereItStands(move) {
-                continue
-            }
             if JournaledStep.key(of: move.from) == key {
                 return (from: move.from, to: move.to)
             }

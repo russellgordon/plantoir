@@ -793,33 +793,6 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         return linkShaBefore != nil
     }
 
-    /// Whether the op is a relink where the link stands (mac-1, #899): a
-    /// `move`, never a `moveApart` or a `setAside`, whose `from` and `to`
-    /// are ONE path byte for byte, carrying the relinking pair. The link's
-    /// text is changed at that one place, which it neither leaves nor
-    /// fills (opKinds.move's second exception).
-    var isARelinkWhereItStands: Bool {
-        guard knownKind == .move, isARelink, let from, let to else {
-            return false
-        }
-        return UndoOp.isOnePathByteForByte(from, to)
-    }
-
-    /// Whether two paths are ONE path byte for byte: their UTF-8 bytes
-    /// equal, never Swift's `==`, which is Unicode canonical equivalence
-    /// (`Café` composed equals `Café` decomposed). The one same-place test a
-    /// relink where the link stands is asked by (review 1 of mac-1, MEDIUM
-    /// 1): the op, `JournaledStep`, the swap's dispatch and recovery.
-    /// Every other comparison of names (`partInside`, `placesOverlap`,
-    /// `isCaseOnlyMove`) is Swift's `==` after `lowercased()`, canonical
-    /// equivalence, which is equality after NFC normalisation and
-    /// lowercasing: the rule `opKinds.wholeOps` names (review 2 of mac-1,
-    /// LOW 1), so a rename that changes both case and normalisation is a
-    /// capitalisation-only move.
-    static func isOnePathByteForByte(_ first: String, _ second: String) -> Bool {
-        return first.utf8.elementsEqual(second.utf8)
-    }
-
     /// The SHA-256 of the text a link's move holds at `from` (`isAtFrom`)
     /// or at `to`: `linkSha` on both sides of a plain one, each side's own
     /// for a relinking one. Nil for any other op.
@@ -1106,11 +1079,9 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             if !UndoOp.isSafeRelativePath(from) || !UndoOp.isSafeRelativePath(to) {
                 return false
             }
-            // Two exceptions: a capitalisation-only rename (U4b), the two
-            // spellings one place on a case-insensitive volume, and a relink
-            // where the link stands (mac-1), `from` and `to` one path byte
-            // for byte; the pair's own shape is checked below with the rest.
-            if UndoOp.placesOverlap(from, to) && !op.isCaseOnlyMove && !op.isARelinkWhereItStands {
+            // One exception (U4b): a capitalisation-only rename, the two
+            // spellings one place on a case-insensitive volume.
+            if UndoOp.placesOverlap(from, to) && !op.isCaseOnlyMove {
                 return false
             }
             var contents: Int = 0

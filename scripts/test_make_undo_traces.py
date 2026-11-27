@@ -471,42 +471,6 @@ class LineModelTests(unittest.TestCase):
         self.assertEqual(result, ("ready", {path: text + "Written since.\n"}, []))
 
 
-class RelinkRecoveryByStateTests(unittest.TestCase):
-    """Windows' recovery of a relink where the link stands, by state
-    (opKinds.move; review 2 of mac-1, LOW 2): what is at the place and
-    what is set aside decide, a rule for every state."""
-
-    PLACE = "courses/TST1O/section1/Unit 1, Day 4.md"
-
-    def settled(self, at_the_place, set_aside):
-        op = {"kind": "move", "from": self.PLACE, "to": self.PLACE,
-              "linkShaBefore": traces.sha("Unit 1, Day 3.md"),
-              "linkShaAfter": traces.sha("Unit 1, Day 5.md")}
-        pages = {self.PLACE + traces.SET_ASIDE: set_aside}
-        if at_the_place is not None:
-            pages[self.PLACE] = at_the_place
-        return traces.settle_what_was_set_aside([op], pages, True)
-
-    def test_the_place_empty_takes_back_whatever_was_set_aside(self):
-        for set_aside in (("link", "Unit 1, Day 3.md"), "Teacher's save.\n"):
-            self.assertEqual(self.settled(None, set_aside), {self.PLACE: set_aside})
-
-    def test_a_link_of_the_steps_at_the_place_gives_the_teachers_item_back(self):
-        self.assertEqual(self.settled(("link", "Unit 1, Day 5.md"), "Teacher's save.\n"),
-                         {self.PLACE: "Teacher's save.\n"})
-        self.assertEqual(self.settled(("link", "Unit 1, Day 5.md"), ("link", "Unit 1, Day 3.md")),
-                         {self.PLACE: ("link", "Unit 1, Day 5.md")})
-
-    def test_a_third_item_at_the_place_keeps_the_teachers_item_visible(self):
-        kept = "courses/TST1O/section1/Unit 1, Day 4 (kept by Undo).md"
-        self.assertEqual(self.settled("Another save.\n", "Teacher's save.\n"),
-                         {self.PLACE: "Another save.\n", kept: "Teacher's save.\n"})
-
-    def test_a_third_item_at_the_place_removes_a_link_of_the_steps_set_aside(self):
-        self.assertEqual(self.settled("Another save.\n", ("link", "Unit 1, Day 3.md")),
-                         {self.PLACE: "Another save.\n"})
-
-
 def safe_path(path):
     if not isinstance(path, str) or not path:
         return False
@@ -551,10 +515,7 @@ def readable_op(op):
     if kind in ("move", "moveApart", "setAside"):
         if "path" in op or not safe_path(op.get("from")) or not safe_path(op.get("to")):
             return False
-        # Two exceptions: a capitalisation-only rename (U4b), and a relink
-        # where the link stands (mac-1: from and to one path byte for byte,
-        # a move carrying the relinking pair).
-        if overlap(op["from"], op["to"]) and not traces.is_case_only_move(op) and not traces.is_a_relink_in_place(op):
+        if overlap(op["from"], op["to"]) and not traces.is_case_only_move(op):
             return False
         # Exactly one content form: sha, listingSha, linkSha (U4b2-14), or
         # the relinking pair linkShaBefore and linkShaAfter counted as ONE
@@ -1739,12 +1700,9 @@ class ContractCaseTests(unittest.TestCase):
         holding a relinking move, killed before a swap or inside the
         relink's (relinkStaged, relinkRenamedIn), going forward or back,
         settles whole: recovery first removes the link the interrupted swap
-        had just made when both stand, then judges by content. mac-1's
-        inPlace rows: a relink where the link stands, stopped with its new
-        link staged (relinkStaged) or just after its one swap
-        (relinkSwapped), settles on the text the place holds."""
+        had just made when both stand, then judges by content."""
         cases = [case for case in shared_undo()["recoveryCases"] if case.get("withARelink")]
-        self.assertEqual(len(cases), 21)
+        self.assertEqual(len(cases), 13)
         phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
                   ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done"}
         old, new = "Unit 1, Day 3.md", "Unit 1, Day 4.md"
@@ -1757,7 +1715,7 @@ class ContractCaseTests(unittest.TestCase):
 
         for case in cases:
             with self.subTest(case["name"]):
-                self.assertIn(case["withARelink"], ("alone", "leavingAHandedOverPlace", "chained", "chainedThree", "thenAMove", "inPlace"))
+                self.assertIn(case["withARelink"], ("alone", "leavingAHandedOverPlace", "chained", "chainedThree", "thenAMove"))
                 days = (3, 4, 5)
                 if case["withARelink"] == "chained":
                     # Review D of U4b3: two relinks that chain, highest first.
@@ -1777,12 +1735,6 @@ class ContractCaseTests(unittest.TestCase):
                     texts = ["Unit 1, Day %d.md" % number for number in range(1, 5)]
                     pages = {self.day(4): ("link", texts[0]), self.day(5): ("link", texts[1]), self.day(6): ("link", texts[2])}
                     ops = [relink(6, 7, texts[2], texts[3]), relink(5, 6, texts[1], texts[2]), relink(4, 5, texts[0], texts[1])]
-                elif case["withARelink"] == "inPlace":
-                    # mac-1: Day 4's link re-pointed where it stands.
-                    pages = {self.day(3): "Three.\n", self.day(4): ("link", old)}
-                    ops = [relink(4, 4, old, "Unit 1, Day 5.md")]
-                    self.assertTrue(traces.is_a_relink_in_place(ops[0]))
-                    self.assertEqual(traces.handovers(ops), [])
                 else:
                     pages = {self.day(3): "Three.\n", self.day(4): ("link", old)}
                     ops = [relink(4, 5, old, new)]

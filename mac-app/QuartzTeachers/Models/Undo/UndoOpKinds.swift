@@ -1099,9 +1099,6 @@ nonisolated extension UndoCheck {
             guard let from = op.from, let to = op.to else {
                 return .neither
             }
-            if op.isARelinkWhereItStands {
-                return UndoMoveSide.stateWhereTheLinkStands(op, at: root.appendingPathComponent(from))
-            }
             if op.isCaseOnlyMove, let spelled = UndoMoveSide.spellingListed(
                 from: root.appendingPathComponent(from), to: root.appendingPathComponent(to)
             ) {
@@ -1254,32 +1251,6 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
             return .another
         }
         return .another
-    }
-
-    /// mac-1 (#899): a relink where the link stands, judged at its ONE
-    /// place with `lstat` and `readlink`, never followed: holding the old
-    /// text is as before, the new text as the step left it, anything else
-    /// (nothing, a file, a folder, another text) changed since, and a place
-    /// that cannot be read just now cannot tell.
-    static func stateWhereTheLinkStands(_ op: UndoOp, at url: URL) -> UndoOpState {
-        guard let before = op.linkShaBefore, let after = op.linkShaAfter else {
-            return .neither
-        }
-        let holdingTheOld: UndoMoveSide = UndoMoveSide.readLink(at: url, linkSha: before)
-        if holdingTheOld == .cannotRead {
-            return .cannotTell
-        }
-        if holdingTheOld == .holdsTheContent {
-            return .before
-        }
-        let holdingTheNew: UndoMoveSide = UndoMoveSide.readLink(at: url, linkSha: after)
-        if holdingTheNew == .cannotRead {
-            return .cannotTell
-        }
-        if holdingTheNew == .holdsTheContent {
-            return .after
-        }
-        return .neither
     }
 
     /// `isAtFrom` names the side read: a relinking move (U4b3 relink-1)

@@ -143,10 +143,7 @@ nonisolated enum UndoRefusal: Equatable, Sendable {
     /// permission). Nothing was swapped and nothing of the step is left
     /// beside any page (`undo.rule.stagedThenSwapped`; the Fable sweep of
     /// U1, F1). Never `fileIsInUse`, which would tell the teacher a file is
-    /// open somewhere when it is not. Also a relink where the link stands on
-    /// a volume that will not exchange two links in one call (`RENAME_SWAP`
-    /// refused, as SMB may: mac-1's fix round): the change cannot be made
-    /// in that folder, and nothing was changed.
+    /// open somewhere when it is not.
     case couldNotWrite(path: String)
 
     /// Content the step needs is missing from the list.
@@ -167,16 +164,6 @@ nonisolated enum UndoRefusal: Equatable, Sendable {
 nonisolated enum JournaledWrite {
 
     // MARK: - Functions
-
-    /// The trail line said when an apply's relink keeps a teacher's item
-    /// under a visible name (review 3 of mac-1, LOW 1): none without a
-    /// working folder to name the place inside.
-    static func tellingWhatIsKept(of draft: UndoOpsDraft) -> ((_ place: URL, _ foundAt: URL, _ keptAs: URL, _ isAFolder: Bool) -> Void)? {
-        guard let root = draft.workingFolderURL else {
-            return nil
-        }
-        return UndoRecovery.tellingWhatIsKept(course: draft.course, section: draft.section, root: root)
-    }
 
     /// The ops that describe one file's change: `editLine` for each
     /// front-matter entry it changed when that is ALL it changed, otherwise
@@ -280,10 +267,7 @@ nonisolated enum JournaledWrite {
             return .stoppedByATest
         }
 
-        switch UndoSwap.swap(
-            targets, label: "\(seq)-apply", root: draft.workingFolderURL,
-            tellingKept: UndoRecovery.tellingWhatIsKept(course: draft.course, section: draft.section, root: draft.workingFolderURL)
-        ) {
+        switch UndoSwap.swap(targets, label: "\(seq)-apply", root: draft.workingFolderURL) {
         case .refused(let refusal):
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             return .refused(refusal)
@@ -460,10 +444,7 @@ nonisolated enum JournaledWrite {
             // now: nothing was changed, and the step is not made.
             return .couldNotRecordTheStep
         }
-        switch UndoSwap.swap(
-            targets, label: "\(seq)-apply", places: places, root: draft.workingFolderURL,
-            tellingKept: JournaledWrite.tellingWhatIsKept(of: draft)
-        ) {
+        switch UndoSwap.swap(targets, label: "\(seq)-apply", places: places, root: draft.workingFolderURL) {
         case .refused(let refusal):
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             return .refused(refusal)
@@ -1160,10 +1141,6 @@ nonisolated enum UndoKillPoint: Equatable, Sendable {
     /// U4b3 relink-3: inside the same swap, the new link renamed in and the
     /// old one not yet removed: both links stand.
     case relinkRenamedIn(Int)
-    /// mac-1: inside a relink's swap where the link stands, at target N:
-    /// the new link exchanged into the place in one call, the old one under
-    /// the staged name and not yet removed.
-    case relinkSwapped(Int)
     case beforeApplied
     case afterUndoing
     case beforeUndone
@@ -1236,17 +1213,6 @@ nonisolated enum UndoKillPoints {
     /// this place (U4b3 relink-1), as a place taken in that instant would.
     /// Set only by tests.
     nonisolated(unsafe) static var relinkRenameInFails: ((URL) -> Bool)?
-
-    /// mac-1's fix round: a relink where the link stands whose exchange
-    /// BACK (the place found changed under the swap) is refused, as on a
-    /// volume that stopped taking it. Set only by tests.
-    nonisolated(unsafe) static var relinkExchangeBackFails: ((URL) -> Bool)?
-
-    /// Review 3 of mac-1, LOW 2: called with the place just before a
-    /// teacher's item under a relink's staged name is renamed back into
-    /// it, so a test can fill the place in that instant, as another
-    /// program might. Set only by tests.
-    nonisolated(unsafe) static var beforeARenameBack: ((URL) -> Void)?
 
     /// Called with the list's folder once its segments are listed and
     /// before any of them is opened: a test takes a segment away there, as
@@ -1373,14 +1339,6 @@ nonisolated enum UndoTrailHook {
     /// something else now holds that place. The course and section, the
     /// place and the visible name, both inside the working folder.
     nonisolated(unsafe) static var keptAPageLine: ((_ course: String, _ section: Int?, _ place: String, _ keptAs: String) -> Void)?
-
-    /// mac-2 (the day27b-2 sweep, finding 1): an item that was not
-    /// Plantoir's, a page, a folder or a link with another text, was found
-    /// under a relink's own hidden name where a link was being changed, live
-    /// or by recovery, and is about to be kept under the visible name
-    /// `keptAs` beside `place`. Never the kept-page or kept-folder line: no
-    /// change removed, moved or set it aside. Both inside the working folder.
-    nonisolated(unsafe) static var keptAnItemFoundWhereALinkWasChangedLine: ((_ course: String, _ section: Int?, _ place: String, _ keptAs: String) -> Void)?
 
     /// #899, ahead of U5: a restore replacing a course closed a step left
     /// in flight there (`UndoRestoreSetAside`), so recovery never judges the
