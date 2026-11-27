@@ -709,6 +709,19 @@ internal static class UndoLinks
         return target is null ? null : Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(target)));
     }
 
+    /// <summary>
+    /// Whether the link at <paramref name="fullPath"/> is a link to a FOLDER
+    /// (a junction, or a symbolic link made as a folder's), told by the
+    /// link's OWN attributes, never by following it: so a link to a folder
+    /// that leads nowhere is still one (#899 W8b-21). Ask it only of a place
+    /// <see cref="Look"/> calls a link.
+    /// </summary>
+    internal static bool IsALinkToAFolder(string fullPath)
+    {
+        try { return File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+    }
+
     /// <summary>A file's bytes, read sharing everything, or null when it cannot be read now.</summary>
     internal static byte[]? ReadAll(string fullPath)
     {

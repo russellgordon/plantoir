@@ -261,7 +261,9 @@ public static class SpecialFolderRenamer
     /// as ONE step through the door (#899 W8b-15b; the mac's U4b), made by
     /// <c>sheet</c>, held by the course: one <c>move</c> per place of the
     /// folder (<see cref="UndoActionStep.MoveFolder"/>, judged by its
-    /// listing), then each relinked page named at its place after the move,
+    /// listing; a place that is a link to a folder, <see cref="UndoActionStep.MoveLink"/>,
+    /// the link itself judged by its target as stored, what it leads to never
+    /// listed, read, moved or written), then each relinked page named at its place after the move,
     /// then one <c>editJSON</c> per changed member of the settings. All of it
     /// or none: a step refused leaves the course exactly as it was, and is
     /// said as a <see cref="RenameException"/>. A step refused because a page
@@ -304,7 +306,13 @@ public static class SpecialFolderRenamer
             CourseConfiguration.PlannedRecord? plannedSettings = null;
             try
             {
-                foreach (var move in moves) step.MoveFolder(move.From, move.To);
+                foreach (var move in moves)
+                {
+                    // A place that is a link is renamed by moving the LINK
+                    // (W8b-21, ruling 1 of #899): never what it leads to.
+                    if (UndoLinks.Look(move.From) == UndoLinks.What.Link) step.MoveLink(move.From, move.To);
+                    else step.MoveFolder(move.From, move.To);
+                }
                 relinked = PlanRelinkedPages(step, courseDirectory, oldName, newName, moves);
                 if (settings is not null) plannedSettings = settings.Configuration.PlanRecordOnDisk(settings.Change, settings.Path, step);
             }
@@ -678,13 +686,20 @@ public static class SpecialFolderRenamer
     /// <summary>
     /// Whether a place holds something the rename moves, looked at WITHOUT
     /// following a link (<see cref="UndoLinks.Look"/>, never
-    /// <c>Directory.Exists</c>, which follows one): a folder; or a link, or a
-    /// place that cannot be looked at now, either of which the step refuses
-    /// <c>cannotTellNow</c> with nothing changed (a linked folder is renamed
-    /// as a link by W8b-21). A file at the place, or nothing, is not moved.
+    /// <c>Directory.Exists</c>, which follows one): a folder; a link to a
+    /// folder, by the link's own attributes (<see cref="UndoLinks.IsALinkToAFolder"/>),
+    /// wherever it leads, nowhere included, which the step moves as itself
+    /// (W8b-21); a link whose target cannot be read, or a place that cannot
+    /// be looked at now, either of which the step refuses <c>cannotTellNow</c>
+    /// with nothing changed. A file at the place, a link to a file, or
+    /// nothing, is not moved.
     /// </summary>
-    private static bool IsAPlaceToMove(string place) =>
-        UndoLinks.Look(place) is UndoLinks.What.Folder or UndoLinks.What.Link or UndoLinks.What.CannotLook;
+    private static bool IsAPlaceToMove(string place) => UndoLinks.Look(place) switch
+    {
+        UndoLinks.What.Folder or UndoLinks.What.CannotLook => true,
+        UndoLinks.What.Link => UndoLinks.LinkSha(place) is null || UndoLinks.IsALinkToAFolder(place),
+        _ => false,
+    };
 
     /// <summary>
     /// Why the moves cannot all be made, or null when they can.
