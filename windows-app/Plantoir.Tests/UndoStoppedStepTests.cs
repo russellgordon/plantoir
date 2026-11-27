@@ -18,7 +18,7 @@ namespace Plantoir.Tests;
 /// unless it says shadow.
 /// </summary>
 [Collection(SharedActivityState.Name)]
-public sealed class UndoStoppedStepTests : IDisposable
+public sealed partial class UndoStoppedStepTests : IDisposable
 {
     // ---- Stored properties ---------------------------------------------------------
 
@@ -532,10 +532,9 @@ public sealed class UndoStoppedStepTests : IDisposable
     /// <c>referenceCourses.settingStoppedCases</c>, run from the JSON through
     /// <see cref="ReferenceCourseUpkeep.WriteSchoolYear"/> with a live door
     /// stopped after its swap: what the teacher reads, whether the step is
-    /// left in flight, and what Undo offers then. The alert's own words for
-    /// <c>settingCouldNotBeChanged</c> are W8c-1b's: here that row is the
-    /// door's "could not finish" (the step in flight, its number the one Put
-    /// It Back takes), never said as saved.
+    /// left in flight, and what Undo offers then. <c>settingCouldNotBeChanged</c>
+    /// is the alert's title (W8c-1b), the step left in flight, its number the
+    /// one Put It Back takes.
     /// </summary>
     [Fact]
     public void TheContractsStoppedSettingCases()
@@ -564,7 +563,7 @@ public sealed class UndoStoppedStepTests : IDisposable
                     Assert.True(said == ReferenceCourse.CouldNotSetSchoolYear(ReferenceCourse.ShownCode(course)), name + ": " + said);
                     break;
                 case "settingCouldNotBeChanged":
-                    Assert.True(said is not null, name + ": said as saved");
+                    Assert.True(said == ReferenceCourse.SettingCouldNotBeChanged("school year"), name + ": " + said);
                     Assert.Equal(UndoPutBackVerdict.PutBack, Door(list).PutBackAtOnce(2));
                     Assert.True(YearOnDisk() == 2026, name + ": Put It Back did not put the old year back");
                     break;

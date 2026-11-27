@@ -51,6 +51,7 @@ public class DialogTitleScanTests
         ["Views/SectionScheduleDialog.cs"] = 1,
         ["Views/SectionVerbDialog.cs"] = 1,
         ["Views/SidebarPane.Reference.cs"] = 6,
+        ["Views/SettingPutBackAlert.cs"] = 1,   // #899 W8c-1b: the one Put It Back alert of Set School Year, Save and a one-file Rename folder
         ["Views/SidebarPane.xaml.cs"] = 17,
         ["Views/SpecialFoldersHelpDialog.cs"] = 1,
         ["Views/StartOfYearDialog.cs"] = 2,
