@@ -17,6 +17,10 @@ final class UndoRelinkTests: XCTestCase {
 
     let section: String = "courses/TST1O/section1/"
 
+    /// The new class page Insert Class writes in the chained kill table's
+    /// shape of review 3 of mac-1.
+    let newClassText: String = "New class.\n"
+
 
     /// Where the relinked link's texts lead.
     enum Leads: CaseIterable {
@@ -433,6 +437,13 @@ final class UndoRelinkTests: XCTestCase {
         /// 2.md` becoming `Unit 1, Day 3.md`), then Day 4's link, holding
         /// `Unit 1, Day 2.md` too, moved plainly into Day 5.
         case aRelinkThenAMoveIntoItsPlace
+        /// Review 3 of mac-1, MEDIUM: Insert Class at a day whose page is a
+        /// link. Day 4's link (`Unit 1, Day 3.md`) relinked to Day 5
+        /// (`Unit 1, Day 4.md`), then the new class page written at Day 4,
+        /// the relink's `from`: the write's staged page and, going back, its
+        /// kept original stand beside a relink's place, and are the step's,
+        /// never the teacher's.
+        case aNewClassWrittenAtTheRelinksFrom
     }
 
     /// One shape laid out: its folder, journal folder, draft, and the class
@@ -477,7 +488,11 @@ final class UndoRelinkTests: XCTestCase {
     /// after, nothing staged is left, and the step is settled on the side
     /// its links show. MUST FAIL with review D's rule (one look along the
     /// chain) and with plain link moves left out of the reading (9 of the
-    /// 40 move-chained kills).
+    /// 40 move-chained kills). Review 3 of mac-1, MEDIUM: Insert Class's
+    /// new page written at the relink's `from` (`aNewClassWrittenAtTheRelinksFrom`)
+    /// leaves nothing kept under a visible name and no empty day; MUST FAIL
+    /// with every staged name beside a relink's place judged by the one
+    /// rule (6 of its 19 kills, F-J).
     func testChainedLinkMovesKilledAtEveryStopPointLoseNoLink() async throws {
         var reached: Int = 0
         var expected: Int = 0
@@ -581,6 +596,20 @@ final class UndoRelinkTests: XCTestCase {
         let links: [String?] = linksOn(made.days, root: root)
         XCTAssertTrue(links == linksBefore || links == linksAfter, "\(label): links \(links)")
         XCTAssertEqual(stagedLeft(under: root), [], label)
+        // Undo's own staged items are never the teacher's: nothing is ever
+        // kept under a visible name for them (review 3 of mac-1, MEDIUM).
+        XCTAssertEqual(keptLeft(under: root), [], label)
+        if shape == .aNewClassWrittenAtTheRelinksFrom {
+            // Whole after: the new class page at Day 4, never an empty day;
+            // whole before: Day 4's link, and nothing else there.
+            let dayFour: URL = root.appendingPathComponent(section + "Unit 1, Day 4.md")
+            if links == linksAfter {
+                let held: Data? = try? Data(contentsOf: dayFour)
+                XCTAssertEqual(held, Data(newClassText.utf8), "\(label): Day 4 is not the new class page")
+            } else {
+                XCTAssertTrue(UndoSwap.isALink(dayFour), label)
+            }
+        }
         let phase: UndoStepPhase? = try survivor.read().records[1]?.phase
         // Settled on the side its links show: done when they are as after,
         // failed or rolled back (an apply) or undone (an Undo or a Redo)
@@ -644,6 +673,16 @@ final class UndoRelinkTests: XCTestCase {
             ops.append(relink(5, 6, from: two, to: three))
             ops.append(UndoOp.moveLink(from: section + "Unit 1, Day 4.md", to: section + "Unit 1, Day 5.md", linkSha: UndoHash.sha256(of: two)))
             blobs = [two, three]
+        case .aNewClassWrittenAtTheRelinksFrom:
+            // The texts lead inside, as Insert Class's do: Day 4's link to
+            // Day 3's page, and Day 5's new link to the new class at Day 4.
+            try UndoContractReplay.write("Three.\n", to: section + "Unit 1, Day 3.md", in: root)
+            try layLink(section + "Unit 1, Day 4.md", holding: "Unit 1, Day 3.md", root: root)
+            let newClass: Data = Data(newClassText.utf8)
+            ops.append(relink(4, 5, from: three, to: four))
+            ops.append(UndoOp.writeFile(path: section + "Unit 1, Day 4.md", beforeSha: nil, afterSha: UndoHash.sha256(of: newClass)))
+            blobs = [three, four, newClass]
+            days = [4, 5]
         }
         let draft: UndoOpsDraft = UndoContractKinds.draft(ops: ops, blobs: blobs, root: root, action: "insertClass")
         return LaidChain(root: root, journalFolder: place.journalFolder, draft: draft, days: days)
@@ -1648,6 +1687,20 @@ final class UndoRelinkTests: XCTestCase {
                 found[name] = "folder"
             } else {
                 found[name] = "file " + (try Data(contentsOf: url)).base64EncodedString()
+            }
+        }
+        return found
+    }
+
+    /// Every name under the root kept visible by Undo (`(kept by Undo`).
+    func keptLeft(under root: URL) -> [String] {
+        var found: [String] = []
+        guard let walker = FileManager.default.enumerator(atPath: root.path) else {
+            return found
+        }
+        while let name = walker.nextObject() as? String {
+            if name.contains("(kept by Undo") {
+                found.append(name)
             }
         }
         return found
