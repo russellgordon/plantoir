@@ -734,6 +734,40 @@ internal static class UndoLinks
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
     }
 
+    /// <summary>
+    /// The file a link at <paramref name="fullPath"/> leads to, followed link
+    /// by link (at most 32, as the mac's <c>MAXSYMLINKS</c>) from the target
+    /// each holds AS STORED (<see cref="FileSystemInfo.LinkTarget"/>), its
+    /// separators read either way and a relative one taken from the folder
+    /// above the link, the folders named as the caller named them; the place
+    /// itself when it is not a link (<see cref="Look(string)"/>) or its target
+    /// cannot be read (#899 W8b-21a6; the mac's
+    /// <c>CourseConfiguration.fileALinkLeadsTo</c>). So a link the mac writes
+    /// (<c>../library/Day 2.md</c>), which Windows does not open, leads to the
+    /// same file as one Windows writes. Nothing is opened: where it leads
+    /// need not exist.
+    /// </summary>
+    internal static string FileALinkLeadsTo(string fullPath)
+    {
+        string place = Path.GetFullPath(fullPath);
+        for (int hops = 0; hops < 32; hops++)
+        {
+            if (Look(place) != What.Link) return place;
+            string? target;
+            try
+            {
+                FileSystemInfo link = IsALinkToAFolder(place) ? new DirectoryInfo(place) : new FileInfo(place);
+                target = link.LinkTarget;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return place; }
+            if (string.IsNullOrEmpty(target)) return place;
+            string spelled = target.Replace('/', Path.DirectorySeparatorChar);
+            string folder = Path.GetDirectoryName(place) ?? place;
+            place = Path.GetFullPath(Path.IsPathRooted(spelled) ? spelled : Path.Combine(folder, spelled));
+        }
+        return place;
+    }
+
     /// <summary>A file's bytes, read sharing everything, or null when it cannot be read now.</summary>
     internal static byte[]? ReadAll(string fullPath)
     {

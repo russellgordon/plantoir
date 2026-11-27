@@ -1182,8 +1182,11 @@ internal static class UndoRecovery
             {
                 // A move, a tree or an external op is one place of its own,
                 // judged whole (a move by its pair, never by one side); a
-                // place that now leads outside the folder is in the way.
-                if (UndoPlaces.FirstPlaceLeadingOut(root, op) is not null) return UndoOpState.Neither;
+                // place that now leads outside the folder is in the way. A
+                // side judged free for a handover is never resolved through
+                // what stands there now, only its folders above (review 1 of
+                // window D, LOW 1; the mac's fileStates has no such look).
+                if (LeadsOut(op, root, sides)) return UndoOpState.Neither;
                 if (carriers.Values.Any(carrier => ReferenceEquals(carrier, op))) return CarryingMoveState(op, step, carriers, root, where, blob);
                 return UndoCheck.WholeStateOf(op, root, where, toIsHandedOver: sides.ToIsFree, fromIsHandedOver: sides.FromIsFree);
             }
@@ -1224,6 +1227,24 @@ internal static class UndoRecovery
             }
         }
         return order.Select(path => (path, states[path])).ToList();
+    }
+
+    /// <summary>
+    /// Whether a whole op's place leads out of the working folder now, links
+    /// resolved (<see cref="UndoPlaces.StaysInside(string, string, UndoOp)"/>),
+    /// but for a side its handover judges free (<see cref="UndoHandedOverSides"/>):
+    /// that side is asked only of the folders above it
+    /// (<see cref="UndoPlaces.StaysInsideAbove"/>), as what fills it now (a
+    /// link leading out, say) is the other op's, never this op's.
+    /// </summary>
+    private static bool LeadsOut(UndoOp op, string root, UndoHandedOverSides sides)
+    {
+        foreach (string place in op.PathsNamed)
+        {
+            bool free = (sides.FromIsFree && place == op.From) || (sides.ToIsFree && place == op.To);
+            if (free ? !UndoPlaces.StaysInsideAbove(root, place) : !UndoPlaces.StaysInside(root, place, op)) return true;
+        }
+        return false;
     }
 
     /// <summary>Whether the folder (or file) a move carries edits with is at its old place now: nothing at <c>to</c> and something at <c>from</c> (the mac's <c>isAtItsOldPlace</c>). Looked at without following a link.</summary>
