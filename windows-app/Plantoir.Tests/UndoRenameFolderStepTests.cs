@@ -397,6 +397,32 @@ public sealed class UndoRenameFolderStepTests : IDisposable
         Assert.False(File.Exists(SpecialFolderRenamer.RenameRecordPath(CourseFolder)), "nothing started, nothing recorded");
     }
 
+    /// <summary>
+    /// A place of the folder that is a OneDrive-style placeholder (a reparse
+    /// point that is NOT a name surrogate) is the teacher's own folder, not a
+    /// link: moved whole, by its listing, never as a link (the one link test,
+    /// <see cref="UndoLinks.Look"/>, never the bare reparse-point attribute).
+    /// </summary>
+    [CloudPlaceholderFact]
+    public void APlaceThatIsAOneDriveStylePlaceholderIsMovedAsTheFolderItIs()
+    {
+        TheCourseWithSectionTwosTasksToLay();
+        Write("section2/Tasks/Quiz 2.md", "Quiz two.\n");
+        _syncRoot = Path.Combine(CourseFolder, "section2");
+        Assert.Null(UndoCloudPlaceholders.Make(_syncRoot, SectionTwosTasks));
+        Assert.True(File.GetAttributes(SectionTwosTasks).HasFlag(FileAttributes.ReparsePoint), "the placeholder carries a reparse point");
+
+        var outcome = Rename();
+
+        Assert.Equal(2, outcome.FoldersMoved);
+        JsonObject step = Assert.Single(AppliedSteps());
+        JsonObject move = step["ops"]!.AsArray()[1]!.AsObject();
+        Assert.Equal(LinkFrom, (string?)move["from"]);
+        Assert.NotNull(move["listingSha"]);
+        Assert.Null(move["linkSha"]);
+        Assert.Equal("Quiz two.\n", Read("section2/Assessments/Quiz 2.md"));
+    }
+
     /// <summary>A link to something that is not a folder is skipped, as a file at that place is: left as it is, and section 1 alone is renamed.</summary>
     [SymbolicLinkFact]
     public void ALinkToAFileAtThePlaceIsSkippedAsAFileIs()
