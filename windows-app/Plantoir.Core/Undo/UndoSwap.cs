@@ -469,10 +469,8 @@ internal static class UndoSwap
                 if (target.Change is UndoSwapChange.MoveHere moving)
                 {
                     ownLeftOut = LetGoOwnFilesInside(moving.FromRelative);
-                    // And what the step's EARLIER swaps left inside it (U4b, M1; #899 W8-3),
-                    // never inside a link's move: nothing of the step's is there,
-                    // and what the link leads to is never walked (U4b2-14; W8-6).
-                    if (moving.Op.LinkSha is null && SeqOfLabel(label) is { } seq)
+                    // And what the step's EARLIER swaps left inside it (U4b, M1; #899 W8-3).
+                    if (SeqOfLabel(label) is { } seq)
                     {
                         foreach ((string inside, UndoCurrent absent) in StepsOwnFilesInside(moving.FromFull, seq))
                             ownLeftOut.TryAdd(inside, absent);
@@ -530,7 +528,7 @@ internal static class UndoSwap
         // differ in spelling, a place the op does not name that leads out is
         // still named, by the place it changes (as the mac's fallback).
         UndoSwapChange.MoveHere move => UndoPlaces.FirstPlaceLeadingOut(root, move.Op)
-            ?? (UndoPlaces.StaysInside(root, move.FromRelative, move.Op) && UndoPlaces.StaysInside(root, target.RelativePath, move.Op) ? null : target.RelativePath),
+            ?? (UndoPlaces.StaysInside(root, move.FromRelative) && UndoPlaces.StaysInside(root, target.RelativePath) ? null : target.RelativePath),
         _ => UndoPlaces.StaysInside(root, target.RelativePath) ? null : target.RelativePath,
     };
 

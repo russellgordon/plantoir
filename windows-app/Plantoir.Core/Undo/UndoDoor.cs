@@ -314,8 +314,7 @@ internal sealed partial class UndoDoor
             if (op.Kind == UndoOp.Recompute && !CanRederive(op))
                 return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: new UndoRefusal(UndoRefusalKind.NotReadable));
         }
-        // 2. Every path inside the working folder, its links resolved (a
-        // link's move by the folders above the link alone, U4b2-14; W8-6).
+        // 2. Every path inside the working folder, its links resolved.
         foreach (UndoOp op in step.Ops)
         {
             if (op.PathsNamed.Any() && (draft.WorkingFolder is null || UndoPlaces.FirstPlaceLeadingOut(draft.WorkingFolder, op) is not null))

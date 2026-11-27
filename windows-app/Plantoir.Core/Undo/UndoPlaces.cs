@@ -70,37 +70,9 @@ internal static class UndoPlaces
     {
         foreach (string place in op.PathsNamed)
         {
-            if (!StaysInside(root, place, op)) return place;
+            if (!StaysInside(root, place)) return place;
         }
         return null;
-    }
-
-    /// <summary>
-    /// <see cref="StaysInside(string, string)"/> for a place <paramref name="op"/>
-    /// names (the mac's <c>staysInside(_:_:namedBy:)</c>, U4b2-14; #899 W8-6).
-    /// A link's move names the link itself at its <c>from</c> and <c>to</c>,
-    /// so there the link is never followed: only the folder above it is
-    /// resolved, and a link leading out of the working folder, or nowhere,
-    /// is moved as a link like any other.
-    /// </summary>
-    internal static bool StaysInside(string root, string relative, UndoOp op)
-    {
-        if (op.LinkSha is null || (relative != op.From && relative != op.To)) return StaysInside(root, relative);
-        return StaysInsideAbove(root, relative);
-    }
-
-    /// <summary>
-    /// Whether the folders above <paramref name="relative"/> stay inside the
-    /// working folder, links resolved, the place itself never followed (the
-    /// mac's <c>UndoPlaces.staysInsideAbove</c>): how a link's own place is
-    /// judged by its move (#899 W8b-21a1). A place breaking the path rules
-    /// never stays.
-    /// </summary>
-    internal static bool StaysInsideAbove(string root, string relative)
-    {
-        if (!UndoPath.IsWithinTheRules(relative)) return false;
-        int slash = relative.LastIndexOf('/');
-        return slash < 0 || StaysInside(root, relative[..slash]);
     }
 
     /// <summary>

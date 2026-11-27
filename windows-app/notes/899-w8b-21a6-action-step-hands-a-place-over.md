@@ -1,4 +1,4 @@
-Its handing-over order removed by #1055 W3; the rest by W4.
+Its handing-over order removed by #1055 W3. Its link half removed by #1055 W4.
 
 # #899 W8b-21a6: an action step hands a link move's old place over (Windows #949)
 

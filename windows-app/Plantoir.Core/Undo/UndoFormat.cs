@@ -95,13 +95,6 @@ internal sealed record UndoOp
     /// <summary>A folder's <c>move</c>, <c>createTree</c> and <c>removeTree</c>: the SHA-256 of the folder's listing (<see cref="UndoTreeListing"/>).</summary>
     internal string? ListingSha { get; init; }
 
-    /// <summary>
-    /// A link's <c>move</c> (U4b2-14; #899 W8-6): the SHA-256 of the target
-    /// the link holds, as stored (<see cref="UndoLinks.LinkSha"/>), never a
-    /// blob: the link itself is what moves.
-    /// </summary>
-    internal string? LinkSha { get; init; }
-
     /// <summary><c>external</c>: what outside every working folder it changed (<c>preference:&lt;name&gt;</c>).</summary>
     internal string? Target { get; init; }
 
@@ -211,15 +204,11 @@ internal sealed record UndoOp
     /// spellings are one place, so the edit is told to be named at the new
     /// spelling by the moved item's own part alone, as spelled (never the
     /// <c>from</c> spelling), the parts above it by <see cref="PartInside"/>
-    /// (review 1 of U4b2-9, L3). A link's move carries nothing (U4b2-14,
-    /// review 1; #899 W8-6): a link is neither a file nor a folder the move
-    /// moved, so an edit at or inside its <c>to</c> breaks
-    /// <c>opKinds.wholeOps</c> and the step is not readable.
+    /// (review 1 of U4b2-9, L3).
     /// </summary>
     internal static bool MoveCarries(UndoOp move, UndoOp edit)
     {
         if (move.Kind != Move || !move.Readable || move.From is not { } from || move.To is not { } to || edit.Path is not { } path) return false;
-        if (move.LinkSha is not null) return false;
         if (edit.Kind is not (WriteFile or EditLine or ReplaceText or EditJson)) return false;
         if (edit.From is not null || edit.To is not null || edit.Target is not null) return false;
         if (PartInside(to, path) is null) return false;
@@ -774,7 +763,6 @@ internal static class UndoFormat
         if (!OptionalString(element, "to", out string? to)) readable = false;
         if (!OptionalString(element, "sha", out string? sha)) readable = false;
         if (!OptionalString(element, "listingSha", out string? listingSha)) readable = false;
-        if (!OptionalString(element, "linkSha", out string? linkSha)) readable = false;
         if (!OptionalString(element, "target", out string? target)) readable = false;
         List<string>? keyPath = null;
         if (element.TryGetProperty("keyPath", out JsonElement keyPathElement) && keyPathElement.ValueKind != JsonValueKind.Null)
@@ -853,7 +841,6 @@ internal static class UndoFormat
             To = to,
             Sha = sha,
             ListingSha = listingSha,
-            LinkSha = linkSha,
             Target = target,
             Blobs = blobs.Distinct(StringComparer.Ordinal).ToList(),
         };
@@ -872,23 +859,18 @@ internal static class UndoFormat
             if (!IsBlobName(name)) return false;
         }
         if (op.Sha is not null && !IsBlobName(op.Sha)) return false;
-        if (op.LinkSha is not null && !IsBlobName(op.LinkSha)) return false;
         switch (op.Kind)
         {
             case UndoOp.Move:
                 // No path: from and to follow path's rules, differ, and neither
                 // holds the other, but for a capitalisation-only rename (U4b;
-                // W8-5); exactly one of a file's sha, a folder's listingSha
-                // and a link's linkSha (U4b2-14; W8-6).
+                // W8-5); exactly one of a file's sha and a folder's listingSha
+                // (#1055 W4: no build moves a link as itself, so a move that
+                // carries an older build's linkSha holds neither).
                 if (op.Path is not null || op.From is null || op.To is null) return false;
                 if (!UndoPath.IsWithinTheRules(op.From) || !UndoPath.IsWithinTheRules(op.To)) return false;
                 if (UndoOp.PlacesOverlap(op.From, op.To) && !op.IsCaseOnlyMove) return false;
-                int contents = 0;
-                foreach (string? given in new[] { op.Sha, op.ListingSha, op.LinkSha })
-                {
-                    if (given is not null) contents++;
-                }
-                return contents == 1;
+                return (op.Sha is not null) != (op.ListingSha is not null);
             case UndoOp.External:
             {
                 if (op.Path is not null || op.Target is not { } target) return false;

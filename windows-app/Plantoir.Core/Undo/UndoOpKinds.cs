@@ -717,75 +717,6 @@ internal static class UndoLinks
         return error.Message.Replace(full, Path.GetFileName(full), StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// A link's <c>linkSha</c> (<c>opKinds.move</c>, U4b2-14; #899 W8-6): the
-    /// SHA-256 of the target it holds, as stored (<see cref="FileSystemInfo.LinkTarget"/>,
-    /// never <c>ResolveLinkTarget</c>, so what it leads to is never opened),
-    /// as UTF-8, unchanged: separators are NOT normalised, so a link made on
-    /// the mac (<c>../library</c>) and one Windows stores with backslashes
-    /// differ, which is changed since, and safe. Null when the target cannot
-    /// be read: a reparse point .NET does not read as a link (WSL's own), or
-    /// an error.
-    /// </summary>
-    internal static string? LinkSha(string fullPath)
-    {
-        string? target;
-        try
-        {
-            FileSystemInfo link = File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory) ? new DirectoryInfo(fullPath) : new FileInfo(fullPath);
-            target = link.LinkTarget;
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
-        return target is null ? null : Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(target)));
-    }
-
-    /// <summary>
-    /// Whether the link at <paramref name="fullPath"/> is a link to a FOLDER
-    /// (a junction, or a symbolic link made as a folder's), told by the
-    /// link's OWN attributes, never by following it: so a link to a folder
-    /// that leads nowhere is still one (#899 W8b-21). Ask it only of a place
-    /// <see cref="Look"/> calls a link.
-    /// </summary>
-    internal static bool IsALinkToAFolder(string fullPath)
-    {
-        try { return File.GetAttributes(fullPath).HasFlag(FileAttributes.Directory); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
-    }
-
-    /// <summary>
-    /// The file a link at <paramref name="fullPath"/> leads to, followed link
-    /// by link (at most 32, as the mac's <c>MAXSYMLINKS</c>) from the target
-    /// each holds AS STORED (<see cref="FileSystemInfo.LinkTarget"/>), its
-    /// separators read either way and a relative one taken from the folder
-    /// above the link, the folders named as the caller named them; the place
-    /// itself when it is not a link (<see cref="Look(string)"/>) or its target
-    /// cannot be read (#899 W8b-21a6; the mac's
-    /// <c>CourseConfiguration.fileALinkLeadsTo</c>). So a link the mac writes
-    /// (<c>../library/Day 2.md</c>), which Windows does not open, leads to the
-    /// same file as one Windows writes. Nothing is opened: where it leads
-    /// need not exist.
-    /// </summary>
-    internal static string FileALinkLeadsTo(string fullPath)
-    {
-        string place = Path.GetFullPath(fullPath);
-        for (int hops = 0; hops < 32; hops++)
-        {
-            if (Look(place) != What.Link) return place;
-            string? target;
-            try
-            {
-                FileSystemInfo link = IsALinkToAFolder(place) ? new DirectoryInfo(place) : new FileInfo(place);
-                target = link.LinkTarget;
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return place; }
-            if (string.IsNullOrEmpty(target)) return place;
-            string spelled = target.Replace('/', Path.DirectorySeparatorChar);
-            string folder = Path.GetDirectoryName(place) ?? place;
-            place = Path.GetFullPath(Path.IsPathRooted(spelled) ? spelled : Path.Combine(folder, spelled));
-        }
-        return place;
-    }
-
     /// <summary>A file's bytes, read sharing everything, or null when it cannot be read now.</summary>
     internal static byte[]? ReadAll(string fullPath)
     {
@@ -971,7 +902,6 @@ internal static class UndoMoveSides
         UndoOp op, string fullPath, Func<string, bool>? cannotRead = null, IReadOnlyDictionary<string, UndoCurrent>? overriding = null)
     {
         if (op.Sha is not null) return (ReadAFile(op, fullPath, cannotRead, overriding), []);
-        if (op.LinkSha is { } linkSha) return (ReadALink(linkSha, fullPath, cannotRead), []);
         switch (UndoTreeReading.Read(fullPath, cannotRead: cannotRead))
         {
             case UndoTreeReading.Absent: return (UndoMoveSide.Free, []);
@@ -1109,31 +1039,6 @@ internal static class UndoMoveSides
 
     /// <summary>Whether <paramref name="path"/> is below <paramref name="folder"/> (never the folder itself), by the one comparison.</summary>
     private static bool IsBelow(string path, string folder) => UndoOp.PartInside(folder, path) is { Length: > 0 };
-
-    /// <summary>
-    /// One side of a link's move (U4b2-14; #899 W8-6; the mac's
-    /// <c>UndoMoveSide.readLink</c>), read on the link itself and never
-    /// followed, so what it leads to (outside the working folder, or nowhere)
-    /// is never read: the content is a link (<see cref="UndoLinks.Look"/>, a
-    /// name surrogate, never a OneDrive placeholder) whose target hashes to
-    /// <paramref name="linkSha"/>; a folder, a file or a link with another
-    /// target is something else; a link whose target cannot be read is
-    /// cannot tell now.
-    /// </summary>
-    private static UndoMoveSide ReadALink(string linkSha, string fullPath, Func<string, bool>? cannotRead)
-    {
-        switch (UndoLinks.Look(fullPath))
-        {
-            case UndoLinks.What.Nothing: return UndoMoveSide.Free;
-            case UndoLinks.What.Link:
-                if (cannotRead?.Invoke(fullPath) == true) return UndoMoveSide.CannotRead;
-                return UndoLinks.LinkSha(fullPath) is { } found
-                    ? string.Equals(found, linkSha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse
-                    : UndoMoveSide.CannotRead;
-            case UndoLinks.What.CannotLook: return UndoMoveSide.CannotRead;
-            default: return UndoMoveSide.HoldsSomethingElse;
-        }
-    }
 
     private static UndoMoveSide ReadAFile(UndoOp op, string fullPath, Func<string, bool>? cannotRead, IReadOnlyDictionary<string, UndoCurrent>? overriding)
     {

@@ -821,7 +821,7 @@ public class SpecialFolderRenamerTests : IDisposable
         Directory.CreateDirectory(InCourse("section2/Assessments"));
 
         var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
-                                                              new[] { (InCourse("section2/Assessments"), false) }, null);
+                                                              new[] { InCourse("section2/Assessments") }, null);
 
         Assert.Equal(new[] { "section2/Assessments" }, left.Places);
         Assert.Empty(left.CannotTell);
@@ -835,15 +835,15 @@ public class SpecialFolderRenamerTests : IDisposable
         Directory.CreateDirectory(InCourse("section2/Assessments"));
 
         var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
-                                                              Array.Empty<(string, bool)>(), NoteOf("section1/Assessments"));
+                                                              Array.Empty<string>(), NoteOf("section1/Assessments"));
 
         Assert.Equal(new[] { "section1/Assessments" }, left.Places);
         Assert.Empty(left.CannotTell);
     }
 
-    /// <summary>A link at the new name is named only where this run moved a link there; any other is cannot-tell, never named.</summary>
+    /// <summary>A link at the new name is never this run's, even where this run planned a move there (#1055: no link is moved as itself): cannot-tell, never named.</summary>
     [Fact]
-    public void ALinkThisRunDidNotMoveIsCannotTellNeverNamed()
+    public void ALinkAtTheNewNameIsCannotTellNeverNamed()
     {
         string library = Path.Combine(_root, "library");
         Directory.CreateDirectory(library);
@@ -851,16 +851,11 @@ public class SpecialFolderRenamerTests : IDisposable
         Directory.CreateDirectory(InCourse("section2/Assessments"));
 
         var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
-                                                              new[] { (InCourse("section1/Assessments"), false) },
+                                                              new[] { InCourse("section1/Assessments") },
                                                               NoteOf("section1/Assessments", "section2/Assessments"));
         Assert.Equal(new[] { "section2/Assessments" }, left.Places);
         Assert.Equal(new[] { "section1/Assessments" }, left.CannotTellWhose);
         Assert.Equal(new[] { "section1/Assessments" }, left.CannotTell);
-
-        var moved = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
-                                                               new[] { (InCourse("section1/Assessments"), true) }, null);
-        Assert.Equal(new[] { "section1/Assessments" }, moved.Places);
-        Assert.Empty(moved.CannotTell);
     }
 
     /// <summary>A capitalisation-only rename counts a place only when the folder's listing shows the new spelling.</summary>
@@ -871,7 +866,7 @@ public class SpecialFolderRenamerTests : IDisposable
         Directory.CreateDirectory(InCourse("section2/Tasks"));
 
         var left = SpecialFolderRenamer.FoldersAtTheirNewName("tasks", "Tasks", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
-                                                              new[] { (InCourse("section1/Tasks"), false), (InCourse("section2/Tasks"), false) }, null);
+                                                              new[] { InCourse("section1/Tasks"), InCourse("section2/Tasks") }, null);
 
         Assert.Equal(new[] { "section2/Tasks" }, left.Places);
         Assert.Empty(left.CannotTell);
@@ -889,7 +884,7 @@ public class SpecialFolderRenamerTests : IDisposable
         try
         {
             var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
-                                                                  new[] { (InCourse("section1/Assessments"), false), (InCourse("section2/Assessments"), false) }, null);
+                                                                  new[] { InCourse("section1/Assessments"), InCourse("section2/Assessments") }, null);
 
             Assert.Equal(new[] { "section2/Assessments" }, left.Places);
             Assert.Equal(new[] { "section1/Assessments (Access to the path is denied.)" }, left.Unreadable);
@@ -1004,7 +999,7 @@ public class SpecialFolderRenamerTests : IDisposable
         try
         {
             var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
-                                                                  new[] { (InCourse("section1/Assessments"), false), (InCourse("section2/Assessments"), false) }, null);
+                                                                  new[] { InCourse("section1/Assessments"), InCourse("section2/Assessments") }, null);
             var ending = SpecialFolderRenamer.PartWayEnding("Tasks", "Assessments", "ICS3U", FolderScope.PerSection, left, 0, "stopped");
 
             string unreadable = Assert.Single(left.Unreadable);

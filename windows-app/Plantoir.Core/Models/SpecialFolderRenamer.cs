@@ -381,9 +381,7 @@ public static class SpecialFolderRenamer
     /// as ONE step through the door (#899 W8b-15b; the mac's U4b), made by
     /// <c>sheet</c>, held by the course: one <c>move</c> per place of the
     /// folder (<see cref="UndoActionStep.MoveFolder"/>, judged by its
-    /// listing; a place that is a link to a folder, <see cref="UndoActionStep.MoveLink"/>,
-    /// the link itself judged by its target as stored, what it leads to never
-    /// listed, read, moved or written), then each relinked page named at its place after the move,
+    /// listing), then each relinked page named at its place after the move,
     /// then one <c>editJSON</c> per changed member of the settings. All of it
     /// or none: a step refused leaves the course exactly as it was, and is
     /// said as a <see cref="RenameException"/>. A step refused because a page
@@ -431,19 +429,15 @@ public static class SpecialFolderRenamer
                                           section: null, holds: "course", undo: undo, door: door);
             int relinked;
             CourseConfiguration.PlannedRecord? plannedSettings = null;
-            // Each move's destination, and whether it moves a link: what a
-            // part-way ending counts as this run's (W8b-18b).
-            var planned = new List<(string To, bool IsALink)>();
+            // Each move's destination: what a part-way ending counts as this
+            // run's (W8b-18b).
+            var planned = new List<string>();
             try
             {
                 foreach (var move in moves)
                 {
-                    // A place that is a link is renamed by moving the LINK
-                    // (W8b-21, ruling 1 of #899): never what it leads to.
-                    bool isALink = UndoLinks.Look(move.From) == UndoLinks.What.Link;
-                    if (isALink) step.MoveLink(move.From, move.To);
-                    else step.MoveFolder(move.From, move.To);
-                    planned.Add((move.To, isALink));
+                    step.MoveFolder(move.From, move.To);
+                    planned.Add(move.To);
                 }
                 relinked = PlanRelinkedPages(step, courseDirectory, oldName, newName, moves);
                 if (settings is not null) plannedSettings = settings.Configuration.PlanRecordOnDisk(settings.Change, settings.Path, step);
@@ -643,8 +637,9 @@ public static class SpecialFolderRenamer
             string oldPlace = Path.Combine(Path.GetDirectoryName(place)!, oldName);
             var besideIt = WhatIsAt(oldPlace, onlyCapitalisation);
             if (besideIt != UndoLinks.What.Nothing && besideIt != UndoLinks.What.CannotLook) continue;
-            // A link counts too (the mac's U4b2-15): a rename moves a linked
-            // folder as the link, so a link here may be an earlier run's.
+            // A link counts too (the mac's U4b2-15), and is then told as
+            // cannot-tell, never counted as this rename's (#1055: no link is
+            // moved as itself).
             var atTheNewName = WhatIsAt(place, onlyCapitalisation);
             if (atTheNewName == UndoLinks.What.Folder || atTheNewName == UndoLinks.What.Link || atTheNewName == UndoLinks.What.CannotLook)
                 places.Add(inside);
@@ -730,8 +725,8 @@ public static class SpecialFolderRenamer
     /// run's <paramref name="planned"/> moves, or a place the earlier record of
     /// this same rename says it moved (<see cref="PlacesMoved"/>). Shows: a
     /// folder, by a look that never follows a link
-    /// (<see cref="WhatIsAt(string, bool, out string?)"/>); a link only where
-    /// this run moved a link (any other link there is cannot-tell); for a
+    /// (<see cref="WhatIsAt(string, bool, out string?)"/>), never a link (a
+    /// link there is cannot-tell; #1055: no link is moved as itself); for a
     /// capitalisation-only rename, only when the folder's listing shows the
     /// new spelling. A place that does not belong is told only when the
     /// earlier run may have moved it (<see cref="PlacesAnEarlierRunMayHaveMoved"/>),
@@ -741,7 +736,7 @@ public static class SpecialFolderRenamer
     /// Places are compared by the one comparison (<see cref="HoldsThePlace"/>).</para>
     /// </summary>
     internal static LeftAtTheNewName FoldersAtTheirNewName(string oldName, string newName, FolderScope scope, string courseDirectory,
-                                                          IReadOnlyList<int> sectionNumbers, IReadOnlyList<(string To, bool IsALink)> planned,
+                                                          IReadOnlyList<int> sectionNumbers, IReadOnlyList<string> planned,
                                                           RenameRecordNote? earlierRecord)
     {
         var result = new LeftAtTheNewName();
@@ -752,12 +747,9 @@ public static class SpecialFolderRenamer
         {
             string inside = PlaceInside(place, courseDirectory);
             bool movedHereThisRun = false;
-            bool movedALinkHere = false;
-            foreach (var (to, isALink) in planned)
+            foreach (string to in planned)
             {
-                if (!HoldsThePlace(new[] { PlaceInside(to, courseDirectory) }, inside)) continue;
-                movedHereThisRun = true;
-                movedALinkHere = isALink;
+                if (HoldsThePlace(new[] { PlaceInside(to, courseDirectory) }, inside)) movedHereThisRun = true;
             }
             bool belongs = movedHereThisRun || (recorded is not null && HoldsThePlace(recorded, inside));
             // Neither this rename's nor one an earlier run may have moved: a
@@ -771,14 +763,13 @@ public static class SpecialFolderRenamer
                 continue;
             }
             if (what != UndoLinks.What.Folder && what != UndoLinks.What.Link) continue;
-            if (belongs && (what == UndoLinks.What.Folder || movedALinkHere))
+            if (belongs && what == UndoLinks.What.Folder)
             {
                 result.Places.Add(inside);
                 continue;
             }
-            // A link at a place this run did not move a link to, or a place
-            // an earlier run may have moved: told, never counted (the mac's
-            // U4b2-15, U4b2-6).
+            // A link, or a place an earlier run may have moved: told, never
+            // counted (the mac's M7, U4b2-6).
             result.CannotTellWhose.Add(inside);
             result.CannotTell.Add(inside);
         }
@@ -1137,20 +1128,14 @@ public static class SpecialFolderRenamer
     /// <summary>
     /// Whether a place holds something the rename moves, looked at WITHOUT
     /// following a link (<see cref="UndoLinks.Look"/>, never
-    /// <c>Directory.Exists</c>, which follows one): a folder; a link to a
-    /// folder, by the link's own attributes (<see cref="UndoLinks.IsALinkToAFolder"/>),
-    /// wherever it leads, nowhere included, which the step moves as itself
-    /// (W8b-21); a link whose target cannot be read, or a place that cannot
-    /// be looked at now, either of which the step refuses <c>cannotTellNow</c>
-    /// with nothing changed. A file at the place, a link to a file, or
+    /// <c>Directory.Exists</c>, which follows one): a folder; or a link, or a
+    /// place that cannot be looked at now, either of which the step refuses
+    /// <c>cannotTellNow</c> with nothing changed (<see cref="UndoActionStep.MoveFolder"/>'s
+    /// own guard; #1055: no link is moved as itself). A file at the place, or
     /// nothing, is not moved.
     /// </summary>
-    private static bool IsAPlaceToMove(string place) => UndoLinks.Look(place) switch
-    {
-        UndoLinks.What.Folder or UndoLinks.What.CannotLook => true,
-        UndoLinks.What.Link => UndoLinks.LinkSha(place) is null || UndoLinks.IsALinkToAFolder(place),
-        _ => false,
-    };
+    private static bool IsAPlaceToMove(string place) =>
+        UndoLinks.Look(place) is UndoLinks.What.Folder or UndoLinks.What.Link or UndoLinks.What.CannotLook;
 
     /// <summary>
     /// Why the moves cannot all be made, or null when they can.
