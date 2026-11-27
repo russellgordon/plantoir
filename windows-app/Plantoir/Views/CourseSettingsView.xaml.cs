@@ -443,37 +443,31 @@ public sealed partial class CourseSettingsView : UserControl
     }
 
     /// <summary>
-    /// Disk first, then the configuration, in that order: a move that fails
-    /// leaves the course exactly as it was, where the other order would leave
-    /// a configuration naming a folder that is not there — the state this
-    /// whole feature exists to make impossible. Returns the sentence to show
-    /// inside the sheet on failure, or null when the rename is whole.
+    /// The folders' moves, the relinked pages and the settings' change, as
+    /// ONE step through the door (#899 W8b-15b): all of them or none, so a
+    /// rename refused leaves the course exactly as it was, and no second
+    /// settings write follows it. Returns the sentence to show inside the
+    /// sheet on failure, or null when the rename is whole.
     /// </summary>
     private async Task<string?> RenameFolderAsync(string oldName, string newName, FolderScope scope, bool finishing)
     {
         string courseDirectory = _course.DirectoryPath;
         var sections = Config.SectionNumbers.ToList();
+        CourseConfiguration configuration = Config;
+        string configPath = _course.ConfigFilePath;
         RenameOutcome outcome;
-        List<string>? curriculumPages = null;
-        List<string>? curriculumLetterFirst = null;
         try
         {
-            // Off the UI thread: the move is quick, but reading every page in
-            // the course to rewrite links is not on a synced vault.
-            var sharedBefore = Config.SharedFolders.Append(newName).ToList();
+            // Off the UI thread: reading every page in the course to rewrite
+            // links is not quick on a synced vault, and neither is the door's
+            // check of every file in a moved folder. A rename found interrupted
+            // (finishing) moves nothing: its folders already moved.
             outcome = await Task.Run(() =>
             {
                 // The curriculum folders are decided from their pages, so they
-                // are read BEFORE the move (#345) — afterwards the old name is
-                // not there — and off the UI thread, like the move itself.
-                var (pagesBefore, letterFirstBefore) = CurriculumFolderRule.FoldersWithPages(courseDirectory, sharedBefore);
-                curriculumPages = pagesBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
-                curriculumLetterFirst = letterFirstBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
-                if (!finishing) return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections);
-                // The folders already moved; only the links and the record remain.
-                int relinked = SpecialFolderRenamer.RelinkPages(courseDirectory, oldName, newName);
-                return new RenameOutcome(true, SpecialFolderRenamer.DoneMessage(oldName, newName, relinked),
-                                         0, relinked, NothingWasThere: false);
+                // are read BEFORE the move (#345).
+                var settings = SpecialFolderRenamer.RenamingTheSettings(configuration, configPath, oldName, newName, scope, courseDirectory);
+                return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections, settings, finishing);
             });
         }
         catch (SpecialFolderRenamer.RenameException error)
@@ -481,23 +475,6 @@ public sealed partial class CourseSettingsView : UserControl
             return error.Message;
         }
 
-        try
-        {
-            Config.RecordOnDisk(values => SpecialFolderRenamer.Renaming(values, oldName, newName, scope,
-                                                                        curriculumPages, curriculumLetterFirst),
-                                _course.ConfigFilePath);
-        }
-        catch (Exception error)
-        {
-            // Recorded BEFORE returning: the folder has moved and the settings
-            // do not know, which is the state somebody will be asked to
-            // explain later. Not "the rename failed" — a rename whose
-            // bookkeeping did not land; the record stays so the next opening
-            // of the sheet can finish it.
-            ActivityTrail.Note(ActivityTrail.Event.FolderRenamed,
-                $"renamed the folder {oldName} to {newName} in {_course.Code} but could not write it to this course's settings — {error.Message}");
-            return $"“{oldName}” was renamed to “{newName}”, but Plantoir could not write the change to this course's settings: {error.Message}";
-        }
         SpecialFolderRenamer.ClearRenameRecord(courseDirectory);
         ActivityTrail.Note(ActivityTrail.Event.FolderRenamed,
             $"renamed the folder {oldName} to {newName} in {_course.Code} ({SpecialFolderRenamer.ConfigurationKey(scope)}, {outcome.FoldersMoved} moved, {outcome.PagesRelinked} pages relinked)");

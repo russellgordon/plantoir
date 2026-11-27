@@ -363,6 +363,55 @@ public sealed class CourseConfiguration
         catch { return null; }
     }
 
+    /// <summary>What a rename's change to the settings plans: the bytes the file holds once the step is made.</summary>
+    internal sealed record PlannedRecord(byte[] Bytes);
+
+    /// <summary>
+    /// Plans ONE change to the file, made from a fresh read of it, into
+    /// <paramref name="step"/> (#899 W8b-15b, Rename folder; the mac's
+    /// <c>planRecordOnDisk</c>): the step's own write, never a second one
+    /// after it. The file is read once, here, and never again at the make;
+    /// <paramref name="change"/> is applied to that read, so this copy's other
+    /// unsaved edits stay unsaved (<see cref="RecordOnDisk"/>'s rule). Then
+    /// one <c>editJSON</c> per top-level member whose value it changes, keys
+    /// sorted, by the same member planner Save uses (<see cref="MembersMoved"/>);
+    /// a file the member rule cannot move is one <c>writeFile</c> of the whole
+    /// bytes. A change that changes nothing plans nothing. A settings file
+    /// that is a link is planned where it leads (<see cref="FileALinkLeadsTo"/>).
+    /// </summary>
+    internal PlannedRecord PlanRecordOnDisk(Func<JObject, JObject> change, string path, UndoActionStep step)
+    {
+        string place = FileALinkLeadsTo(path);
+        var read = ReadBytes(place);
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) throw HeldFiles.Refusal(place, read);
+        if (read.Outcome != HeldFiles.ReadOutcome.Read) throw new FileNotFoundException(null, place);
+        JObject onDisk = ParseObject(read.Data!);
+        JObject wanted = change(onDisk);
+        if (JToken.DeepEquals(onDisk, wanted)) return new PlannedRecord(read.Data!);
+        if (MembersMoved(read.Data!, onDisk, wanted) is { } moved)
+        {
+            step.EditJson(place, read.Data!, moved.Changes, moved.Bytes);
+            return new PlannedRecord(moved.Bytes);
+        }
+        byte[] whole = Serialize(wanted);
+        PlanWhole(step, place, read, whole);
+        return new PlannedRecord(whole);
+    }
+
+    /// <summary>
+    /// Once the step <see cref="PlanRecordOnDisk"/> planned into is made, the
+    /// change is applied to this copy too, and the file as it is now becomes
+    /// its last-saved state (the plan's bytes when it cannot be read back), so
+    /// Revert keeps the change and drops only what was never saved, as after
+    /// <see cref="RecordOnDisk"/>.
+    /// </summary>
+    internal void FinishRecord(PlannedRecord planned, Func<JObject, JObject> change, string path)
+    {
+        _values = change(_values);
+        var read = ReadBytes(FileALinkLeadsTo(path));
+        _lastSavedData = read.Outcome == HeldFiles.ReadOutcome.Read ? read.Data! : planned.Bytes;
+    }
+
     /// <summary>
     /// The file a settings file that is a link leads to, or
     /// <paramref name="path"/> itself when it is not a link (the mac's

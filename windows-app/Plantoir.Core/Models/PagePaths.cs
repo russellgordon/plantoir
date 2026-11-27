@@ -162,7 +162,14 @@ public static class PagePaths
     /// sections' folders are left out too — a class page in section 1 has no
     /// business linking into section 2.
     /// </summary>
-    public static List<string> MarkdownPages(string courseDirectory, int? sectionNumber = null)
+    /// <param name="descendsIntoLinks">
+    /// False for Rename folder's walk (#899 W8b-15b): a folder entry that is a
+    /// link (<see cref="Plantoir.Core.Undo.UndoLinks.Look"/>, a name-surrogate
+    /// reparse point) is not descended into, so a page is found only at its own
+    /// place inside the course. Any other reparse point, a OneDrive
+    /// placeholder's among them, is walked as the folder it is.
+    /// </param>
+    public static List<string> MarkdownPages(string courseDirectory, int? sectionNumber = null, bool descendsIntoLinks = true)
     {
         var pages = new List<string>();
         Walk(courseDirectory);
@@ -191,6 +198,8 @@ public static class PagePaths
                     var match = Regex.Match(name, @"^section(\d+)$", RegexOptions.IgnoreCase);
                     if (match.Success && sectionNumber is { } wanted &&
                         int.TryParse(match.Groups[1].Value, out int found) && found != wanted)
+                        continue;
+                    if (!descendsIntoLinks && Plantoir.Core.Undo.UndoLinks.Look(entry) == Plantoir.Core.Undo.UndoLinks.What.Link)
                         continue;
                     Walk(entry);
                 }

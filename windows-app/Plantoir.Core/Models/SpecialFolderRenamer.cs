@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Newtonsoft.Json.Linq;
 using Plantoir.Core.Undo;
 
@@ -229,59 +230,164 @@ public static class SpecialFolderRenamer
     // ---- Doing it ------------------------------------------------------------
 
     /// <summary>
-    /// Renames the folder on disk — in every section that has one — and
-    /// rewrites the links that name it. The configuration is NOT touched here:
-    /// the caller records the change with <see cref="Renaming"/> through
-    /// <see cref="CourseConfiguration.RecordOnDisk"/>, disk first on purpose,
-    /// so that a move that fails leaves the course exactly as it was.
+    /// Course Settings' change to <c>course_config.json</c>, planned into the
+    /// rename's own step (#899 W8b-15b): the configuration this copy holds,
+    /// the file, and the change made to a fresh read of it.
+    /// </summary>
+    public sealed record SettingsChange(CourseConfiguration Configuration, string Path, Func<JObject, JObject> Change);
+
+    /// <summary>
+    /// The settings change a rename of this folder makes (<see cref="Renaming"/>),
+    /// with the curriculum folders that hold an expectation page read NOW,
+    /// before the move (#345): afterwards the old name is not there to read.
+    /// </summary>
+    public static SettingsChange RenamingTheSettings(CourseConfiguration configuration, string configPath,
+                                                     string oldName, string newName, FolderScope scope, string courseDirectory)
+    {
+        var sharedBefore = configuration.SharedFolders.Append(newName).ToList();
+        var (pagesBefore, letterFirstBefore) = CurriculumFolderRule.FoldersWithPages(courseDirectory, sharedBefore);
+        var curriculumPages = pagesBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
+        var curriculumLetterFirst = letterFirstBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
+        return new SettingsChange(configuration, configPath,
+            values => Renaming(values, oldName, newName, scope, curriculumPages, curriculumLetterFirst));
+    }
+
+    /// <summary><c>undo-action-steps.json</c> → <c>renameFolder</c>'s action key.</summary>
+    internal const string RenameFolderActionKey = "renameFolder";
+
+    /// <summary>
+    /// Renames the folder on disk — in every section that has one — rewrites
+    /// the links that name it, and makes <paramref name="settings"/>' change,
+    /// as ONE step through the door (#899 W8b-15b; the mac's U4b), made by
+    /// <c>sheet</c>, held by the course: one <c>move</c> per place of the
+    /// folder (<see cref="UndoActionStep.MoveFolder"/>, judged by its
+    /// listing), then each relinked page named at its place after the move,
+    /// then one <c>editJSON</c> per changed member of the settings. All of it
+    /// or none: a step refused leaves the course exactly as it was, and is
+    /// said as a <see cref="RenameException"/>. A step refused because a page
+    /// or a setting changed between the plan and the make is planned again
+    /// from the disk, up to three times, as the mac's sheet does.
     ///
-    /// <para>Nothing moves until every destination has been checked (a
-    /// per-section rename is several moves, and one that stopped half way
-    /// would leave a course nobody could reason about). If a move still
-    /// fails — <c>Directory.Move</c> refuses a folder with an open handle, and
-    /// both OneDrive and Obsidian hold them — the moved sections stay moved
-    /// and the exception names WHICH section stopped it. Rolling back was
-    /// rejected: a roll-back can itself half-fail, leaving a state nobody has
-    /// a sentence for, and it moves a teacher's folders a second time without
-    /// being asked.</para>
+    /// <para>Nothing is planned until every destination has been checked.
+    /// <paramref name="finishing"/> is a rename found interrupted: its
+    /// folders already moved, so the step is its relinked pages and its
+    /// members, and no move.</para>
     /// </summary>
     public static RenameOutcome Rename(
-        string oldName, string newName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers)
+        string oldName, string newName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers,
+        SettingsChange? settings = null, bool finishing = false)
+        => Rename(oldName, newName, scope, courseDirectory, sectionNumbers, settings, finishing, null, null);
+
+    /// <param name="undo">The list, mode and trail: this process's by default, a test's own in a test.</param>
+    /// <param name="door">A test's door over <paramref name="undo"/>; the list's own by default.</param>
+    internal static RenameOutcome Rename(
+        string oldName, string newName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers,
+        SettingsChange? settings, bool finishing, UndoForThisProcess? undo, UndoDoor? door)
     {
-        var moves = Moves(courseDirectory, oldName, newName, scope, sectionNumbers);
+        IReadOnlyList<(string From, string To, int? Section)> moves = finishing
+            ? new List<(string, string, int?)>()
+            : Moves(courseDirectory, oldName, newName, scope, sectionNumbers);
         // A rename that only changes capitalisation moves a folder onto
         // itself: the destination "exists" because it IS the source.
         bool onlyCapitalisation = oldName.Equals(newName, StringComparison.OrdinalIgnoreCase);
         if (!onlyCapitalisation && WhyTheMovesCannotBeMade(moves) is { } refusal)
             throw new RenameException(refusal);
 
-        if (moves.Count == 0)
+        string? workingFolder = HowITeachSettingsRow.WorkingFolderOf(courseDirectory);
+        string course = Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(courseDirectory)));
+        int attempts = 0;
+        while (true)
         {
-            // No folder to move — but a page may still carry a qualified link
-            // into the name, and the configuration is about to change under
-            // it, so the links are rewritten regardless; and the rename DID
-            // happen, so the done sentence leads and "nothing was there" is
-            // the explanation after it, as on the mac.
-            int relinkedAnyway = RelinkPages(courseDirectory, oldName, newName);
-            string done = SpecialNames.RenameDone.Replace("{old}", oldName).Replace("{new}", newName);
-            return new RenameOutcome(true, done + " " + SpecialNames.RenameNothingWasThere, 0, relinkedAnyway, NothingWasThere: true);
-        }
+            var step = new UndoActionStep(new UndoStepMaker("sheet", RenameFolderActionKey), workingFolder, course,
+                                          section: null, holds: "course", undo: undo, door: door);
+            int relinked;
+            CourseConfiguration.PlannedRecord? plannedSettings = null;
+            try
+            {
+                foreach (var move in moves) step.MoveFolder(move.From, move.To);
+                relinked = PlanRelinkedPages(step, courseDirectory, oldName, newName, moves);
+                if (settings is not null) plannedSettings = settings.Configuration.PlanRecordOnDisk(settings.Change, settings.Path, step);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
+            {
+                // Only planning: nothing was written.
+                throw new RenameException(error.Message);
+            }
 
-        RecordRenameStarting(oldName, newName, scope, courseDirectory);
-
-        int moved = 0;
-        foreach (var move in moves)
-        {
-            try { Directory.Move(move.From, move.To); moved++; }
+            if (moves.Count > 0) RecordRenameStarting(oldName, newName, scope, courseDirectory);
+            try { step.Make(); }
+            catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince && attempts < 3)
+            {
+                attempts++;
+                continue;
+            }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
-                throw new RenameException(HalfFailureMessage(moved, moves.Count, oldName, move.Section, error.Message));
+                throw new RenameException(error.Message);
             }
-        }
+            if (plannedSettings is not null) settings!.Configuration.FinishRecord(plannedSettings, settings.Change, settings.Path);
 
-        int relinked = RelinkPages(courseDirectory, oldName, newName);
-        return new RenameOutcome(true, DoneMessage(oldName, newName, relinked), moved, relinked, NothingWasThere: false);
+            if (!finishing && moves.Count == 0)
+            {
+                // No folder to move — but a page may still carry a qualified
+                // link into the name, and the configuration changes under it,
+                // so the links are rewritten regardless; and the rename DID
+                // happen, so the done sentence leads and "nothing was there"
+                // is the explanation after it, as on the mac.
+                string done = SpecialNames.RenameDone.Replace("{old}", oldName).Replace("{new}", newName);
+                return new RenameOutcome(true, done + " " + SpecialNames.RenameNothingWasThere, 0, relinked, NothingWasThere: true);
+            }
+            return new RenameOutcome(true, DoneMessage(oldName, newName, relinked), moves.Count, relinked, NothingWasThere: false);
+        }
     }
+
+    /// <summary>
+    /// Plans every page in the course whose links name the folder, rewritten,
+    /// into <paramref name="step"/>: each read now, from where the walk finds
+    /// it, and named at its place AFTER the moves (inside a moved folder, at
+    /// the folder's new place, which the move carries). The walk never goes
+    /// through a link (<see cref="PagePaths.MarkdownPages"/> with
+    /// <c>descendsIntoLinks: false</c>), so a page is relinked only at its own
+    /// place inside the course. The pages are planned in the one page order
+    /// (<see cref="UndoActionStep.ComparePageOrder"/>, by the place each is
+    /// named at), which a step that moves no folder keeps as planned. A page
+    /// that cannot be read, or is not UTF-8, is left out, as on the mac.
+    /// Returns how many pages are planned.
+    /// </summary>
+    internal static int PlanRelinkedPages(UndoActionStep step, string courseDirectory, string oldName, string newName,
+                                          IReadOnlyList<(string From, string To, int? Section)> moves)
+    {
+        var strict = new UTF8Encoding(false, throwOnInvalidBytes: true);
+        var planned = new List<(string Place, byte[] Rewritten)>();
+        foreach (string page in PagePaths.MarkdownPages(courseDirectory, descendsIntoLinks: false))
+        {
+            string text;
+            try { text = strict.GetString(File.ReadAllBytes(page)); }
+            catch (Exception) { continue; }
+            if (FolderPathRewriter.Count(text, oldName) == 0) continue;
+            string rewritten = FolderPathRewriter.Rewritten(text, oldName, newName);
+            if (rewritten == text) continue;
+            planned.Add((PlaceAfter(moves, page), strict.GetBytes(rewritten)));
+        }
+        planned.Sort((first, second) => UndoActionStep.ComparePageOrder(Slashed(first.Place), Slashed(second.Place)));
+        foreach (var (place, rewritten) in planned) step.WriteBytes(place, rewritten);
+        return planned.Count;
+    }
+
+    /// <summary>A page's place once the folders have moved: under a move's <c>To</c> when it is inside its <c>From</c>, by the one comparison (<see cref="UndoOp.PartInside"/>).</summary>
+    private static string PlaceAfter(IReadOnlyList<(string From, string To, int? Section)> moves, string page)
+    {
+        string place = Path.GetFullPath(page);
+        foreach (var move in moves)
+        {
+            if (UndoOp.PartInside(Slashed(Path.GetFullPath(move.From)), Slashed(place)) is not { } inside) continue;
+            string to = Path.GetFullPath(move.To);
+            return inside.Length == 0 ? to : Path.Combine(to, inside.Replace('/', Path.DirectorySeparatorChar));
+        }
+        return place;
+    }
+
+    private static string Slashed(string fullPath) => fullPath.Replace('\\', '/');
 
     /// <summary>What the teacher is told afterwards: what moved, and what else changed.</summary>
     public static string DoneMessage(string oldName, string newName, int relinked)
@@ -294,26 +400,6 @@ public static class SpecialFolderRenamer
             _ => SpecialNames.RenameRelinkedMany.Replace("{count}", relinked.ToString()),
         };
         return done + " " + links;
-    }
-
-    /// <summary>
-    /// Every page in the course whose links name the folder is rewritten.
-    /// One unwritable page must not abandon the rest: the folder has already
-    /// moved, so stopping would leave MORE links broken than carrying on.
-    /// </summary>
-    public static int RelinkPages(string courseDirectory, string oldName, string newName)
-    {
-        int changed = 0;
-        foreach (string page in PagePaths.MarkdownPages(courseDirectory))
-        {
-            string text;
-            try { text = File.ReadAllText(page); } catch (Exception) { continue; }
-            if (FolderPathRewriter.Count(text, oldName) == 0) continue;
-            string rewritten = FolderPathRewriter.Rewritten(text, oldName, newName);
-            if (rewritten == text) continue;
-            try { File.WriteAllText(page, rewritten); changed++; } catch (Exception) { }
-        }
-        return changed;
     }
 
     /// <summary>
@@ -574,7 +660,7 @@ public static class SpecialFolderRenamer
         if (scope == FolderScope.Shared)
         {
             string from = Path.Combine(courseDirectory, currentName);
-            if (Directory.Exists(from))
+            if (IsAPlaceToMove(from))
                 moves.Add((from, Path.Combine(courseDirectory, newName), null));
             return moves;
         }
@@ -583,11 +669,22 @@ public static class SpecialFolderRenamer
         {
             string sectionDirectory = Path.Combine(courseDirectory, $"section{section}");
             string from = Path.Combine(sectionDirectory, currentName);
-            if (Directory.Exists(from))
+            if (IsAPlaceToMove(from))
                 moves.Add((from, Path.Combine(sectionDirectory, newName), section));
         }
         return moves;
     }
+
+    /// <summary>
+    /// Whether a place holds something the rename moves, looked at WITHOUT
+    /// following a link (<see cref="UndoLinks.Look"/>, never
+    /// <c>Directory.Exists</c>, which follows one): a folder; or a link, or a
+    /// place that cannot be looked at now, either of which the step refuses
+    /// <c>cannotTellNow</c> with nothing changed (a linked folder is renamed
+    /// as a link by W8b-21). A file at the place, or nothing, is not moved.
+    /// </summary>
+    private static bool IsAPlaceToMove(string place) =>
+        UndoLinks.Look(place) is UndoLinks.What.Folder or UndoLinks.What.Link or UndoLinks.What.CannotLook;
 
     /// <summary>
     /// Why the moves cannot all be made, or null when they can.
