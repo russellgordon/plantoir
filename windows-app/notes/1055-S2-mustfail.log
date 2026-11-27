@@ -1,0 +1,7 @@
+# #1055 S2 must-fail log (tests first, on origin/dev 412053b07)
+FAIL: test_a_page_inside_a_linked_folder_is_dated_through_the_folder (__main__.DatesFollowTheClassTests.test_a_page_inside_a_linked_folder_is_dated_through_the_folder)
+AssertionError: 'linked' != 'written'
+FAIL: test_a_page_that_is_a_link_to_a_file_elsewhere_is_dated_through_the_link (__main__.DatesFollowTheClassTests.test_a_page_that_is_a_link_to_a_file_elsewhere_is_dated_through_the_link)
+AssertionError: '2026-09-08T07:00:00.000+0000' != '2026-09-24T07:00:00.000+0000'
+Ran 16 tests in 0.193s
+FAILED (failures=2)

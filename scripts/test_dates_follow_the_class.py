@@ -353,10 +353,10 @@ class DatesFollowTheClassTests(unittest.TestCase):
                        "frontmatter": "createdSection1: 2026-09-08T07:00:00.000+0000\n"}],
         }
 
-    def test_a_page_that_is_a_link_to_a_file_elsewhere_is_never_written_through(self):
-        # The build reads it — the site is dated — but the file it points at
-        # lives outside this course, or is shared by another, so it is named
-        # and left alone.
+    def test_a_page_that_is_a_link_to_a_file_elsewhere_is_dated_through_the_link(self):
+        # Russell's ruling of 2026-11-27 (#1055, "Truly write through"): the
+        # date goes into the file the link leads to, by the same safe write,
+        # and the link stays a link with the same target.
         case = self.one_class_linking("Kept Elsewhere")
         self.use_the_course_words(case)
         folder = self.folder_for(case, 97)
@@ -364,35 +364,46 @@ class DatesFollowTheClassTests(unittest.TestCase):
         elsewhere = self.temporary / "elsewhere.md"
         shutil.move(page, elsewhere)
         _link_or_skip(self, page, elsewhere)
+        target = os.readlink(page)
         original = elsewhere.read_bytes()
 
         content, result = folder.build(1)
-        self.assertEqual(elsewhere.read_bytes(), original, "the build wrote through the link")
         self.assertTrue(page.is_symlink(), "the link was replaced")
-        self.assertEqual(result["rewritten"], [])
-        self.assertEqual(result["left_linked"], ["Exercises/Kept Elsewhere"])
+        self.assertEqual(os.readlink(page), target, "the link leads somewhere else now")
+        self.assertEqual(self.date_the_build_reads(elsewhere, 1), "2026-09-24T07:00:00.000+0000",
+                         "the file the link leads to was not dated")
+        expected = original.replace(b"createdSection1: 2026-09-08T07:00:00.000+0000",
+                                    b"createdSection1: 2026-09-24T07:00:00.000+0000")
+        self.assertEqual(elsewhere.read_bytes(), expected, "more than the date changed")
+        self.assertEqual(result["rewritten"], ["Exercises/Kept Elsewhere"])
+        self.assertEqual(result["left_linked"], [])
         self.assertEqual(frontmatter.load(self.copy_of(content, "Kept Elsewhere")).get("created"),
-                         "2026-09-24T07:00:00.000+0000", "the site is still dated")
+                         "2026-09-24T07:00:00.000+0000", "the site is not dated")
 
-        printed: list[str] = []
-        build_site.announce_dated_pages(result, "TEST", 1, printer=printed.append)
-        self.assertEqual(len(printed), 1)
-        self.assertIn("Exercises/Kept Elsewhere", printed[0])
+        self.assert_a_second_build_writes_nothing(folder, [1])
+        self.assertTrue(page.is_symlink(), "the second build replaced the link")
 
-    def test_a_page_inside_a_linked_folder_is_never_written_through(self):
-        # The build copies a shared folder that is itself a link (os.walk
-        # follows the folder it is given), so the check looks at every folder
-        # between the page and the course folder, not only at the page.
+    def test_a_page_inside_a_linked_folder_is_dated_through_the_folder(self):
+        # A course folder that is itself a link to a folder elsewhere: the
+        # date goes into the real file, and the folder stays a link.
         course = self.temporary / "courses" / "TEST"
         elsewhere = self.temporary / "elsewhere-folder"
         elsewhere.mkdir(parents=True)
-        (elsewhere / "Notes.md").write_text("---\ntitle: Notes\n---\nBody\n", encoding="utf-8")
+        real_page = elsewhere / "Notes.md"
+        real_page.write_text("---\ntitle: Notes\ncreatedSection1: 2026-09-08T07:00:00.000+0000\n---\nBody\n",
+                             encoding="utf-8")
         course.mkdir(parents=True)
         _link_or_skip(self, course / "Exercises", elsewhere, target_is_directory=True)
-        (course / "Plain.md").write_text("---\ntitle: Plain\n---\nBody\n", encoding="utf-8")
         build_site.forget_vault_sources(course)
-        self.assertTrue(build_site._reaches_the_page_through_a_link(course / "Exercises" / "Notes.md"))
-        self.assertFalse(build_site._reaches_the_page_through_a_link(course / "Plain.md"))
+
+        outcome = build_site._write_date_into_the_teachers_page(
+            course / "Exercises" / "Notes.md", False, 1, "2026-09-24T07:00:00.000+0000")
+        self.assertEqual(outcome, "written")
+        self.assertEqual(real_page.read_text(encoding="utf-8"),
+                         "---\ntitle: Notes\ncreatedSection1: 2026-09-24T07:00:00.000+0000\n---\nBody\n")
+        self.assertTrue((course / "Exercises").is_symlink(), "the folder link was replaced")
+        self.assertEqual(sorted(path.name for path in elsewhere.iterdir()), ["Notes.md"],
+                         "a half-made file was left beside the page")
 
     def test_a_page_with_two_names_is_never_written(self):
         case = self.one_class_linking("Two Names")
