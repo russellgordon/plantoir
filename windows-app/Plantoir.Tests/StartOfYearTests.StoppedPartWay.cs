@@ -126,6 +126,7 @@ public partial class StartOfYearTests
 
             LayOut(ThePlainYear);
             var visibleBefore = PlannedPagesVisibleNow();
+            _visibleBeforeGo = visibleBefore;
             Assert.NotEmpty(visibleBefore);
             StartOfYearOutcome outcome = null!;
             string trail = TrailWhile(() => outcome = GoWithTheDoor(inUseAt, putBackFailsAt, new BackupMaker.Teacher()));
@@ -146,12 +147,7 @@ public partial class StartOfYearTests
                     Assert.Contains(ActivityTrail.StartOfYearStoppedPartWayLine("from the app", 1, Path.GetFileName(outcome.BackupPath!)), trail, StringComparison.Ordinal);
                     Assert.DoesNotContain("(writeFailed)", trail, StringComparison.Ordinal);
                     Assert.DoesNotContain("nothing was changed", trail, StringComparison.Ordinal);
-                    // TODO(W8c-2b): the answer half. `leaveAsItIs`: the sheet's
-                    // Leave As It Is changes no file of the course and keeps the
-                    // backup, byte for byte; `restoreCourse`: the sheet's
-                    // Restore Course hands stop.Backup, and only it, to the
-                    // whole-course restore with no second confirmation.
-                    Assert.Contains(stopCase["then"]!.ToString(), new[] { "leaveAsItIs", "restoreCourse" });
+                    AnswerAsTheCaseSays(name, stopCase["then"]!.ToString(), stop);
                     break;
                 case "writeFailed":
                     Assert.Null(outcome.StoppedPartWay);
@@ -165,6 +161,206 @@ public partial class StartOfYearTests
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// The answer half of a <c>stoppedPartWay</c> case (#899 W8c-2b), as
+    /// <c>howToRunAStoppedPartWayCase</c> says: <c>leaveAsItIs</c> changes
+    /// nothing (every file of the course and the backup byte for byte as
+    /// after Go) and restores nothing; <c>restoreCourse</c> hands the backup
+    /// Go made, and only it, to the whole-course restore Restore from Backup…
+    /// runs, with no second confirmation.
+    /// </summary>
+    private void AnswerAsTheCaseSays(string name, string then, StartOfYearStoppedPartWay stop)
+    {
+        var recorder = new AnswersRecorder(this);
+        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        switch (then)
+        {
+            case "leaveAsItIs":
+                var before = EveryFileOf(Path.Combine(_folder, "courses", Code), stop.Backup.FilePath);
+                Assert.True(offer.LeaveAsItIs(), name);
+                // Restore Course after it: answered once, nothing happens.
+                Assert.Equal(RestoreCoursePress.AlreadyAnswered, offer.RestoreCourseIsPressed());
+                offer.RestoreCourseAsync(recorder.Answers).GetAwaiter().GetResult();
+                Assert.Empty(recorder.Restored);
+                Assert.Equal(before, EveryFileOf(Path.Combine(_folder, "courses", Code), stop.Backup.FilePath));
+                break;
+            case "restoreCourse":
+                // No second question: the press itself closes the offer.
+                Assert.Equal(RestoreCoursePress.Closes, offer.RestoreCourseIsPressed());
+                offer.RestoreCourseAsync(recorder.Answers).GetAwaiter().GetResult();
+                Assert.Equal(new[] { stop.Backup }, recorder.Restored);
+                Assert.Equal(0, InDraftNow(recorder.VisibleBeforeGo));
+                break;
+            default:
+                Assert.Fail($"{name}: a then this replay does not know: {then}");
+                break;
+        }
+    }
+
+    /// <summary>Every file under the course folder, and the backup, with its bytes (hidden files included).</summary>
+    private static SortedDictionary<string, string> EveryFileOf(string courseFolder, string backup)
+    {
+        var files = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (string file in Directory.EnumerateFiles(courseFolder, "*", SearchOption.AllDirectories))
+            files[file] = Convert.ToBase64String(File.ReadAllBytes(file));
+        files[backup] = Convert.ToBase64String(File.ReadAllBytes(backup));
+        return files;
+    }
+
+    /// <summary>
+    /// The app's answers, recorded: the restore is the REAL whole-course
+    /// restore (<see cref="CourseRestorer.RestoreWholeCourse"/>); the previews
+    /// are the test's, previewing the sections it is told.
+    /// </summary>
+    private sealed class AnswersRecorder
+    {
+        public readonly List<BackupItem> Restored = [];
+        public readonly List<string> Calls = [];
+        public readonly HashSet<int> Previewing = [];
+        public readonly List<string> VisibleBeforeGo;
+        public StartOfYearRestoreAnswers Answers { get; }
+
+        public AnswersRecorder(StartOfYearTests test, IReadOnlyCollection<int>? sectionsAfter = null)
+        {
+            VisibleBeforeGo = test._visibleBeforeGo;
+            string folder = test._folder;
+            Answers = new StartOfYearRestoreAnswers(
+                StopEveryPreviewOfTheCourse: () =>
+                {
+                    var stopped = Previewing.OrderBy(section => section).ToList();
+                    foreach (int section in stopped) Calls.Add("stop " + section);
+                    Previewing.Clear();
+                    return Task.FromResult<IReadOnlyList<int>>(stopped);
+                },
+                RestoreWholeCourse: item =>
+                {
+                    Calls.Add("restore");
+                    Restored.Add(item);
+                    var workspace = new AssistWorkspace(folder, new FakeLauncher(), undo: new UndoHistory());
+                    CourseRestorer.RestoreWholeCourse(item, workspace.Course(item.CourseCode), Workspace.CoursesDirectory(folder));
+                    return Task.CompletedTask;
+                },
+                SectionsOfTheCourseNow: () => sectionsAfter ?? new AssistWorkspace(folder, new FakeLauncher(), undo: new UndoHistory()).Course(Code).Configuration.SectionNumbers,
+                IsPreviewing: section => Previewing.Contains(section),
+                StartPreview: section =>
+                {
+                    Calls.Add("start " + section);
+                    Previewing.Add(section);
+                });
+        }
+    }
+
+    private List<string> _visibleBeforeGo = [];
+
+    /// <summary>The plain year stopped part way, as the contract's first case, with the pages visible before Go remembered.</summary>
+    private StartOfYearStoppedPartWay StopPartWay()
+    {
+        LayOut(ThePlainYear);
+        _visibleBeforeGo = PlannedPagesVisibleNow();
+        var outcome = GoWithTheDoor(1, 0, new BackupMaker.Teacher());
+        return outcome.StoppedPartWay ?? throw new Xunit.Sdk.XunitException("Go did not stop part way: " + outcome.Message);
+    }
+
+    [Fact]
+    public void TheOfferSaysTheTwoSentencesInOrderAndNamesNoHiddenFile()
+    {
+        var stop = StopPartWay();
+        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        Assert.Equal(new[]
+        {
+            StartOfYearWording.Fill(StartOfYearWording.StoppedPartWay, ("section", "1"), ("course", Code)),
+            StartOfYearWording.Fill(StartOfYearWording.RestoreOffer, ("course", Code), ("backup", Path.GetFileName(stop.Backup.FilePath))),
+        }, offer.Sentences);
+        foreach (string sentence in offer.Sentences) Assert.DoesNotContain(".plantoir-undo", sentence, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RestoreCourseRestoresTheBackupGoMadeWithNoSecondQuestion()
+    {
+        var stop = StopPartWay();
+        var recorder = new AnswersRecorder(this);
+        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        int zipsBefore = Directory.EnumerateFiles(Path.Combine(_folder, "courses"), "*.zip", SearchOption.AllDirectories).Count();
+        string trail = TrailWhile(() =>
+        {
+            Assert.Equal(RestoreCoursePress.Closes, offer.RestoreCourseIsPressed());
+            offer.RestoreCourseAsync(recorder.Answers).GetAwaiter().GetResult();
+        });
+        Assert.Equal(new[] { stop.Backup }, recorder.Restored);
+        Assert.Equal(0, InDraftNow(_visibleBeforeGo));
+        Assert.Contains("restored", trail, StringComparison.OrdinalIgnoreCase);
+        // Archived first, so the course as it was after Go is kept; the backup stays.
+        Assert.True(File.Exists(stop.Backup.FilePath));
+        Assert.True(Directory.EnumerateFiles(Path.Combine(_folder, "courses"), "*.zip", SearchOption.AllDirectories).Count() > zipsBefore,
+            "the course as it was after Go was not archived before the restore");
+    }
+
+    [Fact]
+    public void ADeployHoldsRestoreCourseBackAndTheOfferStillWorksAfter()
+    {
+        var stop = StopPartWay();
+        var recorder = new AnswersRecorder(this);
+        recorder.Previewing.Add(1);
+        bool deploying = true;
+        var offer = new StartOfYearRestoreOffer(stop, () => deploying);
+
+        Assert.Equal(RestoreCoursePress.HeldBackByADeploy, offer.RestoreCourseIsPressed());
+        Assert.False(offer.IsAnswered);
+        Assert.Equal(CourseRestorer.BusyTitle(Code) + "\n" + CourseRestorer.BusyMessage, offer.HeldBackSentence);
+        // Held back: nothing stopped, nothing restored, even if the restore were asked.
+        offer.RestoreCourseAsync(recorder.Answers).GetAwaiter().GetResult();
+        Assert.Empty(recorder.Calls);
+
+        deploying = false;
+        Assert.Equal(RestoreCoursePress.Closes, offer.RestoreCourseIsPressed());
+        offer.RestoreCourseAsync(recorder.Answers).GetAwaiter().GetResult();
+        Assert.Equal(new[] { "stop 1", "restore", "start 1" }, recorder.Calls);
+    }
+
+    [Fact]
+    public void LeaveAsItIsWritesNothingAndKeepsTheBackup()
+    {
+        var stop = StopPartWay();
+        var before = EveryFileOf(Path.Combine(_folder, "courses", Code), stop.Backup.FilePath);
+        var recorder = new AnswersRecorder(this);
+        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        string trail = TrailWhile(() => Assert.True(offer.LeaveAsItIs()));
+        Assert.Equal("", trail);
+        Assert.Equal(before, EveryFileOf(Path.Combine(_folder, "courses", Code), stop.Backup.FilePath));
+        Assert.Empty(recorder.Calls);
+    }
+
+    [Fact]
+    public void TheOfferIsAnsweredOnceAndAPreviewIsStartedAgainOnce()
+    {
+        var stop = StopPartWay();
+        var recorder = new AnswersRecorder(this);
+        recorder.Previewing.Add(1);
+        recorder.Previewing.Add(2);
+        var offer = new StartOfYearRestoreOffer(stop, () => false);
+
+        Assert.Equal(RestoreCoursePress.Closes, offer.RestoreCourseIsPressed());
+        Assert.Equal(RestoreCoursePress.AlreadyAnswered, offer.RestoreCourseIsPressed());
+        Assert.False(offer.LeaveAsItIs());
+        offer.RestoreCourseAsync(recorder.Answers).GetAwaiter().GetResult();
+        offer.RestoreCourseAsync(recorder.Answers).GetAwaiter().GetResult();
+        Assert.Equal(new[] { "stop 1", "stop 2", "restore", "start 1", "start 2" }, recorder.Calls);
+        Assert.Single(recorder.Restored);
+    }
+
+    [Fact]
+    public void APreviewOfASectionTheRestoredCourseNoLongerHasIsNotStartedAgain()
+    {
+        var stop = StopPartWay();
+        var recorder = new AnswersRecorder(this, sectionsAfter: [1]);
+        recorder.Previewing.Add(1);
+        recorder.Previewing.Add(3);
+        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        Assert.Equal(RestoreCoursePress.Closes, offer.RestoreCourseIsPressed());
+        offer.RestoreCourseAsync(recorder.Answers).GetAwaiter().GetResult();
+        Assert.Equal(new[] { "stop 1", "stop 3", "restore", "start 1" }, recorder.Calls);
     }
 
     /// <summary>The mac's <c>testTheStoppedPartWayLineCountsWhatWasKept</c>: no count, one file, several files.</summary>
