@@ -56,13 +56,19 @@ public sealed class UndoActionStepFolderMoveTests : IDisposable
     private UndoActionStep Step(UndoForThisProcess list) =>
         new(new UndoStepMaker("sheet", "renameFolder"), Folder, "TST1O", null, holds: "course", undo: list);
 
-    /// <summary>Every folder and file under the working folder, by its path there, with its bytes (null for a folder).</summary>
+    /// <summary>
+    /// Every folder and file under the working folder, by its path there, with
+    /// its bytes (null for a folder): the teacher's tree, so not the working
+    /// folder's identity the door keeps in <c>courses/.internal</c> once it
+    /// has named a step there.
+    /// </summary>
     private SortedDictionary<string, string?> Tree()
     {
         var tree = new SortedDictionary<string, string?>(StringComparer.Ordinal);
         foreach (string entry in Directory.EnumerateFileSystemEntries(Folder, "*", SearchOption.AllDirectories))
         {
             string relative = Path.GetRelativePath(Folder, entry).Replace('\\', '/');
+            if (UndoOp.PartInside("courses/.internal", relative) is not null) continue;
             tree[relative] = Directory.Exists(entry) ? null : Convert.ToBase64String(File.ReadAllBytes(entry));
         }
         return tree;
@@ -212,14 +218,19 @@ public sealed class UndoActionStepFolderMoveTests : IDisposable
         Assert.Empty(Begins());
     }
 
-    /// <summary>A folder carrying a reparse point that is NOT a link (as a OneDrive folder does) is the teacher's own folder: moved like any other, never refused as a link.</summary>
+    /// <summary>
+    /// A folder carrying a reparse point that is NOT a link (as a OneDrive
+    /// folder does) is the teacher's own folder: moved like any other, never
+    /// refused as a link. Empty: measured on the PC, a file cannot be made
+    /// inside a folder carrying this tag without the filter that owns it
+    /// ("The file cannot be accessed by the system").
+    /// </summary>
     [ReparsePointFact]
     public void AFolderWithAReparsePointThatIsNotALinkIsMovedLikeAnyOther()
     {
         ACourse();
         Directory.CreateDirectory(Full(Notes));
         Assert.Null(UndoReparsePoints.MakeOnAFolder(Full(Notes), UndoReparsePoints.NotALink, new byte[16]));
-        Write(Notes + "/c.md", "C\n");
         Assert.True(File.GetAttributes(Full(Notes)).HasFlag(FileAttributes.ReparsePoint));
         Assert.Equal(UndoLinks.What.Folder, UndoLinks.Look(Full(Notes)));
         UndoActionStep step = Step(List());
@@ -227,8 +238,10 @@ public sealed class UndoActionStepFolderMoveTests : IDisposable
         step.MoveFolder(Full(Notes), Full(Zeta));
         step.Make();
 
-        Assert.False(Directory.Exists(Full(Notes)));
-        Assert.Equal("C\n", File.ReadAllText(Full(Zeta + "/c.md")));
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(Full(Notes)));
+        Assert.Equal(UndoLinks.What.Folder, UndoLinks.Look(Full(Zeta)));
+        JsonNode? move = Assert.Single(Begins()[0]["step"]!["ops"]!.AsArray());
+        Assert.Equal(Notes, (string?)move!["from"]);
     }
 
     [Fact]
