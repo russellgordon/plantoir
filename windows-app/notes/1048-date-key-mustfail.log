@@ -1,0 +1,25 @@
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:364: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testInsertClassMovingOnlyTheLaterLinkedClassLeavesTheFile] : XCTAssertEqual failed: ("---
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testInsertClassMovingOnlyTheLaterLinkedClassLeavesTheFile]' failed (0.489 seconds).
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:348: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testInsertClassMovingTheFirstOfTwoLinkedClassesWritesItsDate] : XCTAssertTrue failed - the first class's day, 2026-09-14: ---
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testInsertClassMovingTheFirstOfTwoLinkedClassesWritesItsDate]' failed (0.037 seconds).
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:379: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testInsertClassWithThreeLinkedClassesKeepsTheFirstClassesDate] : XCTAssertEqual failed: ("---
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testInsertClassWithThreeLinkedClassesKeepsTheFirstClassesDate]' failed (0.025 seconds).
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:325: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateOfThreeLinkedClassesLeavesTheFirstClassesDate] : XCTAssertEqual failed: ("---
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateOfThreeLinkedClassesLeavesTheFirstClassesDate]' failed (0.020 seconds).
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:307: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateOfTwoLinkedClassesKeepsTheFirstClassesDate] : XCTAssertTrue failed
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:308: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateOfTwoLinkedClassesKeepsTheFirstClassesDate] : XCTAssertFalse failed
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateOfTwoLinkedClassesKeepsTheFirstClassesDate]' failed (0.030 seconds).
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:289: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateWritesOnlyThisSectionsLineThroughALink] : XCTAssertEqual failed: ("---
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateWritesOnlyThisSectionsLineThroughALink]' failed (0.031 seconds).
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:269: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheAssistantsGraphReadsThisSectionsKeyThroughALink] : XCTAssertEqual failed: ("nil") is not equal to ("Optional(2026-09-14)")
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:270: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheAssistantsGraphReadsThisSectionsKeyThroughALink] : XCTAssertEqual failed: ("Optional("created")") is not equal to ("Optional("createdSection1")")
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheAssistantsGraphReadsThisSectionsKeyThroughALink]' failed (0.011 seconds).
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:258: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheClassListReadsASharedLessonWithOnlySectionLines] : XCTAssertEqual failed: ("nil") is not equal to ("Optional(2026-09-14)")
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheClassListReadsASharedLessonWithOnlySectionLines]' failed (0.011 seconds).
+mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:249: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheClassListReadsThisSectionsKeyThroughALink] : XCTAssertEqual failed: ("Optional(2026-09-14)") is not equal to ("Optional(2026-09-16)")
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheClassListReadsThisSectionsKeyThroughALink]' failed (0.011 seconds).
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheKeyCasesInTheContract]' passed (0.062 seconds).
+Test Case '-[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheKeyIsDecidedByThePlaceOfTheFileThePageIs]' passed (0.011 seconds).
+	 Executed 11 tests, with 11 failures (0 unexpected) in 0.738 (0.740) seconds
+	 Executed 11 tests, with 11 failures (0 unexpected) in 0.738 (0.740) seconds
+	 Executed 11 tests, with 11 failures (0 unexpected) in 0.738 (0.741) seconds
