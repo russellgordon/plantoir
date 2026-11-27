@@ -110,3 +110,17 @@ Brief `vm-tools/briefs/2026-11-27-899-mac-2-review-1.md`. `origin/dev` (454ef4c6
 - **The changed trail clause.** Windows' `UndoRecovery.cs` (about line 299) still says `nothing could be written beside {path} (the disk may be full)` for `CouldNotWrite` in the "undo refused for a change left part way" line; it owes "{path} could not be changed in its folder, which may be full or may not allow the change" (the event's `carries`). Its test: a second example beside `UndoTrailWordsContractTests.RefusedForAChangeLeftPartWaySaysWhatTheContractSays` with `CouldNotWrite`, read against `carries`. W8b 21b (where its exchange is refused) or 22.
 - The director to carry these on the W8b 21b and 22 issues (this writer opened none).
 
+### Must-fail lines (fix round one)
+
+2 of 2 RED (`899-mac-2-mustfail.log`): S1, the hop keyed by path spelling: RED `testTwoSpellingsOfOneHopRePointItOnce` (refused notReadable), the one-spelling test green. S2, the old refusal at the hidden name: RED `testAnItemThatCannotGoBackAfterTheExchangeIsNamedByTheRefusal`, 2 failures (swap and live).
+
+### Runs (fix round one, `.dd/`)
+
+1. run-fix1-red (tests first, eafafcc6a): 2 tests, 3 failures: the two-spellings test refused notReadable; the leftover test refused at the hidden name (swap and live).
+2. run-fix1-green: `UndoRelinkTests`, `UndoMakeRoomLinkedPageTests`, `UndoWriterScanTests` (reads `UndoCheck.swift` as source), `MakeRoomForClassesTests`, `JournaledStepTests`: 116 tests, 0 failures.
+3. `python3 scripts/test_make_undo_traces.py`: 46 tests OK (no contract change this round).
+4. run-fix1-mustfail: 3 tests, 3 failures as above; restored, then a plain Debug build.
+
+### Self-check (fix round one)
+
+1. Must-fail 2 of 2 RED, restored, `git diff` clean. 2. No timed waits. 3. No new or changed sentence a teacher reads: LOW 1 now reaches existing, true wording (`publishStoppedPartWay` live; the refusal at the visible place on Undo or Redo). 4. `origin/dev` merged before proving and before hand-back (up to date). 5. No number tuned. 6. The ledger string read back by script (no unescaped quote, parentheses balanced); the held name is the contract's event byte for byte. 7. House-style grep over the changed Swift lines empty; MARK sections unchanged. 8. LOW 1 and LOW 2 fixed with tests seen red first; LOW 4 by reading; LOW 3 written for Windows (above), not as rows. 9. Switch off, rename record untouched. 10. No new contract row; the new trail event is now held on Windows by exact name.
