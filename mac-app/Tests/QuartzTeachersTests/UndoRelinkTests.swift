@@ -76,7 +76,7 @@ final class UndoRelinkTests: XCTestCase {
     /// Going forward the link at Day 4 is replaced by one at Day 5 holding
     /// exactly the new text; going back, the old link with the old text
     /// byte for byte. Whatever either text names, inside or out, a file or
-    /// nothing, is never read, written or made.
+    /// nothing, is never written or made.
     func testARelinkGoesForwardAndBackHoldingEachSidesOwnText() throws {
         for leads in Leads.allCases {
             let laid: LaidRelink = try layARelink(named: "there-and-back", leads: leads)
@@ -303,7 +303,7 @@ final class UndoRelinkTests: XCTestCase {
     /// A step holding a relinking move, made through the door with both
     /// texts, then undone and redone through the list: each side holds its
     /// own text byte for byte each time, and whatever the texts name,
-    /// inside or out, a file or nothing, is never read, written or made.
+    /// inside or out, a file or nothing, is never written or made.
     func testARelinkStepIsMadeUndoneAndRedoneThroughTheList() throws {
         for leads in Leads.allCases {
             let laid: LaidRelink = try layARelink(named: "through-the-list-\(leads)", leads: leads)
@@ -389,7 +389,7 @@ final class UndoRelinkTests: XCTestCase {
     /// `notReadable`, before anything changes): after recovery every class page is
     /// whole before or whole after, the link at one name only holding that
     /// side's text, nothing staged left anywhere under the root, and
-    /// nothing outside read, written or made. MUST FAIL with recovery's
+    /// nothing outside written or made. MUST FAIL with recovery's
     /// removal of the link just made skipped (M1) or taken from the
     /// source's name instead (M2).
     func testARelinkKilledAtAnyMomentIsWholeAfterRecovery() async throws {
@@ -1102,7 +1102,7 @@ final class UndoRelinkTests: XCTestCase {
             XCTAssertEqual(try journal.read().records.count, 1, "\(leads)")
             XCTAssertEqual(try pagesBesideTheLink(laid.root), pagesBefore, "\(leads)")
             XCTAssertEqual(stagedLeft(under: laid.root), [], "\(leads)")
-            XCTAssertEqual(try outsideNow(), outsideBefore, "\(leads): something outside was read, written or made")
+            XCTAssertEqual(try outsideNow(), outsideBefore, "\(leads): something outside was written or made")
             JournaledStep.modeOverride = nil
             UndoJournalLocation.folderOverride = nil
         }
@@ -1684,9 +1684,8 @@ final class UndoRelinkTests: XCTestCase {
     }
 
     /// Every page in section 1 but the link itself, by name: what nothing
-    /// may write through the link. The files outside are never opened here
-    /// (their access times are `outsideNow`'s), only by
-    /// `checkTheOutsideBytes` at the end.
+    /// may write through the link. The files outside are never opened here,
+    /// only by `outsideNow` and `checkTheOutsideBytes`.
     func pagesBesideTheLink(_ root: URL) throws -> [String: String] {
         var found: [String: String] = [:]
         for (name, held) in try classPagesNow(root) where name != "Unit 1, Day 4.md" {
@@ -2102,17 +2101,19 @@ final class UndoRelinkTests: XCTestCase {
         return try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
     }
 
-    /// Every file in the folder outside, by name, with its access and
-    /// modification times, read with `lstat` only (this look never opens
-    /// them, so any change of time is the swap's): nothing made there, and
-    /// nothing there read or written.
+    /// Every file in the folder outside, by name, with its modification
+    /// time, size and the SHA-256 of its bytes: nothing made there and
+    /// nothing written there. Never its access time (#1054): a scanner on
+    /// another Mac reads the files and moves it, which says nothing about
+    /// the swap; reading the bytes here moves it too, and is harmless.
     func outsideNow() throws -> [String: String] {
         var found: [String: String] = [:]
         for name in try FileManager.default.contentsOfDirectory(atPath: outside.path) {
             let url: URL = outside.appendingPathComponent(name)
             var information: stat = stat()
             XCTAssertEqual(lstat(url.path, &information), 0)
-            found[name] = "\(information.st_atimespec.tv_sec).\(information.st_atimespec.tv_nsec) \(information.st_mtimespec.tv_sec).\(information.st_mtimespec.tv_nsec)"
+            found[name] = "\(information.st_mtimespec.tv_sec).\(information.st_mtimespec.tv_nsec) \(information.st_size) "
+                + (UndoHash.sha256(ofOptional: try? Data(contentsOf: url)) ?? "unreadable")
         }
         return found
     }
