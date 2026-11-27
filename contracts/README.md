@@ -2282,8 +2282,8 @@ itself — so word it deliberately rather than discovering the gap:
 - **On the Mac, Rename folder's two old half-failure sentences are gone**
   (#899 U4b): the rename is one step through the door, every folder, page and
   setting or none of them, so "renamed N of M copies" and "the folder moved but
-  the settings could not be written" are no longer said there. Windows still
-  says both until its own piece (W8). What a refused rename says on the Mac is
+  the settings could not be written" are no longer said there. Windows no
+  longer says either (W8b pieces 15b and 18b). What a refused rename says on the Mac is
   in `undo.wording`, four keys: `renameFolderNothingWasChanged` (nothing was
   changed), and three for a refused step that could not all be put back, which
   is still possible: `renameFolderStoppedPartWay` (none of the rename's
@@ -2296,10 +2296,8 @@ itself — so word it deliberately rather than discovering the gap:
   never "was not renamed", U4b2-6). Each writes a `folder renamed` line on
   the trail, the third its own "may have renamed … only in part". (The three
   `renameFolderUnderWay…` keys, and U4b2-9's `renameFolderUnderWaySpinner`,
-  are said while a rename runs, not when one is refused.) Windows' one part-way line until
-  W8 is a rename whose folders moved but whose settings could not be written
-  ("renamed the folder … but could not write it to this course's settings");
-  its stop after moving some of the copies writes no line.
+  are said while a rename runs, not when one is refused.) Windows writes the
+  Mac's three part-way lines (W8b piece 18b).
 - **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
 - **The assistant's unit sentences**, which an earlier draft wrongly said were
   "listed below with the others" until this line was added. Two of the five are
