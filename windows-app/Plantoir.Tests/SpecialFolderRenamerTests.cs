@@ -642,9 +642,6 @@ public class SpecialFolderRenamerTests : IDisposable
     /// <summary>The contract's sentence with its places filled and <c>{said}</c> left off: what a sentence must start with.</summary>
     private static string Before(string sentence) => sentence.Substring(0, sentence.IndexOf("{said}", StringComparison.Ordinal));
 
-    /// <summary>The renames a swap tried, as a failing assertion names them.</summary>
-    private List<string> Seen { get; } = new();
-
     private string InCourse(string relative) => Path.Combine(RecordCourse, relative.Replace('/', Path.DirectorySeparatorChar));
 
     [Fact]
@@ -715,39 +712,39 @@ public class SpecialFolderRenamerTests : IDisposable
     }
 
     /// <summary>
-    /// Section 2's old place is taken just as its move is put back (a file
-    /// made there), so the move back fails and it stays at the new name;
-    /// section 1 goes back. Only section 2 is named, on the sheet and the
-    /// trail.
+    /// The step swaps in path order: section 1's move, its Quiz 1, then
+    /// section 1's index, which is read-only and refuses, so section 2 never
+    /// moves. Section 1's old place is taken just as its move is put back (a
+    /// file made there), so it stays at the new name. Only section 1 is
+    /// named, on the sheet and the trail; section 2, never moved, is not.
     /// </summary>
     [Fact]
     public void AFolderLeftAtTheNewNameIsNamedAndTheRenameSaysOnlyInPart()
     {
         TheRecordCourse();
         File.SetAttributes(InCourse("section1/index.md"), FileAttributes.ReadOnly);
-        string sectionTwosOldPlace = Path.GetFullPath(InCourse("section2/Tasks"));
+        string sectionOnesOldPlace = InCourse("section1/Tasks");
         var seams = new UndoSeams
         {
             EachRename = (from, onto) =>
             {
-                // Compared by their last two parts: the swap names them from the
-                // working folder as it reads it, which may be spelled otherwise.
-                bool puttingSectionTwoBack = from.Replace('/', '\\').EndsWith(@"\section2\Assessments", StringComparison.OrdinalIgnoreCase)
-                    && onto.Replace('/', '\\').EndsWith(@"\section2\Tasks", StringComparison.OrdinalIgnoreCase);
-                Seen.Add(from + " -> " + onto);
-                if (puttingSectionTwoBack) File.WriteAllText(sectionTwosOldPlace, "made meanwhile");
+                // Compared by their last two parts: the swap names them from
+                // the working folder as it reads it.
+                bool puttingSectionOneBack = from.Replace('/', '\\').EndsWith(@"\section1\Assessments", StringComparison.OrdinalIgnoreCase)
+                    && onto.Replace('/', '\\').EndsWith(@"\section1\Tasks", StringComparison.OrdinalIgnoreCase);
+                if (puttingSectionOneBack) File.WriteAllText(sectionOnesOldPlace, "made meanwhile");
             },
         };
 
         var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(() => RenameAsTheSheetDoes(seams: seams));
 
-        Assert.True(Directory.Exists(InCourse("section2/Assessments")), "section 2 stayed at the new name; renames: " + string.Join(" | ", Seen) + "; said: " + refused.Message);
-        Assert.False(Directory.Exists(InCourse("section1/Assessments")), "section 1 went back");
+        Assert.True(Directory.Exists(InCourse("section1/Assessments")), "section 1 stayed at the new name: " + refused.Message);
+        Assert.True(Directory.Exists(InCourse("section2/Tasks")), "section 2 never moved");
         Assert.StartsWith(Before(Wording("renameFolderRenamedOnlyInPart").Replace("{old}", "Tasks").Replace("{new}", "Assessments")
-                                     .Replace("{places}", "“section2/Assessments”")),
+                                     .Replace("{places}", "“section1/Assessments”")),
                           refused.Message, StringComparison.Ordinal);
         Assert.Contains("renamed the folder Tasks to Assessments in ICS3U only in part, and could not put everything back (per_section_folders, "
-                        + "still called Assessments: section2/Assessments; ", Trail());
+                        + "still called Assessments: section1/Assessments; ", Trail());
         Assert.True(File.Exists(RecordPath), "a part-way rename keeps its record");
     }
 
