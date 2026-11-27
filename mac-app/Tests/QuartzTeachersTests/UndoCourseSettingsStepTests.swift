@@ -310,7 +310,8 @@ final class UndoCourseSettingsStepTests: XCTestCase {
     /// U4a review 1, LOW 3: one of the Save's own members changed by
     /// something else before EVERY make, four times in a row: the fourth
     /// refusal writes nothing, the edits stay unsaved, and the form says
-    /// "Could not save: The file “course_config.json” couldn’t be saved."
+    /// "Could not save: The file couldn’t be saved." (no file name since the
+    /// #899 settings sweep, LOW A2).
     /// MUST FAIL with a fifth try, or with the Save written anyway as
     /// `write(to:)` did after its third read-again.
     func testAFourthRefusalInARowWritesNothingAndKeepsTheEditsUnsaved() throws {
@@ -333,7 +334,7 @@ final class UndoCourseSettingsStepTests: XCTestCase {
 
         UndoKillPoints.hook = nil
         XCTAssertEqual(races, 4, "tried four times in all")
-        XCTAssertEqual(session.saveProblem, "Could not save: The file “course_config.json” couldn’t be saved.")
+        XCTAssertEqual(session.saveProblem, "Could not save: The file couldn’t be saved.", "names no file (the sweep, LOW A2)")
         XCTAssertEqual(try settings(of: course)["hidden"] as? [String], ["Race 4"], "only the other program's write is on disk")
         XCTAssertTrue(course.configuration.hasUnsavedChanges)
         XCTAssertEqual(course.configuration.hiddenItems, ["Media"])

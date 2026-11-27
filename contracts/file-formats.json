@@ -2281,8 +2281,8 @@
       "step": "begin only: the step (stepKeys). A begin whose step is missing, or whose step.seq differs from the line's, is unreadable.",
       "process": "begin, undoing and redoing: the process that started the work, so recovery can tell whether it is still running: host (for a person; never compared, a Mac's host name changes with its network), pid (a whole number), name (as the process table reports it), started (that platform's own spelling of the process's start time, compared only by that platform).",
       "phase": "failed, rolledBack and interrupted: what they ended: begin, undoing or redoing. Any other value makes the line unreadable.",
-      "reason": "A word, never page text: failed (nothingTookEffect, refused, actionStopped, differedFromTheRecord), rolledBack (partlyTookEffect), interrupted (changedByHand, partlyTookEffect, couldNotPutBack, unsettled), dropped (newStep, redoRefused), pruned (tooMany, tooOld), cleared (the reasons this version writes are shared-rules.json -> undo.clearReasons; a reader honours a cleared line whatever its reason). Readers never act on a reason: it names a clearing or an ending for a person reading the file.",
-      "paths": "interrupted only: the files left in the way (changed by hand, left part way in shadow, or left part way because they could not be put back), or, for a step closed unsettled, every file the step names; inside the working folder like an op's path. Paths, never content."
+      "reason": "A word, never page text: failed (nothingTookEffect, refused, actionStopped, differedFromTheRecord), rolledBack (partlyTookEffect), interrupted (changedByHand, partlyTookEffect, couldNotPutBack, unsettled, setAsideByARestore: a step in flight whose every file a restore replaced, closed once the restore has replaced them with every file it names and no clearing, or a step with files set aside (filesReplacedByARestore) whose other files recovery has settled, closed naming the files set aside and no clearing, #899), filesReplacedByARestore (setAsideByARestore), dropped (newStep, redoRefused), pruned (tooMany, tooOld), cleared (the reasons this version writes are shared-rules.json -> undo.clearReasons; a reader honours a cleared line whatever its reason). Readers never act on a reason: it names a clearing or an ending for a person reading the file.",
+      "paths": "filesReplacedByARestore: the files a restore replaced while the step was in flight. interrupted: the files left in the way (changed by hand, left part way in shadow, or left part way because they could not be put back), or, for a step closed unsettled, every file the step names; inside the working folder like an op's path. Paths, never content."
     },
     "events": {
       "begin": "A step is written down, before its change. Carries step and process.",
@@ -2297,6 +2297,7 @@
       "dropped": "An undone step whose redo was cut off: by a newer step (newStep), or by a Redo refused because what it changed was changed by hand since (redoRefused, shared-rules.json -> undo.rule.clearing, ruling 20), which drops that step and every undone step above it.",
       "pruned": "Past what the disk keeps (undo.rule.limits): never offered again.",
       "cleared": "The WHOLE list cleared (undo.rule.clearing). Not about one step: see folding.moves. Honoured WHATEVER its reason says, a reason the reader does not know included: a reader never checks the reason, so a later version can clear for one of its own.",
+      "filesReplacedByARestore": "Some of a step's files were replaced by a restore while the step was in flight (#899, the director's ruling of 2026-11-27): written once the restore has replaced them, in the lock held across its swap, naming them in `paths`, with reason setAsideByARestore. It moves no step: a step in flight stays where it stands, and the files are added to its files set aside (ignored for a step not in flight). Recovery never judges a step by, or writes into, a file set aside, nor re-derives one: it judges only the step's ops that name none of them, and when it settles those (made, nothing took effect, or put back) it closes the step `interrupted`, reason setAsideByARestore, naming the files set aside, with no clearing, never on the list, so no Undo or Redo ever acts on a file set aside. Its other endings (changedByHand, couldNotPutBack) are written as for any step. A step whose every file a restore replaced gets no filesReplacedByARestore line: it is closed `interrupted` at once. A reader that does not know this event reads the line as unreadable, a barrier, never as a note.",
       "note": "A NEUTRAL line every reader passes over, whatever else it carries: it moves no step, is never a barrier, never stops deletion and never clears. Keys: `v` (the number 1) and `seq` (a whole number) are REQUIRED, or the line is unreadable like any other (unknown.unreadableLine), a barrier; `event` is note; `at` and `about` (a word naming what it records) are optional, and a note with no `about`, or with keys a reader does not know (a `phase` or `reason` of any value included), is still a note. Its seq is the highest seq at writing, as for cleared, and counts toward the highest seq like any line's, so a note never takes a number, and a note whose seq is above every step's raises the next step's number. A later version writes its notes as v 1, so every reader of this version passes over them. Known to every reader from this version on, so a later version can record something an older reader must simply skip; an event a reader does not know is still unreadable (unknown.unreadableLine). U1 writes notes only in the contract's cases and traces."
     },
     "stepKeys": {
@@ -2438,6 +2439,11 @@
           "from": "anything",
           "on": "note",
           "to": "(no move: passed over)"
+        },
+        {
+          "from": "in flight (begun, undoing, redoing)",
+          "on": "filesReplacedByARestore",
+          "to": "(no move: its paths join the step's files set aside)"
         },
         {
           "from": "anything else",

@@ -25,6 +25,10 @@ struct CourseSettingsView: View {
 
     @State var isShowingFoldersHelp: Bool = false
 
+    /// A Save that stopped part way and could not be finished at once: the
+    /// alert offering to put it back (#899, fix round one).
+    @State var putBackOffer: SettingPutBackOffer?
+
     /// The renames this page owns, one per folder list that renames
     /// (#899 U4b2-8): halted while they only plan when the page goes away.
     @State var renames: CourseSettingsRenames = CourseSettingsRenames()
@@ -230,6 +234,9 @@ struct CourseSettingsView: View {
                             )
                         },
                         onRename: renameFromTheSheet(scope: .shared),
+                        onRenamePutBackAnswer: { answer, offer in
+                            return CourseSettingsView.answerARenameOffer(answer, to: offer, course: course)
+                        },
                         renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
@@ -291,6 +298,9 @@ struct CourseSettingsView: View {
                             )
                         },
                         onRename: renameFromTheSheet(scope: .perSection),
+                        onRenamePutBackAnswer: { answer, offer in
+                            return CourseSettingsView.answerARenameOffer(answer, to: offer, course: course)
+                        },
                         renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .perSection)
@@ -448,6 +458,14 @@ struct CourseSettingsView: View {
                 saveButton
             }
             .padding(12)
+        }
+        .settingPutBackAlert(offer: $putBackOffer) { answer, shown in
+            if answer == .notNow {
+                ActivityTrail.note(.settingsCouldNotBeSaved, SettingStopTrail.notNow(setting: shown.setting, course: course.code))
+            }
+            if answer == .putItBack, let refused = CourseSettingsView.putBack(shown, course: course) {
+                saveProblem = refused
+            }
         }
         .sheet(isPresented: $isShowingFoldersHelp) {
             SpecialFoldersHelpView(course: course)
@@ -813,6 +831,9 @@ struct CourseSettingsView: View {
             saveProblem = holdingProblem.sentence
             return
         }
+        // The file's bytes before this Save: which settings a Save that
+        // cannot finish would put back, and what they held (#899).
+        let bytesBefore: Data? = try? Data(contentsOf: course.configFileURL)
         do {
             // What the file hid BEFORE this Save, for the trail — read from
             // the file, not this copy, because the file is what the site was
@@ -861,9 +882,94 @@ struct CourseSettingsView: View {
                 try? await Task.sleep(for: .seconds(3))
                 didJustSave = false
             }
+        } catch JournaledStepError.couldNotFinish(let seq, _) {
+            // Stopped part way and could not be finished at once: offered
+            // to be put back, never a sentence naming the file (#899).
+            putBackOffer = CourseSettingsView.putBackOffer(
+                seq: seq, before: bytesBefore ?? Data(), wanted: course.configuration.values
+            )
+            ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — stopped part way, offered to put back")
         } catch {
-            saveProblem = "Could not save: \(error.localizedDescription)"
+            // A refusal never names the file to a teacher (#899, the
+            // settings sweep's LOW A2): it is the course's settings file
+            // every time, and the trail keeps the full sentence.
+            if case .refused? = error as? JournaledStepError {
+                saveProblem = "Could not save: " + JournaledStepError.notMade.localizedDescription
+            } else {
+                saveProblem = "Could not save: \(error.localizedDescription)"
+            }
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
+        }
+    }
+
+    /// The offer for a Save that stopped part way: one setting by its own
+    /// name and old value when exactly one changed and it is named in
+    /// `CourseConfiguration.settingsNamedOneAtATime` with a value a teacher can read; otherwise
+    /// the course settings, put back as they were.
+    static func putBackOffer(seq: Int, before: Data, wanted: [String: Any]) -> SettingPutBackOffer {
+        let together: SettingPutBackOffer = SettingPutBackOffer(seq: seq, setting: "course settings", valueBefore: nil)
+        guard let found = CourseConfiguration.memberChanges(from: before, to: wanted),
+              found.changes.count == 1,
+              let key = found.changes[0].keyPath.first,
+              let name = CourseConfiguration.settingsNamedOneAtATime[key],
+              case .string(let text)? = found.changes[0].before else {
+            return together
+        }
+        let shown: String = CourseConfiguration.oldValueAsTheAlertSaysIt(key: key, text)
+        if shown.isEmpty {
+            return together
+        }
+        return SettingPutBackOffer(seq: seq, setting: name, valueBefore: shown)
+    }
+
+    /// Put It Back for a Save: the old values written back through the door
+    /// as recovery would, the step closed, the settings in memory read from
+    /// the file again; the save's own failure sentence, with no file name,
+    /// when that fails too.
+    static func putBack(_ offer: SettingPutBackOffer, course: Course) -> String? {
+        let verdict: UndoPutBackVerdict = UndoStoppedStep.putBackAtOnce(
+            seq: offer.seq, in: UndoJournalLocation.standardJournal()
+        )
+        try? course.configuration.replaceWithTheFile(url: course.configFileURL)
+        ActivityTrail.note(
+            .settingsCouldNotBeSaved,
+            SettingStopTrail.putItBack(setting: offer.setting, course: course.code, verdict: verdict)
+        )
+        if verdict == .putBack {
+            return nil
+        }
+        return "Could not save: " + JournaledStepError.notMade.localizedDescription
+    }
+
+    /// The answer to a rename's alert (#899, the settings sweep's MEDIUM),
+    /// on the offer the alert showed. Put It Back writes the folder's old
+    /// name back as recovery would and closes the step; when that fails
+    /// too, the rename's existing sentence for a step it could not put all
+    /// back (`renameFolderStoppedPartWay`), with no file name. Not Now
+    /// leaves the step to the next launch's recovery. Each leaves its line.
+    static func answerARenameOffer(
+        _ answer: SettingPutBackAnswer, to offer: SettingPutBackOffer, course: Course
+    ) -> String? {
+        let setting: String = "folder name " + (offer.valueBefore ?? "")
+        switch answer {
+        case .notNow:
+            ActivityTrail.note(.folderRenamed, SettingStopTrail.notNow(setting: setting, course: course.code))
+            return nil
+        case .putItBack:
+            let verdict: UndoPutBackVerdict = UndoStoppedStep.putBackAtOnce(
+                seq: offer.seq, in: UndoJournalLocation.standardJournal()
+            )
+            try? course.configuration.replaceWithTheFile(url: course.configFileURL)
+            ActivityTrail.note(
+                .folderRenamed,
+                SettingStopTrail.putItBack(setting: setting, course: course.code, verdict: verdict)
+            )
+            if verdict == .putBack {
+                return nil
+            }
+            return SpecialFolderRenamer.stoppedPartWay(
+                renaming: offer.valueBefore ?? "", said: JournaledStepError.notMade.localizedDescription
+            )
         }
     }
 
@@ -1304,6 +1410,19 @@ struct CourseSettingsView: View {
                     )
                     ActivityTrail.note(.folderRenamed, ending.line)
                     return .failed(ending.sentence)
+                }
+                if case .couldNotFinish(let seq, _) = partWay {
+                    // The settings file alone (a folder no section has, no
+                    // page relinked), stopped part way and not finished at
+                    // once by content: the same alert as every other
+                    // setting, by its own name and old value (#899, the
+                    // settings sweep's MEDIUM). The step stays in flight
+                    // for Put It Back or the next launch.
+                    ActivityTrail.note(
+                        .folderRenamed,
+                        SettingStopTrail.offered(setting: "folder name " + oldName, course: course.code)
+                    )
+                    return .couldNotFinish(SettingPutBackOffer(seq: seq, setting: "folder name", valueBefore: oldName))
                 }
                 if case .stoppedByATest = partWay {
                     // A process that died here leaves its record, as a kill does.

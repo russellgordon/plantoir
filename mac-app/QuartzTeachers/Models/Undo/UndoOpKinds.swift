@@ -1778,7 +1778,9 @@ nonisolated enum UndoMaintainers {
               let root = UndoCheck.root(of: record.step, resolveRoot: resolveRoot) else {
             return
         }
-        await rederive(record.step.ops, root: root)
+        // Never a file a restore set aside (#899): recovery does not write it.
+        let judged: UndoStep = UndoRestoreSetAside.stepWithout(record.setAsidePaths, record.step)
+        await rederive(judged.ops, root: root)
     }
 }
 

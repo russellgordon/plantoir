@@ -222,7 +222,22 @@ nonisolated enum RestoreSwap {
         /// `Record.leftOutOnPurpose`: the folders inside the course the
         /// archive made first left out on purpose, as paths inside it.
         var leftOutOnPurpose: [String] = []
+
+        /// Runs the swap (handed in, answering whether the restore has
+        /// replaced files of the course: every move made, or stopped part
+        /// way with some not put back). Undo's door (#899) runs it holding
+        /// the list's lock and sets aside the steps in flight whose files
+        /// it replaced, in that lock (`UndoRestoreSetAside`); it throws,
+        /// before the swap starts, when the lock cannot be had. Other doors
+        /// just run it.
+        var holdingTheListAcrossTheSwap: (_ swap: () -> Bool) throws -> Void = { (swap: () -> Bool) in
+            _ = swap()
+        }
     }
+
+    /// Why a restore refused for a busy Undo list was left as it was, in
+    /// `RestoreWholeCourseWording.leftAsItWas` (review 2, L3).
+    static let listBusyReason: String = "another change in Plantoir was still being made"
 
     /// What a restore that did not happen comes to.
     enum Failure: Error, Equatable {
@@ -1125,19 +1140,66 @@ nonisolated enum RestoreSwap {
             throw error
         }
 
-        context.justBeforeTheSwap()
         let writtenAfter: Date? = writtenAfterMoment(of: record)
+        let newcomersURL: URL = staging.appendingPathComponent(newcomersName)
+        // The swap and, when it stops, its way back run together inside
+        // `holdingTheListAcrossTheSwap`, so the steps in flight are set
+        // aside only once it is known the course's files were replaced
+        // (#899, the review of 2026-11-27, M1).
+        var stoppedBy: SwapStopped? = nil
+        var otherError: Error? = nil
+        var wayBackTaken: WayBack? = nil
         do {
-            try swap(moves, coursesDirectoryURL: coursesDirectoryURL, hooks: hooks)
-        } catch let stopped as SwapStopped {
-            let newcomersURL: URL = staging.appendingPathComponent(newcomersName)
-            let back: WayBack = wayBack(
-                moves,
-                coursesDirectoryURL: coursesDirectoryURL,
-                courseURL: courseURL,
-                newcomersURL: newcomersURL,
-                hooks: hooks
+            try context.holdingTheListAcrossTheSwap { () -> Bool in
+            // Inside the lock, so a restore refused for a busy list has done
+            // nothing at all (review 2, L3).
+            context.justBeforeTheSwap()
+            do {
+                try swap(moves, coursesDirectoryURL: coursesDirectoryURL, hooks: hooks)
+                // The commit, written before the steps are set aside.
+                record.phase = .done
+                record.writtenAt = context.now()
+                do {
+                    try writeRecord(record, in: staging, hooks: hooks)
+                } catch {
+                    // Every move was made, so the restore has happened. A
+                    // record that could not say so stays `swapping`: if
+                    // anything is left below, the reading that finds it
+                    // puts the course back, which loses nothing.
+                }
+                return true
+            } catch let stopped as SwapStopped {
+                stoppedBy = stopped
+                let back: WayBack = wayBack(
+                    moves,
+                    coursesDirectoryURL: coursesDirectoryURL,
+                    courseURL: courseURL,
+                    newcomersURL: newcomersURL,
+                    hooks: hooks
+                )
+                wayBackTaken = back
+                return !back.everyFileIsBack
+            } catch {
+                // `swap` throws only `SwapStopped`; anything else is passed
+                // on as before, with the course as it stands unknown, so
+                // nothing is set aside for it.
+                otherError = error
+                return false
+            }
+            }
+        } catch is UndoRestoreSetAside.TheListIsBusy {
+            // The list is held by another change: nothing moved, nothing of
+            // the course was touched, and the existing "left as it was"
+            // sentence is true.
+            removeStaging(staging)
+            throw Failure.leftAsItWas(
+                reason: RestoreSwap.listBusyReason, lockedItem: nil, courseFolderIsLocked: false, newcomersKeptAt: nil
             )
+        }
+        if let otherError {
+            throw otherError
+        }
+        if let stopped = stoppedBy, let back = wayBackTaken {
             // What was written into the backup's items while they were in
             // the course goes with the newcomers, never with the staging
             // folder (the third case).
@@ -1175,16 +1237,6 @@ nonisolated enum RestoreSwap {
             throw Failure.stoppedPartWay(keptAt: kept.path, holdsSomethingToOpen: kept.holdsSomethingToOpen)
         }
 
-        record.phase = .done
-        record.writtenAt = context.now()
-        do {
-            try writeRecord(record, in: staging, hooks: hooks)
-        } catch {
-            // Every move was made, so the restore has happened. A record
-            // that could not say so stays `swapping`: if anything is left
-            // below, the reading that finds it puts the course back, which
-            // loses nothing.
-        }
         let finished: Finished = finishAfterTheCommit(
             staging: staging, record: record, coursesDirectoryURL: coursesDirectoryURL, context: context, hooks: hooks
         )

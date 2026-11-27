@@ -26,6 +26,10 @@ struct SetSchoolYearSheet: View {
     @State var schoolYear: Int?
     @State var problem: String?
 
+    /// A change that stopped part way and could not be finished at once:
+    /// the alert offering to put it back (#899).
+    @State var putBackOffer: SettingPutBackOffer?
+
     let today: CalendarDay
 
     // MARK: - Computed properties
@@ -94,6 +98,11 @@ struct SetSchoolYearSheet: View {
         .padding([.horizontal, .bottom], 20)
         .sheetTitle("Which school year was \(course.displayCode) taught in?")
         .frame(width: 420)
+        .settingPutBackAlert(offer: $putBackOffer) { answer, shown in
+            if let refused = SetSchoolYearSheet.answer(answer, to: shown, course: course) {
+                problem = refused
+            }
+        }
     }
 
     // MARK: - Initializer
@@ -108,12 +117,60 @@ struct SetSchoolYearSheet: View {
     // MARK: - Functions
 
     func setSchoolYear() {
-        if let refused = SetSchoolYearSheet.write(schoolYear, to: course, on: today) {
-            problem = refused
-            return
+        let before: Int? = course.schoolYear(on: today)
+        switch SetSchoolYearSheet.writeJudged(schoolYear, to: course, on: today) {
+        case .saved:
+            dismiss()
+            onSet()
+        case .refused(let sentence):
+            problem = sentence
+        case .couldNotFinish(let seq):
+            putBackOffer = SettingPutBackOffer(
+                seq: seq,
+                setting: "school year",
+                valueBefore: yearLabel(before)
+            )
         }
-        dismiss()
-        onSet()
+    }
+
+    /// A year as the picker shows it, the no-year group by its title.
+    func yearLabel(_ year: Int?) -> String {
+        if let year {
+            return SchoolYear.label(forStartingYear: year)
+        }
+        return workspace.referenceShelf.arrangement.noYearTitle
+    }
+
+    /// Put It Back, or Not Now (#899), on the offer the alert showed: the
+    /// sentence to show when Put It Back fails too, nil otherwise.
+    static func answer(_ answer: SettingPutBackAnswer, to offer: SettingPutBackOffer, course: Course) -> String? {
+        switch answer {
+        case .notNow:
+            // Left in flight: recovery settles it at the next launch.
+            ActivityTrail.note(.settingsCouldNotBeSaved, SettingStopTrail.notNow(setting: "school year", course: course.code))
+            return nil
+        case .putItBack:
+            return SetSchoolYearSheet.putBack(offer, course: course)
+        }
+    }
+
+    /// Put It Back for the school year: the old value written back through
+    /// the door as recovery would, the step closed, the copy in memory
+    /// read from the file again; the sentence for a save that failed when
+    /// that fails too (`couldNotSetSchoolYear`, true there).
+    static func putBack(_ offer: SettingPutBackOffer, course: Course) -> String? {
+        let verdict: UndoPutBackVerdict = UndoStoppedStep.putBackAtOnce(
+            seq: offer.seq, in: UndoJournalLocation.standardJournal()
+        )
+        try? course.configuration.reloadFromDisk(url: course.configFileURL)
+        ActivityTrail.note(
+            .settingsCouldNotBeSaved,
+            SettingStopTrail.putItBack(setting: "school year", course: course.code, verdict: verdict)
+        )
+        if verdict == .putBack {
+            return nil
+        }
+        return ReferenceWording.couldNotSetSchoolYear(course: course.displayCode)
     }
 
     /// Writes the year to the course's settings and leaves the trail line,
@@ -121,17 +178,35 @@ struct SetSchoolYearSheet: View {
     /// (the year in memory then put back). ONE step on the list, its one
     /// `editJSON` the school year (#899 U4a).
     static func write(_ schoolYear: Int?, to course: Course, on today: CalendarDay) -> String? {
+        switch writeJudged(schoolYear, to: course, on: today) {
+        case .saved:
+            return nil
+        case .refused(let sentence):
+            return sentence
+        case .couldNotFinish:
+            return ReferenceWording.settingCouldNotBeChanged(setting: "school year")
+        }
+    }
+
+    /// `write`, with a change that stopped part way and could not be
+    /// finished told apart (#899): a stop the door finished by content is
+    /// `.saved`, one it put back is `.refused`, as any refused change is.
+    static func writeJudged(_ schoolYear: Int?, to course: Course, on today: CalendarDay) -> SettingWriteResult {
         let before: Int? = course.schoolYear(on: today)
         course.configuration.referenceSchoolYear = schoolYear
         do {
             try course.configuration.writeAsOneStep(
                 to: course.configFileURL, madeBy: UndoStepMaker.sheet("setSchoolYear")
             )
+        } catch JournaledStepError.couldNotFinish(let seq, _) {
+            course.configuration.referenceSchoolYear = before
+            ActivityTrail.note(.settingsCouldNotBeSaved, SettingStopTrail.offered(setting: "school year", course: course.code))
+            return .couldNotFinish(seq: seq)
         } catch {
             // Never the raw Foundation string. A teacher reads a sentence
             // about their course, not "NSCocoaErrorDomain Code=513".
             course.configuration.referenceSchoolYear = before
-            return ReferenceWording.couldNotSetSchoolYear(course: course.displayCode)
+            return .refused(ReferenceWording.couldNotSetSchoolYear(course: course.displayCode))
         }
         ActivityTrail.note(
             .referenceCourseSchoolYearChanged,
@@ -140,6 +215,6 @@ struct SetSchoolYearSheet: View {
                 from: before, to: schoolYear
             )
         )
-        return nil
+        return .saved
     }
 }

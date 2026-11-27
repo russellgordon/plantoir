@@ -35,6 +35,56 @@ enum StartOfYearPreparation {
 
         /// Nothing was written, and this sentence says why.
         case refused(String)
+
+        /// The door stopped PART WAY (#899, Russell's ruling of 2026-11-26):
+        /// some pages went into draft and at least one could not be put
+        /// back, so the section is neither as it was nor as planned. The
+        /// sheet offers to restore the whole course from the backup made a
+        /// moment before (`startOfYear.wording.stoppedPartWay`). A stop
+        /// that changed nothing stays `refused(writeFailed)`.
+        case stoppedPartWay(StoppedPartWay)
+    }
+
+    /// What the sheet needs to offer the restore after a part-way stop.
+    struct StoppedPartWay {
+
+        // MARK: - Stored properties
+
+        let sectionNumber: Int
+
+        /// The course's folder name, as the backup and the sidebar know it.
+        let courseCode: String
+
+        /// The course as a teacher reads it in a sentence.
+        let courseDisplayCode: String
+
+        /// The backup made before anything was written, as Restore from
+        /// Backup… lists it: what Restore Course restores. Made with the
+        /// outcome, so the offer is never shown without one (review 1, LOW 1).
+        let backupItem: BackupItem
+
+        /// Go stopped this section's preview before it wrote. It is not
+        /// started again until the offer is answered (review 1, HIGH 1): a
+        /// preview running would make the whole-course restore refuse the
+        /// course as busy. Leave As It Is starts it again; Restore Course
+        /// starts it again after the restore.
+        let previewWasStopped: Bool
+
+        /// The hidden names under which what a page held before is kept
+        /// beside it (`JournaledStepError.leftPartWay`). Carried for the
+        /// trail and the next piece; the sheet names no hidden file
+        /// (Russell, 2026-11-26: "Way too technical.").
+        let keptOriginals: [String]
+
+        // MARK: - Computed properties
+
+        var backupURL: URL {
+            return backupItem.fileURL
+        }
+
+        var backupFileName: String {
+            return backupItem.fileURL.lastPathComponent
+        }
     }
 
     struct Done {
@@ -159,6 +209,38 @@ enum StartOfYearPreparation {
         let applied: (change: AssistChange, leftAlone: [String])
         do {
             applied = try StartOfYearPlanner.apply(plan, in: course)
+        } catch JournaledStepError.leftPartWay(_, _, let keptOriginals) {
+            // Part way: pages went into draft and could not all be put back.
+            // Not "nothing was changed" on the trail, and the sheet offers
+            // the backup (#899).
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearStoppedPartWayLine(
+                    source: "app", keptCount: keptOriginals.count, backupFileName: backupURL.lastPathComponent
+                ),
+                course: course.code, section: sectionNumber
+            )
+            // The backup as Restore from Backup… lists it. Go's own backup
+            // name is always one `BackupItem.from` reads; if it ever were
+            // not, the offer is not made, and the sheet says the sentence
+            // that is true without it (the backup holds the course as it
+            // was), with the preview started again as for any refusal.
+            guard let backupItem = BackupItem.from(fileURL: backupURL, courseCode: course.code) else {
+                if wasRunning, let controller {
+                    controller.startPreview()
+                }
+                return .refused(StartOfYearWording.writeFailed(backup: backupURL.lastPathComponent))
+            }
+            // The preview is NOT started again here (review 1, HIGH 1): it
+            // waits for the teacher's answer to the offer.
+            return .stoppedPartWay(StoppedPartWay(
+                sectionNumber: sectionNumber,
+                courseCode: course.code,
+                courseDisplayCode: course.displayCode,
+                backupItem: backupItem,
+                previewWasStopped: wasRunning && controller != nil,
+                keptOriginals: keptOriginals
+            ))
         } catch {
             noteNotDone("writeFailed", course: course, section: sectionNumber)
             if wasRunning, let controller {
@@ -279,6 +361,91 @@ enum StartOfYearPreparation {
             controller.startPreview()
         }
         return Undone(putBack: result.restored.count, skipped: result.skipped)
+    }
+
+    /// Leave As It Is, after a part-way stop: nothing is changed, and the
+    /// preview Go stopped is started again, as it would have been (#899,
+    /// review 1, HIGH 1). Called once: the sheet's model answers the offer
+    /// only once.
+    static func leaveAsItIs(_ stopped: StoppedPartWay, workspaceURL: URL) {
+        guard stopped.previewWasStopped else {
+            return
+        }
+        let controller: SectionWindowControllers.Controller? = SectionWindowControllers.shared.controller(
+            folderPath: workspaceURL.path, courseCode: stopped.courseCode, sectionNumber: stopped.sectionNumber
+        )
+        if let controller, !controller.isPreviewRunning() {
+            controller.startPreview()
+        }
+    }
+
+    /// The sentence Restore Course is held back with while this app is
+    /// deploying the course, or nil. A deploy cannot be stopped safely, so
+    /// the restore waits for it: the existing busy sentence, which is true.
+    static func deployHoldsTheRestore(_ stopped: StoppedPartWay, workspaceURL: URL) -> String? {
+        guard CourseActivity.coursePublishIsRunning(folderPath: workspaceURL.path, courseCode: stopped.courseCode) else {
+            return nil
+        }
+        return WholeCourseRestore.sentence(for: WholeCourseRestore.Refusal.busy, courseCode: stopped.courseCode, assistant: nil)
+    }
+
+    /// Restore Course, after a part-way stop (#899, review 1, HIGH 1, the
+    /// director's decision 2): the course's running previews are stopped
+    /// first, the way Go stops the section's own (a preview can always be
+    /// started again, so nothing is asked); the whole-course restore runs,
+    /// the one Restore from Backup… runs; then each preview stopped, Go's
+    /// own included, is started again once, if the course as it now is
+    /// still has that section. While another program holds the course
+    /// nothing is stopped: the restore refuses that with its own sentence,
+    /// and a preview stopped then could not be started again (#156).
+    static func restoreCourse(
+        _ stopped: StoppedPartWay,
+        in course: Course,
+        workspaceURL: URL,
+        restore: (BackupItem) async -> Void
+    ) async {
+        let folderPath: String = workspaceURL.path
+        var previewsToStart: [Int] = []
+        if stopped.previewWasStopped {
+            previewsToStart.append(stopped.sectionNumber)
+        }
+        let blocked: WorkLeaseFiles.Holding? = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: folderPath, courseCode: course.code, afterTaking: false
+        )
+        if blocked == nil {
+            let showing: [Int] = SectionWindowControllers.shared.sectionsShowing(
+                folderPath: folderPath, courseCode: course.code
+            )
+            for sectionNumber in showing {
+                let controller: SectionWindowControllers.Controller? = SectionWindowControllers.shared.controller(
+                    folderPath: folderPath, courseCode: course.code, sectionNumber: sectionNumber
+                )
+                if let controller, controller.isPreviewRunning() {
+                    await controller.stopPreview()
+                    if !previewsToStart.contains(sectionNumber) {
+                        previewsToStart.append(sectionNumber)
+                    }
+                }
+            }
+        }
+
+        await restore(stopped.backupItem)
+
+        var sectionsNow: [Int] = course.sectionNumbers
+        if let saved = try? course.asSavedNow() {
+            sectionsNow = saved.sectionNumbers
+        }
+        for sectionNumber in previewsToStart {
+            if !sectionsNow.contains(sectionNumber) {
+                continue
+            }
+            let controller: SectionWindowControllers.Controller? = SectionWindowControllers.shared.controller(
+                folderPath: folderPath, courseCode: course.code, sectionNumber: sectionNumber
+            )
+            if let controller, !controller.isPreviewRunning() {
+                controller.startPreview()
+            }
+        }
     }
 
     // MARK: - Private helpers

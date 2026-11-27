@@ -107,4 +107,5 @@ Renaming a folder and renaming the unit word both happen at once, when you press
 - **A deploy went out without a change you made.** A deploy, and a scheduled deploy, also use the settings as last saved, and a notice says so when there are unsaved changes.
 - **You saved while the course was being deployed.** That deploy uses the settings from before the save:
   {{say:shared-rules#specialNames.settingsSavedWhilePublishing.message}}
+- **An alert says a setting could not be changed.** A Save, or a rename of a folder no section has yet, stopped part way and Plantoir could not finish it. Choose Put It Back to return to what the alert names. Not Now leaves it, and Plantoir settles it the next time it opens.
 - **A folder you removed here, and made again in Obsidian, is not on the site.** Anything removed in these settings stays off the site until you add it back here. Other new folders and files made in Obsidian are added to the site at the next preview.

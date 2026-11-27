@@ -54,6 +54,11 @@ enum RenameResult {
     /// It did not. The sentence is shown inside the sheet, which stays open so
     /// the teacher can type a different name rather than start again.
     case failed(String)
+
+    /// Its step, the settings file alone, stopped part way and could not
+    /// be finished at once (#899, the settings sweep's MEDIUM): the sheet
+    /// stays open and shows the same alert as the other settings.
+    case couldNotFinish(SettingPutBackOffer)
 }
 
 /// An explanation of why an item cannot be removed.
@@ -127,6 +132,11 @@ struct StringListEditorView: View {
     /// the network takes, once per page.
     var onRename: ((_ oldName: String, _ newName: String) async -> RenameResult)? = nil
 
+    /// The answer to the alert a rename that could not finish shows (#899):
+    /// the sentence the sheet shows when Put It Back fails too, nil
+    /// otherwise.
+    var onRenamePutBackAnswer: ((_ answer: SettingPutBackAnswer, _ offer: SettingPutBackOffer) -> String?)? = nil
+
     /// Whether the rename under way has begun its check and swap, after
     /// which halting it would leave it part way (#899 U4b). Until then it is
     /// only planning, which writes nothing, so Cancel halts it (the HIG's
@@ -144,6 +154,7 @@ struct StringListEditorView: View {
     @State var pendingRename: PendingRename? = nil
     @State var proposedName: String = ""
     @State var renameFailure: String? = nil
+    @State var renamePutBackOffer: SettingPutBackOffer? = nil
     /// The rename under way and the one rule for halting it (#899
     /// U4b2-7): Cancel, the sheet going away and a quit all halt it there.
     /// Course Settings hands in the run its page owns
@@ -529,6 +540,11 @@ struct StringListEditorView: View {
         .sheetTitle(SpecialNames.renameFolderTitle(for: item))
         .frame(width: 420)
         .interactiveDismissDisabled(isRenaming)
+        .settingPutBackAlert(offer: $renamePutBackOffer) { answer, shown in
+            if let refused = onRenamePutBackAnswer?(answer, shown) {
+                renameFailure = refused
+            }
+        }
     }
 
     // MARK: - Functions
@@ -739,6 +755,9 @@ struct StringListEditorView: View {
             notice = sentence
         case .failed(let sentence):
             renameFailure = sentence
+        case .couldNotFinish(let offer):
+            renameFailure = nil
+            renamePutBackOffer = offer
         }
     }
 }

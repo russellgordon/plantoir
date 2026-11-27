@@ -85,5 +85,6 @@ After that, the backup made before the change is the way back. See [Back up a co
 - **The sheet says there is nothing to do.** Every later class is already in draft.
 - **The sheet says the course is being deployed.** Nothing is changed. Try again when the deploy has finished.
 - **The list changed while you were reading it.** Nothing is changed, and the sheet shows the list as it now stands. Read it again.
+- **The sheet says the change stopped part way.** Some classes may be changed and some not. Choose Restore Course to put the whole course back from the backup made before the change, or Leave As It Is to keep the course as it now stands.
 - **{{menu:undoGettingReady}} is greyed.** No undo is held for this section. The backup is the way back.
 - **You are looking for Set School Year.** That command belongs to courses kept for reference. See [Set the school year of a reference course](page:school-year).

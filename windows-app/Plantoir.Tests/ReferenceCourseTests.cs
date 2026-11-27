@@ -170,7 +170,7 @@ public class ReferenceCourseTests
     public void EverySentenceIsTheContracts()
     {
         var wording = Rule["wording"]!.AsObject();
-        var notSentences = new HashSet<string> { "rule", "machineryCheck", "theCannotTellSentence", "whyTheLaunchersStillSayPublished" };
+        var notSentences = new HashSet<string> { "rule", "machineryCheck", "theCannotTellSentence", "whyTheLaunchersStillSayPublished", "settingCouldNotBeChangedNote" };
         // A sentence this app does not say yet (the groups' own, #827) is held
         // open by key; "said here" is present AND equal, so a changed
         // sentence is held while it differs and the entry closes the day it

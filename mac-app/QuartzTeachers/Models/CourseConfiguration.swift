@@ -41,6 +41,27 @@ class CourseConfiguration {
         set { values["course_name"] = CourseName.cleaned(newValue) }
     }
 
+    /// The settings a Put It Back alert can name one at a time, by their key
+    /// in `course_config.json`, with the name the alert says (#899). Kept
+    /// here, beside the course name's rule, so every read of the key goes
+    /// through it (`CourseNameCharactersTests`). #986 adds each field as it
+    /// comes to save as it changes; a Save that changed anything else, or
+    /// several settings, offers the course settings back together.
+    static let settingsNamedOneAtATime: [String: String] = [
+        "course_name": "course name",
+    ]
+
+    /// A setting's old value as the alert says it, read from the file's
+    /// bytes: the course name cleaned by its rule (`courseNameCharacters`),
+    /// as the name is everywhere else, then trimmed.
+    static func oldValueAsTheAlertSaysIt(key: String, _ text: String) -> String {
+        var read: String = text
+        if key == "course_name" {
+            read = CourseName.cleaned(text)
+        }
+        return read.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// Where deploys go: "cloudflare_pages", "netlify", or "local_folder" —
     /// a folder on this computer, for teachers who upload to their own web
     /// host themselves (e.g. over SFTP). Course-level: every section of the
@@ -1834,6 +1855,19 @@ class CourseConfiguration {
         if data == lastSavedData {
             return
         }
+        guard let dictionary = CourseConfiguration.decodedDictionary(data) else {
+            throw CourseConfigurationError.notADictionary
+        }
+        lastSavedData = data
+        values = dictionary
+    }
+
+    /// Replaces this copy with what is in the file now even when the file's
+    /// bytes are the ones last saved: after Put It Back wrote a Save's old
+    /// values back (#899), the copy still holds the values that Save tried
+    /// to write, and they are what was put back.
+    func replaceWithTheFile(url: URL) throws {
+        let data: Data = try Data(contentsOf: url)
         guard let dictionary = CourseConfiguration.decodedDictionary(data) else {
             throw CourseConfigurationError.notADictionary
         }

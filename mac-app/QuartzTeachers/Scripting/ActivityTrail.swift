@@ -1316,6 +1316,13 @@ nonisolated enum ActivityTrail {
         /// else holds that place (#899, U4b3 kept-original-named). Both
         /// named. Written just before the rename. Never page text.
         case undoKeptAPageUnderAVisibleName = "undo kept a page under a visible name"
+        /// A restore that replaces a course closed a change, an undo or a
+        /// redo left part way in it, before it moved anything (#899, ahead
+        /// of U5), so recovery never judges the restored files against a
+        /// step that stopped before the restore; or the list could not be
+        /// reached to do so. The course and section, which work had
+        /// stopped, and how many files it names. Never page text.
+        case undoSetAsideByARestore = "undo set aside a change a restore replaced"
         /// Recovery could not put back a step left part way (#899, U3c):
         /// content it needs is gone from the list and no kept original beside
         /// its page matches what the journal recorded. The course and
@@ -2090,6 +2097,23 @@ nonisolated enum ActivityTrail {
     static func startOfYearNotDoneLine(source: String, reason: String) -> String {
         return "did not get ready for the start of the year \(startOfYearSource(source)) — nothing was "
              + "changed (\(reason))"
+    }
+
+    /// The words for `startOfTheYearNotDone` when the write stopped PART WAY
+    /// (#899): some pages went into draft, so "nothing was changed" would be
+    /// false. Counts and the backup's name only, never a page's name.
+    /// One kept file is "beside its page", several "beside their pages",
+    /// and none is not said (review 1, LOW 2: a put-back can fail for a file
+    /// with no original, so nothing is kept).
+    static func startOfYearStoppedPartWayLine(source: String, keptCount: Int, backupFileName: String) -> String {
+        var kept: String = ""
+        if keptCount == 1 {
+            kept = ", 1 file kept beside its page"
+        } else if keptCount > 1 {
+            kept = ", \(keptCount) files kept beside their pages"
+        }
+        return "stopped part way getting ready for the start of the year \(startOfYearSource(source)) — some "
+             + "pages went into draft\(kept); offered the backup \(backupFileName)"
     }
 
     /// The words for `assistantNamedNoPage`: what was being done, and which

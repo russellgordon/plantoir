@@ -45,3 +45,4 @@ A school year is one way to arrange the shelf. You can also make groups of your 
 - **{{menu:courseSetSchoolYear}} is greyed.** The selected course is not kept for reference. Select a course on the {{control:referenceCourses}} shelf.
 - **A sentence appears under the pop-up.** Another reference course with the same code is already filed in that year. Pick another year for this one.
 - **The sheet says the school year could not be saved.** Wait a moment, then try again.
+- **An alert says the school year could not be changed.** The change stopped part way and Plantoir could not finish it. Choose Put It Back to return to the year shown in the alert. Not Now leaves it, and Plantoir settles it the next time it opens.
