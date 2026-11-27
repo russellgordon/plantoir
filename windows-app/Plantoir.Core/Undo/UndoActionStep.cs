@@ -334,7 +334,11 @@ internal sealed class UndoActionStep
     /// A folder that is a link (<see cref="UndoLinks.Look"/>) is never listed
     /// or moved, and no link is moved as itself (#1055): given one, or a
     /// folder that cannot be listed now, this refuses the action,
-    /// <c>cannotTellNow</c>, before anything changes.
+    /// <c>cannotTellNow</c>, before anything changes. The link check below
+    /// repeats one the tree reading (<see cref="UndoTreeReading.Read"/>)
+    /// makes first, since it calls the same <see cref="UndoLinks.Look"/> and
+    /// gives a link or a place it cannot look at no listing; it is kept so
+    /// this method states the rule itself, and no test can bite it alone.
     /// </summary>
     internal void MoveFolder(string fromFull, string toFull)
     {

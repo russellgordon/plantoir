@@ -297,12 +297,6 @@ public sealed class UndoRenameFolderStepTests : IDisposable
     }
 
     /// <summary>
-    /// <c>Tasks</c> to <c>tasks</c> through the door: on Windows the
-    /// destination "exists" because it IS the source, and the rename still
-    /// goes through as one step; Undo puts the old capitalisation back and
-    /// Redo the new.
-    /// </summary>
-    /// <summary>
     /// #1055 W4 (as before W8b-21, taken back from <c>5e86468cd^</c>): a place
     /// of the folder that is a link is never moved as itself. It meets
     /// <see cref="UndoActionStep.MoveFolder"/>'s own guard, which stops the
@@ -328,6 +322,12 @@ public sealed class UndoRenameFolderStepTests : IDisposable
         Assert.False(File.Exists(SpecialFolderRenamer.RenameRecordPath(CourseFolder)), "nothing started, nothing recorded");
     }
 
+    /// <summary>
+    /// <c>Tasks</c> to <c>tasks</c> through the door: on Windows the
+    /// destination "exists" because it IS the source, and the rename still
+    /// goes through as one step; Undo puts the old capitalisation back and
+    /// Redo the new.
+    /// </summary>
     [Fact]
     public void ACapitalisationOnlyRenameThroughTheDoorIsOneStepAndUndoPutsTheOldCaseBack()
     {

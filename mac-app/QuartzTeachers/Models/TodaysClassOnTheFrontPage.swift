@@ -207,8 +207,10 @@ enum TodaysClassOnTheFrontPage {
     }
 
     /// Whether a front page can be written at all: an ordinary file — not a
-    /// symbolic link or a Finder alias, which the build never writes through
-    /// either (#276) — and not locked.
+    /// symbolic link or a Finder alias, which this check refuses — and not
+    /// locked. (Since #1055 S2 the site build's date stamp and title repair do
+    /// write through a symbolic link; a hard link is still left alone. This
+    /// check is the front page's own and is not changed by that.)
     static func frontPageCanBeWritten(_ url: URL) -> Bool {
         guard let values = try? url.resourceValues(forKeys: [.isSymbolicLinkKey, .isAliasFileKey, .isRegularFileKey]) else {
             return false

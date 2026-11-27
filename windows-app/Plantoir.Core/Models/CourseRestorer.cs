@@ -56,18 +56,6 @@ public static class CourseRestorer
         try { File.Delete(item.FilePath); } catch { }
     }
 
-    /// <summary>
-    /// Puts a backup's contents back (row 106). The current version was
-    /// already archived by the caller — even a restore has an undo — and the
-    /// backup zip STAYS: only deleting removes it.
-    ///
-    /// When the course folder still exists, its CONTENTS are replaced rather
-    /// than the folder itself: the folder is Obsidian's vault, and Obsidian's
-    /// file watcher is anchored to it — swap the folder and Obsidian shows
-    /// stale files until the vault is reopened; swap the contents and it
-    /// refreshes on its own. Unpacked and verified BEFORE anything is
-    /// touched, so an unreadable zip can never leave an emptied folder.
-    /// </summary>
     /// <summary>The whole-course restore's busy refusal: its title, while a preview or deploy of the course uses its folders.</summary>
     public static string BusyTitle(string courseCode) => $"{courseCode} is busy right now";
 
@@ -92,6 +80,18 @@ public static class CourseRestorer
             RestoredTrailLine(item, archivedFirst, coursesDirectory));
     }
 
+    /// <summary>
+    /// Puts a backup's contents back (row 106). The current version was
+    /// already archived by the caller — even a restore has an undo — and the
+    /// backup zip STAYS: only deleting removes it.
+    ///
+    /// When the course folder still exists, its CONTENTS are replaced rather
+    /// than the folder itself: the folder is Obsidian's vault, and Obsidian's
+    /// file watcher is anchored to it — swap the folder and Obsidian shows
+    /// stale files until the vault is reopened; swap the contents and it
+    /// refreshes on its own. Unpacked and verified BEFORE anything is
+    /// touched, so an unreadable zip can never leave an emptied folder.
+    /// </summary>
     public static void RestoreBackup(BackupItem item, string coursesDirectory)
     {
         string destination = Path.Combine(coursesDirectory, item.CourseCode);
