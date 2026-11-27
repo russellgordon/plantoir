@@ -35,7 +35,26 @@ public sealed record StartOfYearOutcome(
     bool Changed,
     string Message,
     string? BackupPath,
-    IReadOnlyDictionary<string, (string Before, string After)> Written);
+    IReadOnlyDictionary<string, (string Before, string After)> Written)
+{
+    /// <summary>
+    /// Set only when Go stopped part way (#899 W8c-2a, the mac's
+    /// <c>Outcome.stoppedPartWay</c>): some pages went into draft and could
+    /// not all be put back. Null for every other outcome, a stop that changed
+    /// nothing included (that stays <c>writeFailed</c>). <see cref="Message"/>
+    /// is still what the assistants say today.
+    /// </summary>
+    public StartOfYearStoppedPartWay? StoppedPartWay { get; init; }
+}
+
+/// <summary>
+/// What the sheet needs to offer the restore after Go stopped part way (the
+/// mac's <c>StartOfYearPreparation.StoppedPartWay</c>): the section, the
+/// course, the backup Go made as Restore from Backup… lists it (made with the
+/// outcome, so the offer is never shown without one), and how many files are
+/// kept beside their pages. No hidden name: the sheet names none.
+/// </summary>
+public sealed record StartOfYearStoppedPartWay(int Section, string CourseCode, BackupItem Backup, int KeptCount);
 
 public sealed partial class AssistWorkspace
 {
@@ -236,14 +255,29 @@ public sealed partial class AssistWorkspace
             // All or none: "Nothing was changed" unless the door left a page
             // holding its new content with its earlier content kept beside
             // it, which is said as part way, naming each kept file.
-            if (error is not UndoStepLeftPartWayException)
+            // The door's exception alone tells the two stops apart (#899
+            // W8c-2a): part way is its own outcome, every other write error
+            // changed nothing.
+            if (error is not UndoStepLeftPartWayException partWay)
                 return NotDone("writeFailed", NothingWasChanged(error));
+            string backupName = Path.GetFileName(backup);
             ActivityTrail.Note(ActivityTrail.Event.StartOfYearNotDone,
-                $"did not get ready for the start of the year {where} — the pages could not all be written (writeFailed); backup {Path.GetFileName(backup)}",
+                ActivityTrail.StartOfYearStoppedPartWayLine(where, partWay.KeptOriginals.Count, backupName),
                 course.Code, section);
+            // The backup as Restore from Backup… lists it. Go's own backup
+            // name is always one BackupItem.From reads; if it ever were not,
+            // no offer is made, and the sheet's writeFailed words are said,
+            // which are true (the backup holds the course as it was).
+            if (BackupItem.From(backup, course.Code) is not { } backupItem)
+                return new StartOfYearOutcome(false,
+                    StartOfYearWording.Fill(StartOfYearWording.WriteFailed, ("backup", backupName)),
+                    backup, new Dictionary<string, (string, string)>());
             return new StartOfYearOutcome(false,
                 RefusalForAStepThatStopped(error, "the pages put into draft", section).Message,
-                backup, new Dictionary<string, (string, string)>());
+                backup, new Dictionary<string, (string, string)>())
+            {
+                StoppedPartWay = new StartOfYearStoppedPartWay(section, course.Code, backupItem, partWay.KeptOriginals.Count),
+            };
         }
         // The front page as the rule left it, for Undo Getting Ready.
         string? frontAfter = null;
