@@ -170,6 +170,11 @@ nonisolated enum ReferenceWording {
         return "Plantoir can put it back to \(value)."
     }
 
+    /// The informative text when several settings changed at once and go
+    /// back together (`settingsCanBePutBack`; wording parked for Russell,
+    /// #899 fix round one).
+    static let settingsCanBePutBack: String = "Plantoir can put them back as they were."
+
     /// Not Now (cancel, leading) and Put It Back (the default, trailing).
     static let notNowButton: String = "Not Now"
     static let putItBackButton: String = "Put It Back"

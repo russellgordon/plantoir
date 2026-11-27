@@ -12,10 +12,20 @@ nonisolated enum UndoStoppedStepVerdict: Equatable, Sendable {
     /// The file holds the old value: closed as put back, off the list.
     case putBack
 
-    /// The check could not read the file, or could not close the step: the
-    /// step is left in flight, and the caller offers to put it back
-    /// (`putBackAtOnce`). Recovery settles it at the next launch otherwise.
+    /// The check could not read the file, could not close the step, or
+    /// could not get the list's lock: the step is left in flight, and the
+    /// caller offers to put it back (`putBackAtOnce`), which can succeed.
+    /// Recovery settles it at the next launch otherwise.
     case couldNotFinish(seq: Int)
+
+    /// Closed without the change, and nothing to offer: the file holds
+    /// neither value (another program wrote it, or it is half written), so
+    /// the door's own rule for a file changed by hand closed the step and
+    /// cleared the list (`undo.rule.recovery`), or the step was already
+    /// closed without it. Put It Back could not succeed and is never
+    /// offered; nothing is written over what the file holds. The caller says
+    /// the save's own failure sentence (#899, fix round one).
+    case notMade
 }
 
 /// How a Put It Back went.
@@ -74,8 +84,15 @@ nonisolated enum UndoStoppedStep {
     ) -> UndoStoppedStepVerdict {
         do {
             return try journal.withLock(waitingAtMost: UndoSwitch.finishWaitSeconds) { writer -> UndoStoppedStepVerdict in
-                guard let record = inFlightRecord(seq, writer),
-                      let root = UndoCheck.root(of: record.step, resolveRoot: UndoReach.root) else {
+                guard let record = inFlightRecord(seq, writer) else {
+                    // Already closed (by recovery, or an earlier judgement):
+                    // said as it was closed, never offered.
+                    if writer.fold.records[seq]?.phase == .done {
+                        return .finished(seq: seq)
+                    }
+                    return .notMade
+                }
+                guard let root = UndoCheck.root(of: record.step, resolveRoot: UndoReach.root) else {
                     return .couldNotFinish(seq: seq)
                 }
                 var swapRefused: Bool = false
@@ -93,21 +110,23 @@ nonisolated enum UndoStoppedStep {
                 case .nothingTookEffect, .rolledBack:
                     return .putBack
                 case .interrupted, .leftAlone:
-                    // Closed, the file holding neither value: what the
-                    // teacher is offered is to put the old value back.
-                    return .couldNotFinish(seq: seq)
+                    // Closed by the rule for a file changed by hand, the
+                    // file holding neither value: nothing to offer.
+                    return .notMade
                 }
             }
         } catch {
+            // The lock was not got: the step is still in flight and Put It
+            // Back, which takes the lock again, can succeed.
             return .couldNotFinish(seq: seq)
         }
     }
 
     /// Put It Back: writes what step `seq` changed back to what it held
     /// before, through the door as recovery would, and closes the step as
-    /// put back. A step already closed (recovery settled it, or the file
-    /// held neither value) has its old member values written back as one
-    /// more swap the same way.
+    /// put back. Only a step still in flight is put back: one closed
+    /// meanwhile is never swapped with no line on the list, and counts as
+    /// put back only when its file already holds every old value.
     static func putBackAtOnce(
         seq: Int,
         in journal: UndoJournal,
@@ -123,7 +142,14 @@ nonisolated enum UndoStoppedStep {
                     return .couldNotPutBack
                 }
                 let stepOps: [UndoOp] = known.step.ops
-                let record: UndoStepRecord? = inFlightRecord(seq, writer)
+                guard let record = inFlightRecord(seq, writer) else {
+                    for op in stepOps where op.knownKind == .editJSON {
+                        if !JSONMemberCheck.holdsTheValueBefore(op, root: root) {
+                            return .couldNotPutBack
+                        }
+                    }
+                    return .putBack
+                }
                 let label: String = "\(seq)-recover"
                 var opsToPutBack: [UndoOp] = []
                 for op in stepOps where op.knownKind == .editJSON {
@@ -146,12 +172,19 @@ nonisolated enum UndoStoppedStep {
                         return .couldNotPutBack
                     }
                 }
-                if let record {
+                do {
                     let closing: UndoEventLine = opsToPutBack.isEmpty
                         ? UndoEventLine(seq: seq, event: .failed, phase: .begin, reason: "nothingTookEffect")
                         : UndoEventLine(seq: seq, event: .rolledBack, phase: .begin, reason: "partlyTookEffect")
                     if !UndoRecovery.write([closing], step: record.step, writer) {
                         return .couldNotPutBack
+                    }
+                    if !opsToPutBack.isEmpty {
+                        // The same trail line recovery leaves for a step
+                        // it put back (the first review, LOW 2).
+                        UndoTrailHook.rolledBackLine?(
+                            record.step.course ?? "", record.step.section, .begin, opsToPutBack.count
+                        )
                     }
                     let urls: [URL] = UndoRecovery.placesStagedBeside(of: record.step, root: root)
                     let listHolds: (URL, URL) -> Bool = UndoRecovery.listHolds(record.step, root: root, from: journal)

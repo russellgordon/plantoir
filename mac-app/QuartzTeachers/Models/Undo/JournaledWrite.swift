@@ -107,6 +107,12 @@ nonisolated enum JournaledWriteOutcome: Equatable, Sendable {
     /// left in flight, and the caller offers to put it back (#899).
     case couldNotFinish(seq: Int, UndoRefusal)
 
+    /// A one-file JSON step stopped part way whose file holds neither value
+    /// (another program wrote it, or it is half written), closed by the
+    /// door's own rule for a file changed by hand: the list cleared, nothing
+    /// offered, nothing written over the file (#899, fix round one).
+    case notMade(seq: Int)
+
     /// Nothing to change.
     case changedNothing
 
@@ -482,6 +488,8 @@ nonisolated enum JournaledWrite {
             return .refused(refusal)
         case .couldNotFinish(let leftSeq):
             return .couldNotFinish(seq: leftSeq, refusal)
+        case .notMade:
+            return .notMade(seq: seq)
         }
     }
 

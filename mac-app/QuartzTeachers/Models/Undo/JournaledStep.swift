@@ -66,6 +66,12 @@ nonisolated enum JournaledStepError: Error, LocalizedError, Equatable {
     /// put back (`UndoStoppedStep.putBackAtOnce`).
     case couldNotFinish(seq: Int, fileName: String)
 
+    /// A one-file JSON step stopped part way and was closed without the
+    /// change, its file holding neither value (#899, fix round one): nothing
+    /// is offered, and the caller says its own failure sentence. Never
+    /// retried, so nothing is written over what another program wrote.
+    case notMade
+
     // MARK: - Computed properties
 
     var errorDescription: String? {
@@ -78,9 +84,10 @@ nonisolated enum JournaledStepError: Error, LocalizedError, Equatable {
                 said += " " + JournaledStepError.keptSentence(place: JournaledStepError.placeName(ofKept: kept), kept: kept)
             }
             return said
-        case .couldNotFinish(_, let fileName):
-            return CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: fileName]).localizedDescription
-        case .couldNotRecordTheStep, .anotherChangeIsUnderWay:
+        case .couldNotRecordTheStep, .anotherChangeIsUnderWay, .couldNotFinish, .notMade:
+            // Never the file's name: a teacher reads these (#899, the first
+            // review's MEDIUM 2), and a caller that can says its own
+            // sentence instead.
             return CocoaError(.fileWriteUnknown).localizedDescription
         case .stoppedByATest:
             return "stopped by a test"
@@ -826,6 +833,8 @@ nonisolated final class JournaledStep {
             throw JournaledStepError.anotherChangeIsUnderWay
         case .couldNotFinish(let seq, let refusal):
             throw JournaledStepError.couldNotFinish(seq: seq, fileName: JournaledStep.fileName(in: refusal))
+        case .notMade:
+            throw JournaledStepError.notMade
         case .stoppedByATest:
             throw JournaledStepError.stoppedByATest
         }
@@ -975,6 +984,8 @@ nonisolated final class JournaledStep {
             throw JournaledStepError.anotherChangeIsUnderWay
         case .couldNotFinish(let seq, let refusal):
             throw JournaledStepError.couldNotFinish(seq: seq, fileName: JournaledStep.fileName(in: refusal))
+        case .notMade:
+            throw JournaledStepError.notMade
         case .stoppedByATest:
             throw JournaledStepError.stoppedByATest
         }

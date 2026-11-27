@@ -1841,6 +1841,19 @@ class CourseConfiguration {
         values = dictionary
     }
 
+    /// Replaces this copy with what is in the file now even when the file's
+    /// bytes are the ones last saved: after Put It Back wrote a Save's old
+    /// values back (#899), the copy still holds the values that Save tried
+    /// to write, and they are what was put back.
+    func replaceWithTheFile(url: URL) throws {
+        let data: Data = try Data(contentsOf: url)
+        guard let dictionary = CourseConfiguration.decodedDictionary(data) else {
+            throw CourseConfigurationError.notADictionary
+        }
+        lastSavedData = data
+        values = dictionary
+    }
+
     /// Records a change that has ALREADY happened on disk — a folder rename —
     /// in both the file and the in-memory copy, without saving anything else.
     ///

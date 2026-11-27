@@ -98,8 +98,10 @@ struct SetSchoolYearSheet: View {
         .padding([.horizontal, .bottom], 20)
         .sheetTitle("Which school year was \(course.displayCode) taught in?")
         .frame(width: 420)
-        .settingPutBackAlert(offer: $putBackOffer) { answer in
-            answerTheOffer(answer)
+        .settingPutBackAlert(offer: $putBackOffer) { answer, shown in
+            if let refused = SetSchoolYearSheet.answer(answer, to: shown, course: course) {
+                problem = refused
+            }
         }
     }
 
@@ -139,20 +141,15 @@ struct SetSchoolYearSheet: View {
         return workspace.referenceShelf.arrangement.noYearTitle
     }
 
-    /// Put It Back, or Not Now (#899).
-    func answerTheOffer(_ answer: SettingPutBackAnswer) {
-        guard let offer = putBackOffer else {
-            return
-        }
-        putBackOffer = nil
+    /// Put It Back, or Not Now (#899), on the offer the alert showed: the
+    /// sentence to show when Put It Back fails too, nil otherwise.
+    static func answer(_ answer: SettingPutBackAnswer, to offer: SettingPutBackOffer, course: Course) -> String? {
         switch answer {
         case .notNow:
             // Left in flight: recovery settles it at the next launch.
-            break
+            return nil
         case .putItBack:
-            if let refused = SetSchoolYearSheet.putBack(offer, course: course) {
-                problem = refused
-            }
+            return SetSchoolYearSheet.putBack(offer, course: course)
         }
     }
 

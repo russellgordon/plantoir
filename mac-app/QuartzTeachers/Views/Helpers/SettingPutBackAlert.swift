@@ -22,16 +22,27 @@ struct SettingPutBackOffer: Equatable, Identifiable {
 
     let seq: Int
 
-    /// The setting's name in lower case, as the alert says it.
+    /// The setting's name in lower case, as the alert says it: "school
+    /// year", "course name", or "course settings" for several at once.
     let setting: String
 
-    /// The value before, as the teacher reads it.
-    let valueBefore: String
+    /// The value before, as the teacher reads it; nil when several settings
+    /// changed at once and they go back together.
+    let valueBefore: String?
 
     // MARK: - Computed properties
 
     var id: Int {
         return seq
+    }
+
+    /// The alert's informative text: the one value it goes back to, or the
+    /// settings put back as they were.
+    var informativeText: String {
+        if let valueBefore {
+            return ReferenceWording.settingCanBePutBack(value: valueBefore)
+        }
+        return ReferenceWording.settingsCanBePutBack
     }
 }
 
@@ -51,13 +62,19 @@ enum SettingPutBackAnswer: Equatable {
 /// nothing is lost by it. Not Now is the cancel role, so Escape answers it,
 /// and Put It Back is the default action, so Return does: both shown on
 /// the buttons themselves, no hidden key catcher.
+///
+/// The app's usual alert pattern (`SidebarView.removalRequestIsPresented`):
+/// closing the alert only clears the offer, and each button acts on the
+/// offer the alert was handed, so the outcome never depends on whether
+/// SwiftUI closes the alert before or after it runs the button's action
+/// (the first review of #899's settings piece, HIGH 1).
 struct SettingPutBackAlert: ViewModifier {
 
     // MARK: - Stored properties
 
     @Binding var offer: SettingPutBackOffer?
 
-    let answer: (SettingPutBackAnswer) -> Void
+    let answer: (SettingPutBackAnswer, SettingPutBackOffer) -> Void
 
     // MARK: - Computed properties
 
@@ -65,8 +82,8 @@ struct SettingPutBackAlert: ViewModifier {
         return Binding(
             get: { return offer != nil },
             set: { showing in
-                if !showing && offer != nil {
-                    answer(.notNow)
+                if !showing {
+                    alertClosed()
                 }
             }
         )
@@ -74,23 +91,34 @@ struct SettingPutBackAlert: ViewModifier {
 
     // MARK: - Functions
 
+    /// The alert closed: the offer is cleared, nothing is answered.
+    func alertClosed() {
+        offer = nil
+    }
+
+    /// A button was pressed: its answer, on the offer the alert showed.
+    func answered(_ chosen: SettingPutBackAnswer, with shown: SettingPutBackOffer) {
+        offer = nil
+        answer(chosen, shown)
+    }
+
     func body(content: Content) -> some View {
         content.alert(
             ReferenceWording.settingCouldNotBeChanged(setting: offer?.setting ?? ""),
             isPresented: isPresented,
             presenting: offer
-        ) { _ in
+        ) { shown in
             Button(ReferenceWording.notNowButton, role: .cancel) {
-                answer(.notNow)
+                answered(.notNow, with: shown)
             }
             .keyboardShortcut(.cancelAction)
             Button(ReferenceWording.putItBackButton) {
-                answer(.putItBack)
+                answered(.putItBack, with: shown)
             }
             .keyboardShortcut(.defaultAction)
             .accessibilityIdentifier("settingPutItBackButton")
         } message: { shown in
-            Text(ReferenceWording.settingCanBePutBack(value: shown.valueBefore))
+            Text(shown.informativeText)
         }
     }
 }
@@ -100,7 +128,8 @@ extension View {
     // MARK: - Functions
 
     func settingPutBackAlert(
-        offer: Binding<SettingPutBackOffer?>, answer: @escaping (SettingPutBackAnswer) -> Void
+        offer: Binding<SettingPutBackOffer?>,
+        answer: @escaping (SettingPutBackAnswer, SettingPutBackOffer) -> Void
     ) -> some View {
         return modifier(SettingPutBackAlert(offer: offer, answer: answer))
     }
