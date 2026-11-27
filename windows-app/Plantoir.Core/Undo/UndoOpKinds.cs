@@ -699,6 +699,10 @@ internal static class UndoLinks
         return attributes.HasFlag(FileAttributes.Directory) ? What.Folder : What.File;
     }
 
+    internal static bool CanMakeALink(UndoSeams? seams = null) => throw new NotImplementedException("W8b-21b1a");
+
+    internal static bool CanMakeALinkIn(string folder) => throw new NotImplementedException("W8b-21b1a");
+
     /// <summary>
     /// A link's <c>linkSha</c> (<c>opKinds.move</c>, U4b2-14; #899 W8-6): the
     /// SHA-256 of the target it holds, as stored (<see cref="FileSystemInfo.LinkTarget"/>,

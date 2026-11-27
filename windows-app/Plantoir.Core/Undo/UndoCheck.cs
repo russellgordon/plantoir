@@ -112,8 +112,9 @@ internal abstract record UndoCurrent
     /// written through its link, or a linked later class written plainly,
     /// until W8b piece 22 moves the link itself (documentation 12).
     /// </summary>
-    internal static UndoCurrent ReadWithoutFollowingALink(string fullPath) =>
-        UndoLinks.Look(fullPath) == UndoLinks.What.Link ? new NotAFile() : Read(fullPath);
+    /// <param name="look">A seam for tests (a reparse tag that cannot be read); <see cref="UndoLinks.Look(string)"/> by default.</param>
+    internal static UndoCurrent ReadWithoutFollowingALink(string fullPath, Func<string, UndoLinks.What>? look = null) =>
+        (look is null ? UndoLinks.Look(fullPath) : look(fullPath)) == UndoLinks.What.Link ? new NotAFile() : Read(fullPath);
 
     private static bool IsNotFound(IOException exception) => (exception.HResult & 0xFFFF) is 2 or 3;
 }

@@ -349,6 +349,10 @@ internal sealed class UndoActionStep
         _folderMoves.Add((from, to, null, linkSha));
     }
 
+    internal IReadOnlyList<string> CopiedInsteadOfLinks => [];
+
+    internal bool CopyTheLessonInsteadOfALink(string linkFull, string newFull) => throw new NotImplementedException("W8b-21b1a");
+
     /// <summary>
     /// Where a place is on the disk while the step is planned (the mac's
     /// <c>placeOnDiskNow</c>): under a planned folder move's <c>from</c> when

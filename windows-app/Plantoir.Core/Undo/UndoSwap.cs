@@ -124,6 +124,9 @@ internal sealed class UndoSeams
     /// <summary>A test's: what making a link at this full path answers instead of the system (a Win32 error, 0 to make it), so a PC without the privilege (1314) can be met anywhere (#899 W8b-21b1).</summary>
     internal Func<string, int>? MakingALinkAnswers { get; init; }
 
+    /// <summary>A test's: what <see cref="UndoLinks.CanMakeALink"/> answers instead of this process's probe (false: a PC that cannot make a link, #899 W8b-21b1a).</summary>
+    internal bool? CanMakeALinkAnswers { get; init; }
+
     /// <summary>The POSIX-semantics rename answers "not supported" (87), as on a network share, so every swap takes the fallback (M5).</summary>
     internal bool PosixRenameIsNotSupported { get; init; }
 
