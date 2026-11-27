@@ -128,7 +128,7 @@ public sealed class UndoWriterScanTests
         ["Plantoir.Core/Models/SectionAdder.cs"] = (11, W8 + " (Add Section, the mac's SectionAdder)"),
         ["Plantoir.Core/Models/SectionPublishState.cs"] = (3, "notAStep: the site markers, written by a deploy (rulings 17 and 18) and read by undo.rule.deployed"),
         ["Plantoir.Core/Models/SiteHealthRepair.cs"] = (3, W8),
-        ["Plantoir.Core/Models/SpecialFolderRenamer.cs"] = (3, W8 + " (Rename folder's interrupted-rename record, W8b-17 and 18a. The folder itself, its pages' links and its settings go through the door as one step since W8b-15b, and Add folder as one step of createTree ops since W8-13, FolderScaffold.PlanPages, which holds no writing call)"),
+        ["Plantoir.Core/Models/SpecialFolderRenamer.cs"] = (3, W8 + " (Rename folder's interrupted-rename record, owned by RenameRecordClaim since W8b-17 and kept while the switch is off: its keys wait for W8b-18a, and U7 drops the record. The folder itself, its pages' links and its settings go through the door as one step since W8b-15b, and Add folder as one step of createTree ops since W8-13, FolderScaffold.PlanPages, which holds no writing call)"),
         ["Plantoir.Core/Models/ToolchainMirror.cs"] = (19, "notAStep: the toolchain mirror, its index and the launchers it copies into a working folder"),
         ["Plantoir.Core/Models/ToolchainReadiness.cs"] = (6, "notAStep: the toolchain mirror's copy markers"),
         ["Plantoir.Core/Models/UnitWordRenamer.cs"] = (6, W8),

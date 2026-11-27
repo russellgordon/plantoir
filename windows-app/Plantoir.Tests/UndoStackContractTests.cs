@@ -663,8 +663,7 @@ public sealed class UndoStackContractTests
                     var list = new UndoForThisProcess(_scribe.JournalFolder, UndoMode.Live, null, maintainers: _scribe.Maintainers);
                     Plantoir.Core.Models.SpecialFolderRenamer.Rename("media", "renamed", Plantoir.Core.Models.FolderScope.PerSection, course,
                                                                      new[] { 1 }, null, false, list, _scribe.Door());
-                    // The sheet clears the rename record once the rename is whole.
-                    Plantoir.Core.Models.SpecialFolderRenamer.ClearRenameRecord(course);
+                    // The rename record is cleared by the rename itself once it is whole (W8b-17).
                     UndoOp move = Assert.Single(_scribe.Fold().Steps[seq].Step.Ops);
                     Assert.Equal(UndoOp.Move, move.Kind);
                     Assert.Equal(LinkPlace, move.From);

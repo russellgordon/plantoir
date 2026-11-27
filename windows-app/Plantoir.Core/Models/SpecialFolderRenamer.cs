@@ -159,22 +159,86 @@ public static class SpecialFolderRenamer
     /// record carries the TARGET, and the clash check is relaxed only when the
     /// record and the disk agree.
     /// </summary>
-    public static void RecordRenameStarting(string oldName, string newName, FolderScope scope, string courseDirectory)
+    /// <remarks>Only <see cref="RenameRecordClaim"/> calls it in the app (#899 W8b-17).</remarks>
+    internal static void RecordRenameStarting(string oldName, string newName, FolderScope scope, string courseDirectory)
     {
         try
         {
-            string path = RenameRecordPath(courseDirectory);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var note = new JObject { ["from"] = oldName, ["to"] = newName, ["scope"] = ScopeKey(scope) };
-            File.WriteAllText(path, note.ToString(Newtonsoft.Json.Formatting.Indented) + "\n");
+            WriteRenameRecord(courseDirectory, Encoding.UTF8.GetBytes(note.ToString(Newtonsoft.Json.Formatting.Indented) + "\n"));
         }
         catch (Exception) { /* best-effort: a missing record costs a refusal later, never a folder */ }
     }
 
-    /// <summary>The configuration is written, so the rename is whole and the record can go.</summary>
-    public static void ClearRenameRecord(string courseDirectory)
+    /// <summary>
+    /// The record's bytes written as given: this run's own record, or an
+    /// earlier run's put back byte for byte. Throws when it cannot be written,
+    /// so the owner can say so on the trail.
+    /// </summary>
+    internal static void WriteRenameRecord(string courseDirectory, byte[] bytes)
     {
-        try { File.Delete(RenameRecordPath(courseDirectory)); } catch (Exception) { }
+        string path = RenameRecordPath(courseDirectory);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllBytes(path, bytes);
+    }
+
+    /// <summary>
+    /// Removes the record. Throws when it is there and cannot be removed
+    /// (<see cref="RenameRecordClaim"/> says so on the trail); no record is
+    /// not a failure.
+    /// </summary>
+    internal static void RemoveRenameRecord(string courseDirectory) => File.Delete(RenameRecordPath(courseDirectory));
+
+    /// <summary>Removes the record, quietly. Tests' own tidy; the app's endings are <see cref="RenameRecordClaim"/>'s.</summary>
+    internal static void ClearRenameRecord(string courseDirectory)
+    {
+        try { RemoveRenameRecord(courseDirectory); } catch (Exception) { }
+    }
+
+    /// <summary>The record's bytes as they are on disk, or null when there is none or it cannot be read.</summary>
+    internal static byte[]? ReadRenameRecordBytes(string courseDirectory)
+    {
+        try
+        {
+            string path = RenameRecordPath(courseDirectory);
+            return File.Exists(path) ? File.ReadAllBytes(path) : null;
+        }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>The record's note from its bytes, or null when they are not a record (not JSON, or not an object).</summary>
+    internal static JObject? RenameRecordNote(byte[]? bytes)
+    {
+        if (bytes is null) return null;
+        try { return JToken.Parse(Encoding.UTF8.GetString(bytes)) as JObject; }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>Whether a record names a rename OF this folder, to any name: the same folder (capitals aside), the same scope (the mac's <c>recordNamesTheFolder</c>).</summary>
+    internal static bool RecordNamesTheFolder(JObject? note, string oldName, FolderScope scope) =>
+        note is not null
+        && string.Equals(note["from"]?.ToString(), oldName, StringComparison.OrdinalIgnoreCase)
+        && note["scope"]?.ToString() == ScopeKey(scope);
+
+    /// <summary>Whether a record names this rename: the same folder, the same target (capitals aside), the same scope (the mac's <c>recordNames</c>).</summary>
+    internal static bool RecordNames(JObject? note, string oldName, string newName, FolderScope scope) =>
+        RecordNamesTheFolder(note, oldName, scope)
+        && string.Equals(note!["to"]?.ToString(), newName, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The <c>folder renamed</c> trail line when the record could not be
+    /// left as the rename must leave it (the mac's
+    /// <c>renameNoteNotTidiedLine</c>): "renamed" only once the rename is
+    /// whole, "did not rename" after a refusal that changed nothing. A record
+    /// left behind by mistake greys the one-section restore and may be read
+    /// as an unfinished rename, so it is told rather than kept quiet.
+    /// </summary>
+    internal static string RenameNoteNotTidiedLine(string oldName, string newName, string course, bool wasRenamed, string said)
+    {
+        string whatHappened = wasRenamed
+            ? "renamed the folder " + oldName + " to " + newName + " in " + course + ", but"
+            : "did not rename the folder " + oldName + " to " + newName + " in " + course + ", and";
+        return whatHappened + " could not tidy the note kept while a folder rename is unfinished (" + said + ")";
     }
 
     private static JObject? ReadRenameRecord(string courseDirectory)
@@ -274,6 +338,11 @@ public static class SpecialFolderRenamer
     /// <paramref name="finishing"/> is a rename found interrupted: its
     /// folders already moved, so the step is its relinked pages and its
     /// members, and no move.</para>
+    ///
+    /// <para>The interrupted-rename record is <see cref="RenameRecordClaim"/>'s
+    /// on every exit (#899 W8b-17): written before a step that moves folders,
+    /// put back as it was after a refusal, kept after a part-way stop, and
+    /// cleared or put back once the rename is whole. No caller touches it.</para>
     /// </summary>
     public static RenameOutcome Rename(
         string oldName, string newName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers,
@@ -298,6 +367,8 @@ public static class SpecialFolderRenamer
         string? workingFolder = HowITeachSettingsRow.WorkingFolderOf(courseDirectory);
         string course = Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(courseDirectory)));
         int attempts = 0;
+        // The record before this run writes anything, read once (#899 W8b-17).
+        var record = new RenameRecordClaim(oldName, newName, scope, courseDirectory, changesTheSettings: settings is not null);
         while (true)
         {
             var step = new UndoActionStep(new UndoStepMaker("sheet", RenameFolderActionKey), workingFolder, course,
@@ -322,18 +393,30 @@ public static class SpecialFolderRenamer
                 throw new RenameException(error.Message);
             }
 
-            if (moves.Count > 0) RecordRenameStarting(oldName, newName, scope, courseDirectory);
+            if (moves.Count > 0) record.RenameIsStarting();
             try { step.Make(); }
             catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince && attempts < 3)
             {
+                // Planned again from the disk: the record as it was first.
+                record.NothingWasChanged();
                 attempts++;
                 continue;
             }
+            catch (UndoStepLeftPartWayException partWay)
+            {
+                // Part way: this run's record kept, so the rename can be
+                // recognised and finished (InterruptedRenameTarget).
+                throw new RenameException(partWay.Message);
+            }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
+                record.NothingWasChanged();
                 throw new RenameException(error.Message);
             }
+            // Anything else (a test's kill point, as a process that died
+            // there) leaves this run's record, as the mac's stoppedByATest.
             if (plannedSettings is not null) settings!.Configuration.FinishRecord(plannedSettings, settings.Change, settings.Path);
+            record.RenameIsWhole();
 
             if (!finishing && moves.Count == 0)
             {
@@ -768,4 +851,124 @@ public static class SpecialFolderRenamer
         "shared_folders", "per_section_folders", "graded_folders", "curriculum_folder", "curriculum_folders",
         "class_folder", "hidden", "expandable", "excluded_items",
     };
+}
+
+/// <summary>
+/// Who owns the interrupted-rename record during one Rename folder (#899
+/// W8b-17; the mac's <c>RenameRecordClaim</c>, U4b2-3).
+///
+/// <para><b>The record exists only while the rename that wrote it is
+/// unfinished, and nothing clears a record another run wrote.</b> The record
+/// is one file per course, so a run that writes its own has replaced whatever
+/// was there: another folder's interrupted rename. This reads that earlier
+/// record's bytes before anything is written and, on every exit, leaves the
+/// file as the rule says:</para>
+/// <list type="bullet">
+/// <item><description>refused with nothing changed (<see cref="NothingWasChanged"/>,
+/// which a changed-since retry calls too before it plans again): the earlier
+/// record put back byte for byte, or no record when there was none, so the
+/// one-section restore is not greyed by a rename that never happened;</description></item>
+/// <item><description>stopped part way, or killed: this run's record kept, so the
+/// rename can be recognised and finished (<see cref="SpecialFolderRenamer.InterruptedRenameTarget"/>);</description></item>
+/// <item><description>whole (<see cref="RenameIsWhole"/>: folders moved and
+/// settings written, one step since W8b-15b): a record of THIS rename is
+/// cleared; a record of this folder renamed to ANOTHER name is cleared too
+/// once the old name is gone for good (this run moved the folders, or the
+/// settings change away from it), since the settings no longer name the old
+/// folder; any other earlier record is put back if this run replaced it,
+/// and left untouched if this run wrote nothing.</description></item>
+/// </list>
+/// <para>A put-back or a clear that fails writes a <c>folder renamed</c>
+/// trail line (<see cref="SpecialFolderRenamer.RenameNoteNotTidiedLine"/>),
+/// "did not rename" after a refusal, "renamed" only once whole.</para>
+///
+/// <para>Kept while the switch is off (the director, 2026-11-21); U7 drops
+/// the record. One window is accepted, as on the mac: a kill between this
+/// run's write and the put-back leaves only this run's record.</para>
+/// </summary>
+internal sealed class RenameRecordClaim
+{
+    // ---- Stored properties ---------------------------------------------------------
+
+    private readonly string _oldName;
+    private readonly string _newName;
+    private readonly FolderScope _scope;
+    private readonly string _courseDirectory;
+
+    /// <summary>Whether the caller's step writes the settings away from the old name (the sheet's does).</summary>
+    private readonly bool _changesTheSettings;
+
+    /// <summary>The record on disk before this run wrote anything, as its bytes, or null when there was none.</summary>
+    private readonly byte[]? _earlierRecord;
+
+    /// <summary>Whether the record on disk is this run's own.</summary>
+    private bool _thisRunWroteTheRecord;
+
+    // ---- Initializer ---------------------------------------------------------------
+
+    /// <summary>Read once, before the record is written for the first time.</summary>
+    internal RenameRecordClaim(string oldName, string newName, FolderScope scope, string courseDirectory, bool changesTheSettings)
+    {
+        _oldName = oldName;
+        _newName = newName;
+        _scope = scope;
+        _courseDirectory = courseDirectory;
+        _changesTheSettings = changesTheSettings;
+        _earlierRecord = SpecialFolderRenamer.ReadRenameRecordBytes(courseDirectory);
+    }
+
+    // ---- Functions -------------------------------------------------------------------
+
+    /// <summary>Written BEFORE the rename's step is made, when folders will move.</summary>
+    internal void RenameIsStarting()
+    {
+        SpecialFolderRenamer.RecordRenameStarting(_oldName, _newName, _scope, _courseDirectory);
+        _thisRunWroteTheRecord = true;
+    }
+
+    /// <summary>Refused with nothing changed: the record as it was before this run.</summary>
+    internal void NothingWasChanged()
+    {
+        if (!_thisRunWroteTheRecord) return;
+        PutBackTheEarlierRecord(renameIsWhole: false);
+        _thisRunWroteTheRecord = false;
+    }
+
+    /// <summary>The step is made, so this rename is whole.</summary>
+    internal void RenameIsWhole()
+    {
+        JObject? earlier = SpecialFolderRenamer.RenameRecordNote(_earlierRecord);
+        bool finishesTheRecordedRename = SpecialFolderRenamer.RecordNames(earlier, _oldName, _newName, _scope);
+        bool recordsThisFolder = SpecialFolderRenamer.RecordNamesTheFolder(earlier, _oldName, _scope);
+        bool oldNameIsGone = _thisRunWroteTheRecord || _changesTheSettings;
+        if (finishesTheRecordedRename || (recordsThisFolder && oldNameIsGone)) RemoveTheRecord(renameIsWhole: true);
+        else if (_thisRunWroteTheRecord) PutBackTheEarlierRecord(renameIsWhole: true);
+        _thisRunWroteTheRecord = false;
+    }
+
+    /// <summary>The earlier run's bytes written back, or no record when there was none.</summary>
+    private void PutBackTheEarlierRecord(bool renameIsWhole)
+    {
+        if (_earlierRecord is null)
+        {
+            RemoveTheRecord(renameIsWhole);
+            return;
+        }
+        try { SpecialFolderRenamer.WriteRenameRecord(_courseDirectory, _earlierRecord); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { NoteNotTidied(error, renameIsWhole); }
+    }
+
+    private void RemoveTheRecord(bool renameIsWhole)
+    {
+        if (!File.Exists(SpecialFolderRenamer.RenameRecordPath(_courseDirectory))) return;
+        try { SpecialFolderRenamer.RemoveRenameRecord(_courseDirectory); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { NoteNotTidied(error, renameIsWhole); }
+    }
+
+    private void NoteNotTidied(Exception error, bool renameIsWhole)
+    {
+        string course = Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(_courseDirectory)));
+        Scripting.ActivityTrail.Note(Scripting.ActivityTrail.Event.FolderRenamed,
+            SpecialFolderRenamer.RenameNoteNotTidiedLine(_oldName, _newName, course, renameIsWhole, error.Message));
+    }
 }
