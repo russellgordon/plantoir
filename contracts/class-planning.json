@@ -28,6 +28,7 @@
         {"name": "a numbered class's link passes through an unnumbered page of the class folder", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-01T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "Overview.md"}, {"page": "section1/All Classes/Overview.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-08T07:00:00.000+0000"}}, "ownedByANumberedClass": false, "owningClass": {}},
         {"name": "two sections each own the lesson", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000", "createdSection2": "2026-09-12T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "../../Shared/Lesson.md"}, {"page": "section2/All Classes/Unit 1, Day 1.md", "created": "2026-09-09T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section2/All Classes/Unit 1, Day 3.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000", "createdSection2": "2026-09-12T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md", "section2": "section2/All Classes/Unit 1, Day 3.md"}},
         {"name": "a class's link passes through a hidden folder inside the class folder", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/.drafts/Overview.md", "linkHolds": "../../../Shared/Lesson.md"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": ".drafts/Overview.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md"}},
+        {"name": "the lesson is hidden, so the class that is a link to it is hidden too; an earlier visible class says [[Lesson]]", "files": {"Shared/Lesson.md": {"publish": "false", "createdSection1": "2026-09-10T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/All Classes/Unit 1, Day 2.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-10T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 2.md"}},
         {"name": "a folder named like the class folder elsewhere in the section holds no class", "files": {"Shared/Lesson.md": {"createdSection1": "2026-09-15T07:00:00.000+0000"}}, "classes": [{"page": "section1/All Classes/Unit 1, Day 1.md", "created": "2026-09-08T07:00:00.000+0000", "says": "[[Lesson]]"}, {"page": "section1/Handouts/All Classes/Unit 1, Day 3.md", "linkHolds": "../../../Shared/Lesson.md"}, {"page": "section1/All Classes/Unit 1, Day 5.md", "linkHolds": "../../Shared/Lesson.md"}], "expect": {"Shared/Lesson.md": {"createdSection1": "2026-09-15T07:00:00.000+0000"}}, "ownedByANumberedClass": true, "owningClass": {"section1": "section1/All Classes/Unit 1, Day 5.md"}}
       ],
       "firstClassKeepsASharedLessonCasesLayout": "What the site build does with firstClassKeepsASharedLesson, run by scripts/test_dates_follow_the_class.py. Paths are relative to the course folder; files are course-level pages with the keys they start with; classes are the pages of each section's class folder, either a page of its own (created, and says: its body) or a link (linkHolds, read against the page's folder) whose date is the one the file it leads to holds. Each section that has classes is built, and built again; expect is every key of each file after both builds, and the second build changes no file. A file a numbered class owns keeps the date it holds; a file no numbered class owns is dated by the first visible class that says its name, as any other page. ownedByANumberedClass says, for every section the case has classes in, whether a numbered class of that section owns the file by firstClassKeepsASharedLesson, and owningClass names that class page for each section that owns it ({} when none does), so each app runs the RULE on the case, not only the build outcome. The section's class pages are every page under section<N>/<class folder>/ (a folder of that name directly inside the section folder, nowhere deeper), read from the teacher's folder whether or not their settings can be read, a hidden file or folder (a name starting with a dot) never among them, and never a folder's index.md, as the Mac's ClassPages.list reads them. Every reader of a page's class takes the owner's answer: the build never writes the file's date, the links checklist offers it as datedByTheBuild with no date and claimedBy naming the owning class, and My Progress groups it under the owning class when that class is visible and dated (under the first visible class that says its name otherwise)."
@@ -1196,6 +1197,47 @@
               "group": "fromAClass",
               "ticked": true,
               "step": 1,
+              "claimedBy": "section1/All Classes/Unit 1, Day 2",
+              "date": null,
+              "why": "datedByTheBuild",
+              "dependsOn": []
+            }
+          }
+        },
+        {
+          "name": "s. a shared lesson a numbered class owns, reached at step 2, is never dated from another class (#1048b)",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "path": "Concepts/Hub",
+              "visible": true,
+              "links": [
+                "Lesson"
+              ]
+            },
+            {
+              "path": "Shared/Lesson",
+              "visible": false,
+              "created": "2026-09-10T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 2",
+              "linkHolds": "../../Shared/Lesson.md"
+            }
+          ],
+          "expect": {
+            "Shared/Lesson": {
+              "group": "fromAClass",
+              "ticked": true,
+              "step": 2,
               "claimedBy": "section1/All Classes/Unit 1, Day 2",
               "date": null,
               "why": "datedByTheBuild",

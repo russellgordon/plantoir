@@ -109,7 +109,6 @@ final class FirstClassKeepsASharedLessonTests: XCTestCase {
             return nil
         }
         let numbered: [ClassPageSummary] = ClassInsertionPlanner.numberedClasses(among: classPages)
-        let coursePath: String = course.directoryURL.path + "/"
         for summary in numbered {
             if ResolvedFile.throughLinks(at: summary.fileURL) != resolved {
                 continue
@@ -117,9 +116,12 @@ final class FirstClassKeepsASharedLessonTests: XCTestCase {
             if !ClassPages.isTheFirstClassLeadingToItsFile(summary.fileURL, among: classPages) {
                 continue
             }
+            // The place in the course, whichever spelling of the temporary
+            // folder (`/var` or `/private/var`) the list read it by.
             let path: String = summary.fileURL.path
-            if path.hasPrefix(coursePath) {
-                return String(path.dropFirst(coursePath.count))
+            let marker: String = "/courses/TEST/"
+            if let found = path.range(of: marker) {
+                return String(path[found.upperBound...])
             }
             return path
         }
