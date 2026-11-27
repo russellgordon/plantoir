@@ -294,7 +294,12 @@ class FrontPageTitleRepairTests(unittest.TestCase):
         printed, hidden, _ = self._build(course_dir)
         self.assertFalse(hidden, "the front page is still hidden, so the section has no website:\n" + printed)
         self.assertTrue(page.is_symlink(), "the link was replaced by a file")
-        self.assertEqual(os.readlink(page), str(elsewhere), "the link leads somewhere else now")
+        # Windows gives a link's target back with a "\\?\" prefix, so the two
+        # places are compared as files, not as text.
+        self.assertTrue(
+            os.path.samefile(os.path.realpath(page), elsewhere),
+            "the link leads somewhere else now",
+        )
         self.assertEqual(_read_exactly(elsewhere), WIZARD_PAGE_QUOTED, "the file the link leads to was not quoted")
         sentence = _filled(_rule("frontPageTitleQuoted", "sentence"), course="SPH4U", section=1)
         self.assertIn(sentence, printed.splitlines())
