@@ -117,6 +117,8 @@ internal sealed class UndoActionStep
     private readonly Dictionary<string, IReadOnlyList<UndoMemberChange>> _members = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>Each folder the step makes whole (<see cref="MakeTree"/>), in the order planned.</summary>
     private readonly List<(string FullPath, UndoTreeListing Listing, Dictionary<string, byte[]> Contents)> _trees = [];
+    /// <summary>Each folder the step moves whole (<see cref="MoveFolder"/>), in the order planned, with its listing's hash as it stood when planned.</summary>
+    private readonly List<(string FromFull, string ToFull, string ListingSha)> _folderMoves = [];
 
     // ---- Initializer ---------------------------------------------------------------
 
@@ -157,7 +159,7 @@ internal sealed class UndoActionStep
     {
         get
         {
-            if (_trees.Count > 0) return true;
+            if (_trees.Count > 0 || _folderMoves.Count > 0) return true;
             foreach (string path in _order)
             {
                 if (!Same(_before[path], _after[path])) return true;
@@ -214,7 +216,7 @@ internal sealed class UndoActionStep
             Plan(fullPath, after);
             return;
         }
-        if (Directory.Exists(key)) throw new IOException($"“{Path.GetFileName(key)}” is a folder, so it could not be written.");
+        if (Directory.Exists(PlaceOnDiskNow(key))) throw new IOException($"“{Path.GetFileName(key)}” is a folder, so it could not be written.");
         _before[key] = read;
         _order.Add(key);
         _shownAs[key] = fullPath;
@@ -254,6 +256,79 @@ internal sealed class UndoActionStep
             contents[path] = files[path];
         }
         _trees.Add((Path.GetFullPath(fullPath), new UndoTreeListing(new List<string>(folders), listed), contents));
+    }
+
+    /// <summary>
+    /// Plans the folder at <paramref name="fromFull"/> moved whole to
+    /// <paramref name="toFull"/> as ONE <c>move</c> op <c>{from, to, listingSha}</c>
+    /// (#899 W8b-15a; the mac's <c>JournaledStep.moveFolder</c>, U4b): one
+    /// rename that never replaces, judged by its listing's hash, taken NOW
+    /// from the folder as it stands (<see cref="UndoTreeReading"/>, the
+    /// listing <see cref="UndoMoveSides"/> judges with), never at
+    /// <see cref="Make"/>. No blob: the folder itself is what moves. Plan
+    /// every read and write inside the folder AFTER this, at its NEW place:
+    /// each is read from the old place (<see cref="PlaceOnDiskNow"/>) and
+    /// named at the new one, where the move carries it (<see cref="UndoOp.MoveCarries"/>).
+    /// A folder that is a link (<see cref="UndoLinks.Look"/>) is not moved
+    /// here (W8b-21), and a folder that cannot be listed now is not planned:
+    /// each refuses the action, <c>cannotTellNow</c>, before anything changes.
+    /// </summary>
+    internal void MoveFolder(string fromFull, string toFull)
+    {
+        string from = Path.GetFullPath(fromFull);
+        string to = Path.GetFullPath(toFull);
+        if (UndoLinks.Look(from) is UndoLinks.What.Link or UndoLinks.What.CannotLook
+            || UndoTreeReading.Read(from).ListingSha is not { } listingSha)
+        {
+            var refusal = new UndoRefusal(UndoRefusalKind.CannotTellNow, RelativeOf(from) ?? from);
+            throw new UndoStepRefusedException(refusal, Reason(refusal));
+        }
+        _folderMoves.Add((from, to, listingSha));
+    }
+
+    /// <summary>
+    /// Where a place is on the disk while the step is planned (the mac's
+    /// <c>placeOnDiskNow</c>): under a planned folder move's <c>from</c> when
+    /// the place is at or inside its <c>to</c>, by the one comparison
+    /// (<see cref="UndoOp.PartInside"/>), else the place itself.
+    /// </summary>
+    private string PlaceOnDiskNow(string fullPath)
+    {
+        string place = Path.GetFullPath(fullPath);
+        foreach ((string from, string to, _) in _folderMoves)
+        {
+            if (UndoOp.PartInside(Slashed(to), Slashed(place)) is not { } inside) continue;
+            return inside.Length == 0 ? from : Path.Combine(from, inside.Replace('/', Path.DirectorySeparatorChar));
+        }
+        return place;
+    }
+
+    private static string Slashed(string fullPath) => fullPath.Replace('\\', '/');
+
+    /// <summary>
+    /// The one page order (#899 W8b-15a; documentation 12, "What W8 owes from
+    /// U4b2-11" and "-12"): the lowercased path (<c>ToLowerInvariant</c>,
+    /// ordinal), then on a tie the UTF-8 bytes as spelled, no locale. Each
+    /// page by its own place, as the step names it, never a link's target.
+    /// </summary>
+    internal static int ComparePageOrder(string first, string second)
+    {
+        int lowered = string.CompareOrdinal(first.ToLowerInvariant(), second.ToLowerInvariant());
+        if (lowered != 0) return lowered;
+        return Encoding.UTF8.GetBytes(first).AsSpan().SequenceCompareTo(Encoding.UTF8.GetBytes(second));
+    }
+
+    /// <summary>Each planned folder move's <c>move</c> op, its places inside the working folder, or null when one cannot be named in a step.</summary>
+    private List<JsonObject>? RecordableFolderMoves()
+    {
+        var result = new List<JsonObject>();
+        foreach ((string fromFull, string toFull, string listingSha) in _folderMoves)
+        {
+            if (RelativeOf(fromFull) is not { } from || !UndoPlaces.StaysInside(_root!, from)) return null;
+            if (RelativeOf(toFull) is not { } to || !UndoPlaces.StaysInside(_root!, to)) return null;
+            result.Add(new JsonObject { ["kind"] = UndoOp.Move, ["from"] = from, ["to"] = to, ["listingSha"] = listingSha });
+        }
+        return result;
     }
 
     /// <summary>Each planned folder's <c>createTree</c> op and the blobs it needs (its listing, then every listed file's bytes), or null when one cannot be named in a step.</summary>
@@ -298,7 +373,8 @@ internal sealed class UndoActionStep
     {
         string key = Path.GetFullPath(fullPath);
         if (_after.TryGetValue(key, out byte[]? planned)) return TextOf(planned);
-        return File.Exists(fullPath) ? File.ReadAllText(fullPath) : null;
+        string onDisk = PlaceOnDiskNow(key);
+        return File.Exists(onDisk) ? File.ReadAllText(onDisk) : null;
     }
 
     /// <summary>Whether the file is there as the step will leave it: planned with content, else on the disk (the mac's <c>fileExists</c>).</summary>
@@ -306,7 +382,7 @@ internal sealed class UndoActionStep
     {
         string key = Path.GetFullPath(fullPath);
         if (_after.TryGetValue(key, out byte[]? planned)) return planned is not null;
-        return File.Exists(fullPath);
+        return File.Exists(PlaceOnDiskNow(key));
     }
 
     /// <summary>
@@ -328,7 +404,7 @@ internal sealed class UndoActionStep
         string key = Path.GetFullPath(fullPath);
         if (_after.TryGetValue(key, out byte[]? planned))
             return planned is null ? throw new FileNotFoundException("A file this change removes.", fullPath) : TextOf(planned)!;
-        return File.ReadAllText(fullPath);
+        return File.ReadAllText(PlaceOnDiskNow(key));
     }
 
     /// <summary>The section's front page is kept true by its rule after the step (<c>recompute</c>, <c>sectionFrontPage</c>).</summary>
@@ -348,8 +424,10 @@ internal sealed class UndoActionStep
             // Read NOW, at plan time: the step's before is what the plan was
             // built from. A file that cannot be read stops the action here,
             // before anything is written (it threw at this read before W7a too).
-            if (Directory.Exists(key)) throw new IOException($"“{Path.GetFileName(key)}” is a folder, so it could not be written.");
-            _before[key] = File.Exists(key) ? File.ReadAllBytes(key) : null;
+            // Inside a folder this step moves: read at its old place, named at the new one.
+            string onDisk = PlaceOnDiskNow(key);
+            if (Directory.Exists(onDisk)) throw new IOException($"“{Path.GetFileName(key)}” is a folder, so it could not be written.");
+            _before[key] = File.Exists(onDisk) ? File.ReadAllBytes(onDisk) : null;
             _order.Add(key);
             _shownAs[key] = fullPath;
         }
@@ -371,7 +449,8 @@ internal sealed class UndoActionStep
             RederiveTheFrontPages();
             return;
         }
-        if (RecordableChanges() is not { } changes || (_trees.Count > 0 && RecordableTrees() is null))
+        if (RecordableChanges() is not { } changes || (_trees.Count > 0 && RecordableTrees() is null)
+            || (_folderMoves.Count > 0 && RecordableFolderMoves() is null))
         {
             if (_mode == UndoMode.Live)
             {
@@ -391,7 +470,7 @@ internal sealed class UndoActionStep
                 ["path"] = RelativeOf(full)!, ["section"] = section,
             });
         }
-        if (_members.Count > 0 || _trees.Count > 0)
+        if (_members.Count > 0 || _trees.Count > 0 || _folderMoves.Count > 0)
         {
             MakeAsOps(changes, recomputes);
             return;
@@ -439,11 +518,12 @@ internal sealed class UndoActionStep
     {
         var ops = new JsonArray();
         var blobs = new List<byte[]>();
-        int index = 0;
-        foreach (string path in _order)
+        // Every folder move first: each edit inside it, named at its new
+        // place, comes after it and is carried by it (W8b-15a; the mac's
+        // makeAsOps, opKinds.wholeOps' order).
+        foreach (JsonObject move in RecordableFolderMoves()!) ops.Add(move);
+        foreach ((string path, UndoFileChange change) in InTheStepsOrder(changes))
         {
-            if (Same(_before[path], _after[path])) continue;
-            UndoFileChange change = changes[index++];
             if (_members.TryGetValue(path, out IReadOnlyList<UndoMemberChange>? members))
             {
                 foreach (UndoMemberChange member in members) ops.Add(member.Op(change.RelativePath));
@@ -468,7 +548,7 @@ internal sealed class UndoActionStep
         var draft = new UndoOpsDraft
         {
             ActionKey = _maker.ActionKey,
-            ActionArguments = new Dictionary<string, string>(StringComparer.Ordinal) { ["pageCount"] = (changes.Count + _trees.Count).ToString(System.Globalization.CultureInfo.InvariantCulture) },
+            ActionArguments = new Dictionary<string, string>(StringComparer.Ordinal) { ["pageCount"] = (changes.Count + _trees.Count + _folderMoves.Count).ToString(System.Globalization.CultureInfo.InvariantCulture) },
             MadeBy = _maker.MadeBy,
             WorkingFolder = _root!,
             Course = _course,
@@ -498,6 +578,35 @@ internal sealed class UndoActionStep
             return;
         }
         Answer(outcome, keptBefore);
+    }
+
+    /// <summary>
+    /// Each changed file with its change. In the order first planned; in a
+    /// step that moves a folder (W8b-15a), the files planned whole in the one
+    /// page order (<see cref="ComparePageOrder"/>, never the directory's or
+    /// the plan's), then the files planned member by member in the order
+    /// planned.
+    /// </summary>
+    private List<(string Path, UndoFileChange Change)> InTheStepsOrder(List<UndoFileChange> changes)
+    {
+        var planned = new List<(string Path, UndoFileChange Change)>();
+        int index = 0;
+        foreach (string path in _order)
+        {
+            if (Same(_before[path], _after[path])) continue;
+            planned.Add((path, changes[index++]));
+        }
+        if (_folderMoves.Count == 0) return planned;
+        var pages = new List<(string Path, UndoFileChange Change)>();
+        var memberFiles = new List<(string Path, UndoFileChange Change)>();
+        foreach ((string path, UndoFileChange change) in planned)
+        {
+            if (_members.ContainsKey(path)) memberFiles.Add((path, change));
+            else pages.Add((path, change));
+        }
+        pages.Sort((first, second) => ComparePageOrder(first.Change.RelativePath, second.Change.RelativePath));
+        pages.AddRange(memberFiles);
+        return pages;
     }
 
     /// <summary>What the door's outcome means for the action: nothing more to do, or the refusal it throws.</summary>
@@ -539,7 +648,7 @@ internal sealed class UndoActionStep
         {
             if (Same(_before[path], _after[path])) continue;
             if (RelativeOf(path) is not { } relative || !UndoPlaces.StaysInside(_root, relative)) return null;
-            if (UndoLinks.Look(path) is UndoLinks.What.Link or UndoLinks.What.CannotLook) return null;
+            if (UndoLinks.Look(PlaceOnDiskNow(path)) is UndoLinks.What.Link or UndoLinks.What.CannotLook) return null;
             changes.Add(new UndoFileChange(relative, _before[path], _after[path]));
         }
         foreach ((string full, _) in _frontPages)
@@ -560,9 +669,27 @@ internal sealed class UndoActionStep
     private void WritePlainlyQuietly()
     {
         var targets = new List<UndoSwapTarget>();
+        // Each folder moved first, by the swap's own rename (MoveFileEx,
+        // never replacing, its listing judged again just before), never
+        // Directory.Move (W8b-15a). Named by full paths: no working folder is
+        // there to name them inside.
+        foreach ((string fromFull, string toFull, string listingSha) in _folderMoves)
+        {
+            string from = Slashed(fromFull);
+            string to = Slashed(toFull);
+            UndoOp move = UndoLineOps.Read(new JsonObject { ["kind"] = UndoOp.Move, ["from"] = from, ["to"] = to, ["listingSha"] = listingSha });
+            targets.Add(new UndoSwapTarget(toFull, to, null, null) { Change = new UndoSwapChange.MoveHere(fromFull, from, move) });
+        }
         foreach (string path in _order)
         {
             if (Same(_before[path], _after[path])) continue;
+            // A file inside a moved folder is written at its new place,
+            // staged only once the move has made it there (#899 W8-2).
+            if (!string.Equals(PlaceOnDiskNow(path), path, StringComparison.OrdinalIgnoreCase))
+            {
+                targets.Add(new UndoSwapTarget(path, Slashed(path), _before[path], _after[path]) { StagesAtItsTurn = true });
+                continue;
+            }
             // A link is written through, as File.WriteAllText wrote it: the
             // swap goes in at the file it leads to. A link the step REMOVES
             // (a rename of a linked page, #899 W7b2-1) is the link itself, as
