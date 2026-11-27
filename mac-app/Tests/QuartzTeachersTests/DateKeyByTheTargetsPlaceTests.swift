@@ -559,4 +559,114 @@ final class DateKeyByTheTargetsPlaceTests: XCTestCase {
 
         XCTAssertEqual(ClassPages.dateKey(ofPageAt: place, forSection: 1, in: made.course), "createdSection1")
     }
+
+    // MARK: - Tests: fix round two
+
+    /// Review 2, MEDIUM 1: a shared lesson that only an UNNUMBERED page of
+    /// the class folder leads to is not claimed by any class, so a class
+    /// that brings it still dates it. MUST FAIL on 00b52ec19, which claimed
+    /// every class-folder page's file and left the lesson on the 20th.
+    func testReDateStillDatesALessonOnlyAnUnnumberedLinkLeadsTo() throws {
+        let made = try makeCourse()
+        let file: URL = made.course.directoryURL.appendingPathComponent("elsewhere/Shared.md")
+        try sharedLesson(section1: "2026-09-20").write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            atPath: made.classes.appendingPathComponent("Overview.md").path,
+            withDestinationPath: "../../elsewhere/Shared.md"
+        )
+        try "---\ntitle: Unit 1, Day 3\npublish: true\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nReview [[Shared]]\n"
+            .write(to: made.classes.appendingPathComponent("Unit 1, Day 3.md"), atomically: true, encoding: .utf8)
+
+        try reDate(in: made)
+
+        let after: String = try String(contentsOf: file, encoding: .utf8)
+        XCTAssertTrue(after.contains("createdSection1: 2026-09-14T"), "Day 3's day: \(after)")
+    }
+
+    /// Review 2, MEDIUM 1 and LOW 2, the year-round step: a plain page kept
+    /// in the class folder with no unit and day, named by Key Links, still
+    /// goes to the first day. MUST FAIL on 00b52ec19.
+    func testReDateStillDatesAYearRoundPageKeptInTheClassFolder() throws {
+        let made = try makeCourse()
+        let outline: URL = made.classes.appendingPathComponent("Course Outline.md")
+        try "---\ntitle: Course Outline\npublish: true\ncreated: 2026-09-20T07:00:00.000-0400\n---\n\nOutline.\n"
+            .write(to: outline, atomically: true, encoding: .utf8)
+        try "---\ntitle: Key Links\npublish: true\n---\n\n- [[Course Outline]]\n"
+            .write(to: made.course.directoryURL.appendingPathComponent("section1/Key Links.md"), atomically: true, encoding: .utf8)
+
+        try reDate(in: made)
+
+        let after: String = try String(contentsOf: outline, encoding: .utf8)
+        XCTAssertTrue(after.contains("created: 2026-09-08T"), "the first day: \(after)")
+    }
+
+    /// Review 2, MEDIUM 1, publishing: the same unnumbered link does not
+    /// stop publishing Day 3 from dating the lesson it brings. MUST FAIL on
+    /// 00b52ec19.
+    func testPublishingStillDatesALessonOnlyAnUnnumberedLinkLeadsTo() throws {
+        let made = try makeCourse()
+        let file: URL = made.course.directoryURL.appendingPathComponent("elsewhere/Shared.md")
+        try "---\ntitle: Shared lesson\npublish: false\ncreatedSection1: 2026-09-20T07:00:00.000-0400\n---\n\nShared.\n"
+            .write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            atPath: made.classes.appendingPathComponent("Overview.md").path,
+            withDestinationPath: "../../elsewhere/Shared.md"
+        )
+        try "---\ntitle: Unit 1, Day 3\npublish: false\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nReview [[Shared]]\n"
+            .write(to: made.classes.appendingPathComponent("Unit 1, Day 3.md"), atomically: true, encoding: .utf8)
+
+        let graph: AssistSectionGraph = AssistSectionGraph.read(forSection: 1, in: made.course, workspaceURL: nil)
+        let plan: AssistPublishPlan = AssistPublishPlanner.planPublishing(
+            titles: ["Unit 1, Day 3"], onOrAfter: nil, before: nil, graph: graph,
+            classPages: ClassPages.list(forSection: 1, in: made.course), forSection: 1, in: made.course
+        )
+        _ = try AssistPublishPlanner.apply(plan, forSection: 1, in: made.course)
+
+        XCTAssertTrue(try String(contentsOf: file, encoding: .utf8).contains("createdSection1: 2026-09-14T"))
+    }
+
+    /// The chain: Unit 1, Day 2 is a link to Unit 1, Day 5, which is a link
+    /// to the shared lesson. Day 5 owns the lesson; Day 2 writes nothing
+    /// through Day 5 (#899 U4b3).
+    func makeTheChain(lessonOn day: String) throws -> (made: (root: URL, course: Course, classes: URL), file: URL) {
+        let made = try makeCourse()
+        try "---\ntitle: Unit 1, Day 4\npublish: true\ncreated: 2026-09-16T07:00:00.000-0400\n---\n\nFour.\n"
+            .write(to: made.classes.appendingPathComponent("Unit 1, Day 4.md"), atomically: true, encoding: .utf8)
+        let file: URL = made.course.directoryURL.appendingPathComponent("elsewhere/Shared.md")
+        try sharedLesson(section1: day).write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            atPath: made.classes.appendingPathComponent("Unit 1, Day 5.md").path,
+            withDestinationPath: "../../elsewhere/Shared.md"
+        )
+        let dayTwo: URL = made.classes.appendingPathComponent("Unit 1, Day 2.md")
+        try FileManager.default.removeItem(at: dayTwo)
+        try FileManager.default.createSymbolicLink(atPath: dayTwo.path, withDestinationPath: "Unit 1, Day 5.md")
+        return (made: made, file: file)
+    }
+
+    /// The chain, the lesson already on Day 5's day (the 18th): Day 2 must
+    /// not write its own day through Day 5. MUST FAIL with the rule's own
+    /// check of the class's reach removed (`isTheFirstClassLeadingToItsFile`,
+    /// the `reachOfALinkedClass` of `classPage` itself).
+    func testTheChainDayTwoWritesNothingThroughDayFive() throws {
+        let chain = try makeTheChain(lessonOn: "2026-09-18")
+        let laid: String = try String(contentsOf: chain.file, encoding: .utf8)
+
+        try reDate(in: chain.made)
+
+        XCTAssertEqual(try String(contentsOf: chain.file, encoding: .utf8), laid)
+    }
+
+    /// The chain, the lesson on another day: Day 5 moves it to its own day,
+    /// the 18th. MUST FAIL with the loop's check of an earlier class's reach
+    /// removed (an earlier class leading to the same file always owning it),
+    /// where nobody dates the lesson.
+    func testTheChainDayFiveOwnsTheLesson() throws {
+        let chain = try makeTheChain(lessonOn: "2026-09-30")
+
+        try reDate(in: chain.made)
+
+        let after: String = try String(contentsOf: chain.file, encoding: .utf8)
+        XCTAssertTrue(after.contains("createdSection1: 2026-09-18T"), "Day 5's day: \(after)")
+    }
 }
