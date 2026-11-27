@@ -218,8 +218,10 @@ public sealed class UndoSaveCourseSettingsStepTests : IDisposable
 
         Assert.Equal(4, races);
         Assert.Equal(UndoRefusalKind.ChangedSince, refused.Refusal.Kind);
-        // The sheet shows "Could not save: " and this sentence, a teacher's.
+        // The trail keeps this sentence; the sheet's line names no file
+        // (#899 W8c-1b, the mac's LOW A2: it is the settings file every time).
         Assert.Equal("“course_config.json” was changed by another program while it was being saved.", refused.Message);
+        Assert.Equal("Could not save: " + SettingPutBack.NamingNoFile, CourseConfiguration.SaveFailureLine(refused));
         Assert.Equal("[\"Race 4\"]", OnDisk()["hidden"]!.ToJsonString());
         Assert.True(course.Configuration.HasUnsavedChanges);
         Assert.Equal(new List<string> { "Media" }, course.Configuration.HiddenItems);
