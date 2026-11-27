@@ -212,11 +212,27 @@ public static class SpecialNames
     public const string RenameDone =
         "“{old}” is now “{new}”.";
 
-    /// <summary>STUB (tests first, #899 W8b-18b).</summary>
-    public const string RenameFolderNothingWasChanged = "";
-    public const string RenameFolderStoppedPartWay = "";
-    public const string RenameFolderRenamedOnlyInPart = "";
-    public const string RenameFolderMayBeRenamedInPart = "";
+    /// <summary>
+    /// A rename refused with nothing changed: <c>shared-rules.json</c> →
+    /// <c>undo.wording.renameFolderNothingWasChanged</c>, carries {old} and
+    /// {said}. This and the three part-way sentences below are pinned to
+    /// the contract by key (<c>SpecialFolderRenamerTests.TheRenameSentencesAreTheContractsOwnByKey</c>;
+    /// #899 W8b-18b).
+    /// </summary>
+    public const string RenameFolderNothingWasChanged =
+        "“{old}” was not renamed, and nothing was changed: {said}";
+
+    /// <summary><c>undo.wording.renameFolderStoppedPartWay</c>: part way, no folder at the new name. Carries {old} and {said}.</summary>
+    public const string RenameFolderStoppedPartWay =
+        "“{old}” was not renamed, and Plantoir could not put everything back as it was: {said}";
+
+    /// <summary><c>undo.wording.renameFolderRenamedOnlyInPart</c>: part way, this rename's folders named at the new name. Carries {old}, {new}, {places} and {said}.</summary>
+    public const string RenameFolderRenamedOnlyInPart =
+        "“{old}” was renamed only in part, and Plantoir could not put everything back as it was. Still called “{new}”: {places}. {said}";
+
+    /// <summary><c>undo.wording.renameFolderMayBeRenamedInPart</c>: part way, none known at the new name but some it could not tell. Carries {old}, {new}, {places} and {said}.</summary>
+    public const string RenameFolderMayBeRenamedInPart =
+        "“{old}” may have been renamed only in part, and Plantoir could not put everything back as it was. Plantoir could not tell whether this rename left these called “{new}”: {places}. {said}";
 
     public const string RenameRelinkedOne =
         "One page had links pointing into it, and they now point at the new name.";

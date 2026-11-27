@@ -431,14 +431,19 @@ public static class SpecialFolderRenamer
                                           section: null, holds: "course", undo: undo, door: door);
             int relinked;
             CourseConfiguration.PlannedRecord? plannedSettings = null;
+            // Each move's destination, and whether it moves a link: what a
+            // part-way ending counts as this run's (W8b-18b).
+            var planned = new List<(string To, bool IsALink)>();
             try
             {
                 foreach (var move in moves)
                 {
                     // A place that is a link is renamed by moving the LINK
                     // (W8b-21, ruling 1 of #899): never what it leads to.
-                    if (UndoLinks.Look(move.From) == UndoLinks.What.Link) step.MoveLink(move.From, move.To);
+                    bool isALink = UndoLinks.Look(move.From) == UndoLinks.What.Link;
+                    if (isALink) step.MoveLink(move.From, move.To);
                     else step.MoveFolder(move.From, move.To);
+                    planned.Add((move.To, isALink));
                 }
                 relinked = PlanRelinkedPages(step, courseDirectory, oldName, newName, moves);
                 if (settings is not null) plannedSettings = settings.Configuration.PlanRecordOnDisk(settings.Change, settings.Path, step);
@@ -446,7 +451,7 @@ public static class SpecialFolderRenamer
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
             {
                 // Only planning: nothing was written.
-                throw new RenameException(error.Message);
+                throw new RenameException(NothingWasChanged(oldName, error.Message));
             }
 
             if (moves.Count > 0) record.RenameIsStarting(moves, sectionNumbers);
@@ -461,13 +466,21 @@ public static class SpecialFolderRenamer
             catch (UndoStepLeftPartWayException partWay)
             {
                 // Part way: this run's record kept, so the rename can be
-                // recognised and finished (InterruptedRenameTarget).
-                throw new RenameException(partWay.Message);
+                // recognised and finished (InterruptedRenameTarget). Said as
+                // the disk is, on the sheet and on the trail (the mac's
+                // partWayEnding, W8b-18b): a place is "still called" the new
+                // name only when it is this rename's AND the disk shows it.
+                var left = FoldersAtTheirNewName(oldName, newName, scope, courseDirectory, sectionNumbers, planned, record.EarlierNote);
+                var ending = PartWayEnding(oldName, newName, course, scope, left, partWay.KeptOriginals.Count, partWay.Message);
+                Scripting.ActivityTrail.Note(Scripting.ActivityTrail.Event.FolderRenamed, ending.Line);
+                throw new RenameException(ending.Sentence);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
+                // A refusal (the door's UndoStepRefusedException is one) or
+                // the system's error: nothing was changed.
                 record.NothingWasChanged();
-                throw new RenameException(error.Message);
+                throw new RenameException(NothingWasChanged(oldName, error.Message));
             }
             // Anything else (a test's kill point, as a process that died
             // there) leaves this run's record, as the mac's stoppedByATest.
@@ -624,14 +637,30 @@ public static class SpecialFolderRenamer
     /// </summary>
     internal static UndoLinks.What WhatIsAt(string path, bool spelledExactly) => WhatIsAt(path, spelledExactly, out _);
 
-    /// <summary>STUB (tests first, #899 W8b-18b).</summary>
+    /// <summary>
+    /// Tests only: a place whose look the system refuses, with the sentence
+    /// it refuses with (null: looked at as usual). Asked by
+    /// <see cref="WhatIsAt(string, bool, out string?)"/> alone, so a test can
+    /// show a check that fails for a reason other than "no such file" on a
+    /// machine whose account reads past a deny rule. Null in the app.
+    /// </summary>
     internal static Func<string, string?>? LookingAtAPlaceFails;
 
-    /// <summary>STUB (tests first, #899 W8b-18b).</summary>
+    /// <summary>
+    /// <see cref="WhatIsAt(string, bool)"/>, keeping what the system said
+    /// when it is <see cref="UndoLinks.What.CannotLook"/> (the mac's
+    /// <c>presence</c>'s <c>.unreadable(said)</c>; #899 W8b-18b): the look
+    /// refused (<see cref="UndoLinks.Look(string, out string?)"/>) or the
+    /// folder's listing failed. Only "no such file" is nothing there.
+    /// </summary>
     internal static UndoLinks.What WhatIsAt(string path, bool spelledExactly, out string? said)
     {
-        said = null;
-        var what = UndoLinks.Look(path);
+        if (LookingAtAPlaceFails?.Invoke(path) is { } refused)
+        {
+            said = refused;
+            return UndoLinks.What.CannotLook;
+        }
+        var what = UndoLinks.Look(path, out said);
         if (!spelledExactly || what == UndoLinks.What.Nothing || what == UndoLinks.What.CannotLook) return what;
         string name = Path.GetFileName(path);
         try
@@ -640,31 +669,159 @@ public static class SpecialFolderRenamer
                 if (string.Equals(Path.GetFileName(entry), name, StringComparison.Ordinal)) return what;
             return UndoLinks.What.Nothing;
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return UndoLinks.What.CannotLook; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            said = error.Message;
+            return UndoLinks.What.CannotLook;
+        }
     }
 
     // ---- A rename stopped part way (#899 W8b-18b) ---------------------------------
 
-    /// <summary>STUB (tests first).</summary>
+    /// <summary>What a rename stopped part way left at the new name (the mac's <c>LeftAtTheNewName</c>).</summary>
     internal sealed class LeftAtTheNewName
     {
+        // ---- Stored properties -------------------------------------------------------
+
+        /// <summary>This rename's folders at the new name now, by place inside the course.</summary>
         internal List<string> Places { get; } = new();
+
+        /// <summary>This rename's places the disk could not be read at, each as "place (what the system said)": told, never guessed at.</summary>
         internal List<string> Unreadable { get; } = new();
+
+        /// <summary>Places at the new name this rename cannot tell are its own (an earlier run may have moved them, or a link this run did not move): told, never named as still called the new name.</summary>
         internal List<string> CannotTellWhose { get; } = new();
+
+        /// <summary>Every place in <see cref="Unreadable"/> and <see cref="CannotTellWhose"/>, bare, as the sheet names them when nothing is known to be at the new name.</summary>
         internal List<string> CannotTell { get; } = new();
     }
 
-    /// <summary>STUB (tests first).</summary>
+    /// <summary>
+    /// This rename's folders that are at the new name now, by place inside the
+    /// course (the mac's <c>foldersAtTheirNewName</c>, U4b2-5 and U4b2-6).
+    ///
+    /// <para><b>A place counts only if it BELONGS to this rename AND the disk
+    /// SHOWS it at the new name.</b> Belongs: the destination of one of this
+    /// run's <paramref name="planned"/> moves, or a place the earlier record of
+    /// this same rename says it moved (<see cref="PlacesMoved"/>). Shows: a
+    /// folder, by a look that never follows a link
+    /// (<see cref="WhatIsAt(string, bool, out string?)"/>); a link only where
+    /// this run moved a link (any other link there is cannot-tell); for a
+    /// capitalisation-only rename, only when the folder's listing shows the
+    /// new spelling. A place that does not belong is told only when the
+    /// earlier run may have moved it (<see cref="PlacesAnEarlierRunMayHaveMoved"/>),
+    /// as cannot-tell, never named. A look that fails for any reason but "no
+    /// such file" is neither counted nor taken as absent: it is
+    /// <see cref="LeftAtTheNewName.Unreadable"/>, with what the system said.
+    /// Places are compared by the one comparison (<see cref="HoldsThePlace"/>).</para>
+    /// </summary>
     internal static LeftAtTheNewName FoldersAtTheirNewName(string oldName, string newName, FolderScope scope, string courseDirectory,
                                                           IReadOnlyList<int> sectionNumbers, IReadOnlyList<(string To, bool IsALink)> planned,
-                                                          RenameRecordNote? earlierRecord) => new();
+                                                          RenameRecordNote? earlierRecord)
+    {
+        var result = new LeftAtTheNewName();
+        bool onlyCapitalisation = oldName.Equals(newName, StringComparison.OrdinalIgnoreCase);
+        IReadOnlyList<string>? recorded = PlacesMoved(earlierRecord, oldName, newName, scope);
+        List<string> mayHaveMoved = PlacesAnEarlierRunMayHaveMoved(earlierRecord, oldName, newName, scope, courseDirectory, sectionNumbers);
+        foreach (var (place, _) in FolderLocations(newName, scope, courseDirectory, sectionNumbers))
+        {
+            string inside = PlaceInside(place, courseDirectory);
+            bool movedHereThisRun = false;
+            bool movedALinkHere = false;
+            foreach (var (to, isALink) in planned)
+            {
+                if (!HoldsThePlace(new[] { PlaceInside(to, courseDirectory) }, inside)) continue;
+                movedHereThisRun = true;
+                movedALinkHere = isALink;
+            }
+            bool belongs = movedHereThisRun || (recorded is not null && HoldsThePlace(recorded, inside));
+            // Neither this rename's nor one an earlier run may have moved: a
+            // folder at the new name all along, never looked at.
+            if (!belongs && !HoldsThePlace(mayHaveMoved, inside)) continue;
+            var what = WhatIsAt(place, onlyCapitalisation, out string? said);
+            if (what == UndoLinks.What.CannotLook)
+            {
+                result.Unreadable.Add(inside + " (" + said + ")");
+                result.CannotTell.Add(inside);
+                continue;
+            }
+            if (what != UndoLinks.What.Folder && what != UndoLinks.What.Link) continue;
+            if (belongs && (what == UndoLinks.What.Folder || movedALinkHere))
+            {
+                result.Places.Add(inside);
+                continue;
+            }
+            // A link at a place this run did not move a link to, or a place
+            // an earlier run may have moved: told, never counted (the mac's
+            // U4b2-15, U4b2-6).
+            result.CannotTellWhose.Add(inside);
+            result.CannotTell.Add(inside);
+        }
+        return result;
+    }
 
-    /// <summary>STUB (tests first).</summary>
+    /// <summary>
+    /// The trail line (<c>folder renamed</c>) and the sentence of a rename's
+    /// step stopped part way, from what it left at the new name (the mac's
+    /// <c>partWayEnding</c>): with any place named, "renamed … only in part"
+    /// and <c>undo.wording.renameFolderRenamedOnlyInPart</c>; with none named
+    /// but any unreadable or cannot-tell place, "may have renamed … only in
+    /// part" and <c>renameFolderMayBeRenamedInPart</c> (its places those,
+    /// bare); otherwise "did not rename" and <c>renameFolderStoppedPartWay</c>.
+    /// <paramref name="said"/> is the door's part-way sentence, naming each
+    /// file kept beside its page.
+    /// </summary>
     internal static (string Line, string Sentence) PartWayEnding(string oldName, string newName, string course, FolderScope scope,
-                                                                 LeftAtTheNewName left, int keptBeside, string said) => ("", said);
+                                                                 LeftAtTheNewName left, int keptBeside, string said)
+    {
+        string key = ConfigurationKey(scope);
+        if (left.Places.Count > 0)
+        {
+            string line = "renamed the folder " + oldName + " to " + newName + " in " + course
+                + " only in part, and could not put everything back (" + key
+                + ", still called " + newName + ": " + string.Join(", ", left.Places) + "; " + KeptBesideWords(keptBeside)
+                + CouldNotTellWords(left.Unreadable) + CouldNotTellWhoseWords(left.CannotTellWhose) + ")";
+            string sentence = SpecialNames.RenameFolderRenamedOnlyInPart
+                .Replace("{old}", oldName).Replace("{new}", newName).Replace("{places}", Quoted(left.Places)).Replace("{said}", said);
+            return (line, sentence);
+        }
+        if (left.CannotTell.Count > 0)
+        {
+            string line = "may have renamed the folder " + oldName + " to " + newName + " in " + course
+                + " only in part, and could not put everything back (" + key + ", " + KeptBesideWords(keptBeside)
+                + CouldNotTellWords(left.Unreadable) + CouldNotTellWhoseWords(left.CannotTellWhose) + ")";
+            string sentence = SpecialNames.RenameFolderMayBeRenamedInPart
+                .Replace("{old}", oldName).Replace("{new}", newName).Replace("{places}", Quoted(left.CannotTell)).Replace("{said}", said);
+            return (line, sentence);
+        }
+        string stopped = "did not rename the folder " + oldName + " to " + newName + " in " + course
+            + ", and could not put everything back (" + key + ", " + KeptBesideWords(keptBeside) + ")";
+        return (stopped, SpecialNames.RenameFolderStoppedPartWay.Replace("{old}", oldName).Replace("{said}", said));
+    }
 
-    /// <summary>STUB (tests first).</summary>
-    internal static string NothingWasChanged(string oldName, string said) => said;
+    /// <summary>A rename refused with nothing changed (<c>undo.wording.renameFolderNothingWasChanged</c>), around what the door or the system said.</summary>
+    internal static string NothingWasChanged(string oldName, string said) =>
+        SpecialNames.RenameFolderNothingWasChanged.Replace("{old}", oldName).Replace("{said}", said);
+
+    /// <summary>How many files were kept beside their pages, as the trail says it (the mac's <c>keptBesideWords</c>).</summary>
+    private static string KeptBesideWords(int count) =>
+        count == 1 ? "1 file kept beside its page" : count + " files kept beside their pages";
+
+    /// <summary>The trail's clause for places that could not be read, or nothing (the mac's <c>couldNotTellWords</c>).</summary>
+    private static string CouldNotTellWords(IReadOnlyList<string> unreadable) =>
+        unreadable.Count == 0 ? "" : "; could not tell whether these are at the new name: " + string.Join(", ", unreadable);
+
+    /// <summary>The trail's clause for places this rename cannot tell it moved, or nothing (the mac's <c>couldNotTellWhoseWords</c>).</summary>
+    private static string CouldNotTellWhoseWords(IReadOnlyList<string> cannotTellWhose) =>
+        cannotTellWhose.Count == 0 ? "" : "; could not tell whether this rename moved these: " + string.Join(", ", cannotTellWhose);
+
+    /// <summary>Each place in curly quotes, joined by ", ", as the sheet's sentences name them.</summary>
+    private static string Quoted(IReadOnlyList<string> places)
+    {
+        var quoted = new List<string>();
+        foreach (string place in places) quoted.Add("“" + place + "”");
+        return string.Join(", ", quoted);
+    }
 
     /// <summary>What the teacher is told afterwards: what moved, and what else changed.</summary>
     public static string DoneMessage(string oldName, string newName, int relinked)
@@ -994,22 +1151,6 @@ public static class SpecialFolderRenamer
     }
 
     /// <summary>
-    /// The sentence describing a rename that got part of the way and then
-    /// stopped.
-    ///
-    /// <para>The SHAPE is the point: the count that moved, and the section that
-    /// stopped it. A bare exception here leaves a teacher with a course renamed
-    /// in two sections out of four and no idea which — and a folder half
-    /// renamed is not something they can put right without being told where to
-    /// look.</para>
-    /// </summary>
-    public static string HalfFailureMessage(int moved, int total, string name, int? section, string reason)
-    {
-        string where = section is int number ? $"the one in section{number}" : "the one at the top of the course";
-        return $"Plantoir renamed {moved} of {total} copies of “{name}” and then could not rename {where}: {reason}";
-    }
-
-    /// <summary>
     /// The keys a rename must carry across, from the contract rather than from
     /// memory.
     ///
@@ -1089,6 +1230,11 @@ internal sealed class RenameRecordClaim
         _changesTheSettings = changesTheSettings;
         _earlierRecord = SpecialFolderRenamer.ReadRenameRecordBytes(courseDirectory);
     }
+
+    // ---- Computed properties ---------------------------------------------------------
+
+    /// <summary>The record on disk before this run wrote anything, as read (the mac's <c>earlierRecord</c>), or null when there was none or it is not a record.</summary>
+    internal SpecialFolderRenamer.RenameRecordNote? EarlierNote => SpecialFolderRenamer.ReadRenameRecord(_earlierRecord);
 
     // ---- Functions -------------------------------------------------------------------
 

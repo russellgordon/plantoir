@@ -199,25 +199,6 @@ public class SpecialFolderRenamerTests : IDisposable
         Assert.Null(SpecialFolderRenamer.WhyTheMovesCannotBeMade(moves));
     }
 
-    // ------------------------------------------------------- the half failure
-
-    [Fact]
-    public void AHalfFinishedRenameNamesTheCountAndTheSectionThatStoppedIt()
-    {
-        string message = SpecialFolderRenamer.HalfFailureMessage(2, 4, "Tasks", 3, "the folder is in use");
-        Assert.Contains("2 of 4", message);
-        Assert.Contains("Tasks", message);
-        Assert.Contains("section3", message);
-        Assert.Contains("the folder is in use", message);
-    }
-
-    [Fact]
-    public void ASharedFolderSaysWhereRatherThanNamingASection()
-    {
-        string message = SpecialFolderRenamer.HalfFailureMessage(0, 1, "Curriculum", null, "denied");
-        Assert.DoesNotContain("section", message);
-    }
-
     // ------------------------------------------------------------ the contract
 
     [Fact]
