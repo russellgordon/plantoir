@@ -25,7 +25,7 @@ import Foundation
 /// pruning closes a step it can never settle: partly applied or unknown,
 /// off the list, which is true of a course holding the backup (files the
 /// step never recorded) and of one stopped part way (some backup's, some
-/// its own). A step with files left to judge gets a `setAside` line and
+/// its own). A step with files left to judge gets a `filesReplacedByARestore` line and
 /// stays in flight; recovery then judges only the rest, and closes it
 /// `interrupted` with the files set aside rather than putting it on the
 /// list, since what an Undo would act on was replaced. The earlier steps of
@@ -107,7 +107,7 @@ nonisolated enum UndoRestoreSetAside {
     }
 
     /// The step without the ops that name a file set aside: what recovery
-    /// judges, and the only files it may write (`setAside` lines, #899).
+    /// judges, and the only files it may write (`filesReplacedByARestore` lines, #899).
     static func stepWithout(_ setAside: [String], _ step: UndoStep) -> UndoStep {
         var kept: [UndoOp] = []
         for op in step.ops {
@@ -124,17 +124,24 @@ nonisolated enum UndoRestoreSetAside {
         return reduced
     }
 
+    /// Thrown when the list's lock cannot be had: the restore does not
+    /// start, and nothing has moved (review 2, L3).
+    struct TheListIsBusy: Error, Equatable {}
+
     /// Runs the restore's `swap` holding the list's lock, and once it says
-    /// the restore has replaced files (every move made, or stopped with
-    /// some moved and not all put back), sets aside every step in flight
-    /// whose files are among them, in the same lock, so no recovery can
-    /// judge between the swap and the set-aside and no step can begin in
-    /// between (the review of 2026-11-27, M1 and L1). A swap that moved
+    /// the restore has replaced files (every move made, or stopped part
+    /// way with some moved and not all put back), sets aside every step in
+    /// flight whose files are among them, in the same lock, so no recovery
+    /// can judge between the swap and the set-aside and no step can begin
+    /// in between (the review of 2026-11-27, M1 and L1). A swap that moved
     /// nothing, or put every file back, sets nothing aside: each step stays
-    /// in flight as recovery would have found it. A list that cannot be
-    /// locked never stops the restore: the swap runs, and when it replaced
-    /// files the trail says any change left part way is still open.
-    /// Returns the numbers of the steps it set aside, wholly or in part.
+    /// in flight as recovery would have found it. A lock still held by
+    /// another process after `finishWaitSeconds` stops the restore before
+    /// it starts (`TheListIsBusy`), never a swap with no set-aside (review
+    /// 2, L3). A list that cannot be read or written at all never stops the
+    /// restore, which is how a teacher gets a course back: the swap runs,
+    /// and when it replaced files the trail says any change left part way
+    /// is still open. Returns the numbers of the steps it set aside.
     @discardableResult
     static func swapHoldingTheList(
         inside replaced: [String],
@@ -143,7 +150,7 @@ nonisolated enum UndoRestoreSetAside {
         journal: UndoJournal,
         mode: UndoMode = UndoSwitch.currentMode,
         _ swap: () -> Bool
-    ) -> [Int] {
+    ) throws -> [Int] {
         guard let workingFolderID = FolderIdentityFile.existingIdentifier(forWorkingFolder: workingFolderRoot) else {
             // A folder with no identifier has never had a step made in it.
             _ = swap()
@@ -163,6 +170,8 @@ nonisolated enum UndoRestoreSetAside {
                     )
                 }
             }
+        } catch UndoJournalError.lockBusy where !swapRan {
+            throw TheListIsBusy()
         } catch {
             if !swapRan {
                 replacedFiles = swap()
@@ -174,12 +183,41 @@ nonisolated enum UndoRestoreSetAside {
         return setAside
     }
 
+    /// The settle that finishes a restore found `done` at a later reading
+    /// (`RestoreSettle`, `.finish`): the restore died after its commit and
+    /// before its set-aside line, so the steps in flight in the course are
+    /// set aside now, inside the list's lock, before recovery can judge
+    /// them (review 2, L2). Idempotent: a step already set aside has no
+    /// file newly inside. A settle that puts the course back sets nothing
+    /// aside. A list that cannot be had is said on the trail.
+    static func setAsideAfterASettledRestore(
+        course: String,
+        coursesDirectoryURL: URL,
+        journal: UndoJournal = UndoJournalLocation.standardJournal(),
+        mode: UndoMode = UndoSwitch.currentMode
+    ) {
+        let root: URL = coursesDirectoryURL.deletingLastPathComponent()
+        guard let workingFolderID = FolderIdentityFile.existingIdentifier(forWorkingFolder: root) else {
+            return
+        }
+        do {
+            try journal.withLock(waitingAtMost: UndoSwitch.finishWaitSeconds, inShadow: mode == .shadow) { writer in
+                _ = try setAsideSteps(
+                    inside: ["courses/" + course], workingFolderID: workingFolderID, root: root,
+                    course: course, mode: mode, writer: writer
+                )
+            }
+        } catch {
+            UndoTrailHook.setAsideByARestoreLine?(course, nil, .begin, 0, 0, false)
+        }
+    }
+
     /// Inside the lock: for each step in flight in this working folder that
     /// names a file the restore replaced, those files are set aside. When
     /// that is every file it names (or every one not set aside already),
     /// the step is closed `interrupted`, reason `setAsideByARestore`, with
     /// every file it names, and no clearing (as pruning closes a step it
-    /// can never settle). Otherwise a `setAside` line names the files set
+    /// can never settle). Otherwise a `filesReplacedByARestore` line names the files set
     /// aside, and the step stays in flight for its other files, which
     /// recovery judges as before; it never writes into, or judges the step
     /// by, a file set aside (the director's ruling on M2). Its staged files
@@ -220,7 +258,7 @@ nonisolated enum UndoRestoreSetAside {
                 )
             } else {
                 try writer.append(
-                    UndoEventLine(seq: record.step.seq, event: .setAside, reason: reason, paths: newlyInside)
+                    UndoEventLine(seq: record.step.seq, event: .filesReplacedByARestore, reason: reason, paths: newlyInside)
                 )
             }
             touched.append(record.step.seq)

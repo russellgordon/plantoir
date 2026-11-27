@@ -430,6 +430,7 @@ enum CourseRestorer {
         // did not finish, because it then holds the only copy of what the
         // section had.
         let aside: URL = stagingFolderBesideTheCourses(coursesDirectoryURL)
+        var notPutBack: Int = 0
         let leftOutKept: LeftOutFoldersKept
         do {
             leftOutKept = try swapSectionInPlace(
@@ -439,7 +440,12 @@ enum CourseRestorer {
                 outsideFiles: [],
                 asideURL: aside,
                 hooks: hooks,
-                keepingWhatWasReplaced: nil
+                keepingWhatWasReplaced: nil,
+                thenInsideTheLock: { () in
+                    notPutBack = restorePerSectionKeys(
+                        sectionNumber, inCourseAt: courseURL, from: payload, fromTheMenu: false
+                    ).pagesNotPutBack
+                }
             )
         } catch is WayBackDidNotFinish {
             // The window makes no archive first, so it may not say one is in
@@ -456,9 +462,6 @@ enum CourseRestorer {
         if leftOutKept.everythingMoved {
             removeStaging(aside)
         }
-        let notPutBack: Int = restorePerSectionKeys(
-            sectionNumber, inCourseAt: courseURL, from: payload, fromTheMenu: false
-        ).pagesNotPutBack
         discardBuiltSite(
             forSection: sectionNumber,
             courseCode: item.courseCode,
@@ -620,6 +623,10 @@ enum CourseRestorer {
         /// backup's has moved in: the moment the old code had an EMPTY
         /// section folder.
         case setAside
+        /// Every file is moved in and the section's per-section keys are
+        /// written into the shared pages, still inside the list's lock
+        /// (#899, review 2, L4). Observed only: a throw here is ignored.
+        case perSectionKeysPutBack
     }
 
     /// How a one-section restore moves a file, and what it does at each
@@ -750,6 +757,7 @@ enum CourseRestorer {
         try hooks.reached(.staged)
 
         let aside: URL = staging.appendingPathComponent("as-it-was")
+        var keys: (pagesNotPutBack: Int, pagesNotSaved: Int, pagesMadeSinceHidden: Int) = (0, 0, 0)
         let leftOutKept: LeftOutFoldersKept
         do {
             leftOutKept = try swapSectionInPlace(
@@ -759,7 +767,12 @@ enum CourseRestorer {
                 outsideFiles: OneSectionRestore.filesOutsideTheSection,
                 asideURL: aside,
                 hooks: hooks,
-                keepingWhatWasReplaced: keepingWhatWasReplaced
+                keepingWhatWasReplaced: keepingWhatWasReplaced,
+                thenInsideTheLock: { () in
+                    keys = restorePerSectionKeys(
+                        sectionNumber, inCourseAt: courseURL, from: payload, fromTheMenu: true
+                    )
+                }
             )
         } catch is WayBackDidNotFinish {
             // What the section held is in `aside`, and is kept where a
@@ -775,9 +788,6 @@ enum CourseRestorer {
             keepStaging = true
         }
 
-        let keys: (pagesNotPutBack: Int, pagesNotSaved: Int, pagesMadeSinceHidden: Int) = restorePerSectionKeys(
-            sectionNumber, inCourseAt: courseURL, from: payload, fromTheMenu: true
-        )
         discardBuiltSiteKeepingItsWebsiteMarker(
             forSection: sectionNumber,
             courseURL: courseURL,
@@ -821,7 +831,8 @@ enum CourseRestorer {
         outsideFiles: [OneSectionRestore.OutsideFile],
         asideURL: URL,
         hooks: SectionSwapHooks,
-        keepingWhatWasReplaced: ((URL) -> Void)?
+        keepingWhatWasReplaced: ((URL) -> Void)?,
+        thenInsideTheLock: () -> Void
     ) throws -> LeftOutFoldersKept {
         let fileManager: FileManager = FileManager.default
         let folderName: String = "section\(sectionNumber)"
@@ -844,7 +855,8 @@ enum CourseRestorer {
             replacedPlaces.append("courses/" + courseCode + "/" + file.path(forSection: sectionNumber))
         }
         var swapError: Error? = nil
-        UndoRestoreSetAside.swapHoldingTheList(
+        do {
+        try UndoRestoreSetAside.swapHoldingTheList(
             inside: replacedPlaces, workingFolderRoot: courseURL.deletingLastPathComponent().deletingLastPathComponent(),
             course: courseCode, journal: UndoJournalLocation.standardJournal()
         ) { () -> Bool in
@@ -854,6 +866,10 @@ enum CourseRestorer {
                     liveSectionURL: liveSectionURL, backedUpSectionURL: backedUpSectionURL,
                     asideSectionURL: asideSectionURL, asideOutsideURL: asideOutsideURL, hooks: hooks
                 )
+                // The shared pages' keys for this section, inside the same
+                // lock, so no recovery judges them half written (L4).
+                thenInsideTheLock()
+                try? hooks.reached(.perSectionKeysPutBack)
                 return true
             } catch let stoppedPartWay as WayBackDidNotFinish {
                 swapError = stoppedPartWay
@@ -862,6 +878,10 @@ enum CourseRestorer {
                 swapError = error
                 return false
             }
+        }
+        } catch is UndoRestoreSetAside.TheListIsBusy {
+            // Nothing moved: the section is as it was (review 2, L3).
+            throw Problem.sectionLeftAsItWas(sectionNumber, RestoreSwap.listBusyReason)
         }
         if let swapError {
             throw swapError

@@ -101,7 +101,7 @@ nonisolated struct UndoStepRecord: Equatable, Sendable {
     /// holds, kept while the step is on the list.
     var referencedBlobs: [String] = []
 
-    /// Files a restore replaced while it was in flight (`setAside` lines,
+    /// Files a restore replaced while it was in flight (`filesReplacedByARestore` lines,
     /// #899): never judged or written by recovery.
     var setAsidePaths: [String] = []
 
@@ -338,7 +338,7 @@ nonisolated struct UndoFold: Equatable, Sendable {
             ignoredEvents += 1
             return
         }
-        if kind == .setAside {
+        if kind == .filesReplacedByARestore {
             // No move: files set aside while it is in flight; ignored
             // otherwise, as any event that does not follow.
             if !record.phase.isInFlight {
@@ -417,7 +417,7 @@ nonisolated struct UndoFold: Equatable, Sendable {
     /// follow (and is ignored).
     static func phase(after current: UndoStepPhase, on kind: UndoEventKind, phase: String?) -> UndoStepPhase? {
         switch kind {
-        case .begin, .cleared, .note, .setAside:
+        case .begin, .cleared, .note, .filesReplacedByARestore:
             return nil
         case .applied:
             return current == .begun ? .done : nil

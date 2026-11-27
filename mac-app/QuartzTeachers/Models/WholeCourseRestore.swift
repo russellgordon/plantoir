@@ -379,8 +379,8 @@ enum WholeCourseRestore {
         // Archived, the Get Ready sheet's Restore Course) sets aside the
         // Undo steps left in flight in the course once it has replaced its
         // files, in the list's lock held across the swap (#899).
-        context.holdingTheListAcrossTheSwap = { (swap: () -> Bool) in
-            UndoRestoreSetAside.swapHoldingTheList(
+        context.holdingTheListAcrossTheSwap = { (swap: () -> Bool) throws in
+            try UndoRestoreSetAside.swapHoldingTheList(
                 inside: ["courses/" + courseCode], workingFolderRoot: workingFolderURL,
                 course: courseCode, journal: UndoJournalLocation.standardJournal(), swap
             )

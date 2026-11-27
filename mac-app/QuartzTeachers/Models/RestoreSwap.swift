@@ -227,12 +227,17 @@ nonisolated enum RestoreSwap {
         /// replaced files of the course: every move made, or stopped part
         /// way with some not put back). Undo's door (#899) runs it holding
         /// the list's lock and sets aside the steps in flight whose files
-        /// it replaced, in that lock (`UndoRestoreSetAside`). Other doors
+        /// it replaced, in that lock (`UndoRestoreSetAside`); it throws,
+        /// before the swap starts, when the lock cannot be had. Other doors
         /// just run it.
-        var holdingTheListAcrossTheSwap: (_ swap: () -> Bool) -> Void = { (swap: () -> Bool) in
+        var holdingTheListAcrossTheSwap: (_ swap: () -> Bool) throws -> Void = { (swap: () -> Bool) in
             _ = swap()
         }
     }
+
+    /// Why a restore refused for a busy Undo list was left as it was, in
+    /// `RestoreWholeCourseWording.leftAsItWas` (review 2, L3).
+    static let listBusyReason: String = "another change in Plantoir was still being made"
 
     /// What a restore that did not happen comes to.
     enum Failure: Error, Equatable {
@@ -1135,7 +1140,6 @@ nonisolated enum RestoreSwap {
             throw error
         }
 
-        context.justBeforeTheSwap()
         let writtenAfter: Date? = writtenAfterMoment(of: record)
         let newcomersURL: URL = staging.appendingPathComponent(newcomersName)
         // The swap and, when it stops, its way back run together inside
@@ -1145,7 +1149,11 @@ nonisolated enum RestoreSwap {
         var stoppedBy: SwapStopped? = nil
         var otherError: Error? = nil
         var wayBackTaken: WayBack? = nil
-        context.holdingTheListAcrossTheSwap { () -> Bool in
+        do {
+            try context.holdingTheListAcrossTheSwap { () -> Bool in
+            // Inside the lock, so a restore refused for a busy list has done
+            // nothing at all (review 2, L3).
+            context.justBeforeTheSwap()
             do {
                 try swap(moves, coursesDirectoryURL: coursesDirectoryURL, hooks: hooks)
                 // The commit, written before the steps are set aside.
@@ -1178,6 +1186,15 @@ nonisolated enum RestoreSwap {
                 otherError = error
                 return false
             }
+            }
+        } catch is UndoRestoreSetAside.TheListIsBusy {
+            // The list is held by another change: nothing moved, nothing of
+            // the course was touched, and the existing "left as it was"
+            // sentence is true.
+            removeStaging(staging)
+            throw Failure.leftAsItWas(
+                reason: RestoreSwap.listBusyReason, lockedItem: nil, courseFolderIsLocked: false, newcomersKeptAt: nil
+            )
         }
         if let otherError {
             throw otherError

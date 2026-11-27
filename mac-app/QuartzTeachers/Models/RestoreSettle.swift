@@ -528,6 +528,12 @@ nonisolated enum RestoreSettle {
             guard let record else {
                 return nil
             }
+            // A restore that died after its commit and before its Undo
+            // set-aside: the steps in flight in the course are set aside
+            // first (#899, review 2, L2). A put-back below sets none aside.
+            UndoRestoreSetAside.setAsideAfterASettledRestore(
+                course: record.course, coursesDirectoryURL: coursesDirectoryURL
+            )
             // The record says whether the set-aside copy is kept: a crash
             // between `done` and the keep finishes the keep here (the fix
             // review's I-a: this passed no keep, and the copy was removed).
