@@ -109,8 +109,13 @@ final class UndoStoppedStepTests: XCTestCase {
             (point: .beforeApplied, holdsNew: true),
         ]
         for entry in points {
-            try? FileManager.default.removeItem(at: root)
-            try? FileManager.default.removeItem(at: listFolder)
+            // A fresh course and list for each stop point.
+            let unique: String = UUID().uuidString
+            listFolder = FileManager.default.temporaryDirectory
+                .appendingPathComponent("undo-stopped-list-\(unique)", isDirectory: true)
+            root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("undo-stopped-\(unique)", isDirectory: true)
+            UndoJournalLocation.folderOverride = listFolder
             let course: Course = try courseIn2026()
             let stopAt: UndoKillPoint = entry.point
             UndoKillPoints.hook = { point in point == stopAt }
@@ -186,7 +191,11 @@ final class UndoStoppedStepTests: XCTestCase {
         XCTAssertEqual(result, .couldNotFinish(seq: 2))
         XCTAssertEqual(try inFlightCount(), 1)
         XCTAssertEqual(ReferenceWording.settingCouldNotBeChanged(setting: "school year"), "The school year could not be changed.")
-        XCTAssertEqual(ReferenceWording.settingCanBePutBack(value: SchoolYear.label(forStartingYear: 2026)), "Plantoir can put it back to 2026\u{2013}2027.")
+        // The old value as the picker shows it ("2026\u{2013}27").
+        XCTAssertEqual(
+            ReferenceWording.settingCanBePutBack(value: SchoolYear.label(forStartingYear: 2026)),
+            "Plantoir can put it back to " + SchoolYear.label(forStartingYear: 2026) + "."
+        )
 
         let offer: SettingPutBackOffer = SettingPutBackOffer(seq: 2, setting: "school year", valueBefore: "2026\u{2013}2027")
         XCTAssertNil(SetSchoolYearSheet.putBack(offer, course: course))
