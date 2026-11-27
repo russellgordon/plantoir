@@ -165,7 +165,7 @@ ActivityTrailWiringTests, UndoStoppedStepTests: 37 of 37 green.
 - **M2, per file (the director's ruling).** An op is inside when any file
   it names is under what the restore replaced. A step whose every op is
   inside is closed `interrupted` as before. Otherwise a new journal event
-  `setAside` (reason `setAsideByARestore`, `paths` the files replaced) is
+  `setAside` (renamed `filesReplacedByARestore` in review 2; reason `setAsideByARestore`, `paths` the files replaced) is
   written and the step stays in flight. The fold keeps them in
   `UndoStepRecord.setAsidePaths`. Recovery (`UndoRecovery.settle`, and so
   the at-once judgement) judges only the ops naming none of them, never
@@ -174,7 +174,7 @@ ActivityTrailWiringTests, UndoStoppedStepTests: 37 of 37 green.
   `setAsideByARestore`, naming the files set aside, no clearing: never on
   the list, so Undo and Redo never act on a set-aside file. Changed by hand
   and could-not-put-back endings are unchanged. **Format changed**:
-  `file-formats.json` → `undoJournal.events.setAside`, the moves row, the
+  `file-formats.json` → `undoJournal.events.filesReplacedByARestore` (renamed in review 2), the moves row, the
   `reason` and `paths` keys; `shared-rules.json` mustRecord why; ledger
   reason updated (`Reason899RestoreSetsAsideAStoppedStep`). An event was
   chosen over a note because a reader that does not know it must stop at it
@@ -212,3 +212,59 @@ in b2f9a94b2 (RED on a934b5805: they do not compile there, `setAsidePaths`).
   change left part way is still open (true: nothing was set aside).
 - No number tuned by trial. `origin/dev` merged (already contained).
 - Contract: the events test (`UndoJournalContractTests`) pins the new event.
+
+## Fix round two (review 2: 1 MEDIUM, 5 LOW)
+
+- **M1, Windows held.** The new `folding.moves` row would have turned
+  `UndoFoldMovesContractTests.TheTableIsTheContracts` red. The test now
+  defers rows named in the ledger under a new area `UndoFoldMoves`
+  (`file-formats.json → undoJournal.folding.moves`, keyed
+  `from --on--> to`), the way `SharedRules_ActivityTrailEvents_Exist` defers
+  events, and the ledger holds the one row (`Owed(UndoFoldMoves, 899, V200,
+  Reason899RestoreSetsAsideAStoppedStep, …)`). The count stays 20 of what is
+  compared. **Unbuilt here**: no Windows build or run on this Mac; single
+  quotes only in the new strings.
+- **L5, the name.** The journal event is now `filesReplacedByARestore`, in
+  code (`UndoEventKind`) and contract, so it is never confused with the
+  U3b op kind `setAside`. Unshipped, so nothing migrates.
+- **L1, the lock span proved.** `testTheListsLockIsHeldWhileTheSwapMoves`: a
+  move hook tries the list's lock with no wait and must be refused every
+  time. RED when the swap runs before the lock (R1 below).
+- **L3, no unlocked swap.** A lock still busy after `finishWaitSeconds`
+  throws `UndoRestoreSetAside.TheListIsBusy` before anything is done
+  (`justBeforeTheSwap` now runs inside the lock too). The restore says the
+  existing `leftAsItWas` sentence (whole course: `RestoreWholeCourseWording.leftAsItWas`;
+  one section: `OneSectionRestoreWording.leftAsItWas`) with the reason
+  `RestoreSwap.listBusyReason`, "another change in Plantoir was still being
+  made": new words inside an existing sentence's reason slot, which already
+  carries the file system's words. No contract key is added; if the
+  director wants the reason as a key, it is parked here. A list that cannot
+  be read or written at all (not busy) still lets the restore run, as
+  before, with the trail line: a restore is how a teacher gets a course
+  back.
+- **L2, the crash window closed.** `RestoreSettle`'s `.finish` path (a `done`
+  record found at a later reading) calls `UndoRestoreSetAside.setAsideAfterASettledRestore`
+  inside the list's lock before it finishes; `.putBack` and `.keep` set
+  nothing aside (a stopped restore set aside in its own lock already).
+  Idempotent. Test: a staged `done` record (the state a kill after the commit
+  leaves), the settle, the step `interrupted`, recovery writes nothing.
+  Still owed by order: the settle runs at folder open (`reloadCourses`);
+  whether the MCP process settles before its first recovery was not checked.
+  For U7/U5.
+- **L4, the keys.** The per-section keys are written inside the lock
+  (`swapSectionInPlace`'s `thenInsideTheLock`, both callers), observed at
+  the new `SwapPoint.perSectionKeysPutBack`. Whether keys a restore puts
+  back count as replaced is still for the director (they are judged by
+  content).
+
+### Must-fail, round two (each break on its own, the two set-aside classes)
+
+| Break | RED |
+|---|---|
+| R1 the swap outside the lock | testTheListsLockIsHeldWhileTheSwapMoves, testARestoreThatCannotHaveTheListDoesNotStart, testAOneSectionRestoreWritesItsKeysInsideTheLock |
+| R2 a busy list lets the swap run unlocked | testARestoreThatCannotHaveTheListDoesNotStart |
+| R3 the settle sets nothing aside | testASettleThatFinishesARestoreSetsTheStepAside |
+| R4 the keys written after the lock | testAOneSectionRestoreWritesItsKeysInsideTheLock |
+
+4 of 4 RED. Tests first in e77080809 (RED on 4735571a8: they do not compile
+there, `perSectionKeysPutBack`, `lockFileURL` use aside).
