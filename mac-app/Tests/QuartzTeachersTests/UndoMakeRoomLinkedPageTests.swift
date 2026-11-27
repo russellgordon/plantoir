@@ -1038,6 +1038,10 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         let day4: String = try text("Unit 1, Day 4", in: made)
         XCTAssertTrue(day4.contains("Three.") && day4.contains("title: Unit 1, Day 4"), day4)
         XCTAssertEqual(try text("Unit 1, Day 1", in: made), day4, "the same lesson")
+        // The plan's own date for the renamed page: Day 1's date is read
+        // through its link (the lesson's, 2026-09-14), so the pages it
+        // renames go one meeting later than beside a plain Day 1.
+        XCTAssertTrue(day4.contains("created: 2026-09-18T07:00:00.000-0400"), "its own move's date only: \(day4)")
         XCTAssertEqual(day4.components(separatedBy: "created").count, 2, "dated once, nothing through Day 1: \(day4)")
         let day3: String = try text("Unit 1, Day 3", in: made)
         XCTAssertTrue(day3.contains("Two.") && day3.contains("title: Unit 1, Day 3"), day3)

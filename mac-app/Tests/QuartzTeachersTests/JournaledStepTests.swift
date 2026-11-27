@@ -888,7 +888,7 @@ final class JournaledStepTests: XCTestCase {
             XCTAssertEqual(journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .redone(seq: 1), "\(leads)")
             XCTAssertEqual(try everythingUnder(made.course), after, "\(leads)")
             XCTAssertEqual(stagedNames(under: made.course), [], "\(leads)")
-            XCTAssertEqual(try timesUnder(outside), outsideBefore, "\(leads): something outside was read, written or made")
+            XCTAssertEqual(try timesUnder(outside), outsideBefore, "\(leads): something outside was written or made")
             JournaledStep.modeOverride = nil
         }
     }
@@ -1101,8 +1101,9 @@ final class JournaledStepTests: XCTestCase {
         return URL(fileURLWithPath: text).deletingLastPathComponent()
     }
 
-    /// Every item in a folder by name with its access and modification
-    /// times, read with `lstat` only: nothing made there, read or written.
+    /// Every item in a folder by name with its modification time, size and
+    /// the SHA-256 of its bytes: nothing made there or written there. Never
+    /// its access time (#1054): a scanner moves it on another Mac.
     func timesUnder(_ folder: URL?) throws -> [String: String] {
         var found: [String: String] = [:]
         guard let folder else {
@@ -1111,7 +1112,8 @@ final class JournaledStepTests: XCTestCase {
         for name in try FileManager.default.contentsOfDirectory(atPath: folder.path) {
             var information: stat = stat()
             XCTAssertEqual(lstat(folder.appendingPathComponent(name).path, &information), 0)
-            found[name] = "\(information.st_atimespec.tv_sec).\(information.st_atimespec.tv_nsec) \(information.st_mtimespec.tv_sec).\(information.st_mtimespec.tv_nsec)"
+            found[name] = "\(information.st_mtimespec.tv_sec).\(information.st_mtimespec.tv_nsec) \(information.st_size) "
+                + (UndoHash.sha256(ofOptional: try? Data(contentsOf: folder.appendingPathComponent(name))) ?? "unreadable")
         }
         return found
     }

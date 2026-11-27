@@ -2102,17 +2102,19 @@ final class UndoRelinkTests: XCTestCase {
         return try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
     }
 
-    /// Every file in the folder outside, by name, with its access and
-    /// modification times, read with `lstat` only (this look never opens
-    /// them, so any change of time is the swap's): nothing made there, and
-    /// nothing there read or written.
+    /// Every file in the folder outside, by name, with its modification
+    /// time, size and the SHA-256 of its bytes: nothing made there and
+    /// nothing written there. Never its access time (#1054): a scanner on
+    /// another Mac reads the files and moves it, which says nothing about
+    /// the swap; reading the bytes here moves it too, and is harmless.
     func outsideNow() throws -> [String: String] {
         var found: [String: String] = [:]
         for name in try FileManager.default.contentsOfDirectory(atPath: outside.path) {
             let url: URL = outside.appendingPathComponent(name)
             var information: stat = stat()
             XCTAssertEqual(lstat(url.path, &information), 0)
-            found[name] = "\(information.st_atimespec.tv_sec).\(information.st_atimespec.tv_nsec) \(information.st_mtimespec.tv_sec).\(information.st_mtimespec.tv_nsec)"
+            found[name] = "\(information.st_mtimespec.tv_sec).\(information.st_mtimespec.tv_nsec) \(information.st_size) "
+                + (UndoHash.sha256(ofOptional: try? Data(contentsOf: url)) ?? "unreadable")
         }
         return found
     }
