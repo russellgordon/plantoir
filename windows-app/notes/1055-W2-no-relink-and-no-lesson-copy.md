@@ -9,7 +9,9 @@ lesson where a link cannot be made (21b1a). Nothing a teacher sees changes; no
 Base: `origin/day27c/integration-2` 46fd45e70. `origin/dev` (412053b07) is an
 ancestor of it, so both merges of `origin/dev` (before proving and before
 hand-back) were no-ops: `git merge-base --is-ancestor origin/dev HEAD` true at
-bc6755947 and again at the head handed back.
+bc6755947 and again at the head handed back, where `origin/dev` was
+cc4ee3ab5 (fetched after run `1055-W2-b`; still an ancestor, so nothing came
+in and the classes were not re-run).
 
 ## What was removed, by the commit it came from
 
@@ -112,25 +114,52 @@ before 21b about unit plans, not the removed function.
 ## Tests first
 
 `UndoFormatTests.AStepWithARelinkingMoveIsUnreadable` (bc6755947, on the
-base): not yet seen red: owed (queued in run `1055-W2-a`, `-RedRef bc6755947`).
+base): RED in run `1055-W2-a` (`RED-FAILED ...AStepWithARelinkingMoveIsUnreadable`,
+`Assert.False() Failure`; `UndoFormatTests` 1 failed, 79 passed of 80); green at
+669ea3e3d.
 
 ## Runs (the PC, under `C:\vm-setup\wt-compare.lock`)
 
-OWED. Run `1055-W2-a` (669ea3e3d: red on bc6755947, both builds, the 21 classes named in the brief) was started at 16:52 and is waiting inside its own script for the turn lock, which the director's whole-suite run `int-d27c-3` holds; the script takes the lock, runs, and releases only its own. Run `1055-W2-b` (must-fail and the four harness rows) is copied to `C:\vm-setup\1055-W2-launch-b.ps1` and not started. The writer handed back before either result (told to).
+Hardware: LENOVO 20QES70500, Intel Core i5-8365U @ 1.60GHz, 16 GB, Windows 11 Pro 26200.
+
+- `1055-W2-a` (log `C:\vm-setup\1055-W2-a\run.log`, ref 669ea3e3d, red ref
+  bc6755947), RUN_DONE 2026-11-27 17:12: red as above; `BUILD-APP-EXIT 0`
+  (0 errors, 37 warnings, none new), `BUILD-TESTS-EXIT 0`; the 21 brief classes
+  (`UndoRestoreSetAsideTests` is the W8c-3a class) **911 passed, 0 failed,
+  0 skipped of 911**, 39 s, `UndoWriterScanTests`, `UndoOpKindsContractTests`
+  and `NamedGapLedgerTests` among them (so the restored counts, `UndoOpKinds.cs`
+  11 and `UndoSwap.cs` 26, hold). HEAD-AFTER SAME; LOCK-RELEASED (its own).
+- `1055-W2-b` (log `C:\vm-setup\1055-W2-b\run.log`, ref 669ea3e3d, mode
+  mustfail,kinds), 17:37 to 17:42: the three must-fail rows below, then
+  RESTORED 911 of 911 passed; harness built (exit 0); each harness row run
+  outside OneDrive and inside it (OneDrive running): `w7-plain-kill` 3 of 3,
+  `w7-make-room-kill` 12 of 12, `w8-carrying-move-kill` 36 of 36,
+  `w8b-handover-kill` 36 of 36, failures 0 and every result WHOLE in both
+  places, each exit 0. HEAD-AFTER SAME; LOCK-RELEASED (its own).
 
 ## Must-fail (`vm-tools/guest/1055-W2-mustfail.json`)
 
-Three rows written (the barrier dropped; the tidy removing an only-copy kept original; `KeepPagesWhosePlaceIsTaken` skipped at both calls). Not yet run: owed (`1055-W2-b`).
+All three RED in run `1055-W2-b`, each building (build=0) and failing (test=1):
+
+1. The relink barrier dropped (a move with `linkShaBefore`/`linkShaAfter` and
+   none of `sha`, `listingSha`, `linkSha` read): RED, 1 failed of 80.
+2. The tidy removes a kept original under a staged name that a plain step's
+   verdict keeps (an only copy): RED, 3 failed of 50.
+3. `KeepPagesWhosePlaceIsTaken` skipped (both calls): RED, 2 failed of 10
+   (`UndoKeptPageUnderAVisibleNameTests`, among them
+   `ALinkAtThePlaceLeadingToTheSameBytesIsNeverACopySoThePageIsKeptVisibly`).
+
+3 RED of 3; restored, 911 of 911 passed.
 
 ## Self-check
 
-1. Broke each change and watched a test fail: OWED (must-fail not yet run).
+1. Broke each change and watched a test fail: yes, 3 RED of 3 (run `1055-W2-b`), and test 1 red on the base (run `1055-W2-a`).
 2. No timed waits where an event exists: none added; this piece only removes code.
 3. Every sentence on the failure paths true: no failure sentence added or changed; the relink's were removed with it.
-4. `origin/dev` merged in: yes, both times a no-op (412053b07 is an ancestor of the base).
-5. No number tuned by trial: none; the writer-scan counts are `dcbdb41d5`'s (11 and 26), unproven until the run.
+4. `origin/dev` merged in: yes, both times a no-op (412053b07 before proving, cc4ee3ab5 before hand-back, each an ancestor of the head).
+5. No number tuned by trial: none; the writer-scan counts are `dcbdb41d5`'s (11 and 26), green in run `1055-W2-a` first time.
 6. Contract cases run from the JSON: unchanged; no case retyped.
-11. No held row taught; the one dead ledger comment went. 12. No key added. 13. No new comparison. 14. Run `1055-W2-a` left queued on the PC under its own lock wait (it releases only its own lock); no lock taken or removed by hand.
+11. No held row taught; the one dead ledger comment went. 12. No key added. 13. No new comparison. 14. Both runs finished (RUN_DONE) and each script released only its own lock (owner line `1055-W2 <label>`); no run left going, no lock taken or removed by hand.
 
 ## For documentation 12
 
@@ -142,5 +171,10 @@ staged name as before W8b-21b3. A link's plain move, the handed-over place and
 the kept page under a visible name are untouched (W4, W3, 21c).
 
 ## For the director
+
+For the reviewer: `UndoRecovery.KeptVisibly` was removed although the brief
+listed it as KEEP (its only caller was the relink tidy's
+`GiveBackOrKeepVisibly`; see "Kept, and why"). The finishing round left it
+removed, as told; the kept-page guard's classes are green without it.
 
 Nothing parked.
