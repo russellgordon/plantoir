@@ -1,3 +1,5 @@
+The kept page stays (#1055); its two recovery rows were re-laid on a plain step (#1055 M5, W3).
+
 # #899 W8b-21c: recovery keeps a page it cannot put back under a visible name (2026-11-27)
 
 Branch `issue/899-w8b-21a-handed-over-place`, on 21a5's head 84c7f53be. `origin/dev` 6dc36fcea was already in the branch (`git merge origin/dev`: already up to date, before proving and before handing back).
