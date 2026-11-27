@@ -263,8 +263,12 @@ public sealed partial class AssistWorkspace
     /// F1), so the step names no recompute, as the mac's names none. The
     /// answered file's leftUnticked holds only rows whose OWN tick was off.
     /// </summary>
-    /// <exception cref="AssistRefusal">A deploy is under way; or the step was refused, "Nothing was changed: …", or
-    /// stopped part way, the checklist's part-way sentence (<see cref="LinksChecklistWording.PagesYouTicked"/>).</exception>
+    /// <exception cref="AssistRefusal">A deploy is under way; or the press could not be planned or made, said
+    /// as <see cref="RefusalForAPressThatStopped"/> says it: a page the plan could not read, or a file the door
+    /// could not read just now that really cannot be read, the unreadable-page sentence naming the course; a
+    /// section page changed since it was checked, <c>linksChecklist.wording.pageChangedSince</c>; a step left
+    /// part way, the checklist's part-way sentence (<see cref="LinksChecklistWording.PagesYouTicked"/>);
+    /// anything else, "Nothing was changed: …".</exception>
     public LinksChecklistPublished PublishAndRemember(LinksChecklistSheet sheet)
     {
         var course = Course(sheet.CourseCode);

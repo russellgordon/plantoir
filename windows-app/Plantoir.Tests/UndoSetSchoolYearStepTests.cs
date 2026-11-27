@@ -181,6 +181,47 @@ public sealed class UndoSetSchoolYearStepTests : IDisposable
         Assert.Equal("ICS3U", (string?)written["course_code"]);
     }
 
+    /// <summary>
+    /// W8-11 to 13 review 1, LOW 1: a file planned whole takes as its before
+    /// the bytes the plan was built from, as the mac's
+    /// <c>editJSON(at:read:members:[] leaving: whole)</c> does, never a
+    /// second read of the disk. Bytes another program wrote after the plan's
+    /// read are a change since the plan, refused at the make and kept.
+    /// </summary>
+    [Fact]
+    public void AFilePlannedWholeTakesThePlansOwnReadAsItsBefore()
+    {
+        byte[] planRead = Utf8("this is not JSON {");
+        byte[] theirs = Utf8("written by another program after the plan read the file");
+        byte[] whole = Utf8("{\n  \"course_code\" : \"ICS3U\"\n}\n");
+        File.WriteAllBytes(ConfigPath, theirs);
+        UndoForThisProcess list = List();
+        UndoActionStep step = NewStep(list);
+
+        CourseConfiguration.PlanWhole(step, ConfigPath, new HeldFiles.FileBytes(HeldFiles.ReadOutcome.Read, planRead), whole);
+
+        var planned = Assert.Single(step.ChangedFiles);
+        Assert.Equal(planRead, planned.BeforeBytes);
+        Assert.Throws<UndoStepRefusedException>(step.Make);
+        Assert.Equal(theirs, File.ReadAllBytes(ConfigPath));
+        Assert.Empty(AppliedSteps());
+    }
+
+    /// <summary>A file the plan found not there is planned whole with no before.</summary>
+    [Fact]
+    public void AFileNotThereWhenPlannedIsPlannedWholeWithNoBefore()
+    {
+        byte[] whole = Utf8("{\n  \"course_code\" : \"ICS3U\"\n}\n");
+        UndoActionStep step = NewStep(List());
+
+        CourseConfiguration.PlanWhole(step, ConfigPath, new HeldFiles.FileBytes(HeldFiles.ReadOutcome.NotThere, null), whole);
+
+        var planned = Assert.Single(step.ChangedFiles);
+        Assert.Null(planned.BeforeBytes);
+        step.Make();
+        Assert.Equal(whole, File.ReadAllBytes(ConfigPath));
+    }
+
     public static IEnumerable<object[]> FilesAlreadyFiledUnder2025() =>
     [
         ["{\n  \"course_code\" : \"ICS3U\",\n  \"reference_school_year\" : 2025\n}"],

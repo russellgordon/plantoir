@@ -271,7 +271,9 @@ internal sealed class UndoScribe : IDisposable
     /// is what <see cref="UndoLinks.Look"/> says it is, never the bare
     /// ReparsePoint attribute, which a OneDrive placeholder also carries
     /// (W8-7, the review of pieces 5 and 6, L2): a placeholder folder is
-    /// walked like any other.
+    /// walked like any other. An entry that cannot be looked at fails the
+    /// helper by name, so a folder it cannot read never hides its leftovers
+    /// (the review of pieces 7 and 8, L4).
     /// </summary>
     internal List<string> StagedLeftovers(string folder)
     {
@@ -281,7 +283,9 @@ internal sealed class UndoScribe : IDisposable
             foreach (string entry in Directory.EnumerateFileSystemEntries(place))
             {
                 if (Path.GetFileName(entry).Contains(UndoSwap.StagedMarker, StringComparison.Ordinal)) found.Add(entry);
-                if (UndoLinks.Look(entry) == UndoLinks.What.Folder) Walk(entry);
+                UndoLinks.What what = UndoLinks.Look(entry);
+                if (what == UndoLinks.What.CannotLook) Assert.Fail($"the staged-leftovers walk could not look at {entry}");
+                if (what == UndoLinks.What.Folder) Walk(entry);
             }
         }
         Walk(_folders[folder]);

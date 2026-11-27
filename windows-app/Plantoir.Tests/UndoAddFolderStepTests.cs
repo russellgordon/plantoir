@@ -164,4 +164,30 @@ public sealed class UndoAddFolderStepTests : IDisposable
         Assert.Equal(new FolderScaffold.Outcome(), Add("Labs", FolderScope.Shared));
         Assert.Empty(AppliedSteps());
     }
+    /// <summary>
+    /// W8-11 to 13 review 1, LOW 5: a folder another program makes at the new
+    /// place between the plan and the make is left as it is: the swap's
+    /// absent check refuses the tree, nothing is written into the folder,
+    /// nothing is made in its stead, and no step is applied.
+    /// </summary>
+    [Fact]
+    public void AFolderMadeByAnotherProgramBetweenThePlanAndTheMakeIsLeftAsItIs()
+    {
+        string theirs = Path.Combine(CourseFolder, "Labs");
+        string theirPage = Path.Combine(theirs, "Their page.md");
+        var seams = new UndoSeams
+        {
+            BeforeTheBegin = () =>
+            {
+                Directory.CreateDirectory(theirs);
+                File.WriteAllText(theirPage, "Made by another program.\n");
+            },
+        };
+
+        Assert.Equal(new FolderScaffold.Outcome(), Add("Labs", FolderScope.Shared, seams));
+
+        Assert.Equal([theirPage], Directory.GetFileSystemEntries(theirs));
+        Assert.Equal("Made by another program.\n", File.ReadAllText(theirPage));
+        Assert.Empty(AppliedSteps());
+    }
 }

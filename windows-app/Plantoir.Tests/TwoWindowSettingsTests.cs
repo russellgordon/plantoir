@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using Plantoir.Core.Models;
+using Plantoir.Core.Undo;
 using Xunit;
 
 namespace Plantoir.Tests;
@@ -15,8 +16,29 @@ namespace Plantoir.Tests;
 public class TwoWindowSettingsTests : IDisposable
 {
     private readonly string _dir = Directory.CreateTempSubdirectory("two-windows-").FullName;
-    private string ConfigPath => Path.Combine(_dir, "course_config.json");
+    private string Folder => Path.Combine(_dir, "wf");
+    private string CourseFolder => Path.Combine(Folder, "courses", "ICS3U");
+    private string ConfigPath => Path.Combine(CourseFolder, "course_config.json");
+
+    public TwoWindowSettingsTests()
+    {
+        Directory.CreateDirectory(CourseFolder);
+        File.WriteAllText(Path.Combine(Folder, Workspace.MarkerLauncher), "");
+    }
+
     public void Dispose() { try { Directory.Delete(_dir, true); } catch { } }
+
+    /// <summary>
+    /// The window's Save, as Course Settings makes it since #899 W8-12
+    /// (<see cref="CourseConfiguration.SaveCourseSettings(Course)"/>, one
+    /// step), on this test's own list.
+    /// </summary>
+    private CourseConfiguration.SaveReport Save(CourseConfiguration window)
+    {
+        var list = new UndoForThisProcess(Path.Combine(_dir, "state", "undo"), UndoMode.Shadow, null);
+        var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, trail: list.Trail);
+        return CourseConfiguration.SaveCourseSettings(new Course("ICS3U", CourseFolder, window), list, door);
+    }
 
     private static JObject Obj(System.Text.Json.Nodes.JsonNode? node) => JObject.Parse(node!.ToJsonString());
 
@@ -46,14 +68,38 @@ public class TwoWindowSettingsTests : IDisposable
         var windowB = CourseConfiguration.Load(ConfigPath);
 
         windowA.Values["hidden"] = new JArray("Media", "All Classes");
-        windowA.Write(ConfigPath);
+        Save(windowA);
         windowB.Values["show_reading_time"] = true;
-        var report = windowB.Write(ConfigPath);
+        var report = Save(windowB);
 
         var onDisk = JObject.Parse(File.ReadAllText(ConfigPath));
         Assert.Equal(new[] { "Media", "All Classes" }, onDisk["hidden"]!.Select(t => t.ToString()));
         Assert.True(onDisk["show_reading_time"]!.Value<bool>());
         Assert.Equal(new[] { "hidden" }, report.KeptFromElsewhere);
+        Assert.False(windowB.HasUnsavedChanges);
+    }
+
+    /// <summary>
+    /// #272 as named: a stale window's Save of the SAME member wins, whole
+    /// list, and its report says it replaced the change made elsewhere (the
+    /// list that chooses the status line's sentence), keeping nothing.
+    /// </summary>
+    [Fact]
+    public void AStaleWindowsSaveOfTheSameMemberWinsAndSaysItReplacedIt()
+    {
+        File.WriteAllText(ConfigPath, """{"hidden":["Media","Tasks","Style"],"show_reading_time":false}""");
+        var windowA = CourseConfiguration.Load(ConfigPath);
+        var windowB = CourseConfiguration.Load(ConfigPath);
+
+        windowA.Values["hidden"] = new JArray("Media", "All Classes");
+        Save(windowA);
+        windowB.Values["hidden"] = new JArray("Tasks");
+        var report = Save(windowB);
+
+        var onDisk = JObject.Parse(File.ReadAllText(ConfigPath));
+        Assert.Equal(new[] { "Tasks" }, onDisk["hidden"]!.Select(t => t.ToString()));
+        Assert.Equal(new[] { "hidden" }, report.ReplacedChangesFromElsewhere);
+        Assert.Empty(report.KeptFromElsewhere);
         Assert.False(windowB.HasUnsavedChanges);
     }
 
@@ -67,7 +113,7 @@ public class TwoWindowSettingsTests : IDisposable
         windowB.Values["footer_html"] = "unsaved in B";
 
         windowA.Values["hidden"] = new JArray("Media", "Tasks", "Style");
-        windowA.Write(ConfigPath);
+        Save(windowA);
 
         Assert.False(windowB.RereadIfNothingUnsaved(ConfigPath));   // unsaved: left alone
         Assert.True(windowC.RereadIfNothingUnsaved(ConfigPath));

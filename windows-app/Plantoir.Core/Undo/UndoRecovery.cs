@@ -149,26 +149,123 @@ internal static class UndoTrail
     /// not keep a copy of all it needs for this change, so what it could not
     /// keep stays beside the page, and the next Undo or Redo of this change
     /// uses it. What “A.md” held a moment before is kept beside it as the
-    /// hidden file “…”.</c> (the mac's <c>keptWhatItReplacedLine</c>).
+    /// hidden file “…”.</c> (the mac's <c>keptWhatItReplacedLine</c>, U4b2-4).
+    /// Each kept file is given by its path in the working folder
+    /// (<c>&lt;page's folder&gt;/&lt;hidden name&gt;</c>; a bare hidden name
+    /// stands for a page at the top of the working folder), so two pages with
+    /// one name in two folders are two pages. A page is said to come "from
+    /// what was kept beside it" only when its path is in
+    /// <paramref name="putBackFromAKeptOriginal"/> (null: every page named
+    /// was). A named page whose file name another page of the step shares
+    /// (<paramref name="pagesOfTheStep"/>, every op's path, named here or not)
+    /// is named by its path inside <c>courses/&lt;course&gt;/</c>, or by its
+    /// path in the working folder when it is outside that or the step has no
+    /// course. The hidden file is always its bare name. Names and prefixes are
+    /// compared by <see cref="SameSpelling"/>.
     /// </summary>
-    internal static string KeptWhatItReplacedWords(bool isUndo, IReadOnlyList<string> keptOfWhatItHeld, IReadOnlyList<string> keptOfWhatItHoldsNow)
+    internal static string KeptWhatItReplacedWords(bool isUndo, IReadOnlyList<string> keptOfWhatItHeld, IReadOnlyList<string> keptOfWhatItHoldsNow,
+                                                   string? course = null, IReadOnlyList<string>? putBackFromAKeptOriginal = null,
+                                                   IReadOnlyList<string>? pagesOfTheStep = null)
     {
-        var places = new List<string>();
+        var pages = new List<string>();
         foreach (string kept in keptOfWhatItHeld.Concat(keptOfWhatItHoldsNow))
         {
-            string place = PlaceOfKept(kept);
-            if (!places.Contains(place)) places.Add(place);
+            string page = PageOfKept(kept);
+            if (!ContainsSpelling(pages, page)) pages.Add(page);
+        }
+        var pagesThatCouldBeMistaken = new List<string>(pages);
+        foreach (string page in pagesOfTheStep ?? [])
+        {
+            if (!ContainsSpelling(pagesThatCouldBeMistaken, page)) pagesThatCouldBeMistaken.Add(page);
+        }
+        var fromTheList = new List<string>();
+        var fromKept = new List<string>();
+        foreach (string page in pages)
+        {
+            string named = NameOnTheLine(page, pagesThatCouldBeMistaken, course);
+            if (putBackFromAKeptOriginal is null || ContainsSpelling(putBackFromAKeptOriginal, page)) fromKept.Add(named);
+            else fromTheList.Add(named);
         }
         string which = isUndo ? "Undo" : "Redo";
-        string what = places.Count == 0 ? "a page" : string.Join(", ", places);
         var line = new System.Text.StringBuilder();
-        line.Append($"{which} put back {what} from what was kept beside it, but the list could not keep a copy of all it needs for this change, ");
+        if (pages.Count == 0) line.Append($"{which} put back a page");
+        else if (fromKept.Count == 0) line.Append($"{which} put back {string.Join(", ", fromTheList)}");
+        else if (fromTheList.Count == 0) line.Append($"{which} put back {string.Join(", ", fromKept)} from what was kept beside it");
+        else line.Append($"{which} put back {string.Join(", ", fromTheList)}, and put back {string.Join(", ", fromKept)} from what was kept beside it");
+        line.Append(", but the list could not keep a copy of all it needs for this change, ");
         line.Append("so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it.");
         foreach (string kept in keptOfWhatItHeld)
-            line.Append($" What {PlaceOfKept(kept)} held a moment before is kept beside it as the hidden file {Quoted(kept)}.");
+            line.Append($" What {NameOnTheLine(PageOfKept(kept), pagesThatCouldBeMistaken, course)} held a moment before is kept beside it as the hidden file {Quoted(HiddenNameOf(kept))}.");
         foreach (string kept in keptOfWhatItHoldsNow)
-            line.Append($" What {PlaceOfKept(kept)} holds now is kept beside it as the hidden file {Quoted(kept)}.");
+            line.Append($" What {NameOnTheLine(PageOfKept(kept), pagesThatCouldBeMistaken, course)} holds now is kept beside it as the hidden file {Quoted(HiddenNameOf(kept))}.");
         return line.ToString();
+    }
+
+    /// <summary>
+    /// Whether two names or paths are spelled the same: in Unicode
+    /// normalization form C, then ordinally (documentation 12, "What W4c and
+    /// W8 owe from U4b2-6", its last bullet; the mac's <c>String ==</c>, which
+    /// treats canonically equivalent forms as equal). Capitals differ:
+    /// <c>Index.md</c> and <c>index.md</c> are two names. The one comparison
+    /// of the kept line's names, pages and course prefix.
+    /// </summary>
+    internal static bool SameSpelling(string first, string second) =>
+        string.Equals(first.Normalize(System.Text.NormalizationForm.FormC), second.Normalize(System.Text.NormalizationForm.FormC), StringComparison.Ordinal);
+
+    private static bool ContainsSpelling(IEnumerable<string> list, string wanted)
+    {
+        foreach (string item in list)
+        {
+            if (SameSpelling(item, wanted)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>The last part of a <c>/</c>-separated path: a kept file's hidden name, or a page's file name.</summary>
+    private static string HiddenNameOf(string path) => path[(path.LastIndexOf('/') + 1)..];
+
+    /// <summary>
+    /// The page a kept file stands beside, by its place in the working
+    /// folder: the kept file's folder plus the name between the hidden name's
+    /// leading dot and its last <c>.plantoir-undo-</c>
+    /// (<c>courses/ICS3U/Section 1/.index.md.plantoir-undo-4-undo-orig</c>
+    /// gives <c>courses/ICS3U/Section 1/index.md</c>; a bare hidden name, the
+    /// page's name alone). The mac's <c>UndoTrail.pageOfKept</c>.
+    /// </summary>
+    internal static string PageOfKept(string kept)
+    {
+        int slash = kept.LastIndexOf('/');
+        string hidden = kept[(slash + 1)..];
+        string pageName = UndoSwap.PlaceOfStagedName(hidden) ?? hidden;
+        return slash < 0 ? pageName : kept[..(slash + 1)] + pageName;
+    }
+
+    /// <summary>
+    /// A page as the kept line names it, quoted: by its file name, or, when
+    /// another of <paramref name="pages"/> has the same file name, by its path
+    /// with <c>courses/&lt;course&gt;/</c> taken off, or its whole path in the
+    /// working folder when it is not under that or there is no course (the
+    /// mac's <c>UndoTrail.nameOnTheLine</c>).
+    /// </summary>
+    private static string NameOnTheLine(string page, IReadOnlyList<string> pages, string? course)
+    {
+        string pageName = HiddenNameOf(page);
+        bool sharesItsName = false;
+        foreach (string other in pages)
+        {
+            if (!SameSpelling(other, page) && SameSpelling(HiddenNameOf(other), pageName)) sharesItsName = true;
+        }
+        if (!sharesItsName) return Quoted(pageName);
+        // The prefix is the first two parts, each compared by SameSpelling;
+        // the rest is kept as the path spells it.
+        if (!string.IsNullOrEmpty(course))
+        {
+            int first = page.IndexOf('/');
+            int second = first < 0 ? -1 : page.IndexOf('/', first + 1);
+            if (second > 0 && SameSpelling(page[..first], "courses") && SameSpelling(page[(first + 1)..second], course))
+                return Quoted(page[(second + 1)..]);
+        }
+        return Quoted(page);
     }
 
     /// <summary>
@@ -322,9 +419,10 @@ internal static class UndoRecovery
         // beside its pages like a live one, so one closed interrupted would
         // otherwise leave its dot-files in the course until the switch flips.
         // Shadow removes only the journal's own staged FILES of a step whose
-        // every op changes a file in place, never a folder set aside (the
-        // mac's tidyClosedSteps(onlyStepsOfFiles:)), and keeps a kept
-        // original that differs from its page.
+        // every op changes a file in place or moves a file or folder whole
+        // (ChangesOnlyFilesAndMoves, since W8-7), never a folder set aside or
+        // made (the mac's tidyClosedSteps(onlyStepsOfFiles:)), and keeps a
+        // kept original that differs from its page.
         TidyClosedSteps(writer, journal, trail, onlyStepsOfFiles: mode == UndoMode.Shadow);
         return new UndoRecoveryRun(settled, StoppedByATest: false, left);
     }
@@ -595,6 +693,47 @@ internal static class UndoRecovery
     }
 
     /// <summary>
+    /// Thins the kept originals of this step beside each of these pages to ONE
+    /// per content (the mac's <c>UndoRecovery.removeSupersededKeptCopies</c>,
+    /// U3c review 3, LOW 1, fixed in U4a): with both contents gone and the list
+    /// taking no new file, every Undo and Redo keeps its outgoing bytes under a
+    /// new name, so without this the copies pile up, alternating between two
+    /// contents. A kept copy whose bytes another kept copy of the same step and
+    /// page holds too is superseded: no offer rests on it, since an offer rests
+    /// on content, and that content stays beside the page. The copy this move
+    /// just made (<paramref name="newestLabel"/>) is the one kept for its
+    /// content; otherwise the first by name. A copy that cannot be read is
+    /// never removed, and nothing but this step's own kept copies is touched.
+    /// </summary>
+    internal static void RemoveSupersededKeptCopies(UndoStep step, string root, IEnumerable<string> paths, string newestLabel)
+    {
+        foreach (string path in paths)
+        {
+            var keptFor = new Dictionary<string, string>(StringComparer.Ordinal);
+            var others = new List<(string Kept, string Sha)>();
+            foreach (string kept in KeptOriginalFiles(step, UndoDoor.FullPath(root, path)))
+            {
+                if (UndoCurrent.Read(kept) is not UndoCurrent.Bytes bytes) continue;
+                string sha = UndoCheck.Sha(bytes.Content);
+                if (UndoSwap.IsStaged(Path.GetFileName(kept), newestLabel) && keptFor.TryGetValue(sha, out string? earlier))
+                {
+                    others.Add((earlier, sha));
+                    keptFor[sha] = kept;
+                    continue;
+                }
+                if (!keptFor.ContainsKey(sha)) keptFor[sha] = kept;
+                else others.Add((kept, sha));
+            }
+            foreach ((string kept, string sha) in others)
+            {
+                if (keptFor[sha] == kept) continue;
+                try { UndoStagedFile.RemoveByName(kept); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+            }
+        }
+    }
+
+    /// <summary>
     /// What a step's own swap kept beside a page as its original (any of the
     /// step's labels), answered for a page's path and the sha of the whole
     /// content wanted there only when a kept original's bytes hash to exactly
@@ -645,6 +784,49 @@ internal static class UndoRecovery
             if (!stored) notWhole.Add(use.Path);
         }
         return new UndoWhatTheListCouldNotTake(notWhole, keptNotStored);
+    }
+
+    /// <summary>
+    /// An Undo or Redo never deletes an only copy (documentation 12, "The lows
+    /// fixed with U4a that W4c and W7 copy", item 4; the mac's
+    /// <c>UndoRecovery.storeWhatTheOtherDirectionNeeds</c>): under the lock,
+    /// before the swap, each page's outgoing bytes that the step's other
+    /// direction needs (a writeFile op's after for an Undo, its before for a
+    /// Redo) go into the list when it lacks them. The pages whose bytes the
+    /// list would not take are returned: the swap keeps those bytes beside the
+    /// page (<c>OutgoingOf</c>), and the other direction is made from that kept
+    /// file. Bytes a kept original of the step already holds beside the page
+    /// need nothing more. (#899 W8-9: the U4b2-4 stack case rests on it.)
+    /// </summary>
+    internal static HashSet<string> StoreWhatTheOtherDirectionNeeds(IReadOnlyList<(string Path, byte[]? Expected, byte[]? Replacement)> inOrder,
+                                                                    UndoStep step, bool backward, string root, UndoJournalWriter writer, UndoJournal journal)
+    {
+        var notStored = new HashSet<string>(StringComparer.Ordinal);
+        foreach ((string path, byte[]? outgoing, _) in inOrder)
+        {
+            if (outgoing is null) continue;
+            string outgoingSha = UndoCheck.Sha(outgoing);
+            bool needed = false;
+            foreach (UndoOp op in step.Ops)
+            {
+                if (op.Kind != UndoOp.WriteFile || op.Path != path) continue;
+                string? otherSha = backward ? op.AfterSha : op.BeforeSha;
+                if (string.Equals(otherSha, outgoingSha, StringComparison.Ordinal)) needed = true;
+            }
+            if (!needed || journal.Blob(outgoingSha) is not null) continue;
+            bool alreadyKept = false;
+            if (root.Length > 0)
+            {
+                foreach (string kept in KeptOriginalFiles(step, UndoDoor.FullPath(root, path)))
+                {
+                    if (UndoCurrent.Read(kept) is UndoCurrent.Bytes bytes && string.Equals(UndoCheck.Sha(bytes.Content), outgoingSha, StringComparison.Ordinal))
+                        alreadyKept = true;
+                }
+            }
+            if (alreadyKept) continue;
+            if (!TryToStore(outgoing, writer)) notStored.Add(path);
+        }
+        return notStored;
     }
 
     private static bool TryToStore(byte[] bytes, UndoJournalWriter writer)

@@ -129,9 +129,9 @@ public sealed class UndoRecoveryContractTests
         bool withAMove = Flag(recoveryCase, "withAMove");
         bool withATree = Flag(recoveryCase, "withATree");
         bool withAPreference = Flag(recoveryCase, "withAPreference");
-        // U4b (W8-7): the two pages plus courses/TST1O/media moved to renamed
-        // and a replaceText on renamed/a.md, in that order (opKinds.wholeOps'
-        // one exception: the edit carried by the move).
+        // U4b (W8-7): courses/TST1O/media moved to renamed, then the two
+        // pages, then a replaceText on renamed/a.md inside it, in that order
+        // (opKinds.wholeOps' one exception: the edit carried by the move).
         bool withAMovedFolder = Flag(recoveryCase, "withAMovedFolder");
         bool byOps = withAMove || withATree || withAPreference || withAMovedFolder;
         scribe.Places.Write(UndoKindsForTheCases.Preference, new UndoJson.Text("a"));

@@ -9,9 +9,11 @@ namespace Plantoir.Tests;
 /// recovery writes nothing of the teacher's, but a shadow step is staged
 /// beside its pages like a live one, so the journal's own staged new content
 /// of a step closed <c>interrupted</c> goes when every op of the step changes
-/// a file in place; a kept original that differs from its page stays (the
-/// only copy of what the page held). The mac's
-/// <c>tidyClosedSteps(onlyStepsOfFiles:)</c>.
+/// a file in place or moves a file or folder whole (since W8-7, the mac's
+/// <c>changesOnlyFilesAndMoves</c>); a step that sets a folder aside or makes
+/// or removes a tree is left for a live recovery. A kept original that
+/// differs from its page stays (the only copy of what the page held). The
+/// mac's <c>tidyClosedSteps(onlyStepsOfFiles:)</c>.
 /// </summary>
 public sealed class UndoShadowClosedStepTidyTests
 {
