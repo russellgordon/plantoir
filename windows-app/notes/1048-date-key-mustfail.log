@@ -56,3 +56,14 @@ Restored: 19 of 19 green in the run below.
 /Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:600: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateStillDatesAYearRoundPageKeptInTheClassFolder] : XCTAssertTrue failed - the fir
 /Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:625: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testPublishingStillDatesALessonOnlyAnUnnumberedLinkLeadsTo] : XCTAssertTrue failed
 (the two chain tests are green here by design: they pin the two halves of the owner rule, proven by revert below)
+
+## Fix round two, revert A on the fixed code: the rule's own reach check removed (isTheFirstClassLeadingToItsFile) and Re-date's year-round isOneOf guard removed
+	 Executed 25 tests, with 2 failures (0 unexpected) in 1.056 (1.060) seconds
+	 Executed 25 tests, with 2 failures (0 unexpected) in 1.056 (1.061) seconds
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:657: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheChainDayTwoWritesNothingThroughDayFive] : XCTAssertEqual failed: ("---
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:686: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testReDateYearRoundStepLeavesALessonANumberedClassOwns] : XCTAssertTrue failed - Day 2's
+
+## Fix round two, revert B on the fixed code: the loop's reach check of an earlier class removed (an earlier class leading to the same file always owns it)
+	 Executed 25 tests, with 1 failure (0 unexpected) in 0.777 (0.781) seconds
+	 Executed 25 tests, with 1 failure (0 unexpected) in 0.777 (0.782) seconds
+/Users/russellgordon/plantoir/wt-1048/mac-app/Tests/QuartzTeachersTests/DateKeyByTheTargetsPlaceTests.swift:670: error: -[QuartzTeachersTests.DateKeyByTheTargetsPlaceTests testTheChainDayFiveOwnsTheLesson] : XCTAssertTrue failed - Day 5's day: ---
