@@ -1,3 +1,5 @@
+Partly reversed by #1055 M7 (Russell's rule of 2026-11-27, evening: no link code beyond reading and writing through a link).
+
 # #1055 M1: Insert Class refuses a later class that is a link, before anything changes (Mac)
 
 Brief: `vm-tools/briefs/2026-11-27-1055-M1-insert-class-refuses-a-linked-later-class.md`. Branch `issue/1055-M1-insert-class-refuses-a-linked-later-class`, from `origin/dev` 99499d6b7. Touches `contracts/`: both gates.

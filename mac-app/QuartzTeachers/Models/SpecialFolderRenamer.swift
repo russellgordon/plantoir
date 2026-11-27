@@ -75,11 +75,6 @@ nonisolated struct FolderRenamePlan: Sendable {
         let to: URL
 
         let listingSha: String
-
-        /// Whether what moves is a symbolic link (to a folder), read by
-        /// `lstat` when planned: a link at the new name is this rename's
-        /// only when the rename moved a link there (U4b2-5, review 1, L3).
-        var isALink: Bool = false
     }
 
     /// One page relinked: the bytes read and the bytes it is left holding.
@@ -647,8 +642,7 @@ enum SpecialFolderRenamer {
                 let refusal: UndoRefusal = .cannotTellNow(path: location.path)
                 throw JournaledStepError.refused(refusal, fileName: location.lastPathComponent)
             }
-            let isALink: Bool = presence(at: location, spelledExactly: false) == .link
-            moves.append(FolderRenamePlan.Move(from: location, to: destination, listingSha: listingSha, isALink: isALink))
+            moves.append(FolderRenamePlan.Move(from: location, to: destination, listingSha: listingSha))
         }
 
         var pages: [FolderRenamePlan.Page] = []
@@ -1070,11 +1064,9 @@ enum SpecialFolderRenamer {
         for place in newPlaces {
             let inside: String = placeInside(place, courseDirectory: courseDirectory)
             var movedHereThisRun: Bool = false
-            var movedALinkHere: Bool = false
             for move in moves {
                 if move.to.standardizedFileURL.path == place.standardizedFileURL.path {
                     movedHereThisRun = true
-                    movedALinkHere = move.isALink
                 }
             }
             var belongs: Bool = movedHereThisRun
@@ -1100,14 +1092,10 @@ enum SpecialFolderRenamer {
             switch presence(at: place, spelledExactly: isCaseOnly) {
             case .folder:
                 result.places.append(inside)
-            case .link:
-                if movedALinkHere {
-                    result.places.append(inside)
-                }
             case .unreadable(let said):
                 result.unreadable.append(inside + " (" + said + ")")
                 result.cannotTell.append(inside)
-            case .absent, .somethingElse:
+            case .absent, .link, .somethingElse:
                 continue
             }
         }

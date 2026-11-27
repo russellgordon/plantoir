@@ -1,3 +1,5 @@
+Partly reversed by #1055 M7 (Russell's rule of 2026-11-27, evening: no link code beyond reading and writing through a link).
+
 # #1055 M2: Rename folder refuses a per-section or shared folder that is a link, before anything changes (Mac)
 
 Brief: `vm-tools/briefs/2026-11-27-1055-M2-rename-folder-refuses-a-linked-folder.md`. Branch `issue/1055-M2-rename-folder-refuses-a-linked-folder`, from M1's pushed head 839bbbce3 (stacked on M1). Touches `contracts/`: both gates. `origin/dev` (99499d6b7) and M1's head (839bbbce3) merged before proving and again before hand-back: both already up to date, so no merge commit.
