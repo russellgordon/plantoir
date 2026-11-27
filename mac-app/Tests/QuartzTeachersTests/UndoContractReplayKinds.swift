@@ -44,7 +44,7 @@ nonisolated enum UndoContractKinds {
         "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
         "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
-        "relinkALink", "relinkALinkLeavingAHandedOverPlace", "relinkTwoChainedLinks", "relinkThreeChainedLinks",
+        "relinkALink", "relinkALinkLeavingAHandedOverPlace", "relinkTwoChainedLinks", "relinkThreeChainedLinks", "relinkThenMoveALinkIntoItsPlace",
         "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
         "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass",
         "makeRoomWithALaterClassThatIsABrokenLink",
@@ -649,6 +649,21 @@ nonisolated enum UndoContractKinds {
                 UndoOp.relinkLink(from: classPage(4), to: classPage(5), linkShaBefore: UndoHash.sha256(of: texts[0]), linkShaAfter: UndoHash.sha256(of: texts[1])),
             ]
             return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: texts, root: root, action: "insertClass"), in: journal, mode: .live, places: places))
+        case "relinkThenMoveALinkIntoItsPlace":
+            // Review F of U4b3: Day 4 and Day 5 links both holding `Unit 1,
+            // Day 2.md`; ONE step: Day 5's link relinked to Day 6 holding
+            // `Unit 1, Day 3.md`, then Day 4's moved plainly into Day 5.
+            let two: Data = Data("Unit 1, Day 2.md".utf8)
+            let three: Data = Data("Unit 1, Day 3.md".utf8)
+            if !somethingIsAt(classPage(4), in: root) && !somethingIsAt(classPage(5), in: root) && !somethingIsAt(classPage(6), in: root) {
+                try layALink(classPage(4), leadingTo: "Unit 1, Day 2.md", root: root)
+                try layALink(classPage(5), leadingTo: "Unit 1, Day 2.md", root: root)
+            }
+            let ops: [UndoOp] = [
+                UndoOp.relinkLink(from: classPage(5), to: classPage(6), linkShaBefore: UndoHash.sha256(of: two), linkShaAfter: UndoHash.sha256(of: three)),
+                UndoOp.moveLink(from: classPage(4), to: classPage(5), linkSha: UndoHash.sha256(of: two)),
+            ]
+            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [two, three], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
         case "editTheHandedOverPageByHand":
             try? FileManager.default.removeItem(at: root.appendingPathComponent(classPage(3)))
             try UndoContractReplay.write("Hand.\n", to: classPage(3), in: root)

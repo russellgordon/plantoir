@@ -1783,6 +1783,7 @@ nonisolated enum UndoContractReplay {
                 "leavingAHandedOverPlace": "relinkALinkLeavingAHandedOverPlace",
                 "chained": "relinkTwoChainedLinks",
                 "chainedThree": "relinkThreeChainedLinks",
+                "thenAMove": "relinkThenMoveALinkIntoItsPlace",
             ]
             var handedOverCall: String? = nil
             var handedOverBefore: String = ""
@@ -1803,7 +1804,7 @@ nonisolated enum UndoContractReplay {
                 }
                 shapeCall = call
                 classDays = UndoContractKinds.relinkedDays
-                if shape == "chained" {
+                if shape == "chained" || shape == "thenAMove" {
                     classDays = UndoContractKinds.chainedRelinkDays
                 } else if shape == "chainedThree" {
                     classDays = UndoContractKinds.threeChainedRelinkDays
