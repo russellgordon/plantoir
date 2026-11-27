@@ -42,7 +42,7 @@ nonisolated enum UndoContractKinds {
         "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt", "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt",
         "finderRecordsAWindowInTheMadeFolder",
         "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
-        "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
+        "moveALinkToAFolder", "stepEditingInsideALinksMove",
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
         "relinkALink", "relinkALinkLeavingAHandedOverPlace", "relinkTwoChainedLinks", "relinkThreeChainedLinks", "relinkThenMoveALinkIntoItsPlace",
         "relinkALinkWhereItStands",
@@ -485,43 +485,6 @@ nonisolated enum UndoContractKinds {
             }
             let move: UndoOp = UndoOp.moveLink(from: linkFrom, to: linkTo, linkSha: UndoHash.sha256(of: Data(linkTarget.utf8)))
             return word(JournaledWrite.perform(ops: draft(ops: [move], blobs: [], root: root, action: "renameFolder"), in: journal, mode: .live, places: places))
-        case "renameAPerSectionFolderThatIsALink":
-            // U4b2-15: the same link, section 1's `media`, renamed by Rename
-            // folder's own plan (`SpecialFolderRenamer.plan` and `apply`), a
-            // per-section rename to `renamed` in section 1: the plan reads
-            // the link by its target and plans the link's move, never what
-            // it leads to. Fails if the plan refuses a linked folder again
-            // or moves its target.
-            if !somethingIsAt(linkFrom, in: root) && !somethingIsAt(linkTo, in: root) {
-                for (name, content) in libraryFiles {
-                    try UndoContractReplay.write(content, to: linkedLibrary + "/" + name, in: root)
-                }
-                try FileManager.default.createDirectory(
-                    at: root.appendingPathComponent(linkFrom).deletingLastPathComponent(), withIntermediateDirectories: true
-                )
-                try FileManager.default.createSymbolicLink(
-                    atPath: root.appendingPathComponent(linkFrom).path, withDestinationPath: linkTarget
-                )
-            }
-            let course: URL = root.appendingPathComponent("courses/TST1O")
-            let planned: FolderRenamePlan
-            do {
-                planned = try SpecialFolderRenamer.plan(
-                    (linkFrom as NSString).lastPathComponent, to: (linkTo as NSString).lastPathComponent,
-                    scope: .perSection, courseDirectory: course, sectionNumbers: [1]
-                )
-            } catch {
-                return "renameRefused"
-            }
-            let step: JournaledStep = JournaledStep(
-                courseCode: "TST1O", courseDirectory: course, section: nil,
-                maker: UndoStepMaker.sheet("renameFolder"), holds: "course"
-            )
-            SpecialFolderRenamer.apply(planned, to: step)
-            guard let ops = step.recordableFolderMoves(under: root), !ops.isEmpty else {
-                return "nothingToMove"
-            }
-            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [], root: root, action: "renameFolder"), in: journal, mode: .live, places: places))
         case "stepEditingInsideALinksMove":
             // Review 1 of U4b2-14: written as another version might write
             // it, changing nothing: a link's move and an edit under its `to`.

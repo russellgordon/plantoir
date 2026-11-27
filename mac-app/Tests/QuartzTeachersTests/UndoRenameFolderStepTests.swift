@@ -512,13 +512,9 @@ final class UndoRenameFolderStepTests: XCTestCase {
     }
 
     /// Returns whether the kill point was reached (and so tested).
-    /// `linked`: section 2's `Tasks` is a symbolic link (`linkSectionTwosTasks`).
     @discardableResult
-    func killARename(at point: UndoKillPoint, linked: Bool = false) async throws -> Bool {
+    func killARename(at point: UndoKillPoint) async throws -> Bool {
         let course: Course = try course()
-        if linked {
-            try linkSectionTwosTasks(in: course)
-        }
         let pagesBefore: [String: Data] = pages(of: course)
         let settingsBefore: NSDictionary = try settings(of: course)
         let settingsBytesBefore: Data = try Data(contentsOf: course.configFileURL)
@@ -553,17 +549,6 @@ final class UndoRenameFolderStepTests: XCTestCase {
         }
         if now == pagesBefore {
             XCTAssertEqual(try settings(of: course), settingsBefore, "pages whole before, settings not")
-            if linked {
-                XCTAssertEqual(linkTarget(course, "section2/Tasks"), "../library/Tasks", "the link is not back at \(point)")
-                XCTAssertNil(linkTarget(course, "section2/Assessments"), "a link left at the new name at \(point)")
-            }
-        } else if linked {
-            XCTAssertEqual(now["section1/Assessments/Quiz 1.md"], Data("See [[Assessments/Quiz 2]].\n".utf8), "not whole after at \(point)")
-            XCTAssertEqual(now["library/Tasks/Quiz 2.md"], Data("Quiz two, after [[Assessments/Quiz 1]].\n".utf8), "not whole after at \(point)")
-            XCTAssertEqual(linkTarget(course, "section2/Assessments"), "../library/Tasks", "the link is not at its new name at \(point)")
-            XCTAssertNil(linkTarget(course, "section2/Tasks"), "a link left at the old name at \(point)")
-            XCTAssertEqual(now.count, pagesBefore.count, "not whole after at \(point)")
-            XCTAssertEqual(try settings(of: course)["hidden"] as? [String], ["Assessments"], "pages whole after, settings not")
         } else {
             XCTAssertEqual(now["section1/Assessments/Quiz 1.md"], Data("See [[Assessments/Quiz 2]].\n".utf8), "not whole after at \(point)")
             XCTAssertEqual(now["section2/Assessments/Quiz 2.md"], Data("Quiz two.\n".utf8), "not whole after at \(point)")
@@ -777,7 +762,7 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: record.path), "the record is left after a refused re-plan")
     }
 
-    // MARK: - U4b2-15: a per-section or shared folder that is itself a link
+    // MARK: - A per-section or shared folder that is itself a link (#1055: refused)
 
     /// Section 2's `Tasks` made a symbolic link, `../library/Tasks`, to a
     /// folder elsewhere in the course that holds section 2's page, which
@@ -804,96 +789,6 @@ final class UndoRenameFolderStepTests: XCTestCase {
         return try? FileManager.default.destinationOfSymbolicLink(atPath: path)
     }
 
-    /// A per-section folder that is itself a symbolic link is renamed as
-    /// before U4b, now in the one step (U4b2-15): the LINK is moved (the
-    /// same target, its name changed), the folder it leads to is left where
-    /// it is with its page relinked at its own place (the walk never goes
-    /// through a link, as before U4b), section 1's folder moves, and the
-    /// settings change. Undo puts the link back as a link with the same
-    /// target; Redo moves it again; the folder it leads to never moves.
-    /// MUST FAIL before U4b2-15, when the plan read the link as `.notATree`
-    /// and refused "cannot tell now"; and with the move made on the link's
-    /// target (the target-untouched assertions).
-    func testAPerSectionFolderThatIsALinkIsRenamedByMovingTheLink() async throws {
-        let course: Course = try course()
-        try linkSectionTwosTasks(in: course)
-        let target: URL = course.directoryURL.appendingPathComponent("library/Tasks")
-        let pagesBefore: [String: Data] = pages(of: course)
-        let settingsBefore: NSDictionary = try settings(of: course)
-
-        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Activities", scope: .perSection)
-
-        XCTAssertNotNil(renamed(result), "\(result)")
-        XCTAssertEqual(linkTarget(course, "section2/Activities"), "../library/Tasks", "the link was not moved as a link")
-        XCTAssertNil(linkTarget(course, "section2/Tasks"))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: course.directoryURL.appendingPathComponent("section2/Tasks").path))
-        XCTAssertEqual(listed(target), ["Quiz 2.md"], "the folder the link leads to was moved or changed")
-        XCTAssertEqual(listed(course.directoryURL.appendingPathComponent("library")), ["Tasks"], "the link's target was renamed")
-        let after: [String: Data] = pages(of: course)
-        XCTAssertEqual(after["library/Tasks/Quiz 2.md"], Data("Quiz two, after [[Activities/Quiz 1]].\n".utf8))
-        XCTAssertEqual(after["section1/Activities/Quiz 1.md"], Data("See [[Activities/Quiz 2]].\n".utf8))
-        XCTAssertEqual(after["section1/index.md"], Data("Start with [[Activities/Quiz 1]].\n".utf8))
-        XCTAssertEqual(course.configuration.perSectionFolders, ["All Classes", "Activities"])
-        XCTAssertEqual(try settings(of: course)["hidden"] as? [String], ["Activities"])
-
-        XCTAssertEqual(try journal().read().records.count, 1, "one step")
-        let ops: [UndoOp] = try newestOps()
-        XCTAssertEqual(ops[1].kind, "move")
-        XCTAssertEqual(ops[1].from, "courses/ICS3U/section2/Tasks", "the link's move named what it leads to")
-        XCTAssertEqual(ops[1].to, "courses/ICS3U/section2/Activities")
-        XCTAssertEqual(ops[1].linkSha, UndoHash.sha256(of: Data("../library/Tasks".utf8)))
-        XCTAssertNil(ops[1].listingSha)
-        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path), "the record is cleared once the step is made")
-
-        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in self.root }), .undone(seq: 1))
-        XCTAssertEqual(linkTarget(course, "section2/Tasks"), "../library/Tasks", "the link did not go back as a link")
-        XCTAssertNil(linkTarget(course, "section2/Activities"))
-        XCTAssertEqual(pages(of: course), pagesBefore)
-        XCTAssertEqual(try settings(of: course), settingsBefore)
-        XCTAssertEqual(journal().redoNewest(resolveRoot: { _ in self.root }), .redone(seq: 1))
-        XCTAssertEqual(linkTarget(course, "section2/Activities"), "../library/Tasks")
-        XCTAssertEqual(pages(of: course), after)
-        XCTAssertEqual(listed(target), ["Quiz 2.md"])
-        XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left")
-    }
-
-    /// With the switch off (shadow, as the app runs today), the same rename
-    /// does for the teacher what it did before U4b: renamed, the link moved,
-    /// its target where it was. Nothing is offered to undo (the switch is
-    /// off); the step is made through the door all the same.
-    func testWithTheSwitchOffAPerSectionFolderThatIsALinkIsRenamedAsBeforeU4b() async throws {
-        JournaledStep.modeOverride = .shadow
-        let course: Course = try course()
-        try linkSectionTwosTasks(in: course)
-
-        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Activities", scope: .perSection)
-
-        XCTAssertNotNil(renamed(result), "\(result)")
-        XCTAssertEqual(linkTarget(course, "section2/Activities"), "../library/Tasks")
-        XCTAssertNil(linkTarget(course, "section2/Tasks"))
-        XCTAssertEqual(listed(course.directoryURL.appendingPathComponent("library/Tasks")), ["Quiz 2.md"])
-        XCTAssertEqual(pages(of: course)["library/Tasks/Quiz 2.md"], Data("Quiz two, after [[Activities/Quiz 1]].\n".utf8))
-        XCTAssertEqual(course.configuration.perSectionFolders, ["All Classes", "Activities"])
-        XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left")
-    }
-
-    /// Killed before every swap in turn with section 2's folder a link:
-    /// recovery leaves every place whole before (the link back at `Tasks`)
-    /// or whole after (the link at the new name, same target), never one
-    /// section renamed and not the other. MUST FAIL before U4b2-15: the
-    /// rename was refused before any swap (no kill point reached).
-    func testALinkedSectionsRenameKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery() async throws {
-        var index: Int = 0
-        while try await killARename(at: .beforeSwap(index), linked: true) {
-            try? FileManager.default.removeItem(at: listFolder)
-            try? FileManager.default.removeItem(at: root)
-            useFreshFolders()
-            index += 1
-        }
-        XCTAssertGreaterThanOrEqual(index, 4, "two moves, three pages and the settings: at least four swaps")
-    }
-
     /// A dangling link at a section's place (it leads nowhere) is skipped,
     /// as before U4b, where `fileExists` followed it and found nothing: the
     /// other section's folder is renamed, the link is left at its old name
@@ -918,49 +813,111 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertEqual(moves, 1, "only section 1's folder moves")
     }
 
-    /// Section 2's `Tasks` a link to section 1's `Tasks`, the other place of
-    /// the same rename: both are planned, the folder by its listing and the
-    /// link by its target, kept as written, as before U4b (`moveItem` moved
-    /// the folder, then renamed the link, which then led to the old name).
-    /// One step; Undo puts the folder and the link back, Redo again (review 1
-    /// of U4b2-15, L2). MUST FAIL with a link's `from` resolved to what it
-    /// leads to (it would name section 1's folder, the other move's `from`).
-    func testALinkToAnotherSectionsFolderOfTheSameRenameIsMovedAsALink() async throws {
-        let course: Course = try course()
-        let sectionTwo: URL = course.directoryURL.appendingPathComponent("section2/Tasks")
-        try FileManager.default.removeItem(at: sectionTwo)
-        try FileManager.default.createSymbolicLink(atPath: sectionTwo.path, withDestinationPath: "../section1/Tasks")
-        let pagesBefore: [String: Data] = pages(of: course)
-
-        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Activities", scope: .perSection)
-
-        XCTAssertNotNil(renamed(result), "\(result)")
-        XCTAssertEqual(linkTarget(course, "section2/Activities"), "../section1/Tasks", "the link was not moved as a link")
-        XCTAssertNil(linkTarget(course, "section2/Tasks"))
-        XCTAssertEqual(pages(of: course)["section1/Activities/Quiz 1.md"], Data("See [[Activities/Quiz 2]].\n".utf8))
-        let ops: [UndoOp] = try newestOps()
-        XCTAssertEqual(ops[0].from, "courses/ICS3U/section1/Tasks")
-        XCTAssertNotNil(ops[0].listingSha)
-        XCTAssertEqual(ops[1].from, "courses/ICS3U/section2/Tasks", "the link's move named what it leads to")
-        XCTAssertNotNil(ops[1].linkSha)
-        let pagesAfter: [String: Data] = pages(of: course)
-
-        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in self.root }), .undone(seq: 1))
-        XCTAssertEqual(linkTarget(course, "section2/Tasks"), "../section1/Tasks")
-        XCTAssertNil(linkTarget(course, "section2/Activities"))
-        XCTAssertEqual(pages(of: course), pagesBefore)
-        XCTAssertEqual(journal().redoNewest(resolveRoot: { _ in self.root }), .redone(seq: 1))
-        XCTAssertEqual(linkTarget(course, "section2/Activities"), "../section1/Tasks")
-        XCTAssertEqual(pages(of: course), pagesAfter)
-        XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left")
+    /// Everything under a folder by its path inside it, never following a
+    /// link: a file by its bytes, a link by the text it holds, a folder by a
+    /// mark. `leaving` names top-level entries left out (the trail).
+    func everything(under folder: URL, leaving: [String] = []) -> [String: String] {
+        var result: [String: String] = [:]
+        var toVisit: [String] = [""]
+        while !toVisit.isEmpty {
+            let inside: String = toVisit.removeLast()
+            let here: URL = inside.isEmpty ? folder : folder.appendingPathComponent(inside)
+            let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: here.path)) ?? []
+            for name in names {
+                if inside.isEmpty && leaving.contains(name) {
+                    continue
+                }
+                let path: String = inside.isEmpty ? name : inside + "/" + name
+                let url: URL = folder.appendingPathComponent(path)
+                let attributes: [FileAttributeKey: Any] = (try? FileManager.default.attributesOfItem(atPath: url.path)) ?? [:]
+                let type: FileAttributeType? = attributes[.type] as? FileAttributeType
+                if type == .typeSymbolicLink {
+                    let target: String = (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) ?? "?"
+                    result[path] = "link " + target
+                } else if type == .typeDirectory {
+                    result[path] = "folder"
+                    toVisit.append(path)
+                } else {
+                    let data: Data = (try? Data(contentsOf: url)) ?? Data()
+                    result[path] = "file " + data.base64EncodedString()
+                }
+            }
+        }
+        return result
     }
 
-    /// The same code path for a SHARED folder that is a link, here one
-    /// leading OUT of the working folder: renamed by moving the link, as
-    /// before U4b (`moveItem` renamed any link), and what it leads to is
-    /// never read, listed or written, the page inside it included, which
-    /// names the folder and is left exactly as it was.
-    func testASharedFolderThatIsALinkOutOfTheWorkingFolderIsRenamedAndWhatItLeadsToIsUntouched() async throws {
+    /// The plan's refusal of a folder that is a link, by its error: U4b's
+    /// `cannotTellNow` naming the folder's path, the file name its own.
+    func assertThePlanRefuses(
+        _ oldName: String, to newName: String, scope: FolderScope, in course: Course, place: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        let location: URL = course.directoryURL.appendingPathComponent(place)
+        do {
+            _ = try SpecialFolderRenamer.plan(
+                oldName, to: newName, scope: scope,
+                courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
+            )
+            XCTFail("the plan of a folder that is a link was not refused", file: file, line: line)
+        } catch JournaledStepError.refused(let refusal, let fileName) {
+            XCTAssertEqual(refusal, .cannotTellNow(path: location.path), file: file, line: line)
+            XCTAssertEqual(fileName, location.lastPathComponent, file: file, line: line)
+        } catch {
+            XCTFail("refused otherwise: \(error)", file: file, line: line)
+        }
+    }
+
+    /// The sentence the teacher reads: the door's existing one for a
+    /// refused step, naming the folder (U4b, before U4b2-15).
+    func refusalSentence(renaming oldName: String, folder: String) -> String {
+        let said: String = CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: folder]).localizedDescription
+        return SpecialFolderRenamer.nothingWasChanged(renaming: oldName, said: said)
+    }
+
+    /// No step on the list, whether or not the list folder was ever made.
+    func stepsOnTheList() -> Int {
+        guard let fold = try? journal().read() else {
+            return 0
+        }
+        return fold.records.count
+    }
+
+    /// Section 2's `Tasks` is a symbolic link: Rename folder refuses before
+    /// anything changes, as U4b did (#1055: links are not supported), live
+    /// and with the switch off. Every file and link under the working folder
+    /// is as it was, the link compared by its text; no step; no rename
+    /// record. MUST FAIL with the link moved as a link (U4b2-15).
+    func testAPerSectionFolderThatIsALinkIsRefusedBeforeAnythingChanges() async throws {
+        let modes: [UndoMode] = [.live, .shadow]
+        for mode in modes {
+            try? FileManager.default.removeItem(at: listFolder)
+            try? FileManager.default.removeItem(at: root)
+            useFreshFolders()
+            JournaledStep.modeOverride = mode
+            let course: Course = try course()
+            try linkSectionTwosTasks(in: course)
+            let before: [String: String] = everything(under: root, leaving: [".trail"])
+            let settingsBytes: Data = try Data(contentsOf: course.configFileURL)
+
+            assertThePlanRefuses("Tasks", to: "Activities", scope: .perSection, in: course, place: "section2/Tasks")
+            let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Activities", scope: .perSection)
+
+            XCTAssertEqual(failed(result), refusalSentence(renaming: "Tasks", folder: "Tasks"), "\(mode)")
+            XCTAssertEqual(everything(under: root, leaving: [".trail"]), before, "something changed, \(mode)")
+            XCTAssertEqual(linkTarget(course, "section2/Tasks"), "../library/Tasks", "\(mode)")
+            XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBytes, "\(mode)")
+            XCTAssertEqual(course.configuration.perSectionFolders, ["All Classes", "Tasks"], "\(mode)")
+            XCTAssertEqual(stepsOnTheList(), 0, "a step was made, \(mode)")
+            let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: record.path), "a rename record was left, \(mode)")
+        }
+    }
+
+    /// The shared folder `Concepts` is a link leading OUT of the working
+    /// folder: refused the same way, and the folder it leads to, the page
+    /// inside it included, is byte for byte as it was. MUST FAIL with the
+    /// link moved as a link (U4b2-15).
+    func testASharedFolderThatIsALinkOutOfTheWorkingFolderIsRefusedAndWhatItLeadsToIsUntouched() async throws {
         let course: Course = try course()
         let outside: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("undo-rename-outside-\(UUID().uuidString)", isDirectory: true)
@@ -968,23 +925,88 @@ final class UndoRenameFolderStepTests: XCTestCase {
             try? FileManager.default.removeItem(at: outside)
         }
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
-        let outsidePage: Data = Data("See [[Concepts/Loops]].\n".utf8)
-        try outsidePage.write(to: outside.appendingPathComponent("Loops.md"))
+        try Data("See [[Concepts/Loops]].\n".utf8).write(to: outside.appendingPathComponent("Loops.md"))
         let concepts: URL = course.directoryURL.appendingPathComponent("Concepts")
         try FileManager.default.removeItem(at: concepts)
         try FileManager.default.createSymbolicLink(atPath: concepts.path, withDestinationPath: outside.path)
+        let before: [String: String] = everything(under: root, leaving: [".trail"])
+        let outsideBefore: [String: String] = everything(under: outside)
+        let settingsBytes: Data = try Data(contentsOf: course.configFileURL)
 
+        assertThePlanRefuses("Concepts", to: "Ideas", scope: .shared, in: course, place: "Concepts")
         let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Concepts", to: "Ideas", scope: .shared)
 
-        XCTAssertNotNil(renamed(result), "\(result)")
-        XCTAssertEqual(linkTarget(course, "Ideas"), outside.path)
-        XCTAssertNil(linkTarget(course, "Concepts"))
-        XCTAssertEqual(listed(outside), ["Loops.md"])
-        XCTAssertEqual(try Data(contentsOf: outside.appendingPathComponent("Loops.md")), outsidePage, "a page outside the working folder was written")
-        XCTAssertEqual(try settings(of: course)["shared_folders"] as? [String], ["Ideas"])
-        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in self.root }), .undone(seq: 1))
+        XCTAssertEqual(failed(result), refusalSentence(renaming: "Concepts", folder: "Concepts"))
+        XCTAssertEqual(everything(under: root, leaving: [".trail"]), before, "something changed")
+        XCTAssertEqual(everything(under: outside), outsideBefore, "what the link leads to changed")
         XCTAssertEqual(linkTarget(course, "Concepts"), outside.path)
-        XCTAssertEqual(listed(outside), ["Loops.md"])
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBytes)
+        XCTAssertEqual(stepsOnTheList(), 0, "a step was made")
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path), "a rename record was left")
+    }
+
+    /// A per-section rename with no link plans the same moves and pages,
+    /// and its step holds the same ops, as before #1055 (recorded from a
+    /// run on the base, 839bbbce3). MUST FAIL with any plain folder's move
+    /// changed by the revert.
+    func testAPlainPerSectionRenameStillPlansTheSameMoves() async throws {
+        let course: Course = try course()
+        let prefix: String = UndoFolderPlaces.canonicalPath(of: course.directoryURL) + "/"
+        let planned: FolderRenamePlan = try SpecialFolderRenamer.plan(
+            "Tasks", to: "Assessments", scope: .perSection,
+            courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
+        )
+        var plannedLines: [String] = []
+        for move in planned.moves {
+            let from: String = String(UndoFolderPlaces.canonicalPath(of: move.from).dropFirst(prefix.count))
+            let to: String = String(UndoFolderPlaces.canonicalPath(of: move.to).dropFirst(prefix.count))
+            plannedLines.append("move " + from + " -> " + to + " link " + String(move.isALink))
+        }
+        for page in planned.pages {
+            let path: String = String(UndoFolderPlaces.canonicalPath(of: page.url).dropFirst(prefix.count))
+            plannedLines.append("page " + path + " = " + (String(data: page.rewritten, encoding: .utf8) ?? "?"))
+        }
+        XCTAssertEqual(plannedLines, [
+            "move section1/Tasks -> section1/Assessments link false",
+            "move section2/Tasks -> section2/Assessments link false",
+            "page section1/Assessments/Quiz 1.md = See [[Assessments/Quiz 2]].\n",
+            "page section1/index.md = Start with [[Assessments/Quiz 1]].\n",
+        ])
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        XCTAssertNotNil(renamed(result), "\(result)")
+        var opLines: [String] = []
+        for op in try newestOps() {
+            var line: String = op.kind
+            if let from = op.from {
+                line += " from " + from
+            }
+            if let to = op.to {
+                line += " to " + to
+            }
+            if let path = op.path {
+                line += " path " + path
+            }
+            if let keyPath = op.keyPath {
+                line += " key " + keyPath.joined(separator: ".")
+            }
+            if let listingSha = op.listingSha {
+                line += " listing " + listingSha
+            }
+            line += op.linkSha == nil ? "" : " link"
+            opLines.append(line)
+        }
+        XCTAssertEqual(opLines, [
+            "move from courses/ICS3U/section1/Tasks to courses/ICS3U/section1/Assessments listing 23dc9b20edc443f6a84df5c3cee6945e26e2916d80cebb537b821091f00992df",
+            "move from courses/ICS3U/section2/Tasks to courses/ICS3U/section2/Assessments listing 27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b",
+            "writeFile path courses/ICS3U/section1/Assessments/Quiz 1.md",
+            "writeFile path courses/ICS3U/section1/index.md",
+            "editJSON path courses/ICS3U/course_config.json key expandable",
+            "editJSON path courses/ICS3U/course_config.json key hidden",
+            "editJSON path courses/ICS3U/course_config.json key per_section_folders",
+        ])
     }
 
     // MARK: - Part six: one piece of work the whole app knows about
