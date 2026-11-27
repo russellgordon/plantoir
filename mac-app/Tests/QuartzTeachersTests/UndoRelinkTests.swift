@@ -2007,6 +2007,75 @@ final class UndoRelinkTests: XCTestCase {
         }
     }
 
+    // MARK: - #1055 M3
+
+    /// #1055 M3: a `move` whose `from` and `to` are one place carrying the
+    /// relinking pair is a shape this version cannot read, as before mac-1:
+    /// the link holding the new text, as the step left it, is judged by
+    /// neither Undo nor Redo; the door refuses it before anything changes;
+    /// a step another version wrote holding it is a barrier, never undone,
+    /// never redone, never a reason to clear; the link keeps its text.
+    func testARelinkWhereTheLinkStandsIsAShapeThisVersionCannotRead() throws {
+        let laid: LaidRelink = try layARelinkWhereItStands(named: "m3-not-readable", leads: .inside)
+        try FileManager.default.removeItem(at: laid.root.appendingPathComponent(section + "Unit 1, Day 4.md"))
+        try layLink(section + "Unit 1, Day 4.md", holding: laid.newText, root: laid.root)
+        XCTAssertFalse(UndoOp.shapeIsKnown(laid.op))
+        let line: Data = try JSONEncoder().encode(laid.op)
+        XCTAssertFalse(try JSONDecoder().decode(UndoOp.self, from: line).isReadable)
+
+        let before: [String: String] = try folderNow(laid.root)
+        let blobs: [Data] = [Data(laid.oldText.utf8), Data(laid.newText.utf8)]
+        let places: UndoMemoryPlaces = UndoMemoryPlaces()
+        let refused: JournaledWriteOutcome = JournaledWrite.perform(
+            ops: UndoContractKinds.draft(ops: [laid.op], blobs: blobs, root: laid.root, action: "insertClass"),
+            in: laid.journal, mode: .live, places: places
+        )
+        XCTAssertEqual(refused, .refused(.notReadable))
+        XCTAssertEqual(try folderNow(laid.root), before)
+
+        let ops: String = "[" + String(decoding: line, as: UTF8.self) + "]"
+        try UndoContractKinds.appendAStepChangingNothing(ops: ops, root: laid.root, journal: laid.journal)
+        XCTAssertEqual(laid.journal.undoNewest(resolveRoot: { _ in laid.root }, places: places), .notAvailable)
+        XCTAssertEqual(laid.journal.redoNewest(resolveRoot: { _ in laid.root }, places: places), .notAvailable)
+        XCTAssertEqual(try folderNow(laid.root), before)
+        XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: laid.root), laid.newText)
+        XCTAssertEqual(try laid.journal.read().records.count, 1, "nothing is cleared")
+    }
+
+    /// #1055 M3 keeps the rename that changes both case and Unicode
+    /// normalisation in the last part: a capitalisation-only move, judged
+    /// as the step left it each way, as today.
+    func testACapitalisationAndNormalisationRenameIsStillACapitalisationOnlyMove() throws {
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "m3-case-and-normalisation")
+        let content: String = "{\"site_id\": \"aaa-111\"}\n"
+        let to: String = "courses/TST1O/m/\u{00C9}cole.json"
+        try UndoContractReplay.write(content, to: to, in: place.root)
+        let given: [String: Any] = [
+            "kind": "move",
+            "from": "courses/TST1O/m/e\u{0301}cole.json",
+            "to": to,
+            "sha": UndoHash.sha256(of: Data(content.utf8))
+        ]
+        let op: UndoOp = try JSONDecoder().decode(UndoOp.self, from: JSONSerialization.data(withJSONObject: given))
+        XCTAssertTrue(op.isReadable)
+        let state: UndoOpState = UndoCheck.wholeState(of: op, root: place.root, places: UndoMemoryPlaces())
+        XCTAssertEqual(UndoCheck.verdict(for: state, direction: .backward), .canUndo)
+        XCTAssertEqual(UndoCheck.verdict(for: state, direction: .forward), .alreadyRedone)
+    }
+
+    /// #1055 M3 leaves U4b3's two-place relink alone (M4 removes it): the
+    /// new link at its new place and the old place free is as the step
+    /// left it, each side judged by its own text.
+    func testATwoPlaceRelinkIsStillReadAndJudgedAsToday() throws {
+        let laid: LaidRelink = try layARelink(named: "m3-two-place", leads: .inside)
+        try makeItForward(laid)
+        XCTAssertTrue(laid.op.isReadable)
+        XCTAssertNotEqual(laid.op.from, laid.op.to)
+        let state: UndoOpState = UndoCheck.wholeState(of: laid.op, root: laid.root, places: UndoMemoryPlaces())
+        XCTAssertEqual(UndoCheck.verdict(for: state, direction: .backward), .canUndo)
+        XCTAssertEqual(UndoCheck.verdict(for: state, direction: .forward), .alreadyRedone)
+    }
+
     // MARK: - Helpers
 
     /// A link at Day 4 and the op moving it to Day 5 with a new text: in
