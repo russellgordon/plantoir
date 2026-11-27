@@ -206,8 +206,19 @@ public static class SpecialFolderRenamer
         catch (Exception) { return null; }
     }
 
+    /// <summary>A rename record as read (W8b-18a tests first: not yet read by shape).</summary>
+    internal sealed record RenameRecordNote(string From, string To, string Scope, IReadOnlyList<string>? Moved, IReadOnlyList<string> MayHaveMoved);
+
+    /// <summary>Tests first (W8b-18a): the record read as today, each key by its text, no other key.</summary>
+    internal static RenameRecordNote? ReadRenameRecord(byte[]? bytes)
+    {
+        var note = RenameRecordObject(bytes);
+        if (note is null || note["from"] is null || note["to"] is null || note["scope"] is null) return null;
+        return new RenameRecordNote(note["from"]!.ToString(), note["to"]!.ToString(), note["scope"]!.ToString(), null, new List<string>());
+    }
+
     /// <summary>The record's note from its bytes, or null when they are not a record (not JSON, or not an object).</summary>
-    internal static JObject? RenameRecordNote(byte[]? bytes)
+    internal static JObject? RenameRecordObject(byte[]? bytes)
     {
         if (bytes is null) return null;
         try { return JToken.Parse(Encoding.UTF8.GetString(bytes)) as JObject; }
@@ -393,7 +404,7 @@ public static class SpecialFolderRenamer
                 throw new RenameException(error.Message);
             }
 
-            if (moves.Count > 0) record.RenameIsStarting();
+            if (moves.Count > 0) record.RenameIsStarting(moves, sectionNumbers);
             try { step.Make(); }
             catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince && attempts < 3)
             {
@@ -920,7 +931,7 @@ internal sealed class RenameRecordClaim
     // ---- Functions -------------------------------------------------------------------
 
     /// <summary>Written BEFORE the rename's step is made, when folders will move.</summary>
-    internal void RenameIsStarting()
+    internal void RenameIsStarting(IReadOnlyList<(string From, string To, int? Section)> moves, IReadOnlyList<int> sectionNumbers)
     {
         SpecialFolderRenamer.RecordRenameStarting(_oldName, _newName, _scope, _courseDirectory);
         _thisRunWroteTheRecord = true;
@@ -937,7 +948,7 @@ internal sealed class RenameRecordClaim
     /// <summary>The step is made, so this rename is whole.</summary>
     internal void RenameIsWhole()
     {
-        JObject? earlier = SpecialFolderRenamer.RenameRecordNote(_earlierRecord);
+        JObject? earlier = SpecialFolderRenamer.RenameRecordObject(_earlierRecord);
         bool finishesTheRecordedRename = SpecialFolderRenamer.RecordNames(earlier, _oldName, _newName, _scope);
         bool recordsThisFolder = SpecialFolderRenamer.RecordNamesTheFolder(earlier, _oldName, _scope);
         bool oldNameIsGone = _thisRunWroteTheRecord || _changesTheSettings;

@@ -604,6 +604,23 @@ public class SpecialFolderRenamerTests : IDisposable
         Assert.DoesNotContain("could not tidy", Trail());
     }
 
+    /// <summary>The kept record says what this run moves, as the contract's array (#899 W8b-18a).</summary>
+    [Fact]
+    public void ARenameThatStoppedPartWayKeepsARecordThatSaysWhatItMoves()
+    {
+        TheRecordCourse();
+        File.SetAttributes(Path.Combine(RecordCourse, "section1", "index.md"), FileAttributes.ReadOnly);
+
+        Assert.Throws<SpecialFolderRenamer.RenameException>(
+            () => RenameAsTheSheetDoes(seams: new UndoSeams { PutBackFailsAt = _ => true }));
+
+        var note = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(RecordPath));
+        var moved = note["moved"] as Newtonsoft.Json.Linq.JArray;
+        Assert.NotNull(moved);
+        Assert.Equal(new[] { "section1/Assessments", "section2/Assessments" }, moved!.Select(place => place.ToString()).ToArray());
+        Assert.Null(note["mayHaveMoved"]);
+    }
+
     [Fact]
     public void APutBackThatFailsAfterARefusalSaysDidNotRenameOnTheTrail()
     {
