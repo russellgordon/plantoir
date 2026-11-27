@@ -13,7 +13,7 @@ namespace Plantoir.Tests;
 /// code, then read back by the built site's reading.
 /// </summary>
 [Collection(SharedActivityState.Name)]
-public class StartOfYearTests : IDisposable
+public partial class StartOfYearTests : IDisposable
 {
     private const string Code = "TEST";
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "plantoir-tests", "soy-" + Guid.NewGuid().ToString("N"));
