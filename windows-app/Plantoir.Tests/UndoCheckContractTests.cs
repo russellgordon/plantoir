@@ -230,12 +230,6 @@ public sealed class UndoCheckContractTests : IDisposable
     public void EveryCheckCase(string name) =>
         JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, JudgeOnTheDisk);
 
-    /// <summary><see cref="EveryCheckCase"/> for the cases that lay a link holding the case's own target.</summary>
-    [SymbolicLinkTheory]
-    [MemberData(nameof(LinkMoveCases))]
-    public void EveryLinkMoveCheckCase(string name) =>
-        JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, JudgeOnTheDisk);
-
     /// <summary>One case, judged by <paramref name="judge"/> on the op <paramref name="readOp"/> reads, and held or not as <paramref name="entries"/> say.</summary>
     internal static void JudgeAsTheLedgerSays(string name, IEnumerable<NamedGapLedger.Entry> entries,
                                               Func<JsonElement, UndoOp> readOp,

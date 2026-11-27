@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): Plantoir has no link code beyond reading and writing through a link.
+
 # U4b2-14: a-moved-link-is-judged-by-its-bytes (#899)
 
 Branch `issue/899-u4b2-14-a-moved-link-is-judged-by-its-bytes`, from `origin/issue/899-u4b2-10-carried-subfolder-left-out` 78671eafc (which holds `dev` 811c956ce and pieces 9 and 10). `origin/dev` merged before proving and again before hand-back: both "Already up to date" (`dev` still 811c956ce), so no merge commit. (Merged on 2026-11-26 in `night25/integration-7`, 69b247fd5, with U4b2-11 to U4b2-15. "For PROGRESS" and "For documentation 12" are folded into `windows-app/PROGRESS.md` and documentation 12. Piece 15, merged beside this one, made Rename folder move a folder that is a link and reworded `undo.rule.shadow`; the lines below that say the writers and that clause are unchanged are this piece's record as it stood.)

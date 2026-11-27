@@ -83,11 +83,6 @@ public sealed class UndoStackContractTests
     [MemberData(nameof(Cases))]
     public void EveryStackCase(string name) => RunAsTheLedgerSays(name, NamedGapLedger.All, () => WalkTheCase(name));
 
-    /// <summary><see cref="EveryStackCase"/> for the cases that lay a symbolic link.</summary>
-    [SymbolicLinkTheory]
-    [MemberData(nameof(LinkCases))]
-    public void EveryLinkStackCase(string name) => RunAsTheLedgerSays(name, NamedGapLedger.All, () => WalkTheCase(name));
-
     /// <summary>
     /// One case, walked by <paramref name="walk"/>, held or not as
     /// <paramref name="entries"/> say. <see cref="EveryStackCase"/> passes the
