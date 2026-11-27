@@ -266,6 +266,24 @@ _ran_by_name_list="/tmp/verify_ran_by_name.list"
 : >"$_ran_by_name_list"
 ran_by_name() { printf '%s\n' "$1" >>"$_ran_by_name_list"; printf '%s' "$1"; }
 tests_run_by_name_later="test_build_site_domain_resolution.py test_class_folder.py test_coverage_tab.py test_dates_follow_the_class.py test_folder_titles.py test_front_page_lines_resolve.py test_front_page_title_repair.py test_graded_folders.py test_links_checklist.py test_links_into_hidden_pages.py test_netlify_paths.py test_page_sources.py test_published_pages_record.py test_social_card_fonts.py test_unreadable_page_settings.py"
+# A run line that hands python3 a scripts/test_*.py without ran_by_name would
+# be missing from the list, so the discovery would run that file a second
+# time (#1052). Comment, echo, printf, pass and fail lines are left out. The
+# script reads itself by its own name: it has moved into its folder already.
+_this_script="$(basename "${BASH_SOURCE[0]}")"
+if [ ! -r "$_this_script" ]; then
+  fail "verify.sh could not read itself ($_this_script) to check its run lines (#1052)"
+fi
+_bare_run_lines="$(grep -nE 'python3' "$_this_script" \
+  | grep -E '(scripts/|python3( -[A-Za-z]+)* +"?)test_[A-Za-z0-9_]+\.py' \
+  | grep -v 'ran_by_name' \
+  | grep -vE '^[0-9]+:[[:space:]]*(#|echo|printf|pass|fail)' || true)"
+if [ -z "$_bare_run_lines" ]; then
+  pass "every scripts/test_*.py run line in verify.sh goes through ran_by_name (#1052)"
+else
+  fail "these verify.sh lines run a scripts/test_*.py without ran_by_name, so the discovery would run it again (#1052):"
+  printf '%s\n' "$_bare_run_lines"
+fi
 
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
