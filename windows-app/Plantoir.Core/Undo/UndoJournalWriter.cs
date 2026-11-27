@@ -70,6 +70,9 @@ internal sealed class UndoJournalWriter : IDisposable
     /// </summary>
     internal HashSet<long> LeftForARederivingRecovery { get; } = [];
 
+    /// <summary>The list this writer holds the lock of.</summary>
+    internal UndoJournal Journal => _journal;
+
     /// <summary>The list as read fresh when the lock was taken, with every line this writer has appended.</summary>
     internal UndoFolded Folded { get; private set; }
 

@@ -325,6 +325,15 @@ public static class ActivityTrail
         /// </summary>
         UndoCouldNotPutBack,
         /// <summary>
+        /// A restore replaced files of a step left in flight (#899, the mac's
+        /// restore piece; <c>UndoRestoreSetAside</c>): the step set aside,
+        /// closed or only for the files replaced, once per step, with how
+        /// many files were set aside and how many are still settled as before.
+        /// Nothing is shown to the teacher, so this line is the only place it
+        /// is said. Counts only, never page text.
+        /// </summary>
+        UndoSetAsideByARestore,
+        /// <summary>
         /// Undo's recovery settled a step and left a kept original beside a
         /// page because it is the only copy of what it holds, each with its
         /// page, its hidden name and why (#899 W4c). Never page text.
@@ -983,6 +992,7 @@ public static class ActivityTrail
         Event.UndoFoundAFolderSetAside => "undo found a folder set aside",
         Event.UndoKeptAPageUnderAVisibleName => "undo kept a page under a visible name",
         Event.UndoCouldNotPutBack => "undo could not put back a change that stopped",
+        Event.UndoSetAsideByARestore => "undo set aside a change a restore replaced",
         Event.UndoKeptWhatAPageHeld => "undo kept what a page held",
         Event.UndoKeptWhatItReplaced => "undo kept what it replaced",
         Event.UndoRefusedForAChangeLeftPartWay => "undo refused for a change left part way",

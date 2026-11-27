@@ -21,6 +21,14 @@ internal sealed class UndoFoldedStep
     /// <summary>Every segment that holds an event about it.</summary>
     internal SortedSet<int> Segments { get; } = [];
 
+    /// <summary>
+    /// The files a restore replaced while it was in flight, each once
+    /// (<c>filesReplacedByARestore</c> lines, #899; the mac's
+    /// <c>setAsidePaths</c>): recovery never judges, writes or re-derives
+    /// them (<see cref="UndoRestoreSetAside.StepWithout"/>).
+    /// </summary>
+    internal List<string> SetAsidePaths { get; } = [];
+
     internal long Seq => Step.Seq;
     internal bool Readable => Step.Readable;
 
@@ -110,6 +118,7 @@ internal sealed class UndoFolded
         {
             var stepCopy = new UndoFoldedStep { Step = step.Step, State = step.State, Process = step.Process, MarkedByAClearing = step.MarkedByAClearing };
             foreach (int segment in step.Segments) stepCopy.Segments.Add(segment);
+            stepCopy.SetAsidePaths.AddRange(step.SetAsidePaths);
             copy.Steps[seq] = stepCopy;
         }
         foreach (UndoBarrier barrier in Barriers)
@@ -131,8 +140,9 @@ internal sealed class UndoFolded
 /// for row, as text; <c>UndoFoldMovesContractTests</c> compares it with the
 /// JSON so a row added or changed on the mac is red here, and exercises every
 /// row against <see cref="Fold"/>. The fold itself is written as code beside
-/// it, one case per row, because three rows are rules rather than lookups (a
-/// clearing by seq, a step in flight marked, a note passed over).</para>
+/// it, one case per row, because four rows are rules rather than lookups (a
+/// clearing by seq, a step in flight marked, a note passed over, a restore's
+/// files set aside).</para>
 /// </summary>
 internal static class UndoFold
 {
@@ -161,6 +171,7 @@ internal static class UndoFold
         new("in flight, seq <= the cleared line's", "cleared",
             "(still in flight, marked) then cleared when its work ends in done or undone (undo.rule.clearing)"),
         new("anything", "note", "(no move: passed over)"),
+        new("in flight (begun, undoing, redoing)", "filesReplacedByARestore", "(no move: its paths join the step's files set aside)"),
         new("anything else", "any other event", "(ignored)"),
     ];
 
@@ -249,6 +260,18 @@ internal static class UndoFold
         // An event for a seq with no begin is ignored.
         if (!folded.Steps.TryGetValue(seq, out UndoFoldedStep? target)) return;
         target.Segments.Add(line.Segment);
+
+        if (line.Event == UndoEvent.FilesReplacedByARestore)
+        {
+            // No move: the files join those set aside while it is in flight;
+            // ignored for a step not in flight, as any event that does not follow.
+            if (!target.IsInFlight) return;
+            foreach (string path in line.Paths)
+            {
+                if (!target.SetAsidePaths.Contains(path, StringComparer.Ordinal)) target.SetAsidePaths.Add(path);
+            }
+            return;
+        }
 
         UndoStepState? next = (target.State, line.Event, line.Phase) switch
         {
