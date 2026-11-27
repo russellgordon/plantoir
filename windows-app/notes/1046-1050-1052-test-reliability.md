@@ -188,3 +188,60 @@ changed here).
 - Step 0.5 alone (lines 1 to 109 and step 0.5 of `verify.sh`, the terminal check and lock left out; `.dd/step05-fix1b.log`): **PASS 138, FAIL 0, `FAILED=false`** (141 before, less the 3 duplicate runs). Printed: "119 run by name in this script, 14 found and run by the discovery"; `test_handout_starters.py` "skipped 1 of its own test case(s)". Checked by script against the run's own list and log: each of the 133 `scripts/test_*.py` ran exactly once in step 0.5, or is in `tests_run_by_name_later` (image runs) and ran zero times there. The first run of this round (`step05-fix1.log`) was 136 and 2, the two readers above; fixed.
 - The end-of-run check of `tests_run_by_name_later` sits before the summary and was not run (it needs the image steps; the director's gate runs it). It would go red if a later step that names a listed file is ever made conditional and skipped.
 
+
+## Fix round two (review 2, 2026-11-27)
+
+Merged `origin/dev` before proving and before handing back.
+
+**#1046 (MEDIUM 1).** The test now sees ORDER. Right after the two
+`loadIfNeeded` calls it asserts `appLoadsHandedToWebKit` is still 0, and
+right after `showFreshBuild` that it is still 1, each before its wait.
+`removeData`'s completion comes on a later turn of the main run loop, so
+when the load is handed over in that completion the count cannot have
+moved yet; a load handed to WebKit before the caches are emptied moves it
+at once and goes red. No timed wait, no poll, no GCD.
+
+**#1046 (LOW 1).** The fresh-build test's address is back to
+`http://127.0.0.1:8081/`, as on `dev`. Round one's move to `localhost` was
+not needed: nothing in the test depends on the host name, and the restored
+test is green 20 of 20 with it.
+
+**#1052 (LOW 3).** At the start of step 0.5, `verify.sh` reads itself and
+fails if any line that is not a comment, `echo`, `printf`, `pass` or `fail`
+hands `python3` a `test_*.py` (as `scripts/test_x.py`,
+`/opt/scripts/test_x.py`, or bare inside `cd scripts`) without
+`ran_by_name`. Such a line would be missing from the list, and the
+discovery would run that file a second time. It reads itself by its own
+base name, since it has already moved into its folder, and fails if it
+cannot. Proved on copies: the real `verify.sh` PASS; with a planted
+`(cd scripts && python3 -B test_planted_bare.py)` line FAIL, naming line
+301; with a planted image-style `python3 /opt/scripts/test_planted_bare.py`
+line FAIL too.
+
+**#1050 (LOW 2), noted only.** The 0.6 s settle after the sheet attaches is
+removed, and that removal is shown only by green runs (59 of 59 across the
+four classes in round one), not by an event. If a sizing test that reads
+`sheet.frame`, a table width or a row count right after `SheetHost.init`
+is ever reported flaky, look here first.
+
+**LOW 4** (the stale docstring in
+`scripts/test_build_keeps_a_readonly_hidden_page_hidden.py`) stays out of
+this branch, as in round one.
+
+### Must-fail and runs (fix round two)
+
+| Check | Sabotage | Result | Log |
+|---|---|---|---|
+| #1046 order | load handed to WebKit before `removeData`, nothing in its completion | RED 3 of 3 (line 69: 1 is not 0; line 79: 2 is not 1) | `run-fix2-sabotage.log` |
+| #1052 bare run line | planted bare `python3` run lines (two forms) in copies of `verify.sh` | FAIL, naming the line, both times; real file PASS | by hand, in the scratchpad |
+
+- `run-fix2-20.log`: WebPreviewControllerTests, 20 iterations, restored
+  code: 60 tests, 0 failures (the fresh-build test passed 20 of 20).
+- Step 0.5 alone (lines 1 to 109 and step 0.5 of `verify.sh`, the terminal
+  check and lock left out; `.dd/step05-fix2b.log`): **PASS 139, FAIL 0,
+  `FAILED=false`** (round one's 138 plus the new check). Printed "119 run by
+  name in this script, 14 found and run by the discovery";
+  `test_handout_starters.py` "skipped 1 of its own test case(s)". A first
+  run (`step05-fix2.log`) was 138 and 1: the one FAIL was round one's
+  `scripts/__pycache__` (written at 12:19, before that run began), which was
+  removed before the second run; this change writes none.
