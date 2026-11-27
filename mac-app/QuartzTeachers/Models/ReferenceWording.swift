@@ -156,6 +156,24 @@ nonisolated enum ReferenceWording {
         return "\(course)'s school year could not be saved. Try again in a moment."
     }
 
+    /// The alert's message when a settings change stopped part way and
+    /// Plantoir could not finish it (#899, Russell's ruling of 2026-11-26;
+    /// `shared-rules.json` → `settingCouldNotBeChanged`). `setting` is the
+    /// setting's name in lower case: "school year".
+    static func settingCouldNotBeChanged(setting: String) -> String {
+        return "The \(setting) could not be changed."
+    }
+
+    /// The alert's informative text: what Put It Back does, in plain words
+    /// (`settingCanBePutBack`). Never a file name or a kept copy.
+    static func settingCanBePutBack(value: String) -> String {
+        return "Plantoir can put it back to \(value)."
+    }
+
+    /// Not Now (cancel, leading) and Put It Back (the default, trailing).
+    static let notNowButton: String = "Not Now"
+    static let putItBackButton: String = "Put It Back"
+
     /// The trail line for a year that moved.
     ///
     /// Names BOTH the code a teacher reads and the folder, because the two

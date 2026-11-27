@@ -61,6 +61,11 @@ nonisolated enum JournaledStepError: Error, LocalizedError, Equatable {
     /// (`AssistWording.publishStoppedPartWay`).
     case leftPartWay(UndoRefusal, fileName: String, keptOriginals: [String])
 
+    /// A one-file JSON step stopped part way and could not be finished at
+    /// once (#899): left in flight as step `seq`, which the caller offers to
+    /// put back (`UndoStoppedStep.putBackAtOnce`).
+    case couldNotFinish(seq: Int, fileName: String)
+
     // MARK: - Computed properties
 
     var errorDescription: String? {
@@ -73,6 +78,8 @@ nonisolated enum JournaledStepError: Error, LocalizedError, Equatable {
                 said += " " + JournaledStepError.keptSentence(place: JournaledStepError.placeName(ofKept: kept), kept: kept)
             }
             return said
+        case .couldNotFinish(_, let fileName):
+            return CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: fileName]).localizedDescription
         case .couldNotRecordTheStep, .anotherChangeIsUnderWay:
             return CocoaError(.fileWriteUnknown).localizedDescription
         case .stoppedByATest:
@@ -817,6 +824,8 @@ nonisolated final class JournaledStep {
             throw JournaledStepError.couldNotRecordTheStep
         case .anotherChangeIsUnderWay:
             throw JournaledStepError.anotherChangeIsUnderWay
+        case .couldNotFinish(let seq, let refusal):
+            throw JournaledStepError.couldNotFinish(seq: seq, fileName: JournaledStep.fileName(in: refusal))
         case .stoppedByATest:
             throw JournaledStepError.stoppedByATest
         }
@@ -964,6 +973,8 @@ nonisolated final class JournaledStep {
             )
         case .anotherChangeIsUnderWay:
             throw JournaledStepError.anotherChangeIsUnderWay
+        case .couldNotFinish(let seq, let refusal):
+            throw JournaledStepError.couldNotFinish(seq: seq, fileName: JournaledStep.fileName(in: refusal))
         case .stoppedByATest:
             throw JournaledStepError.stoppedByATest
         }

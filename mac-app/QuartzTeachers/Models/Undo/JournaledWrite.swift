@@ -102,6 +102,11 @@ nonisolated enum JournaledWriteOutcome: Equatable, Sendable {
     /// for recovery; the teacher is told only part was changed.
     case leftPartWay(UndoRefusal, keptOriginals: [String])
 
+    /// A one-file JSON step stopped part way and its content could not be
+    /// judged or the step closed at once (`UndoStoppedStep.judgeAtOnce`):
+    /// left in flight, and the caller offers to put it back (#899).
+    case couldNotFinish(seq: Int, UndoRefusal)
+
     /// Nothing to change.
     case changedNothing
 
@@ -438,6 +443,13 @@ nonisolated enum JournaledWrite {
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             return .refused(refusal)
         case .notPutBack(let refusal, let keptOriginals):
+            // A one-file JSON step (a Course Settings field, Set School
+            // Year) is judged at once by content and closed, as recovery
+            // would close it, so nothing is left in flight while the app is
+            // open (#899, Russell's ruling of 2026-11-26).
+            if mode == .live && UndoStoppedStep.isOneFileJSONStep(draft.ops) {
+                return JournaledWrite.closedAtOnce(seq: seq, refusal: refusal, in: journal, places: places)
+            }
             // Left IN FLIGHT, never `failed`: a page may be new with its
             // original beside it, so recovery settles it from the content
             // once this process is gone (`undo.rule.recovery`).
@@ -455,6 +467,22 @@ nonisolated enum JournaledWrite {
         _ = recomputes
         finish(seq: seq, with: .applied, phase: nil, reason: nil, in: journal, mode: mode)
         return .applied(seq: seq)
+    }
+
+    /// The door's answer for a one-file JSON step judged at once after it
+    /// stopped part way: made, put back (nothing changed, said as a
+    /// refusal is), or left for the caller to offer Put It Back.
+    static func closedAtOnce(
+        seq: Int, refusal: UndoRefusal, in journal: UndoJournal, places: UndoExternalPlaces
+    ) -> JournaledWriteOutcome {
+        switch UndoStoppedStep.judgeAtOnce(seq: seq, in: journal, places: places) {
+        case .finished(let finishedSeq):
+            return .applied(seq: finishedSeq)
+        case .putBack:
+            return .refused(refusal)
+        case .couldNotFinish(let leftSeq):
+            return .couldNotFinish(seq: leftSeq, refusal)
+        }
     }
 
     /// What the door found when it vetted a step before writing anything.
