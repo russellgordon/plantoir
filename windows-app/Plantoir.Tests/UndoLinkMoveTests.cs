@@ -415,6 +415,20 @@ internal static class UndoReparsePoints
         return null;
     }
 
+    /// <summary>Sets the reparse point on the EMPTY folder at <paramref name="folder"/>: null when set, else why not (#899 W8b-15a).</summary>
+    internal static string? MakeOnAFolder(string folder, uint tag, byte[] data)
+    {
+        using SafeFileHandle handle = CreateFileW(folder, GenericWrite, 0, IntPtr.Zero, OpenExisting, BackupSemantics | OpenReparsePoint, IntPtr.Zero);
+        if (handle.IsInvalid) return "the folder could not be opened (" + Marshal.GetLastWin32Error() + ")";
+        byte[] buffer = new byte[8 + data.Length];
+        BitConverter.GetBytes(tag).CopyTo(buffer, 0);
+        BitConverter.GetBytes((ushort)data.Length).CopyTo(buffer, 4);
+        data.CopyTo(buffer, 8);
+        if (!DeviceIoControl(handle, SetReparsePoint, buffer, buffer.Length, IntPtr.Zero, 0, out _, IntPtr.Zero))
+            return "FSCTL_SET_REPARSE_POINT answered " + Marshal.GetLastWin32Error();
+        return null;
+    }
+
     private const uint GenericWrite = 0x40000000;
     private const uint OpenExisting = 3;
     private const uint BackupSemantics = 0x02000000;
