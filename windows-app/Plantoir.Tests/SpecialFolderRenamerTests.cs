@@ -898,4 +898,126 @@ public class SpecialFolderRenamerTests : IDisposable
         }
         finally { SpecialFolderRenamer.LookingAtAPlaceFails = null; }
     }
+
+    // ------------------------------- window B's lows (#899 W8b, review 1)
+
+    /// <summary>Rename folder through a door with the list live, so an exception a seam throws before the door's begin reaches the make (shadow writes plainly instead).</summary>
+    private RenameOutcome RenameThroughALiveDoor(UndoSeams seams)
+    {
+        var list = new UndoForThisProcess(Path.Combine(_root, "state", "undo"), UndoMode.Live, null);
+        var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams, trail: list.Trail);
+        string configPath = Path.Combine(RecordCourse, "course_config.json");
+        var configuration = CourseConfiguration.Load(configPath);
+        var settings = SpecialFolderRenamer.RenamingTheSettings(configuration, configPath, "Tasks", "Assessments", FolderScope.PerSection, RecordCourse);
+        return SpecialFolderRenamer.Rename("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 }, settings, false, list, door);
+    }
+
+    /// <summary>LOW 1: a planning bug's exception from the make changed nothing, so no record is left for it, and the one-section restore is not greyed as a rename unfinished (the mac's catch-all puts the record back).</summary>
+    [Fact]
+    public void ABugsNullReferenceFromTheMakeLeavesNoRecord()
+    {
+        TheRecordCourse();
+
+        Assert.Throws<NullReferenceException>(
+            () => RenameThroughALiveDoor(new UndoSeams { BeforeTheBegin = () => throw new NullReferenceException() }));
+
+        Assert.True(Directory.Exists(InCourse("section1/Tasks")), "nothing was renamed");
+        Assert.False(File.Exists(RecordPath), "a rename that changed nothing leaves no record");
+        Assert.False(OneSectionRestore.RenameIsUnfinished(RecordCourse));
+    }
+
+    /// <summary>LOW 1: an ArgumentException from the make puts another folder's record back byte for byte.</summary>
+    [Fact]
+    public void ABugsArgumentExceptionFromTheMakePutsTheEarlierRecordBack()
+    {
+        TheRecordCourse();
+        LayTheRecord(AnotherFoldersRecord);
+
+        Assert.Throws<ArgumentException>(
+            () => RenameThroughALiveDoor(new UndoSeams { BeforeTheBegin = () => throw new ArgumentException("a planning bug") }));
+
+        Assert.Equal(AnotherFoldersRecord, File.ReadAllBytes(RecordPath));
+    }
+
+    /// <summary>LOW 1: a test's stop is its own type, and keeps this run's record, as a process that died there (the mac's stoppedByATest).</summary>
+    [Fact]
+    public void ATestsStopKeepsThisRunsRecord()
+    {
+        TheRecordCourse();
+
+        Assert.ThrowsAny<InvalidOperationException>(
+            () => RenameAsTheSheetDoes(seams: new UndoSeams { StopsHere = (point, index) => point == "beforeSwap" }));
+
+        Assert.True(File.Exists(RecordPath), "a stop is a process that died there: its record stays");
+    }
+
+    /// <summary>LOW 6 (the mac does the same): a record that could not be read when the rename started is removed by a refusal, since the claim read it as none.</summary>
+    [Fact]
+    public void ARecordUnreadableAtTheStartIsRemovedByARefusal()
+    {
+        TheRecordCourse();
+        LayTheRecord(AnotherFoldersRecord);
+        RenameRecordClaim record;
+        using (new FileStream(RecordPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            record = new RenameRecordClaim("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, changesTheSettings: false);
+        record.RenameIsStarting(new List<(string, string, int?)> { (InCourse("section1/Tasks"), InCourse("section1/Assessments"), 1) }, new[] { 1, 2 });
+
+        record.NothingWasChanged();
+
+        Assert.False(File.Exists(RecordPath), "today: read as none at the start, so put back as none");
+    }
+
+    /// <summary>
+    /// A place under the test's root (under the account folder on the PC) whose
+    /// look the system truly refuses with an I/O error: a name it will not
+    /// take. A deny entry is read past by the PC's account (measured, run
+    /// w8b-wbl-a: the look saw a Folder), so a name the system refuses is the
+    /// look that fails on every machine.
+    /// </summary>
+    private string APlaceTheSystemWillNotLookAt() => InCourse("section1/not|a name");
+
+    /// <summary>LOW 3: the real capture in <c>UndoLinks.Look</c>, on a place the system truly refuses to look at: a reason is kept, never "nothing there".</summary>
+    [Fact]
+    public void ALookTheSystemRefusesKeepsItsReason()
+    {
+        Directory.CreateDirectory(InCourse("section1"));
+
+        var what = UndoLinks.Look(APlaceTheSystemWillNotLookAt(), out string? said);
+
+        Assert.Equal(UndoLinks.What.CannotLook, what);
+        Assert.False(string.IsNullOrWhiteSpace(said), "the system's reason is kept");
+    }
+
+    /// <summary>LOW 2: the unreadable clause names the place as the course does and the system's short reason, from the real look: no drive, no account folder, no backslash path (the mac's strerror).</summary>
+    [Fact]
+    public void AnUnreadablePlaceIsToldWithAShortReasonAndNoPath()
+    {
+        Directory.CreateDirectory(InCourse("section1/Assessments"));
+        Directory.CreateDirectory(InCourse("section2/Assessments"));
+        string refused = InCourse("section1/Assessments");
+        // The seam hands over what the REAL look said at a place it refuses.
+        SpecialFolderRenamer.LookingAtAPlaceFails = path =>
+        {
+            if (!string.Equals(Path.GetFullPath(path), Path.GetFullPath(refused), StringComparison.OrdinalIgnoreCase)) return null;
+            return UndoLinks.Look(APlaceTheSystemWillNotLookAt(), out string? said) == UndoLinks.What.CannotLook ? said : null;
+        };
+        try
+        {
+            var left = SpecialFolderRenamer.FoldersAtTheirNewName("Tasks", "Assessments", FolderScope.PerSection, RecordCourse, new[] { 1, 2 },
+                                                                  new[] { (InCourse("section1/Assessments"), false), (InCourse("section2/Assessments"), false) }, null);
+            var ending = SpecialFolderRenamer.PartWayEnding("Tasks", "Assessments", "ICS3U", FolderScope.PerSection, left, 0, "stopped");
+
+            string unreadable = Assert.Single(left.Unreadable);
+            Assert.StartsWith("section1/Assessments (", unreadable, StringComparison.Ordinal);
+            Assert.True(unreadable.Length > "section1/Assessments ()".Length, "a reason is given");
+            foreach (string said in new[] { unreadable, ending.Sentence, ending.Line })
+            {
+                Assert.DoesNotContain(":\\", said);
+                Assert.DoesNotContain("\\", said);
+                Assert.DoesNotContain(Environment.UserName, said, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(_root, said, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        finally { SpecialFolderRenamer.LookingAtAPlaceFails = null; }
+    }
 }
