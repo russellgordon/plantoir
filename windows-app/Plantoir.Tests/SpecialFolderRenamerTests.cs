@@ -728,8 +728,9 @@ public class SpecialFolderRenamerTests : IDisposable
         {
             EachRename = (from, onto) =>
             {
-                bool puttingSectionTwoBack = string.Equals(Path.GetFullPath(from), sectionTwosNewPlace, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(Path.GetFullPath(onto), sectionTwosOldPlace, StringComparison.OrdinalIgnoreCase);
+                // Compared by their ends: the swap may name them with the long-path prefix.
+                bool puttingSectionTwoBack = from.EndsWith(sectionTwosNewPlace.Substring(2), StringComparison.OrdinalIgnoreCase)
+                    && onto.EndsWith(sectionTwosOldPlace.Substring(2), StringComparison.OrdinalIgnoreCase);
                 if (puttingSectionTwoBack) File.WriteAllText(sectionTwosOldPlace, "made meanwhile");
             },
         };
