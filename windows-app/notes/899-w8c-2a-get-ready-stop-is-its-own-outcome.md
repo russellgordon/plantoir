@@ -24,11 +24,12 @@ Branch `issue/899-w8c-2a-get-ready-stop-is-its-own-outcome`, based on `origin/da
 
 ## Must-fail lines
 
-`vm-tools/guest/899-w8c-2a-mustfail.json`, run in PC run `w8c-2a-a`: see "Runs".
+`vm-tools/guest/899-w8c-2a-mustfail.json`: 4 of 4 RED in PC run `w8c-2a-b` (see "Runs").
 
 ## Runs
 
-- PC `C:\vm-setup\w8c-2a-a` (`899-w8c-2a-launch-a.ps1`): red run of dcef14d64, classes and must-fail on a0a2273ab. Result: see below.
+- PC `C:\vm-setup\w8c-2a-a` (`899-w8c-2a-launch-a.ps1`): tests commit dcef14d64 RED (does not compile: `StartOfYearStoppedPartWay`, `StartOfYearOutcome.StoppedPartWay` and `ActivityTrail.StartOfYearStoppedPartWayLine` do not exist, `StartOfYearTests.StoppedPartWay.cs` lines 138, 146, 157, 175). On a0a2273ab both builds exit 0; 259 of 260: `StoppedPartWayCasesAsTheContractSays` asserted two visible planned pages where the plain year lays out three (my number, not the contract's), fixed in 98bab3297. Lock taken and released by the run.
+- PC `C:\vm-setup\w8c-2a-b` (`899-w8c-2a-launch-b.ps1`) on 98bab3297: both builds exit 0; `StartOfYearTests`, `StartOfYearSheetTests`, `UndoStartOfYearStepTests`, `ActivityTrailWiringTests`, `NamedGapLedgerTests`, `UndoWriterScanTests`, `UndoOpKindsContractTests`, `UndoStackContractTests`: 260 of 260 passed. Must-fail 4 of 4 RED: (1) `StoppedPartWayCasesAsTheContractSays` "Assert.Null() Failure" (the nothing-written case got an offer); (2) the same and `NoOfferWhenNoBackupItemCanBeMade`, the part-way line not found; (3) `TheStoppedPartWayLineCountsWhatWasKept`, strings differ; (4) `TheRestoreOfferWordsAreTheContracts` and `EverySentenceIsTheContracts`, "startOfYear.wording.leaveAsItIsButton differs". Restored 260 of 260; HEAD unchanged, tree clean; lock released by the run.
 
 ## Left for the next piece
 
@@ -37,3 +38,12 @@ Branch `issue/899-w8c-2a-get-ready-stop-is-its-own-outcome`, based on `origin/da
 ## For the director
 
 - The contract's `activityTrail.mustRecord` → `start of the year not done` line still reads only "did not get ready … — nothing was changed ({reason})"; the part-way line is on the same event on both platforms (the mac's piece did the same). Not changed here (no `contracts/` change allowed).
+
+## Self-check
+
+- Tests red first (compile), then green; must-fail 4 of 4 RED, restored byte for byte by `git checkout`.
+- One place decides part way: `error is not UndoStepLeftPartWayException`; no sentence compared.
+- Ledger: four rows and the constant gone; no other reason named the keys; the area constant stays.
+- No key added to a replay's `KeysChecked`; the new replay has its own known-key sets.
+- No run going, no lock held; the only lock touched was this run's own.
+- `origin/dev` (99499d6b7) is in the base; no merge needed.
