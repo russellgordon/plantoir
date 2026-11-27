@@ -1164,13 +1164,14 @@ internal static class UndoRecovery
         IUndoExternalPlaces where = places ?? new UndoAppSettingsPlaces();
         // Each page is read once. A place that now leads outside the folder
         // (a junction since) is read through nothing: it is in the way. A
-        // carried edit is read where its folder is now.
+        // carried edit is read where its folder is now. A link at a page's
+        // place is not a file (W8b-21c2).
         var currents = new Dictionary<string, UndoCurrent?>(StringComparer.Ordinal);
         foreach (UndoOp op in step.Ops)
         {
             if (op.IsWhole || op.Kind == UndoOp.Recompute || op.Path is not { } path || currents.ContainsKey(path)) continue;
             string readPath = carriers.TryGetValue(path, out UndoOp? carrier) ? PlaceNow(path, carrier, root) : path;
-            currents[path] = UndoPlaces.StaysInside(root, readPath) ? UndoCurrent.Read(UndoDoor.FullPath(root, readPath)) : null;
+            currents[path] = UndoPlaces.StaysInside(root, readPath) ? UndoCurrent.ReadWithoutFollowingALink(UndoDoor.FullPath(root, readPath)) : null;
         }
         // A handed-over place's two ops are judged together (W8b-21a3).
         IReadOnlyList<UndoHandover> handovers = UndoOp.Handovers(step.Ops);

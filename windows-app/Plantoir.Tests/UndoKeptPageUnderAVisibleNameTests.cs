@@ -115,8 +115,8 @@ public sealed class UndoKeptPageUnderAVisibleNameTests
     /// (<c>../library/Day 2.md</c>, forward slashes) was cannot tell, so
     /// recovery left the step in flight for good and the removed page stayed
     /// hidden; a link Windows writes was judged by its target's bytes (here
-    /// the op's after). MUST FAIL with the link followed by
-    /// <see cref="UndoCurrent.Read"/>.
+    /// the op's after). MUST FAIL with the link followed
+    /// (<see cref="UndoCurrent.ReadWithoutFollowingALink"/> reading through it).
     /// </summary>
     [Theory]
     [InlineData("../library/Day 2.md")]
@@ -133,7 +133,7 @@ public sealed class UndoKeptPageUnderAVisibleNameTests
         File.CreateSymbolicLink(place, target);
 
         Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(place));
-        Assert.IsType<UndoCurrent.NotAFile>(UndoCurrent.Read(place));
+        Assert.IsType<UndoCurrent.NotAFile>(UndoCurrent.ReadWithoutFollowingALink(place));
         (string judged, UndoOpState state) = Assert.Single(UndoRecovery.FileStates(scribe.Fold().Steps[seq].Step, scribe.FullPath("A", "")));
         Assert.Equal(Day2, judged);
         Assert.Equal(UndoOpState.Neither, state);

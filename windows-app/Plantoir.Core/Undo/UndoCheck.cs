@@ -53,7 +53,7 @@ internal abstract record UndoCurrent
 
     internal sealed record Absent : UndoCurrent;
     internal sealed record Folder : UndoCurrent;
-    /// <summary>A symbolic link or junction at the path (<see cref="UndoLinks.Look(string)"/>): not a file, never read through (the mac's <c>UndoItem.notAFile</c>, lstat).</summary>
+    /// <summary>A symbolic link or junction at the path (<see cref="UndoLinks.Look(string)"/>), as recovery judges a page's place (<see cref="ReadWithoutFollowingALink"/>): not a file, never read through (the mac's <c>UndoItem.notAFile</c>, lstat).</summary>
     internal sealed record NotAFile : UndoCurrent;
     internal sealed record Bytes(byte[] Content) : UndoCurrent;
     internal sealed record CannotReadNow(int ErrorCode) : UndoCurrent;
@@ -69,13 +69,6 @@ internal abstract record UndoCurrent
     /// <param name="open">A seam for tests (a cloud or network failure); the real open by default.</param>
     internal static UndoCurrent Read(string fullPath, Func<string, Stream>? open = null)
     {
-        // A link is not a file, and what it leads to is never read as the
-        // page (the mac's UndoItem.read, by lstat: notAFile). Read through, a
-        // link the mac writes (../library/Day 2.md) was cannot tell, so
-        // recovery left a step in flight for good and a page it removed stayed
-        // hidden (#899 W8b-21c2); a link Windows writes was judged by its
-        // target's bytes. One function says what a link is: UndoLinks.Look.
-        if (UndoLinks.Look(fullPath) == UndoLinks.What.Link) return new NotAFile();
         if (Directory.Exists(fullPath)) return new Folder();
         try
         {
@@ -104,6 +97,23 @@ internal abstract record UndoCurrent
             return new CannotReadNow(exception.HResult & 0xFFFF);
         }
     }
+
+    /// <summary>
+    /// <see cref="Read"/> as recovery judges a page op's place (<see cref="UndoRecovery.FileStates"/>):
+    /// a link there (<see cref="UndoLinks.Look(string)"/>, the one test of a
+    /// link) is <see cref="NotAFile"/>, and what it leads to is never read as
+    /// the page, as the mac's <c>UndoItem.read</c> (lstat) calls it
+    /// <c>notAFile</c>. Read through, a link the mac writes
+    /// (<c>../library/Day 2.md</c>) was cannot tell, so recovery left a step
+    /// that handed a place over in flight for good and the page it removed
+    /// stayed hidden (#899 W8b-21c2); a link Windows writes was judged by its
+    /// target's bytes. The door's plan and the swap's re-read still read a
+    /// page through its link: with the switch off, a step on a linked page is
+    /// written through its link, or a linked later class written plainly,
+    /// until W8b piece 22 moves the link itself (documentation 12).
+    /// </summary>
+    internal static UndoCurrent ReadWithoutFollowingALink(string fullPath) =>
+        UndoLinks.Look(fullPath) == UndoLinks.What.Link ? new NotAFile() : Read(fullPath);
 
     private static bool IsNotFound(IOException exception) => (exception.HResult & 0xFFFF) is 2 or 3;
 }
