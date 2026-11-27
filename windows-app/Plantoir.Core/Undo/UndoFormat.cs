@@ -201,6 +201,11 @@ internal sealed record UndoOp
             if (string.Equals(from, to, StringComparison.Ordinal) || PartInside(from, to) is not "") return false;
             int fromSlash = from.LastIndexOf('/');
             int toSlash = to.LastIndexOf('/');
+            // Alike after NFC alone is another normalisation of one name, not
+            // a change of case: the places overlap and the op is not readable
+            // (mac-1's normalisation row); a change of case and normalisation
+            // together is still a capitalisation-only move.
+            if (string.Equals(from[(fromSlash + 1)..].Normalize(NormalizationForm.FormC), to[(toSlash + 1)..].Normalize(NormalizationForm.FormC), StringComparison.Ordinal)) return false;
             return fromSlash == toSlash && string.Equals(from[..(fromSlash + 1)], to[..(toSlash + 1)], StringComparison.Ordinal);
         }
     }
@@ -300,15 +305,21 @@ internal sealed record UndoOp
     /// </summary>
     internal static string? PartInside(string place, string path)
     {
+        // Two names are one part when equal after NFC normalisation and
+        // lowercasing (opKinds.wholeOps' one comparison, mac-1 review 2 LOW 1),
+        // as the mac's volume and Python's part_inside take them.
         string[] placeParts = place.Split('/');
         string[] pathParts = path.Split('/');
         if (pathParts.Length < placeParts.Length) return null;
         for (int index = 0; index < placeParts.Length; index++)
         {
-            if (!string.Equals(placeParts[index].ToLowerInvariant(), pathParts[index].ToLowerInvariant(), StringComparison.Ordinal)) return null;
+            if (!string.Equals(OnePart(placeParts[index]), OnePart(pathParts[index]), StringComparison.Ordinal)) return null;
         }
         return string.Join('/', pathParts, placeParts.Length, pathParts.Length - placeParts.Length);
     }
+
+    /// <summary>One part as <see cref="PartInside"/> compares it: NFC-normalised, then lowercased.</summary>
+    private static string OnePart(string part) => part.Normalize(NormalizationForm.FormC).ToLowerInvariant();
 
     /// <summary>
     /// The handed-over places of a step, in the step's order (#899 W8b-21a1;
