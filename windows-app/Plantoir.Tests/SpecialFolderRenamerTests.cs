@@ -4,14 +4,19 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 using Xunit;
 
 namespace Plantoir.Tests;
 
 /// <summary>
 /// Renaming a course folder: the refusals, the moves, and the rule that
-/// nothing moves until every destination has been checked.
+/// nothing moves until every destination has been checked; and the
+/// interrupted-rename record, which lives only while its own rename is
+/// unfinished (#899 W8b-17). In the shared collection because the record's
+/// tests read their own trail.
 /// </summary>
+[Collection(SharedActivityState.Name)]
 public class SpecialFolderRenamerTests : IDisposable
 {
     private readonly string _root;
@@ -23,6 +28,14 @@ public class SpecialFolderRenamerTests : IDisposable
 
     public void Dispose()
     {
+        ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+        // A test's read-only file is made writable again, so the folder goes.
+        try
+        {
+            foreach (string file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+                File.SetAttributes(file, FileAttributes.Normal);
+        }
+        catch { }
         try { Directory.Delete(_root, recursive: true); } catch { }
     }
 
@@ -418,5 +431,206 @@ public class SpecialFolderRenamerTests : IDisposable
                                                 FolderScope.Shared, new[] { 1 }));
         Assert.Empty(SpecialFolderRenamer.Moves(course, "Tasks", @"sub\folder",
                                                 FolderScope.Shared, new[] { 1 }));
+    }
+
+    // ------------------------------------------- the interrupted-rename record (#899 W8b-17)
+
+    /// <summary>The settings, as Course Settings would find them: Tasks per section, Concepts shared and never made on disk.</summary>
+    private const string RecordSettings =
+        "{\"course_code\":\"ICS3U\",\"section_numbers\":[1,2],\"per_section_folders\":[\"All Classes\",\"Tasks\"],"
+        + "\"shared_folders\":[\"Concepts\"],\"hidden\":[\"Tasks\"],\"expandable\":[\"Tasks\"]}";
+
+    /// <summary>An earlier record spelled as no writer here spells it (CRLF, its own spacing), so a put-back that rewrites it shows.</summary>
+    private static readonly byte[] AnotherFoldersRecord =
+        System.Text.Encoding.UTF8.GetBytes("{\r\n    \"from\": \"Notes\",  \"to\": \"Handouts\",\r\n    \"scope\": \"shared\"\r\n}\r\n");
+
+    private string WorkingFolder => Path.Combine(_root, "wf");
+    private string RecordCourse => Path.Combine(WorkingFolder, "courses", "ICS3U");
+    private string RecordPath => SpecialFolderRenamer.RenameRecordPath(RecordCourse);
+    private string TrailPath => Path.Combine(_root, "trail.txt");
+
+    /// <summary>Two sections with Tasks, section 1's index linking into it: a rename of Tasks moves two folders and relinks two pages.</summary>
+    private void TheRecordCourse()
+    {
+        Directory.CreateDirectory(RecordCourse);
+        File.WriteAllText(Path.Combine(WorkingFolder, Workspace.MarkerLauncher), "");
+        File.WriteAllText(Path.Combine(RecordCourse, "course_config.json"), RecordSettings);
+        WriteInCourse("section1/Tasks/Quiz 1.md", "See [[Tasks/Quiz 2]].\n");
+        WriteInCourse("section1/index.md", "Start with [[Tasks/Quiz 1]].\n");
+        WriteInCourse("section2/Tasks/Quiz 2.md", "Quiz two.\n");
+        ActivityTrail.SetCustomLogPathForTesting(TrailPath);
+    }
+
+    private void WriteInCourse(string relative, string text)
+    {
+        string full = Path.Combine(RecordCourse, relative.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        File.WriteAllText(full, text);
+    }
+
+    private void LayTheRecord(byte[] bytes)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(RecordPath)!);
+        File.WriteAllBytes(RecordPath, bytes);
+    }
+
+    private static byte[] RecordOf(string from, string to, string scope) =>
+        System.Text.Encoding.UTF8.GetBytes("{\n  \"from\": \"" + from + "\",\n  \"to\": \"" + to + "\",\n  \"scope\": \"" + scope + "\"\n}\n");
+
+    /// <summary>Rename folder as the sheet makes it: through a door of the test's own, with the settings' change in the step.</summary>
+    private RenameOutcome RenameAsTheSheetDoes(string oldName = "Tasks", string newName = "Assessments", FolderScope scope = FolderScope.PerSection,
+                                               bool finishing = false, UndoSeams? seams = null)
+    {
+        var list = new UndoForThisProcess(Path.Combine(_root, "state", "undo"), UndoMode.Shadow, null);
+        var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams, trail: list.Trail);
+        string configPath = Path.Combine(RecordCourse, "course_config.json");
+        var configuration = CourseConfiguration.Load(configPath);
+        var settings = SpecialFolderRenamer.RenamingTheSettings(configuration, configPath, oldName, newName, scope, RecordCourse);
+        return SpecialFolderRenamer.Rename(oldName, newName, scope, RecordCourse, new[] { 1, 2 }, settings, finishing, list, door);
+    }
+
+    private string Trail() => File.Exists(TrailPath) ? File.ReadAllText(TrailPath) : "";
+
+    [Fact]
+    public void AnotherFoldersUnfinishedRecordSurvivesAWholeRenameOfThisOneByteForByte()
+    {
+        TheRecordCourse();
+        LayTheRecord(AnotherFoldersRecord);
+
+        var outcome = RenameAsTheSheetDoes();
+
+        Assert.Equal(2, outcome.FoldersMoved);
+        Assert.True(File.Exists(RecordPath), "another folder's unfinished rename is not this rename's to clear");
+        Assert.Equal(AnotherFoldersRecord, File.ReadAllBytes(RecordPath));
+    }
+
+    [Fact]
+    public void AWholeRenameWithNoEarlierRecordLeavesNone()
+    {
+        TheRecordCourse();
+
+        RenameAsTheSheetDoes();
+
+        Assert.False(File.Exists(RecordPath));
+        Assert.False(OneSectionRestore.RenameIsUnfinished(RecordCourse));
+    }
+
+    [Fact]
+    public void TheSameRenamesRecordIsClearedWhenTheRenameIsFinished()
+    {
+        TheRecordCourse();
+        // Interrupted: the folders moved, the settings and links not.
+        Directory.Move(Path.Combine(RecordCourse, "section1", "Tasks"), Path.Combine(RecordCourse, "section1", "Assessments"));
+        Directory.Move(Path.Combine(RecordCourse, "section2", "Tasks"), Path.Combine(RecordCourse, "section2", "Assessments"));
+        LayTheRecord(RecordOf("Tasks", "Assessments", "per_section"));
+
+        var outcome = RenameAsTheSheetDoes(finishing: true);
+
+        Assert.Equal(0, outcome.FoldersMoved);
+        Assert.False(File.Exists(RecordPath), "the rename the record names is whole");
+    }
+
+    [Fact]
+    public void ThisFoldersEarlierRenameToAnotherNameIsClearedOnceTheSettingsNoLongerNameIt()
+    {
+        TheRecordCourse();
+        LayTheRecord(RecordOf("tasks", "Homework", "per_section"));
+
+        RenameAsTheSheetDoes();
+
+        Assert.False(File.Exists(RecordPath), "the settings no longer name Tasks, so its sheet never opens again");
+    }
+
+    [Fact]
+    public void ARenameThatMovesNoFolderLeavesAnotherFoldersRecordUntouched()
+    {
+        TheRecordCourse();
+        LayTheRecord(AnotherFoldersRecord);
+        var written = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(RecordPath, written);
+
+        // Concepts is in the settings and nowhere on disk.
+        var outcome = RenameAsTheSheetDoes("Concepts", "Ideas", FolderScope.Shared);
+
+        Assert.True(outcome.NothingWasThere);
+        Assert.Equal(AnotherFoldersRecord, File.ReadAllBytes(RecordPath));
+        Assert.Equal(written, File.GetLastWriteTimeUtc(RecordPath));
+    }
+
+    [Fact]
+    public void ARefusalThatChangedNothingPutsTheEarlierRecordBackByteForByte()
+    {
+        TheRecordCourse();
+        LayTheRecord(AnotherFoldersRecord);
+
+        // The second staged file fails as it is written, as a full disk does: nothing moved.
+        Assert.Throws<SpecialFolderRenamer.RenameException>(
+            () => RenameAsTheSheetDoes(seams: new UndoSeams { StagingWriteFailsAt = index => index == 1 }));
+
+        Assert.True(Directory.Exists(Path.Combine(RecordCourse, "section1", "Tasks")), "nothing moved");
+        Assert.Equal(AnotherFoldersRecord, File.ReadAllBytes(RecordPath));
+        Assert.DoesNotContain("could not tidy", Trail());
+    }
+
+    [Fact]
+    public void ARefusalThatChangedNothingLeavesNoRecordWhenThereWasNoneSoTheOneSectionRestoreIsNotGreyed()
+    {
+        TheRecordCourse();
+
+        Assert.Throws<SpecialFolderRenamer.RenameException>(
+            () => RenameAsTheSheetDoes(seams: new UndoSeams { StagingWriteFailsAt = index => index == 1 }));
+
+        Assert.True(Directory.Exists(Path.Combine(RecordCourse, "section1", "Tasks")), "nothing moved");
+        Assert.False(File.Exists(RecordPath), "a rename that never happened leaves no record");
+        Assert.False(OneSectionRestore.RenameIsUnfinished(RecordCourse));
+    }
+
+    [Fact]
+    public void ARenameThatStoppedPartWayKeepsThisRunsRecord()
+    {
+        TheRecordCourse();
+        LayTheRecord(AnotherFoldersRecord);
+        // Section 1's index will not take its relink, and no page can be put
+        // back: the step stops part way, the folders' moves left as they are.
+        File.SetAttributes(Path.Combine(RecordCourse, "section1", "index.md"), FileAttributes.ReadOnly);
+
+        Assert.Throws<SpecialFolderRenamer.RenameException>(
+            () => RenameAsTheSheetDoes(seams: new UndoSeams { PutBackFailsAt = _ => true }));
+
+        var note = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(RecordPath));
+        Assert.Equal("Tasks", note["from"]?.ToString());
+        Assert.Equal("Assessments", note["to"]?.ToString());
+        Assert.Equal("per_section", note["scope"]?.ToString());
+        Assert.DoesNotContain("could not tidy", Trail());
+    }
+
+    [Fact]
+    public void APutBackThatFailsAfterARefusalSaysDidNotRenameOnTheTrail()
+    {
+        TheRecordCourse();
+        LayTheRecord(AnotherFoldersRecord);
+        // The record will take no write: neither this run's nor the put-back.
+        File.SetAttributes(RecordPath, FileAttributes.ReadOnly);
+
+        Assert.Throws<SpecialFolderRenamer.RenameException>(
+            () => RenameAsTheSheetDoes(seams: new UndoSeams { StagingWriteFailsAt = index => index == 1 }));
+
+        string trail = Trail();
+        Assert.Contains("did not rename the folder Tasks to Assessments in ICS3U, and could not tidy the note kept while a folder rename is unfinished (", trail);
+        Assert.DoesNotContain("renamed the folder Tasks", trail);
+    }
+
+    [Fact]
+    public void APutBackThatFailsOnceTheRenameIsWholeSaysRenamedOnTheTrail()
+    {
+        TheRecordCourse();
+        LayTheRecord(AnotherFoldersRecord);
+        File.SetAttributes(RecordPath, FileAttributes.ReadOnly);
+
+        RenameAsTheSheetDoes();
+
+        string trail = Trail();
+        Assert.Contains("renamed the folder Tasks to Assessments in ICS3U, but could not tidy the note kept while a folder rename is unfinished (", trail);
+        Assert.DoesNotContain("did not rename", trail);
     }
 }
