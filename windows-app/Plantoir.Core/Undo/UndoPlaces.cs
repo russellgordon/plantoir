@@ -92,7 +92,7 @@ internal static class UndoPlaces
     /// </summary>
     internal static bool StaysInside(string root, string relative, UndoOp op)
     {
-        if (op.LinkSha is null || (relative != op.From && relative != op.To)) return StaysInside(root, relative);
+        if (!op.IsALinksMove || (relative != op.From && relative != op.To)) return StaysInside(root, relative);
         return StaysInsideAbove(root, relative);
     }
 

@@ -31,6 +31,14 @@ internal sealed record UndoMemberChange(IReadOnlyList<string> KeyPath, UndoJson?
 }
 
 /// <summary>
+/// What <see cref="UndoActionStep.RelinkLink"/> planned (#899 W8b-21b5): the
+/// link moved with a new text, moved as itself (the text unchanged), a copy of
+/// its lesson where this PC cannot make a link (Russell's Q2, 21b1a), or
+/// nothing (no link there, or its text cannot be read now).
+/// </summary>
+internal enum UndoRelinkPlanned { Relinked, Moved, Copied, NotPlanned }
+
+/// <summary>
 /// A daily action's step that the door refused (#899 W7a; the mac's
 /// <c>JournaledStepError.refused</c>): NOTHING of it was written. An
 /// <see cref="IOException"/>, so a caller that said "Nothing was changed: …"
@@ -132,9 +140,14 @@ internal sealed class UndoActionStep
     /// Each folder the step moves whole (<see cref="MoveFolder"/>, with its
     /// listing's hash) and each link it moves as itself (<see cref="MoveLink"/>,
     /// with its target's hash), in the order planned, each hash as it stood
-    /// when planned: exactly one of the two is set.
+    /// when planned: exactly one of the two is set. A link moved with a new
+    /// text (<see cref="RelinkLink"/>, W8b-21b5) also holds both texts, as
+    /// stored, its <c>LinkSha</c> the text it holds now, so every reading that
+    /// asks "is this a link's move" holds for it.
     /// </summary>
-    private readonly List<(string FromFull, string ToFull, string? ListingSha, string? LinkSha)> _folderMoves = [];
+    private readonly List<(string FromFull, string ToFull, string? ListingSha, string? LinkSha, byte[]? TextBefore, byte[]? TextAfter)> _folderMoves = [];
+    /// <summary>Each copy planned in place of a link this PC cannot make (<see cref="CopyTheLessonInsteadOfALink"/>), by its full path.</summary>
+    private readonly List<string> _copiedInsteadOfLinks = [];
 
     // ---- Initializer ---------------------------------------------------------------
 
@@ -330,7 +343,7 @@ internal sealed class UndoActionStep
             var refusal = new UndoRefusal(UndoRefusalKind.CannotTellNow, RelativeOf(from) ?? from);
             throw new UndoStepRefusedException(refusal, Reason(refusal));
         }
-        _folderMoves.Add((from, to, listingSha, null));
+        _folderMoves.Add((from, to, listingSha, null, null, null));
     }
 
     /// <summary>
@@ -359,7 +372,145 @@ internal sealed class UndoActionStep
             var refusal = new UndoRefusal(UndoRefusalKind.CannotTellNow, RelativeOf(from) ?? from);
             throw new UndoStepRefusedException(refusal, Reason(refusal));
         }
-        _folderMoves.Add((from, to, null, linkSha));
+        _folderMoves.Add((from, to, null, linkSha, null, null));
+    }
+
+    /// <summary>
+    /// Plans the link at <paramref name="fromFull"/> moved to
+    /// <paramref name="toFull"/> holding <paramref name="textAfter"/> instead
+    /// of the text it holds now (#899 W8b-21b5; the mac's
+    /// <c>JournaledStep.relinkLink(_:to:textAfter:)</c>, U4b3 relink-4), as
+    /// ONE <c>move</c> op <c>{from, to, linkShaBefore, linkShaAfter, blobs}</c>.
+    /// The text now is read here as the link itself
+    /// (<see cref="UndoLinks.TextOf"/>, the bytes <see cref="UndoLinks.LinkSha"/>
+    /// hashes, never followed); the text written is
+    /// <see cref="UndoLinks.TextToWrite"/>'s. Both texts go to the list as
+    /// blobs before the step begins. As for <see cref="MoveLink"/>, the place
+    /// it leaves is handed over (it reads as free; a write there is a new
+    /// file, never through the leaving link). A write planned at its new
+    /// place, before or after this, refuses the step <c>cannotTellNow</c>
+    /// before anything changes: nothing is read or written through either
+    /// name. Where this PC cannot make a link
+    /// (<see cref="UndoLinks.CanMakeALink"/>, the step's seams answering in a
+    /// test), the lesson is copied instead
+    /// (<see cref="CopyTheLessonInsteadOfALink"/>; Russell's Q2); a link that
+    /// leads to no lesson is then moved as itself. Plan this before any write
+    /// of the file the link leads to.
+    /// </summary>
+    /// <returns>
+    /// <see cref="UndoRelinkPlanned.Relinked"/>; <see cref="UndoRelinkPlanned.Moved"/>
+    /// for a text unchanged (the link's plain move); <see cref="UndoRelinkPlanned.Copied"/>;
+    /// or <see cref="UndoRelinkPlanned.NotPlanned"/>, nothing planned, for a
+    /// place that is not a link or a text that cannot be read now.
+    /// </returns>
+    internal UndoRelinkPlanned RelinkLink(string fromFull, string toFull, string textAfter)
+    {
+        string from = Path.GetFullPath(fromFull);
+        string to = Path.GetFullPath(toFull);
+        if (UndoLinks.Look(from) != UndoLinks.What.Link || UndoLinks.TextOf(from) is not { } textNow) return UndoRelinkPlanned.NotPlanned;
+        string written = UndoLinks.TextToWrite(textNow, textAfter);
+        if (string.Equals(written, textNow, StringComparison.Ordinal))
+        {
+            MoveLink(from, to);
+            return UndoRelinkPlanned.Moved;
+        }
+        if (_after.TryGetValue(to, out byte[]? plannedThere) && plannedThere is not null) RefuseCannotTellNow(to);
+        // A junction is a kind of link Undo cannot make (window E review 2,
+        // LOW 5): the relink is refused before anything is planned, as any
+        // link it cannot make (could not write), never re-made as a symbolic link.
+        if (UndoLinks.IsAJunction(from))
+        {
+            var refusal = new UndoRefusal(UndoRefusalKind.CouldNotWrite, RelativeOf(to) ?? to);
+            throw new UndoStepRefusedException(refusal, Reason(refusal));
+        }
+        if (!UndoLinks.CanMakeALink(_plainSeams))
+        {
+            if (CopyTheLessonInsteadOfALink(from, to)) return UndoRelinkPlanned.Copied;
+            MoveLink(from, to);
+            return UndoRelinkPlanned.Moved;
+        }
+        _folderMoves.Add((from, to, null, UndoCheck.Sha(Encoding.UTF8.GetBytes(textNow)), Encoding.UTF8.GetBytes(textNow), Encoding.UTF8.GetBytes(written)));
+        return UndoRelinkPlanned.Relinked;
+    }
+
+
+    /// <summary>
+    /// The full path of each copy <see cref="CopyTheLessonInsteadOfALink"/>
+    /// planned, in the order planned, so its caller can say that a page is
+    /// now a copy because this PC cannot make links (W8b piece 22b).
+    /// </summary>
+    internal IReadOnlyList<string> CopiedInsteadOfLinks => _copiedInsteadOfLinks;
+
+    /// <summary>
+    /// Where this PC cannot make a link (<see cref="UndoLinks.CanMakeALink"/>;
+    /// #899 W8b-21b1a, Russell's Q2, 2026-11-27, "Copy the lesson instead"),
+    /// plans what a re-pointing of the link at <paramref name="linkFull"/> to
+    /// <paramref name="newFull"/> becomes, with plain ops only, so making,
+    /// Undo and Redo need no privilege: the bytes of the file the link leads
+    /// to NOW are read (<see cref="UndoLinks.FileALinkLeadsTo"/>, read only,
+    /// from the disk, so plan this before any write of that file), then (1)
+    /// the link is moved AS ITSELF (<see cref="MoveLink"/>), text and all,
+    /// to <see cref="SetAsideName"/> beside it, and (2) a new file at
+    /// <paramref name="newFull"/> holds those bytes. The place the link
+    /// leaves is handed over as for any link's move. Undo removes the copy
+    /// (judged by its content: a copy edited since is changed since) and
+    /// moves the link back; Redo does both again. The set-aside link is never
+    /// removed. A link leading nowhere (or to a folder) has no lesson: false,
+    /// nothing planned, and its caller moves it as itself. A place that is not
+    /// a link refuses the action, <c>cannotTellNow</c>, as <see cref="MoveLink"/>.
+    /// </summary>
+    internal bool CopyTheLessonInsteadOfALink(string linkFull, string newFull)
+    {
+        string link = Path.GetFullPath(linkFull);
+        if (UndoLinks.Look(link) != UndoLinks.What.Link) RefuseCannotTellNow(link);
+        string lessonFile = UndoLinks.FileALinkLeadsTo(link);
+        if (UndoLinks.Look(lessonFile) != UndoLinks.What.File) return false;
+        if (UndoLinks.ReadAll(lessonFile) is not { } lesson)
+        {
+            RefuseCannotTellNow(lessonFile);
+            return false;
+        }
+        MoveLink(link, SetAsideName(link));
+        WriteBytes(newFull, lesson);
+        _copiedInsteadOfLinks.Add(Path.GetFullPath(newFull));
+        return true;
+    }
+
+    /// <summary>
+    /// The name a link is set aside under beside itself
+    /// (<see cref="CopyTheLessonInsteadOfALink"/>): <c>.&lt;name&gt;.link-kept-by-undo</c>,
+    /// then <c>-2</c>, <c>-3</c> and on, the first neither on the disk nor
+    /// chosen in this step. A dot file, which Obsidian and the site build
+    /// pass over, and never one holding <see cref="UndoSwap.StagedMarker"/>,
+    /// so <c>TidyLeftovers</c> never removes the only link.
+    /// </summary>
+    private string SetAsideName(string link)
+    {
+        string folder = Path.GetDirectoryName(link)!;
+        string first = "." + Path.GetFileName(link) + ".link-kept-by-undo";
+        for (int number = 1; ; number++)
+        {
+            string candidate = Path.Combine(folder, number == 1 ? first : first + "-" + number);
+            if (UndoLinks.Look(candidate) == UndoLinks.What.Nothing && !IsChosenInThisStep(candidate)) return candidate;
+        }
+    }
+
+    /// <summary>Whether a place is already named in this step: planned as a file, or a folder's or link's move ends or starts there.</summary>
+    private bool IsChosenInThisStep(string fullPath)
+    {
+        if (_before.ContainsKey(fullPath)) return true;
+        string place = Slashed(fullPath);
+        foreach ((string from, string to, _, _, _, _) in _folderMoves)
+        {
+            if (UndoOp.PartInside(Slashed(to), place) is "" || UndoOp.PartInside(Slashed(from), place) is "") return true;
+        }
+        return false;
+    }
+
+    private void RefuseCannotTellNow(string fullPath)
+    {
+        var refusal = new UndoRefusal(UndoRefusalKind.CannotTellNow, RelativeOf(fullPath) ?? fullPath);
+        throw new UndoStepRefusedException(refusal, Reason(refusal));
     }
 
     /// <summary>
@@ -372,7 +523,7 @@ internal sealed class UndoActionStep
     private string PlaceOnDiskNow(string fullPath)
     {
         string place = Path.GetFullPath(fullPath);
-        foreach ((string from, string to, _, string? linkSha) in _folderMoves)
+        foreach ((string from, string to, _, string? linkSha, _, _) in _folderMoves)
         {
             if (linkSha is not null) continue;
             if (UndoOp.PartInside(Slashed(to), Slashed(place)) is not { } inside) continue;
@@ -387,7 +538,7 @@ internal sealed class UndoActionStep
     private (string From, string To)? LinkMoveEndingAt(string fullPath)
     {
         string place = Slashed(Path.GetFullPath(fullPath));
-        foreach ((string from, string to, _, string? linkSha) in _folderMoves)
+        foreach ((string from, string to, _, string? linkSha, _, _) in _folderMoves)
         {
             if (linkSha is not null && UndoOp.PartInside(Slashed(to), place) is "") return (from, to);
         }
@@ -398,11 +549,22 @@ internal sealed class UndoActionStep
     private (string From, string To)? LinkMoveStartingAt(string fullPath)
     {
         string place = Slashed(Path.GetFullPath(fullPath));
-        foreach ((string from, string to, _, string? linkSha) in _folderMoves)
+        foreach ((string from, string to, _, string? linkSha, _, _) in _folderMoves)
         {
             if (linkSha is not null && UndoOp.PartInside(Slashed(from), place) is "") return (from, to);
         }
         return null;
+    }
+
+    /// <summary>Whether a planned RELINKING move (<see cref="RelinkLink"/>) ends exactly at the place (the mac's <c>isARelink(endingAt:)</c>).</summary>
+    private bool IsARelinkEndingAt(string fullPath)
+    {
+        string place = Slashed(Path.GetFullPath(fullPath));
+        foreach ((_, string to, _, _, byte[]? textBefore, byte[]? textAfter) in _folderMoves)
+        {
+            if (textBefore is not null && textAfter is not null && UndoOp.PartInside(Slashed(to), place) is "") return true;
+        }
+        return false;
     }
 
     /// <summary>Whether a link's move keeps it in the folder it was in, so a relative target leads to the same file from either name (the mac's <c>staysInItsFolder</c>).</summary>
@@ -433,7 +595,7 @@ internal sealed class UndoActionStep
     private string PlannedPlace(string fullPath)
     {
         string place = Path.GetFullPath(fullPath);
-        if (LinkMoveEndingAt(place) is { } move && StaysInItsFolder(move)) return UndoLinks.FileALinkLeadsTo(move.From);
+        if (LinkMoveEndingAt(place) is { } move && StaysInItsFolder(move) && !IsARelinkEndingAt(place)) return UndoLinks.FileALinkLeadsTo(move.From);
         return place;
     }
 
@@ -446,10 +608,12 @@ internal sealed class UndoActionStep
     /// new place of a link moved to ANOTHER folder (the mac's
     /// <c>refusesAWrite</c>, U4b3): a relative target leads elsewhere from
     /// there, so a write would be a write through a link no step can judge.
+    /// So is a plan at a relinking move's new place (W8b-21b5; relink-4),
+    /// wherever it is: the link there holds a text the step changes.
     /// </summary>
     private void RefuseAWriteAtALinkMovedAway(string fullPath)
     {
-        if (LinkMoveEndingAt(fullPath) is not { } move || StaysInItsFolder(move)) return;
+        if (LinkMoveEndingAt(fullPath) is not { } move || (StaysInItsFolder(move) && !IsARelinkEndingAt(fullPath))) return;
         string place = Path.GetFullPath(fullPath);
         var refusal = new UndoRefusal(UndoRefusalKind.CannotTellNow, RelativeOf(place) ?? place);
         throw new UndoStepRefusedException(refusal, Reason(refusal));
@@ -479,21 +643,38 @@ internal sealed class UndoActionStep
     private List<JsonObject>? RecordableFolderMoves()
     {
         var result = new List<JsonObject>();
-        foreach ((string fromFull, string toFull, string? listingSha, string? linkSha) in _folderMoves)
+        foreach ((string fromFull, string toFull, string? listingSha, string? linkSha, byte[]? textBefore, byte[]? textAfter) in _folderMoves)
         {
             if (RelativeOf(fromFull) is not { } from || RelativeOf(toFull) is not { } to) return null;
-            JsonObject move = FolderMoveOp(from, to, listingSha, linkSha);
+            JsonObject move = FolderMoveOp(from, to, listingSha, linkSha, textBefore, textAfter);
             if (UndoPlaces.FirstPlaceLeadingOut(_root!, UndoLineOps.Read(move)) is not null) return null;
             result.Add(move);
         }
         return result;
     }
 
-    /// <summary>A planned move as its op between the places given: a link's by its <c>linkSha</c>, a folder's by its <c>listingSha</c>.</summary>
-    private static JsonObject FolderMoveOp(string from, string to, string? listingSha, string? linkSha) =>
-        linkSha is not null
+    /// <summary>
+    /// A planned move as its op between the places given: a relinking move by
+    /// both texts' hashes, both named as its blobs (<c>opKinds.move</c>; the
+    /// mac's <c>folderMoveOp</c>, relink-4), a link's by its <c>linkSha</c>, a
+    /// folder's by its <c>listingSha</c>.
+    /// </summary>
+    private static JsonObject FolderMoveOp(string from, string to, string? listingSha, string? linkSha, byte[]? textBefore, byte[]? textAfter)
+    {
+        if (textBefore is not null && textAfter is not null)
+        {
+            string before = UndoCheck.Sha(textBefore);
+            string after = UndoCheck.Sha(textAfter);
+            return new JsonObject
+            {
+                ["kind"] = UndoOp.Move, ["from"] = from, ["to"] = to,
+                ["linkShaBefore"] = before, ["linkShaAfter"] = after, ["blobs"] = new JsonArray(before, after),
+            };
+        }
+        return linkSha is not null
             ? new JsonObject { ["kind"] = UndoOp.Move, ["from"] = from, ["to"] = to, ["linkSha"] = linkSha }
             : new JsonObject { ["kind"] = UndoOp.Move, ["from"] = from, ["to"] = to, ["listingSha"] = listingSha };
+    }
 
     /// <summary>Each planned folder's <c>createTree</c> op and the blobs it needs (its listing, then every listed file's bytes), or null when one cannot be named in a step.</summary>
     private List<(JsonObject Op, List<byte[]> Blobs)>? RecordableTrees()
@@ -702,6 +883,16 @@ internal sealed class UndoActionStep
         // place, comes after it and is carried by it (W8b-15a; the mac's
         // makeAsOps, opKinds.wholeOps' order).
         foreach (JsonObject move in RecordableFolderMoves()!) ops.Add(move);
+        // A relinking move's two texts, before then after, go to the list
+        // with every other blob, before the begin (W8b-21b5; the mac's
+        // makeAsOps, relink-4): one that cannot be written is the same
+        // failure as any blob's.
+        foreach ((_, _, _, _, byte[]? textBefore, byte[]? textAfter) in _folderMoves)
+        {
+            if (textBefore is null || textAfter is null) continue;
+            blobs.Add(textBefore);
+            blobs.Add(textAfter);
+        }
         foreach ((string path, UndoFileChange change) in InTheStepsOrder(changes))
         {
             if (_members.TryGetValue(path, out IReadOnlyList<UndoMemberChange>? members))
@@ -868,12 +1059,16 @@ internal sealed class UndoActionStep
         // Directory.Move (W8b-15a); a link the same way, as itself, judged by
         // its target as stored (W8b-21). Named by full paths: no working
         // folder is there to name them inside.
-        foreach ((string fromFull, string toFull, string? listingSha, string? linkSha) in _folderMoves)
+        foreach ((string fromFull, string toFull, string? listingSha, string? linkSha, byte[]? textBefore, byte[]? textAfter) in _folderMoves)
         {
             string from = Slashed(fromFull);
             string to = Slashed(toFull);
-            UndoOp move = UndoLineOps.Read(FolderMoveOp(from, to, listingSha, linkSha));
-            targets.Add(new UndoSwapTarget(toFull, to, null, null) { Change = new UndoSwapChange.MoveHere(fromFull, from, move) });
+            UndoOp move = UndoLineOps.Read(FolderMoveOp(from, to, listingSha, linkSha, textBefore, textAfter));
+            // A relinking move made as the door makes it (W8b-21b5; the mac's
+            // relinkGoingForward): a new link holding the new text, renamed
+            // in without replacing, the old one removed once re-read.
+            UndoRelink? relink = textBefore is not null && textAfter is not null ? new UndoRelink(textBefore, textAfter, SourceIsFrom: true) : null;
+            targets.Add(new UndoSwapTarget(toFull, to, null, null) { Change = new UndoSwapChange.MoveHere(fromFull, from, move), Relink = relink });
             targetOps.Add([move]);
         }
         foreach (string path in _order)
