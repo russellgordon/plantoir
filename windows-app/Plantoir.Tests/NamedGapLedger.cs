@@ -771,6 +771,9 @@ internal static class NamedGapLedger
              "unfinished restore settled", "course restore kept files",
              // The mac's #909 (2026-11-26): a one-section restore keeps the left-out folders beside the backups.
              "section restore kept files"),
+        // The mac's U4b3 (2026-11-26, Russell's ruling 7): a removed page recovery cannot
+        // put back is kept as '<name> (kept by Undo).md' with a trail line; W8b piece 21c builds it.
+        Owed(ActivityTrailEvents, 899, V200, Reason899W8HandedOverPlace, "undo kept a page under a visible name"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")
