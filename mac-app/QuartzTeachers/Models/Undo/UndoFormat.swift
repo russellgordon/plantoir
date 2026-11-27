@@ -42,8 +42,9 @@ nonisolated struct UndoEventLine: Codable, Equatable, Sendable {
     /// A word, never page text.
     var reason: String?
 
-    /// `interrupted` only: the files left neither before nor after, inside
-    /// the working folder. Paths, never content.
+    /// `interrupted`: the files left neither before nor after, inside the
+    /// working folder; `setAside`: the files a restore replaced. Paths,
+    /// never content.
     var paths: [String]?
 
     // MARK: - Initializer
@@ -221,6 +222,10 @@ nonisolated enum UndoEventKind: String, Sendable, CaseIterable {
     /// older reader must simply skip (the director's ruling 2 on U1's second
     /// reviews); U1 writes none outside the contract's cases and traces.
     case note
+    /// Some of a step's files were replaced by a restore (#899): named in
+    /// `paths`, never judged or written by recovery again; the step stays
+    /// where it stands and its other files are judged as before.
+    case setAside
 }
 
 /// What a `failed`, `rolledBack` or `interrupted` event ended.

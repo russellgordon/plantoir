@@ -301,27 +301,16 @@ enum CourseRestorer {
                 of: item.courseCode, inMadeGroup: nil, coursesDirectoryURL: coursesDirectoryURL
             )
         }
-        // Every Undo step left in flight in the course is set aside inside
-        // the list's lock, after the caller's last refusal and immediately
-        // before anything moves (#899, ahead of U5), so recovery never
-        // judges the restored files against a step that stopped before the
-        // restore (`UndoRestoreSetAside`).
-        let workingFolderRoot: URL = coursesDirectoryURL.deletingLastPathComponent()
-        let courseCode: String = item.courseCode
-        let settingAsideFirst: (URL) throws -> Void = { (staging: URL) throws in
-            try beforeTheSwap(staging)
-            UndoRestoreSetAside.setAsideStepsInFlight(
-                inside: ["courses/" + courseCode], workingFolderRoot: workingFolderRoot,
-                course: courseCode, journal: UndoJournalLocation.standardJournal()
-            )
-        }
+        // Every Undo step left in flight in the course is set aside by
+        // `WholeCourseRestore.restore` once the swap has replaced its files
+        // (#899, `UndoRestoreSetAside`).
         return try WholeCourseRestore.restore(
             fromZipAt: item.fileURL,
             courseCode: item.courseCode,
             coursesDirectoryURL: coursesDirectoryURL,
             archiveURL: archiveURL,
             archiveBegan: archiveBegan,
-            beforeTheSwap: settingAsideFirst,
+            beforeTheSwap: beforeTheSwap,
             hooks: hooks
         )
     }
@@ -844,21 +833,86 @@ enum CourseRestorer {
         try fileManager.createDirectory(at: asideSectionURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: asideOutsideURL, withIntermediateDirectories: true)
 
-        // Every Undo step left in flight wholly inside what this restore
-        // replaces (the section's folder and its files outside it) is set
-        // aside first, inside the list's lock, before anything moves (#899;
-        // `UndoRestoreSetAside`). Shared by the menu's and the assistant's
-        // one-section restores.
+        // Every Undo step left in flight that names a file this restore
+        // replaces (the section's folder and its files outside it) has
+        // those files set aside once they are replaced, in the list's lock
+        // held across the swap (#899; `UndoRestoreSetAside`). Shared by the
+        // menu's and the assistant's one-section restores.
         let courseCode: String = courseURL.lastPathComponent
         var replacedPlaces: [String] = ["courses/" + courseCode + "/" + folderName]
         for file in outsideFiles where file.treatment != .leftAsItIs {
             replacedPlaces.append("courses/" + courseCode + "/" + file.path(forSection: sectionNumber))
         }
-        UndoRestoreSetAside.setAsideStepsInFlight(
+        var swapError: Error? = nil
+        UndoRestoreSetAside.swapHoldingTheList(
             inside: replacedPlaces, workingFolderRoot: courseURL.deletingLastPathComponent().deletingLastPathComponent(),
             course: courseCode, journal: UndoJournalLocation.standardJournal()
+        ) { () -> Bool in
+            do {
+                try swapTheSectionsFiles(
+                    sectionNumber, inCourseAt: courseURL, from: payload, outsideFiles: outsideFiles,
+                    liveSectionURL: liveSectionURL, backedUpSectionURL: backedUpSectionURL,
+                    asideSectionURL: asideSectionURL, asideOutsideURL: asideOutsideURL, hooks: hooks
+                )
+                return true
+            } catch let stoppedPartWay as WayBackDidNotFinish {
+                swapError = stoppedPartWay
+                return true
+            } catch {
+                swapError = error
+                return false
+            }
+        }
+        if let swapError {
+            throw swapError
+        }
+        // What backups leave out, inside the section, is in neither the
+        // backup nor the live files it replaced: kept beside the backups
+        // under #909's name before the set-aside copy goes, by the rule the
+        // whole-course restore follows (Russell's ruling of 2026-11-25 on
+        // #909 and #911). The course's top is never touched here.
+        let kept: (keptAt: String?, everythingMoved: Bool, moved: [String]) = RestoreSwap.keepInANotInTheArchiveFolderSayingWhich(
+            RestoreSwap.leftOutItemsKeptAtAnyDepth(in: asideSectionURL, insideTheCopyAt: asideURL),
+            from: asideURL,
+            courseCode: courseURL.lastPathComponent,
+            coursesDirectoryURL: courseURL.deletingLastPathComponent(),
+            stamp: ArchiveStamp.text(for: Date())
         )
+        keepingWhatWasReplaced?(asideURL)
+        // Each moved path is inside the set-aside copy, so inside the
+        // course ("section2/Unit 1/My App/.git"); the teacher is told its
+        // path inside the section ("Unit 1/My App/.git").
+        let sectionPrefix: String = folderName + "/"
+        var insideTheSection: [String] = []
+        for path in kept.moved {
+            if path.hasPrefix(sectionPrefix) {
+                insideTheSection.append(String(path.dropFirst(sectionPrefix.count)))
+            } else {
+                insideTheSection.append(path)
+            }
+        }
+        return LeftOutFoldersKept(
+            keptAt: kept.keptAt, everythingMoved: kept.everythingMoved, insideTheSection: insideTheSection
+        )
+    }
 
+    /// `swapSectionInPlace`'s moves: the section's files out, the backup's
+    /// in, and every move undone when one fails. Throws
+    /// `WayBackDidNotFinish` when a move back failed too (files of the
+    /// section replaced and not all put back), `Problem.sectionLeftAsItWas`
+    /// when every file went back.
+    private static func swapTheSectionsFiles(
+        _ sectionNumber: Int,
+        inCourseAt courseURL: URL,
+        from payload: URL,
+        outsideFiles: [OneSectionRestore.OutsideFile],
+        liveSectionURL: URL,
+        backedUpSectionURL: URL,
+        asideSectionURL: URL,
+        asideOutsideURL: URL,
+        hooks: SectionSwapHooks
+    ) throws {
+        let fileManager: FileManager = FileManager.default
         var done: [SwapStep] = []
         do {
             // Out: the section's own files, hidden ones included.
@@ -922,34 +976,6 @@ enum CourseRestorer {
             }
             throw Problem.sectionLeftAsItWas(sectionNumber, error.localizedDescription)
         }
-        // What backups leave out, inside the section, is in neither the
-        // backup nor the live files it replaced: kept beside the backups
-        // under #909's name before the set-aside copy goes, by the rule the
-        // whole-course restore follows (Russell's ruling of 2026-11-25 on
-        // #909 and #911). The course's top is never touched here.
-        let kept: (keptAt: String?, everythingMoved: Bool, moved: [String]) = RestoreSwap.keepInANotInTheArchiveFolderSayingWhich(
-            RestoreSwap.leftOutItemsKeptAtAnyDepth(in: asideSectionURL, insideTheCopyAt: asideURL),
-            from: asideURL,
-            courseCode: courseURL.lastPathComponent,
-            coursesDirectoryURL: courseURL.deletingLastPathComponent(),
-            stamp: ArchiveStamp.text(for: Date())
-        )
-        keepingWhatWasReplaced?(asideURL)
-        // Each moved path is inside the set-aside copy, so inside the
-        // course ("section2/Unit 1/My App/.git"); the teacher is told its
-        // path inside the section ("Unit 1/My App/.git").
-        let sectionPrefix: String = folderName + "/"
-        var insideTheSection: [String] = []
-        for path in kept.moved {
-            if path.hasPrefix(sectionPrefix) {
-                insideTheSection.append(String(path.dropFirst(sectionPrefix.count)))
-            } else {
-                insideTheSection.append(path)
-            }
-        }
-        return LeftOutFoldersKept(
-            keptAt: kept.keptAt, everythingMoved: kept.everythingMoved, insideTheSection: insideTheSection
-        )
     }
 
     /// Where a one-section restore kept the folders backups leave out that

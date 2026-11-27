@@ -85,10 +85,12 @@ nonisolated enum UndoTrail {
                 UndoTrail.keptAPageLine(course: course, section: section, place: place, keptAs: keptAs)
             )
         }
-        UndoTrailHook.setAsideByARestoreLine = { course, section, phase, files, closed in
+        UndoTrailHook.setAsideByARestoreLine = { course, section, phase, files, stillJudged, closed in
             ActivityTrail.note(
                 .undoSetAsideByARestore,
-                UndoTrail.setAsideByARestoreLine(course: course, section: section, phase: phase, files: files, closed: closed)
+                UndoTrail.setAsideByARestoreLine(
+                    course: course, section: section, phase: phase, files: files, stillJudged: stillJudged, closed: closed
+                )
             )
         }
         UndoTrailHook.rolledBackLine = { course, section, phase, files in
@@ -413,20 +415,26 @@ nonisolated enum UndoTrail {
     }
 
     /// `ICS3U/1 · the undo list set aside a change that stopped part way
-    /// (3 files), because a restore is replacing the course; it is not
-    /// judged again`, or, when the list could not be reached, `ICS3U · the
-    /// undo list could not be reached before a restore replaced the course;
-    /// a change left part way in it is still open`.
-    static func setAsideByARestoreLine(course: String, section: Int?, phase: UndoPhase, files: Int, closed: Bool) -> String {
+    /// (3 files), because a restore replaced its files; it is not judged
+    /// again`; `… set aside 2 files of a change that stopped part way,
+    /// because a restore replaced them; 1 other file of it will be settled
+    /// as before`; or, when the list could not be reached, `ICS3U · the
+    /// undo list could not be reached when a restore replaced files of the
+    /// course, so any change left part way in it is still open`.
+    static func setAsideByARestoreLine(course: String, section: Int?, phase: UndoPhase, files: Int, stillJudged: Int, closed: Bool) -> String {
         var line: String = course
         if let section {
             line += "/\(section)"
         }
         if !closed {
-            return line + " · the undo list could not be reached before a restore replaced the course, so any change left part way in it is still open"
+            return line + " · the undo list could not be reached when a restore replaced files of the course, so any change left part way in it is still open"
         }
         let counted: String = files == 1 ? "1 file" : "\(files) files"
-        return line + " · the undo list set aside \(what(phase)) that stopped part way (\(counted)), because a restore is replacing the course; it is not judged again"
+        if stillJudged > 0 {
+            let rest: String = stillJudged == 1 ? "1 other file" : "\(stillJudged) other files"
+            return line + " · the undo list set aside \(counted) of \(what(phase)) that stopped part way, because a restore replaced them; \(rest) of it will be settled as before"
+        }
+        return line + " · the undo list set aside \(what(phase)) that stopped part way (\(counted)), because a restore replaced its files; it is not judged again"
     }
 
     /// `ICS3U/1 · the undo list put back 2 files left part way by a change

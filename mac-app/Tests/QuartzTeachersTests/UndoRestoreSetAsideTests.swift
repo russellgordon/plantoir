@@ -46,7 +46,7 @@ final class UndoRestoreSetAsideTests: XCTestCase {
         let afterRestore: [UndoStepRecord] = UndoRestoreSetAsideTests.steps(in: try journal.read(), after: baseline, folderID: folderID)
         XCTAssertEqual(UndoRestoreSetAsideTests.countInFlight(afterRestore), 0, "the restore left a step in flight")
         let trail: String = ActivityTrail.store.activityText(includingPrompts: false)
-        let pieces: [String] = trail.components(separatedBy: "because a restore is replacing the course; it is not judged again")
+        let pieces: [String] = trail.components(separatedBy: "because a restore replaced its files; it is not judged again")
         XCTAssertEqual(pieces.count - 1, 1, "one trail line for the step set aside: \(trail)")
 
         // Get Ready again, all the way, on the restored course.

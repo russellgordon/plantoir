@@ -332,7 +332,7 @@ enum WholeCourseRestore {
         let courseURL: URL = coursesDirectoryURL.appendingPathComponent(courseCode)
         let backupFileName: String = zipURL.lastPathComponent
         let workingFolderURL: URL = coursesDirectoryURL.deletingLastPathComponent()
-        let context: RestoreSwap.Context = RestoreSwap.Context(
+        var context: RestoreSwap.Context = RestoreSwap.Context(
             computer: SharedMediaStore.thisComputer,
             owner: ProcessLiveness.leaseBody(),
             now: { () -> String in
@@ -375,6 +375,16 @@ enum WholeCourseRestore {
             archiveBegan: archiveBegan,
             leftOutOnPurpose: leftOutOnPurpose(courseURL: courseURL)
         )
+        // Every whole-course restore through this door (from Backups, from
+        // Archived, the Get Ready sheet's Restore Course) sets aside the
+        // Undo steps left in flight in the course once it has replaced its
+        // files, in the list's lock held across the swap (#899).
+        context.holdingTheListAcrossTheSwap = { (swap: () -> Bool) in
+            UndoRestoreSetAside.swapHoldingTheList(
+                inside: ["courses/" + courseCode], workingFolderRoot: workingFolderURL,
+                course: courseCode, journal: UndoJournalLocation.standardJournal(), swap
+            )
+        }
         do {
             let restored: RestoreSwap.Restored = try RestoreSwap.restore(
                 fromZipAt: zipURL,

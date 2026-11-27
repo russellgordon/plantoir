@@ -1345,7 +1345,7 @@ nonisolated enum UndoTrailHook {
     /// restored files against it. The course and section, which work had
     /// stopped, how many files the step names, and whether the list could
     /// be reached at all (`closed` false: nothing was closed).
-    nonisolated(unsafe) static var setAsideByARestoreLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ files: Int, _ closed: Bool) -> Void)?
+    nonisolated(unsafe) static var setAsideByARestoreLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ files: Int, _ stillJudged: Int, _ closed: Bool) -> Void)?
 
     // MARK: - Functions
 

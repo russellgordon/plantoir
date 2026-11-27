@@ -902,29 +902,20 @@ struct CourseSettingsView: View {
         }
     }
 
-    /// The settings a teacher can be offered back one at a time, by their
-    /// key in `course_config.json`, with the name the alert says (#899, fix
-    /// round one). #986 adds each field here as it comes to save as it
-    /// changes; a Save that changed anything else, or several settings,
-    /// offers the course settings back together.
-    static let settingsNamedOneAtATime: [String: String] = [
-        "course_name": "course name",
-    ]
-
     /// The offer for a Save that stopped part way: one setting by its own
     /// name and old value when exactly one changed and it is named in
-    /// `settingsNamedOneAtATime` with a value a teacher can read; otherwise
+    /// `CourseConfiguration.settingsNamedOneAtATime` with a value a teacher can read; otherwise
     /// the course settings, put back as they were.
     static func putBackOffer(seq: Int, before: Data, wanted: [String: Any]) -> SettingPutBackOffer {
         let together: SettingPutBackOffer = SettingPutBackOffer(seq: seq, setting: "course settings", valueBefore: nil)
         guard let found = CourseConfiguration.memberChanges(from: before, to: wanted),
               found.changes.count == 1,
               let key = found.changes[0].keyPath.first,
-              let name = settingsNamedOneAtATime[key],
+              let name = CourseConfiguration.settingsNamedOneAtATime[key],
               case .string(let text)? = found.changes[0].before else {
             return together
         }
-        let shown: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shown: String = CourseConfiguration.oldValueAsTheAlertSaysIt(key: key, text)
         if shown.isEmpty {
             return together
         }

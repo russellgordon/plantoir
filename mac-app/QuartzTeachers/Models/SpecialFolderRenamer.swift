@@ -1549,9 +1549,14 @@ nonisolated struct RenameRecordClaim {
 
     /// The step was not made: kept when it stopped part way or was killed,
     /// otherwise nothing was changed.
+    /// `.couldNotFinish` falls to `nothingWasChanged()` and that is right:
+    /// it comes only from a one-file step, a rename that moves no folder,
+    /// and such a rename never writes the rename record (`renameIsStarting`
+    /// runs only when folders will move), so there is no record to keep
+    /// (#899, the follow-ups' review, L2).
     mutating func stepWasNotMade(_ stopped: JournaledStepError) {
         switch stopped {
-        case .leftPartWay, .stoppedByATest, .couldNotFinish:
+        case .leftPartWay, .stoppedByATest:
             return
         default:
             nothingWasChanged()

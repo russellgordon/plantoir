@@ -1212,7 +1212,13 @@ nonisolated enum UndoRecovery {
         swapRefused: inout Bool,
         leftFor: inout UndoRefusal?
     ) -> UndoRecoveryResult? {
-        let step: UndoStep = record.step
+        // Files a restore replaced while the step was in flight are never
+        // judged or written (#899, the director's ruling on M2): only the
+        // step's other ops are, and a step so settled is closed off the
+        // list (`closingWithFilesSetAside`), since what an Undo of it would
+        // act on was replaced.
+        let setAside: [String] = record.setAsidePaths
+        let step: UndoStep = UndoRestoreSetAside.stepWithout(setAside, record.step)
         let phase: UndoPhase
         let label: String
         switch record.phase {
@@ -1349,7 +1355,7 @@ nonisolated enum UndoRecovery {
             case .redoing:
                 finishing = .redone
             }
-            if finishing == .applied {
+            if finishing == .applied && setAside.isEmpty {
                 JournaledWrite.dropTheRedoBranch(below: step.seq, writer)
             }
             events.append(UndoEventLine(seq: step.seq, event: finishing))
@@ -1493,6 +1499,9 @@ nonisolated enum UndoRecovery {
                 }
             }
         }
+        if !setAside.isEmpty {
+            events = closingWithFilesSetAside(events, phase: phase, setAside: setAside)
+        }
         if !UndoRecovery.write(events, step: step, writer) {
             return nil
         }
@@ -1533,6 +1542,32 @@ nonisolated enum UndoRecovery {
         // re-derivation would otherwise be left with its front page stale
         // (`undo.laterPieces.U2`; the Fable sweep of U1, T5).
         return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: outcome)
+    }
+
+    /// A step with files a restore set aside never goes back on the list,
+    /// and never stays where it began: its other files settled (made,
+    /// nothing taken effect, or put back), it is closed `interrupted`,
+    /// reason `setAsideByARestore`, naming the files set aside (partly
+    /// applied or unknown, off the list), with no clearing, as a step
+    /// wholly set aside is. Any other closing (changed by hand, could not
+    /// put back) is kept as it is, its clearing with it.
+    static func closingWithFilesSetAside(_ events: [UndoEventLine], phase: UndoPhase, setAside: [String]) -> [UndoEventLine] {
+        var result: [UndoEventLine] = []
+        for event in events {
+            let settles: Bool = event.event == UndoEventKind.applied.rawValue
+                || event.event == UndoEventKind.undone.rawValue
+                || event.event == UndoEventKind.redone.rawValue
+                || event.event == UndoEventKind.failed.rawValue
+                || event.event == UndoEventKind.rolledBack.rawValue
+            if settles {
+                result.append(UndoEventLine(
+                    seq: event.seq, event: .interrupted, phase: phase, reason: UndoRestoreSetAside.reason, paths: setAside
+                ))
+            } else {
+                result.append(event)
+            }
+        }
+        return result
     }
 
     /// Appends recovery's lines, a clearing's `seq` the highest in the
