@@ -1,6 +1,7 @@
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Plantoir.Core.Scripting;
 using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Models;
@@ -289,10 +290,74 @@ public sealed class CourseConfiguration
                 attempts++;
                 continue;
             }
+            catch (UndoStepCouldNotFinishException couldNotFinish)
+            {
+                // Stopped part way and not finished at once: left in flight,
+                // offered to be put back (#899 W8c-1b), this copy's edits left
+                // unsaved. Never a sentence naming the file.
+                SettingPutBackOffer offer = PutBackOffer(couldNotFinish.Seq, planned.Before, planned.Values);
+                ActivityTrail.Note(ActivityTrail.Event.SettingsCouldNotBeSaved,
+                    "could not save the settings for " + course.Code + " — stopped part way, offered to put back");
+                throw new SettingCouldNotFinishException(offer);
+            }
             configuration.TakeTheFile(course.ConfigFilePath, planned);
             return planned.Report;
         }
     }
+
+    /// <summary>
+    /// The settings a Put It Back alert can name one at a time, by their key
+    /// in <c>course_config.json</c>, with the name the alert says (#899
+    /// W8c-1b; the mac's <c>settingsNamedOneAtATime</c>). Kept here, beside
+    /// the course name's rule. #986 adds each field as it comes to save as it
+    /// changes; a Save that changed anything else, or several settings, offers
+    /// the course settings back together.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, string> SettingsNamedOneAtATime = new Dictionary<string, string>
+    {
+        ["course_name"] = "course name",
+    };
+
+    /// <summary>A setting's old value as the alert says it: the course name cleaned by its rule, then trimmed (the mac's <c>oldValueAsTheAlertSaysIt</c>).</summary>
+    internal static string OldValueAsTheAlertSaysIt(string key, string text)
+    {
+        string read = text;
+        if (key == "course_name") read = OneLineText.CourseName(text);
+        return read.Trim();
+    }
+
+    /// <summary>
+    /// The offer for a Save that stopped part way (the mac's
+    /// <c>putBackOffer</c>): one setting by its own name and old value when
+    /// exactly one top-level member changed, it is named in
+    /// <see cref="SettingsNamedOneAtATime"/>, and its old value is text a
+    /// teacher can read; otherwise "course settings", put back together.
+    /// </summary>
+    internal static SettingPutBackOffer PutBackOffer(long seq, byte[]? before, JObject wanted)
+    {
+        var together = new SettingPutBackOffer(seq, "course settings", null);
+        JObject? onDisk = null;
+        try { if (before is not null) onDisk = ParseObject(before); } catch { onDisk = null; }
+        if (onDisk is null) return together;
+        var changed = new List<string>();
+        foreach (string key in onDisk.Properties().Select(p => p.Name).Concat(wanted.Properties().Select(p => p.Name)).Distinct(StringComparer.Ordinal))
+            if (!JToken.DeepEquals(onDisk[key], wanted[key])) changed.Add(key);
+        if (changed.Count != 1) return together;
+        if (!SettingsNamedOneAtATime.TryGetValue(changed[0], out string? name)) return together;
+        if (onDisk[changed[0]] is not JValue { Type: JTokenType.String } old) return together;
+        string shown = OldValueAsTheAlertSaysIt(changed[0], (string)old!);
+        return shown.Length == 0 ? together : new SettingPutBackOffer(seq, name, shown);
+    }
+
+    /// <summary>
+    /// Save's failure line (#899 W8c-1b, the mac's LOW A2): a step refused or
+    /// not made names no file (it is the course's settings file every time;
+    /// the trail keeps the full sentence); any other error as it came.
+    /// </summary>
+    public static string SaveFailureLine(Exception error) =>
+        error is UndoStepRefusedException or UndoStepNotMadeException
+            ? "Could not save: " + SettingPutBack.NamingNoFile
+            : "Could not save: " + error.Message;
 
     /// <summary>The Course Settings sheet's Save, as Plantoir's window calls it: <see cref="SaveCourseSettings(Course, UndoForThisProcess?, UndoDoor?)"/> on this process's list.</summary>
     public static SaveReport SaveCourseSettings(Course course) => SaveCourseSettings(course, null, null);
@@ -301,7 +366,7 @@ public sealed class CourseConfiguration
     internal const string SaveCourseSettingsActionKey = "saveCourseSettings";
 
     /// <summary>What a Save's plan says the file will hold, and what it kept or replaced from elsewhere.</summary>
-    internal sealed record PlannedSave(SaveReport Report, JObject Values, byte[] Bytes);
+    internal sealed record PlannedSave(SaveReport Report, JObject Values, byte[] Bytes, byte[]? Before = null);
 
     /// <summary>
     /// Plans this copy's Save into <paramref name="step"/> from the file as it
@@ -327,14 +392,14 @@ public sealed class CourseConfiguration
         JObject? onDisk = null;
         try { if (read.Outcome == HeldFiles.ReadOutcome.Read) onDisk = ParseObject(read.Data!); }
         catch { onDisk = null; }
-        if (onDisk is not null && JToken.DeepEquals(onDisk, written)) return new PlannedSave(report, written, read.Data!);
+        if (onDisk is not null && JToken.DeepEquals(onDisk, written)) return new PlannedSave(report, written, read.Data!, read.Data);
         if (onDisk is not null && MembersMoved(read.Data!, onDisk, written) is { } moved)
         {
             step.EditJson(place, read.Data!, moved.Changes, moved.Bytes);
-            return new PlannedSave(report, written, moved.Bytes);
+            return new PlannedSave(report, written, moved.Bytes, read.Data);
         }
         PlanWhole(step, place, read, whole);
-        return new PlannedSave(report, written, whole);
+        return new PlannedSave(report, written, whole, read.Outcome == HeldFiles.ReadOutcome.Read ? read.Data : null);
     }
 
     /// <summary>

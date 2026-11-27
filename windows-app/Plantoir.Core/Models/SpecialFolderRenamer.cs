@@ -481,6 +481,19 @@ public static class SpecialFolderRenamer
                 // run's record stays (the mac's stepWasNotMade, stoppedByATest).
                 throw;
             }
+            catch (UndoStepCouldNotFinishException couldNotFinish)
+            {
+                // The settings file alone (a folder no section has, no page
+                // relinked), stopped part way and not finished at once by
+                // content: the same alert as every other setting, by its own
+                // name and old value (#899 W8c-1b; the mac's settings sweep,
+                // MEDIUM). The step stays in flight for Put It Back or the
+                // next launch; no record was written for a rename that moves
+                // nothing, and none is touched.
+                Scripting.ActivityTrail.Note(Scripting.ActivityTrail.Event.FolderRenamed,
+                    SettingPutBack.OfferedLine("folder name " + oldName, course));
+                throw new SettingCouldNotFinishException(new SettingPutBackOffer(couldNotFinish.Seq, "folder name", oldName));
+            }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
                 // A refusal (the door's UndoStepRefusedException is one) or

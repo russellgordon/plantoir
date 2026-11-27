@@ -59,6 +59,10 @@ internal enum UndoOutcomeKind
     Applied, AppliedWithoutARecord, CouldNotRecordTheStep, ChangedNothing,
     Undone, Redone, NothingToUndo, NothingToRedo, AnotherChangeIsUnderWay, NotAvailable,
     Refused, ListUnavailable, StoppedByATest,
+    /// <summary>A one-file settings step stopped part way and judged at once closed without the change, the file holding neither value: never retried, nothing offered (#899 W8c-1a).</summary>
+    NotMade,
+    /// <summary>A one-file settings step stopped part way that could not be judged now (its file unreadable, the lock not had): left in flight, its number in <see cref="UndoOutcome.Seq"/> for Put It Back (#899 W8c-1a).</summary>
+    CouldNotFinish,
 }
 
 /// <summary>How the door went: a step made, an undo, a redo.</summary>
@@ -137,7 +141,7 @@ internal interface IUndoMaintainers
 /// <see cref="UndoForThisProcess"/> (W4); its actions come through the door
 /// from W7, and the switch stays off until W11a.</para>
 /// </summary>
-internal sealed class UndoDoor
+internal sealed partial class UndoDoor
 {
     /// <summary>How long a closing event waits for the lock before it is kept (the mac's <c>UndoSwitch.finishWaitSeconds</c>, 10 s; the plan review's L6).</summary>
     internal static readonly TimeSpan FinishWait = TimeSpan.FromSeconds(10);
@@ -853,6 +857,11 @@ internal sealed class UndoDoor
             case UndoSwapResult.Refused { LeftPartWay: true } partWay:
                 // Half applied: left in flight for recovery, never failed (LOW 1).
                 Abandon(seq, UndoStepState.Begun);
+                // A one-file settings step (all editJSON on one file) is judged
+                // at once by recovery's own settle while the app is open, live
+                // only (#899 W8c-1a; the mac's closedAtOnce, Russell's ruling
+                // of 2026-11-26).
+                if (Live && UndoStoppedStep.IsOneFileJsonStep(ops)) return ClosedAtOnce(seq, partWay.Refusal, ops, root);
                 return new UndoOutcome(UndoOutcomeKind.Refused, seq, partWay.Refusal) { LeftPartWay = true };
             case UndoSwapResult.Refused refused:
                 Finish(seq, "failed", "begin", "refused");

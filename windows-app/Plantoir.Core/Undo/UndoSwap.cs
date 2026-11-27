@@ -1464,7 +1464,8 @@ internal static class UndoSwap
             if (!UndoPlaces.StaysInside(root, relative)) continue;
             folders.Add(Path.GetDirectoryName(full)!);
         }
-        string[] labels = [$"{seq}-apply", $"{seq}-undo", $"{seq}-redo"];
+        // `-recover` is Put It Back's own swap (#899 W8c-1 review 1, LOW 3; the mac tidies that label too).
+        string[] labels = [$"{seq}-apply", $"{seq}-undo", $"{seq}-redo", $"{seq}-recover"];
         foreach (string folder in folders)
         {
             List<string> entries;

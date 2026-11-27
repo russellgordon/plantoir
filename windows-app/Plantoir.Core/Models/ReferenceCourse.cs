@@ -174,6 +174,18 @@ public static class ReferenceCourse
         ["groupTitle"] = "Reference Courses",
         ["keepACopyMenuItem"] = "Keep a Copy for Reference…",
         ["setSchoolYearMenuItem"] = "Set School Year…",
+        // #899 W8c-1b: the alert a one-file settings change that stopped part
+        // way and could not be finished shows (SettingPutBackOffer).
+        ["settingCouldNotBeChanged"] = "The {setting} could not be changed.",
+        ["settingCanBePutBack"] = "Plantoir can put it back to {value}.",
+        ["settingsCanBePutBack"] = "Plantoir can put them back as they were.",
+    };
+
+    /// <summary>The lists of <c>referenceCourses.wording</c>, by key: each compared with the contract as a list.</summary>
+    public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> WordingLists = new Dictionary<string, IReadOnlyList<string>>
+    {
+        // Not Now (the close button, Escape), then Put It Back (the primary and default, Enter).
+        ["settingCouldNotBeChangedButtons"] = ["Not Now", "Put It Back"],
     };
 
     private static string Say(string key, params (string Name, string Value)[] fills) =>
@@ -192,6 +204,11 @@ public static class ReferenceCourse
     public static string GroupTitle => Wording["groupTitle"];
     public static string KeepACopyMenuItem => Wording["keepACopyMenuItem"];
     public static string SetSchoolYearMenuItem => Wording["setSchoolYearMenuItem"];
+    public static string SettingCouldNotBeChanged(string setting) => Say("settingCouldNotBeChanged", ("setting", setting));
+    public static string SettingCanBePutBack(string value) => Say("settingCanBePutBack", ("value", value));
+    public static string SettingsCanBePutBack => Wording["settingsCanBePutBack"];
+    public static string NotNowButton => WordingLists["settingCouldNotBeChangedButtons"][0];
+    public static string PutItBackButton => WordingLists["settingCouldNotBeChangedButtons"][1];
 
     /// <summary>
     /// What a screen reader says for a reference course's sidebar row: "ICS3U,

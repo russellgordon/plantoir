@@ -175,7 +175,16 @@ public class ReferenceCourseTests
         // open by key; "said here" is present AND equal, so a changed
         // sentence is held while it differs and the entry closes the day it
         // matches. Every other sentence is compared as before.
-        var sentences = wording.Where(pair => !notSentences.Contains(pair.Key)).ToList();
+        // A list (the alert's buttons, #899 W8c-1b) is compared as a list,
+        // item by item, never as the text of its JSON.
+        var lists = wording.Where(pair => pair.Value is JsonArray).ToList();
+        foreach (var (key, value) in lists)
+        {
+            Assert.True(ReferenceCourse.WordingLists.TryGetValue(key, out IReadOnlyList<string>? mine), $"referenceCourses.wording.{key} is not said here");
+            Assert.Equal(value!.AsArray().Select(item => (string)item!).ToList(), mine!.ToList());
+        }
+        Assert.Contains(lists, pair => pair.Key == "settingCouldNotBeChangedButtons");
+        var sentences = wording.Where(pair => !notSentences.Contains(pair.Key) && pair.Value is not JsonArray).ToList();
         var deferred = NamedGapLedger.GapsIn(NamedGapLedger.ShelfWording, sentences.Select(pair => pair.Key),
             sentences.Where(pair => ReferenceCourse.Wording.TryGetValue(pair.Key, out string? said) && said == pair.Value!.ToString())
                      .Select(pair => pair.Key));

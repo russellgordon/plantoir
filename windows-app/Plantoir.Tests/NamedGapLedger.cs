@@ -453,7 +453,6 @@ internal static class NamedGapLedger
     private const string Reason824 = "sharing a course's unit plans (with #848's look before a share) is #824's piece of v2.0.0, not built here yet";
     private const string Reason826 = "replacing a reference course is #826's piece of v2.0.0, not built here yet";
     private const string Reason827 = "the groups a teacher makes on the reference shelf are #827's piece of v2.0.0, not built here yet";
-    private const string Reason899SettingsFinishesItself = "the mac's #899 (2026-11-27): a one-file settings step stopped part way is judged at once by content, and one that cannot be finished offers Put It Back; Windows does not judge at once or offer it yet";
     private const string Reason899GetReadyRestoreOffer = "the mac's #899 (2026-11-27): Get Ready for the Start of the Year stopped part way offers, in the same sheet, to restore the whole course from the backup made at Go (Leave As It Is with Escape, Restore Course with Return, no second confirmation), and a stop that changed nothing stays writeFailed; Windows does not tell the two stops apart or offer the restore yet";
     private const string Reason884 = "GitHub Copilot as a third outside assistant (the mac's #783) is #884's piece of v2.0.0; Windows has no Copilot door yet";
 
@@ -559,8 +558,6 @@ internal static class NamedGapLedger
              "the same code in one made group", "the same code in a made group and in a year group",
              "the same code in two made groups"),
         Owed(ShelfWording, 827, V200, Reason827, "codeAlreadyInThatGroup"),
-        Owed(ShelfWording, 899, V200, Reason899SettingsFinishesItself,
-             "settingCouldNotBeChanged", "settingCanBePutBack", "settingsCanBePutBack", "settingCouldNotBeChangedButtons"),
         Owed(StartOfYearSheetWording, 899, V200, Reason899GetReadyRestoreOffer,
              "stoppedPartWay", "restoreOffer", "leaveAsItIsButton", "restoreCourseButton"),
         Owed(SubjectMenuItems, 827, V200, Reason827, "moveToGroup"),

@@ -66,16 +66,32 @@ public static class ReferenceCourseUpkeep
     /// <see cref="ReferenceCourse.CouldNotSetSchoolYear"/> and writes nothing.
     /// </summary>
     /// <returns>Null when done, else the sentence for the teacher.</returns>
-    public static string? SetSchoolYear(Course course, int? startingYear, IReadOnlyList<Course> allCourses, DateOnly today)
+    public static string? SetSchoolYear(Course course, int? startingYear, IReadOnlyList<Course> allCourses, DateOnly today) =>
+        Said(SetSchoolYearJudged(course, startingYear, allCourses, today));
+
+    /// <summary>
+    /// <see cref="SetSchoolYear"/>, with a change that stopped part way and
+    /// could not be finished told apart (#899 W8c-1b): the sheet offers Put It
+    /// Back for <see cref="SettingWriteResult.CouldNotFinish"/>.
+    /// </summary>
+    public static SettingWriteResult SetSchoolYearJudged(Course course, int? startingYear, IReadOnlyList<Course> allCourses, DateOnly today)
     {
         string shown = ReferenceCourse.ShownCode(course);
-        if (!ReferenceCourse.IsKeptForReference(course)) return null;
+        if (!ReferenceCourse.IsKeptForReference(course)) return new SettingWriteResult.Saved();
         int? before = SchoolYear.Read(course.Configuration.StoredReferenceSchoolYear, today);
-        if (before == startingYear) return null;
+        if (before == startingYear) return new SettingWriteResult.Saved();
         if (ReferenceCourse.ShelfTrouble(shown, startingYear, ReferenceCourse.Shelf(allCourses, today), ignoringFolder: course.Code) is { } trouble)
-            return trouble;
-        return WriteSchoolYear(course, startingYear, today);
+            return new SettingWriteResult.Refused(trouble);
+        return WriteSchoolYearJudged(course, startingYear, today);
     }
+
+    /// <summary>A result as one sentence: null when saved; the alert's title when it could not finish (the mac's <c>write</c>).</summary>
+    private static string? Said(SettingWriteResult result) => result switch
+    {
+        SettingWriteResult.Refused refused => refused.Sentence,
+        SettingWriteResult.CouldNotFinish couldNotFinish => couldNotFinish.Offer.Title,
+        _ => null,
+    };
 
     /// <summary>
     /// The sheet's write (the mac's <c>SetSchoolYearSheet.write</c>): ONE step
@@ -96,7 +112,20 @@ public static class ReferenceCourseUpkeep
     /// <param name="undo">The list, mode and trail: this process's by default, a test's own in a test.</param>
     /// <param name="door">A test's door over <paramref name="undo"/>; the list's own by default.</param>
     internal static string? WriteSchoolYear(Course course, int? startingYear, DateOnly today,
-                                            UndoForThisProcess? undo = null, UndoDoor? door = null)
+                                            UndoForThisProcess? undo = null, UndoDoor? door = null) =>
+        Said(WriteSchoolYearJudged(course, startingYear, today, undo, door));
+
+    /// <summary>
+    /// <see cref="WriteSchoolYear"/>, judged (#899 W8c-1b; the mac's
+    /// <c>writeJudged</c>): a stop the door finished by content is saved and
+    /// says nothing; one put back or holding neither year is refused with
+    /// <see cref="ReferenceCourse.CouldNotSetSchoolYear"/>, never offered; one
+    /// that could not be finished leaves its offer line and is
+    /// <see cref="SettingWriteResult.CouldNotFinish"/>, "school year" and the
+    /// old year as the picker labels it.
+    /// </summary>
+    internal static SettingWriteResult WriteSchoolYearJudged(Course course, int? startingYear, DateOnly today,
+                                                            UndoForThisProcess? undo = null, UndoDoor? door = null)
     {
         string shown = ReferenceCourse.ShownCode(course);
         int? before = SchoolYear.Read(course.Configuration.StoredReferenceSchoolYear, today);
@@ -109,16 +138,24 @@ public static class ReferenceCourseUpkeep
                 () => new UndoActionStep(new UndoStepMaker("sheet", "setSchoolYear"), workingFolder, course.Code,
                                          section: null, holds: "course", undo: undo, door: door));
         }
+        catch (UndoStepCouldNotFinishException couldNotFinish)
+        {
+            // Left in flight for Put It Back; the year in memory is the file's last saved one.
+            try { course.Configuration.DiscardChanges(); } catch { }
+            ActivityTrail.Note(ActivityTrail.Event.SettingsCouldNotBeSaved, SettingPutBack.OfferedLine("school year", course.Code));
+            return new SettingWriteResult.CouldNotFinish(
+                new SettingPutBackOffer(couldNotFinish.Seq, "school year", SchoolYear.PickerLabel(before)));
+        }
         catch
         {
             // A held file keeps the window's copy (#874); here the year this
             // call set must not stay on as if it were filed, so it goes too.
             try { if (!course.Configuration.RevertToFile(course.ConfigFilePath)) course.Configuration.DiscardChanges(); } catch { }
-            return ReferenceCourse.CouldNotSetSchoolYear(shown);
+            return new SettingWriteResult.Refused(ReferenceCourse.CouldNotSetSchoolYear(shown));
         }
-        if (!changed) return null;
+        if (!changed) return new SettingWriteResult.Saved();
         ActivityTrail.Note(ActivityTrail.Event.ReferenceCourseSchoolYearChanged,
             $"filed {shown} ({course.Code}) under {SchoolYear.Name(startingYear)} — it was {SchoolYear.Name(before)}");
-        return null;
+        return new SettingWriteResult.Saved();
     }
 }
