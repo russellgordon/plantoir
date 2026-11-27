@@ -1856,7 +1856,7 @@ class ContractCaseTests(unittest.TestCase):
         settles whole: recovery first removes the link the interrupted swap
         had just made when both stand, then judges by content."""
         cases = [case for case in shared_undo()["recoveryCases"] if case.get("withARelink")]
-        self.assertEqual(len(cases), 10)
+        self.assertEqual(len(cases), 12)
         phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
                   ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done"}
         old, new = "Unit 1, Day 3.md", "Unit 1, Day 4.md"
@@ -1869,7 +1869,7 @@ class ContractCaseTests(unittest.TestCase):
 
         for case in cases:
             with self.subTest(case["name"]):
-                self.assertIn(case["withARelink"], ("alone", "leavingAHandedOverPlace", "chained"))
+                self.assertIn(case["withARelink"], ("alone", "leavingAHandedOverPlace", "chained", "chainedThree"))
                 days = (3, 4, 5)
                 if case["withARelink"] == "chained":
                     # Review D of U4b3: two relinks that chain, highest first.
@@ -1877,6 +1877,12 @@ class ContractCaseTests(unittest.TestCase):
                     one, two, three = "Unit 1, Day 1.md", "Unit 1, Day 2.md", "Unit 1, Day 3.md"
                     pages = {self.day(4): ("link", one), self.day(5): ("link", two)}
                     ops = [relink(5, 6, two, three), relink(4, 5, one, two)]
+                elif case["withARelink"] == "chainedThree":
+                    # Review F of U4b3: three relinks that chain, highest first.
+                    days = (4, 5, 6, 7)
+                    texts = ["Unit 1, Day %d.md" % number for number in range(1, 5)]
+                    pages = {self.day(4): ("link", texts[0]), self.day(5): ("link", texts[1]), self.day(6): ("link", texts[2])}
+                    ops = [relink(6, 7, texts[2], texts[3]), relink(5, 6, texts[1], texts[2]), relink(4, 5, texts[0], texts[1])]
                 else:
                     pages = {self.day(3): "Three.\n", self.day(4): ("link", old)}
                     ops = [relink(4, 5, old, new)]
@@ -1885,12 +1891,16 @@ class ContractCaseTests(unittest.TestCase):
                     ops += traces.ops_for_change(self.day(3), None, "New.\n")
                     self.assertTrue(traces.handovers(ops))
                 work, stop = case["work"], case["stopAt"]
-                point, number = stop.split(":")
+                if stop == "beforeApplied":
+                    point, number = "beforeSwap", None
+                else:
+                    point, number = stop.split(":")
+                    number = int(number)
                 inside = None if point == "beforeSwap" else point
                 after_pages = traces.stopped_part_way(ops, False, pages, None)
                 starting = after_pages if work == "undo" else pages
-                left = traces.stopped_part_way(ops, work == "undo", starting, int(number), inside)
-                if inside == "relinkRenamedIn" and case["withARelink"] != "chained":
+                left = traces.stopped_part_way(ops, work == "undo", starting, number, inside)
+                if inside == "relinkRenamedIn" and case["withARelink"] == "alone":
                     self.assertIsNotNone(left.get(self.day(4)))
                     self.assertIsNotNone(left.get(self.day(5)))
                 outcome, settled, named = traces.recover(ops, left, work != "undo")
@@ -1898,6 +1908,50 @@ class ContractCaseTests(unittest.TestCase):
                 wanted = {"before": pages, "after": after_pages}[case["files"]]
                 self.assertEqual(self.relinked_days(settled, days), self.relinked_days(wanted, days))
                 self.assertEqual(named, case.get("pathsNamed", []))
+
+    def test_chained_relinks_killed_at_every_point_lose_no_link(self):
+        """Review F of U4b3, MEDIUM: two and three chained relinks (as
+        Insert Class makes them, highest first), killed before each swap,
+        inside each (relinkStaged, relinkRenamedIn) and after the last
+        (beforeApplied, beforeUndone), going forward or back: recovery
+        leaves every link exactly as before or exactly as after the step
+        and settles it whole, never interrupted."""
+        def relink(start, end, before_text, after_text):
+            return {"kind": "move", "from": self.day(start), "to": self.day(end),
+                    "linkShaBefore": traces.sha(before_text), "linkShaAfter": traces.sha(after_text),
+                    "blobs": [traces.sha(before_text), traces.sha(after_text)],
+                    "linkTexts": {traces.sha(before_text): before_text, traces.sha(after_text): after_text}}
+
+        def text(day):
+            return "Unit 1, Day %d.md" % day
+
+        kills = 0
+        for count in (2, 3):
+            pages = {}
+            ops = []
+            for number in range(count):
+                pages[self.day(4 + number)] = ("link", text(1 + number))
+            for number in reversed(range(count)):
+                ops.append(relink(4 + number, 5 + number, text(1 + number), text(2 + number)))
+            days = tuple(range(4, 5 + count))
+            after_pages = traces.stopped_part_way(ops, False, pages, None)
+            wanted = (self.relinked_days(pages, days), self.relinked_days(after_pages, days))
+            for backward in (False, True):
+                starting = after_pages if backward else pages
+                for swapped in list(range(count)) + [None]:
+                    for inside in (None, "relinkStaged", "relinkRenamedIn"):
+                        if swapped is None and inside is not None:
+                            continue
+                        name = "%d chained, %s, stopped at %s %s" % (count, "back" if backward else "forward", swapped, inside)
+                        with self.subTest(name):
+                            left = traces.stopped_part_way(ops, backward, starting, swapped, inside)
+                            outcome, settled, _ = traces.recover(ops, left, not backward)
+                            self.assertNotEqual(outcome, "interrupted")
+                            self.assertIn(self.relinked_days(settled, days), wanted)
+                            kills += 1
+        # Two links: two swaps, three moments each, and the end, both ways;
+        # three links: three swaps.
+        self.assertEqual(kills, 2 * (2 * 3 + 1) + 2 * (3 * 3 + 1))
 
     def edited_by_hand(self, pages, page, first, second):
         """recoveryCasesHow's handEdit: `first` or `second`, the publish line

@@ -942,21 +942,27 @@ nonisolated enum UndoRecovery {
     /// other name may be the teacher's. Answers the place that cannot be
     /// read just now (the step is then left for the next recovery), or nil.
     ///
-    /// Review D of U4b3, MEDIUM: only ONE swap can be in flight, so at most
-    /// ONE link is removed. When two relinks chain (op0 Day 5 to Day 6,
-    /// op1 Day 4 to Day 5, op1's new text op0's old), an op can look both
-    /// standing only because another op's link holds its text; removing a
-    /// link from each lost Day 5's. So an op's just-made side is passed
-    /// over when it is the side ANOTHER relink starts the work from and
-    /// that op's end side does not yet hold its end text (the link there is
-    /// that op's own, not yet moved), and of the ops left the LAST in the
-    /// work's own swap order (index order going forward, the reverse for an
-    /// Undo) is the one whose swap was in flight. Every other op is then
-    /// judged as a finished or unstarted relink by `fileStates`. The
-    /// journal writes no line inside a step, so a kill inside either of two
-    /// chained swaps can leave the folder reading alike; removing the later
-    /// op's link leaves every link of the step standing exactly once, at
-    /// one side or the other, either way.
+    /// Review F of U4b3, MEDIUM: at most ONE link is removed, and only
+    /// when the folder reads as a point INSIDE one relink's swap. The ops
+    /// are read in the work's own swap order (index order going forward,
+    /// the reverse for an Undo). An op passes when it stands both ways,
+    /// every relink before it holds its end text at its end side (`to`
+    /// going forward, `from` for an Undo) and every relink after it holds
+    /// its start text at its start side: the ops before it done, the ops
+    /// after it untouched, it alone in flight. Of the ops that pass, the
+    /// last one's just-made link is removed; when none passes, nothing is.
+    /// In a chain each relink's end holds the text the next one's start
+    /// held, so "both standing" alone also describes a relink already
+    /// finished or not yet started (review D, then review F, each lost a
+    /// link that way). The journal writes no line inside a step, so a kill
+    /// inside one of two chained swaps can read alike: then several ops
+    /// pass, and removing the last one's link leaves the folder at a
+    /// consistent point either way. What is proven is what
+    /// `UndoRelinkTests.testChainedRelinksKilledAtEveryStopPointLoseNoLink`
+    /// runs: two and three chained relinks, at every stop point, forward,
+    /// Undo and Redo. A plain link move (`linkSha`) is not read here, and a
+    /// step chaining one to a relink still loses a link at some stop points
+    /// (the same test's laid but unrun shapes).
     static func removeTheLinksJustMade(of step: UndoStep, root: URL, goingForward: Bool) -> String? {
         var relinks: [(from: String, to: String, before: String, after: String, atFrom: UndoMoveSide, atTo: UndoMoveSide)] = []
         var opIndex: Int = 0
@@ -983,22 +989,14 @@ nonisolated enum UndoRecovery {
             relinks.append((from: from, to: to, before: before, after: after, atFrom: atFrom, atTo: atTo))
         }
         var inFlight: (path: String, sha: String)? = nil
-        for candidate in relinks {
-            if candidate.atFrom != .holdsTheContent || candidate.atTo != .holdsTheContent {
-                continue
-            }
-            let justMadePath: String = goingForward ? candidate.to : candidate.from
-            var heldByAnother: Bool = false
-            for other in relinks {
-                let otherStartsAt: String = goingForward ? other.from : other.to
-                let otherEndHolds: Bool = goingForward ? other.atTo == .holdsTheContent : other.atFrom == .holdsTheContent
-                if otherStartsAt == justMadePath && !otherEndHolds {
-                    heldByAnother = true
-                }
-            }
-            if !heldByAnother {
+        var candidateIndex: Int = 0
+        while candidateIndex < relinks.count {
+            let candidate = relinks[candidateIndex]
+            if UndoRecovery.isTheOneInFlight(at: candidateIndex, of: relinks, goingForward: goingForward) {
+                let justMadePath: String = goingForward ? candidate.to : candidate.from
                 inFlight = (path: justMadePath, sha: goingForward ? candidate.after : candidate.before)
             }
+            candidateIndex += 1
         }
         guard let found = inFlight else {
             return nil
@@ -1008,6 +1006,35 @@ nonisolated enum UndoRecovery {
             return found.path
         }
         return nil
+    }
+
+    /// Review F of U4b3: whether the relink at `index` (in the work's swap
+    /// order) can be the one whose swap was in flight: it stands both
+    /// ways, every relink before it holds its end text at its end side,
+    /// and every relink after it holds its start text at its start side.
+    static func isTheOneInFlight(
+        at index: Int,
+        of relinks: [(from: String, to: String, before: String, after: String, atFrom: UndoMoveSide, atTo: UndoMoveSide)],
+        goingForward: Bool
+    ) -> Bool {
+        let candidate = relinks[index]
+        if candidate.atFrom != .holdsTheContent || candidate.atTo != .holdsTheContent {
+            return false
+        }
+        var otherIndex: Int = 0
+        while otherIndex < relinks.count {
+            let other = relinks[otherIndex]
+            let startHolds: Bool = goingForward ? other.atFrom == .holdsTheContent : other.atTo == .holdsTheContent
+            let endHolds: Bool = goingForward ? other.atTo == .holdsTheContent : other.atFrom == .holdsTheContent
+            if otherIndex < index && !endHolds {
+                return false
+            }
+            if otherIndex > index && !startHolds {
+                return false
+            }
+            otherIndex += 1
+        }
+        return true
     }
 
     /// U4b3 door-3: the step's moves that leave or fill a handed-over

@@ -17,6 +17,14 @@ final class UndoRelinkTests: XCTestCase {
 
     let section: String = "courses/TST1O/section1/"
 
+    /// The shapes `testChainedRelinksKilledAtEveryStopPointLoseNoLink` runs. The two with a plain link
+    /// move are laid but NOT run: review F's rule considers relinks only,
+    /// and both lose a link at some stop point (`aMoveThenARelinkIntoItsPlace`
+    /// at `afterBegin`, `aRelinkThenAMoveIntoItsPlace` at `beforeApplied`,
+    /// and in their Undo and Redo), a counter-example handed to the
+    /// director (`windows-app/notes/899-u4b3-review-F-fixes.md`).
+    let shapesTheRuleHolds: [ChainShape] = [.twoChainedRelinks, .threeChainedRelinks]
+
     /// Where the relinked link's texts lead.
     enum Leads: CaseIterable {
         /// To pages of the section, by relative text.
@@ -412,50 +420,132 @@ final class UndoRelinkTests: XCTestCase {
         try checkTheOutsideBytes()
     }
 
-    /// Review D of U4b3, MEDIUM: two relinks that chain, as Insert Class
-    /// makes them when two later classes in a row are links to renamed
-    /// class pages (op0 Day 5 to Day 6, `Unit 1, Day 2.md` becoming
-    /// `Unit 1, Day 3.md`; op1 Day 4 to Day 5, `Unit 1, Day 1.md` becoming
-    /// `Unit 1, Day 2.md`, op0's old text). Killed at every moment of both
-    /// swaps, going forward, back and forward again: after recovery the
-    /// step is whole before or whole after, every link present exactly
-    /// once with its own side's text, nothing lost, nothing staged left.
-    /// MUST FAIL with recovery removing a link from every op standing both
-    /// ways (M4: Day 5 and Day 6 left with no link).
-    func testTwoChainedRelinksKilledAtAnyMomentLoseNoLink() async throws {
+    /// The link-moving steps review F's kill table runs: each a set of
+    /// links laid on class pages and ONE step moving them, as Insert Class
+    /// makes it, highest first (U4b3 review F).
+    enum ChainShape: CaseIterable {
+        /// Review D: Day 5's link (`Unit 1, Day 2.md`) relinked to Day 6
+        /// (`Unit 1, Day 3.md`), then Day 4's (`Unit 1, Day 1.md`) to Day 5
+        /// (`Unit 1, Day 2.md`, the first move's old text).
+        case twoChainedRelinks
+        /// Review F: the same with three links, Day 6 to Day 7 first.
+        case threeChainedRelinks
+        /// Review F's "not probed": a plain link move of Day 5 (holding
+        /// `Unit 1, Day 2.md`) to Day 6, then Day 4's link relinked to Day 5
+        /// with that same text: the move's place is the relink's place.
+        case aMoveThenARelinkIntoItsPlace
+        /// The other order: Day 5's link relinked to Day 6 (`Unit 1, Day
+        /// 2.md` becoming `Unit 1, Day 3.md`), then Day 4's link, holding
+        /// `Unit 1, Day 2.md` too, moved plainly into Day 5.
+        case aRelinkThenAMoveIntoItsPlace
+    }
+
+    /// One shape laid out: its folder, journal folder, draft, and the class
+    /// days whose links it changes.
+    struct LaidChain {
+
+        // MARK: - Stored properties
+
+        let root: URL
+
+        let journalFolder: URL
+
+        let draft: UndoOpsDraft
+
+        let days: [Int]
+    }
+
+    /// Every stop point the door has, for a step of `swaps` swaps.
+    func everyStopPoint(swaps: Int) -> [UndoKillPoint] {
+        var points: [UndoKillPoint] = [.afterBegin, .afterTheCheck, .afterUndoing, .afterRedoing]
+        var index: Int = 0
+        while index < swaps {
+            points.append(.beforeSwap(index))
+            points.append(.relinkStaged(index))
+            points.append(.relinkRenamedIn(index))
+            index += 1
+        }
+        points.append(.beforeApplied)
+        points.append(.beforeUndone)
+        points.append(.beforeRedone)
+        points.append(.whileDeletingAFolder)
+        return points
+    }
+
+    /// Review F of U4b3, MEDIUM: two and three chained relinks, each killed
+    /// at EVERY stop point of the door (`afterBegin`, `afterTheCheck`, each
+    /// `beforeSwap`, both halves inside each relink's swap, `afterUndoing`,
+    /// `afterRedoing`, `beforeApplied`, `beforeUndone`, `beforeRedone`,
+    /// `whileDeletingAFolder`), going forward, back and forward again: after
+    /// recovery every link of the step is exactly as before or exactly as
+    /// after, nothing staged is left, and the step is settled on the side
+    /// its links show. MUST FAIL with review D's rule (one look along the
+    /// chain).
+    func testChainedRelinksKilledAtEveryStopPointLoseNoLink() async throws {
         var reached: Int = 0
-        for work in RelinkWork.allCases {
-            var index: Int = 0
-            while index < 3 {
-                let points: [UndoKillPoint] = [.beforeSwap(index), .relinkStaged(index), .relinkRenamedIn(index)]
-                for point in points {
-                    if try await killTwoChainedRelinks(work, at: point) {
+        var expected: Int = 0
+        for shape in shapesTheRuleHolds {
+            let swaps: Int = shape == .threeChainedRelinks ? 3 : 2
+            let relinks: Int = shape == .twoChainedRelinks || shape == .threeChainedRelinks ? swaps : 1
+            for work in RelinkWork.allCases {
+                for point in everyStopPoint(swaps: swaps) {
+                    if try await killAChain(shape, work, at: point) {
                         reached += 1
                     }
                 }
-                index += 1
+                // An apply: afterBegin, each swap, both halves of each
+                // relink, beforeApplied. An Undo or a Redo: afterTheCheck,
+                // afterUndoing or afterRedoing, the same swaps, beforeUndone
+                // or beforeRedone.
+                expected += work == .apply ? 2 + swaps + 2 * relinks : 3 + swaps + 2 * relinks
             }
         }
-        // Two swaps, each with two moments inside it, for three works.
-        XCTAssertEqual(reached, 6 * 3)
+        XCTAssertEqual(reached, expected)
     }
 
+    /// A swap of two links (Day 4 and Day 5, each relinked into the
+    /// other's place) is not a step the door makes: a relink never renames
+    /// over an occupied place, so the step is refused before anything
+    /// changes, every link left as it was.
+    func testTwoLinksSwappedInOneStepAreRefusedWithNothingChanged() throws {
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "swapped")
+        let root: URL = place.root
+        try layLink(section + "Unit 1, Day 4.md", holding: "Unit 1, Day 1.md", root: root)
+        try layLink(section + "Unit 1, Day 5.md", holding: "Unit 1, Day 2.md", root: root)
+        let one: Data = Data("Unit 1, Day 1.md".utf8)
+        let two: Data = Data("Unit 1, Day 2.md".utf8)
+        let ops: [UndoOp] = [
+            UndoOp.relinkLink(
+                from: section + "Unit 1, Day 4.md", to: section + "Unit 1, Day 5.md",
+                linkShaBefore: UndoHash.sha256(of: one), linkShaAfter: UndoHash.sha256(of: two)
+            ),
+            UndoOp.relinkLink(
+                from: section + "Unit 1, Day 5.md", to: section + "Unit 1, Day 4.md",
+                linkShaBefore: UndoHash.sha256(of: two), linkShaAfter: UndoHash.sha256(of: one)
+            ),
+        ]
+        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: ops, blobs: [one, two], root: root, action: "insertClass")
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        let outcome: JournaledWriteOutcome = JournaledWrite.perform(ops: draft, in: journal, mode: .live, places: UndoMemoryPlaces())
+        XCTAssertNotEqual(outcome, .applied(seq: 1))
+        XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: root), "Unit 1, Day 1.md")
+        XCTAssertEqual(linkText(section + "Unit 1, Day 5.md", root: root), "Unit 1, Day 2.md")
+        XCTAssertEqual(stagedLeft(under: root), [])
+    }
+
+    /// Returns whether the kill point was reached (and so tested).
     @discardableResult
-    func killTwoChainedRelinks(_ work: RelinkWork, at point: UndoKillPoint) async throws -> Bool {
-        let label: String = "chained-\(work)-\(point)"
-        let made: (root: URL, journalFolder: URL, draft: UndoOpsDraft) = try layTwoChainedRelinks(named: "killed-" + label)
-        let twin: (root: URL, journalFolder: URL, draft: UndoOpsDraft) = try layTwoChainedRelinks(named: "twin-" + label)
+    func killAChain(_ shape: ChainShape, _ work: RelinkWork, at point: UndoKillPoint) async throws -> Bool {
+        let label: String = "\(shape)-\(work)-\(point)"
+        let made: LaidChain = try layAChain(shape, named: "killed-" + label)
+        let twin: LaidChain = try layAChain(shape, named: "twin-" + label)
         let root: URL = made.root
         let places: UndoMemoryPlaces = UndoMemoryPlaces()
-        let day4: String = section + "Unit 1, Day 4.md"
-        let day5: String = section + "Unit 1, Day 5.md"
-        let day6: String = section + "Unit 1, Day 6.md"
-        let linksBefore: [String?] = ["Unit 1, Day 1.md", "Unit 1, Day 2.md", nil]
-        let linksAfter: [String?] = [nil, "Unit 1, Day 2.md", "Unit 1, Day 3.md"]
-
+        let linksBefore: [String?] = linksOn(twin.days, root: twin.root)
         let twinJournal: UndoJournal = UndoJournal(folderURL: twin.journalFolder)
         XCTAssertEqual(JournaledWrite.perform(ops: twin.draft, in: twinJournal, mode: .live, places: UndoMemoryPlaces()), .applied(seq: 1), label)
-        XCTAssertEqual([linkText(day4, root: twin.root), linkText(day5, root: twin.root), linkText(day6, root: twin.root)], linksAfter, label)
+        let linksAfter: [String?] = linksOn(twin.days, root: twin.root)
+        XCTAssertNotEqual(linksBefore, linksAfter, label)
 
         let dying: UndoJournal = UndoJournal(
             folderURL: made.journalFolder,
@@ -491,39 +581,83 @@ final class UndoRelinkTests: XCTestCase {
 
         let survivor: UndoJournal = UndoJournal(folderURL: made.journalFolder)
         await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in root }, places: places)
-        let links: [String?] = [linkText(day4, root: root), linkText(day5, root: root), linkText(day6, root: root)]
+        let links: [String?] = linksOn(made.days, root: root)
         XCTAssertTrue(links == linksBefore || links == linksAfter, "\(label): links \(links)")
         XCTAssertEqual(stagedLeft(under: root), [], label)
         let phase: UndoStepPhase? = try survivor.read().records[1]?.phase
-        XCTAssertNotEqual(phase, .begun, label)
-        XCTAssertNotEqual(phase, .undoing, label)
-        XCTAssertNotEqual(phase, .redoing, label)
-        XCTAssertNotEqual(phase, .interrupted, label)
+        // Settled on the side its links show: done when they are as after,
+        // failed or rolled back (an apply) or undone (an Undo or a Redo)
+        // when they are as before.
+        var settledPhases: [UndoStepPhase] = [.done]
+        if links == linksBefore {
+            settledPhases = work == .apply ? [.failed, .rolledBack] : [.undone]
+        }
+        var settledThere: Bool = false
+        if let found = phase {
+            settledThere = settledPhases.contains(found)
+        }
+        XCTAssertTrue(settledThere, "\(label): phase \(String(describing: phase))")
         return true
     }
 
-    /// Day 4's link holding `Unit 1, Day 1.md` and Day 5's holding
-    /// `Unit 1, Day 2.md`, and the step relinking both, highest first.
-    func layTwoChainedRelinks(named name: String) throws -> (root: URL, journalFolder: URL, draft: UndoOpsDraft) {
+    /// The links on these class days, each its text or nil.
+    func linksOn(_ days: [Int], root: URL) -> [String?] {
+        var links: [String?] = []
+        for day in days {
+            links.append(linkText(section + "Unit 1, Day \(day).md", root: root))
+        }
+        return links
+    }
+
+    /// The links `shape` starts from, and the draft of its step.
+    func layAChain(_ shape: ChainShape, named name: String) throws -> LaidChain {
         let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: name)
         let root: URL = place.root
-        try layLink(section + "Unit 1, Day 4.md", holding: "Unit 1, Day 1.md", root: root)
-        try layLink(section + "Unit 1, Day 5.md", holding: "Unit 1, Day 2.md", root: root)
         let one: Data = Data("Unit 1, Day 1.md".utf8)
         let two: Data = Data("Unit 1, Day 2.md".utf8)
         let three: Data = Data("Unit 1, Day 3.md".utf8)
-        let ops: [UndoOp] = [
-            UndoOp.relinkLink(
-                from: section + "Unit 1, Day 5.md", to: section + "Unit 1, Day 6.md",
-                linkShaBefore: UndoHash.sha256(of: two), linkShaAfter: UndoHash.sha256(of: three)
-            ),
-            UndoOp.relinkLink(
-                from: section + "Unit 1, Day 4.md", to: section + "Unit 1, Day 5.md",
-                linkShaBefore: UndoHash.sha256(of: one), linkShaAfter: UndoHash.sha256(of: two)
-            ),
-        ]
-        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: ops, blobs: [one, two, three], root: root, action: "insertClass")
-        return (root: root, journalFolder: place.journalFolder, draft: draft)
+        let four: Data = Data("Unit 1, Day 4.md".utf8)
+        var ops: [UndoOp] = []
+        var blobs: [Data] = [one, two, three]
+        var days: [Int] = [4, 5, 6]
+        switch shape {
+        case .twoChainedRelinks:
+            try layLink(section + "Unit 1, Day 4.md", holding: "Unit 1, Day 1.md", root: root)
+            try layLink(section + "Unit 1, Day 5.md", holding: "Unit 1, Day 2.md", root: root)
+            ops.append(relink(5, 6, from: two, to: three))
+            ops.append(relink(4, 5, from: one, to: two))
+        case .threeChainedRelinks:
+            try layLink(section + "Unit 1, Day 4.md", holding: "Unit 1, Day 1.md", root: root)
+            try layLink(section + "Unit 1, Day 5.md", holding: "Unit 1, Day 2.md", root: root)
+            try layLink(section + "Unit 1, Day 6.md", holding: "Unit 1, Day 3.md", root: root)
+            ops.append(relink(6, 7, from: three, to: four))
+            ops.append(relink(5, 6, from: two, to: three))
+            ops.append(relink(4, 5, from: one, to: two))
+            blobs.append(four)
+            days = [4, 5, 6, 7]
+        case .aMoveThenARelinkIntoItsPlace:
+            try layLink(section + "Unit 1, Day 4.md", holding: "Unit 1, Day 1.md", root: root)
+            try layLink(section + "Unit 1, Day 5.md", holding: "Unit 1, Day 2.md", root: root)
+            ops.append(UndoOp.moveLink(from: section + "Unit 1, Day 5.md", to: section + "Unit 1, Day 6.md", linkSha: UndoHash.sha256(of: two)))
+            ops.append(relink(4, 5, from: one, to: two))
+            blobs = [one, two]
+        case .aRelinkThenAMoveIntoItsPlace:
+            try layLink(section + "Unit 1, Day 4.md", holding: "Unit 1, Day 2.md", root: root)
+            try layLink(section + "Unit 1, Day 5.md", holding: "Unit 1, Day 2.md", root: root)
+            ops.append(relink(5, 6, from: two, to: three))
+            ops.append(UndoOp.moveLink(from: section + "Unit 1, Day 4.md", to: section + "Unit 1, Day 5.md", linkSha: UndoHash.sha256(of: two)))
+            blobs = [two, three]
+        }
+        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: ops, blobs: blobs, root: root, action: "insertClass")
+        return LaidChain(root: root, journalFolder: place.journalFolder, draft: draft, days: days)
+    }
+
+    /// A relinking move of class day `start`'s link to day `end`.
+    func relink(_ start: Int, _ end: Int, from before: Data, to after: Data) -> UndoOp {
+        return UndoOp.relinkLink(
+            from: section + "Unit 1, Day \(start).md", to: section + "Unit 1, Day \(end).md",
+            linkShaBefore: UndoHash.sha256(of: before), linkShaAfter: UndoHash.sha256(of: after)
+        )
     }
 
     /// An Undo asked for while a link the teacher made stands at the
