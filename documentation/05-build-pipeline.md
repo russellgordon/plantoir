@@ -869,15 +869,17 @@ a lost tag. The
 first version truncated and wrote in place with no re-check — a window of a few milliseconds per page, across the
 ~100 writes of a course's first build, on the teacher's own file.
 
-**Links are never written through.** A page that is a symbolic link, one inside
-a folder that is (between the page and the course folder — the build's copy
-follows a shared folder that is itself a link), or a file with a second name
-(a hard link) is left alone: measured, the first version rewrote a file OUTSIDE
-the course through a link, and two courses sharing one page would overwrite
-each other's `createdSection1` on alternate builds. Its site copy is still
-dated; the console names it ("Left the date on N page(s) as it was, because
-each one also lives somewhere else…"), and it is not on the trail, because
-nothing was written.
+**A symbolic link is written through; a hard link is not written.** A page
+that is a symbolic link, or sits under a folder that is one (the build's copy
+follows a shared folder that is itself a link), is written through the link:
+the date goes into the file the link leads to, by the same safe write, and the
+link stays a link (Russell's ruling of 2026-11-27, #1055: "Truly write
+through"); a page shared that way by two courses is dated by each course's
+build in turn. A page that is a second name for the same file (a hard link) is
+never written, since the rename would part the two names: its site copy is
+still dated; the console names it ("Left the date on N page(s) as it was,
+because each one also lives somewhere else…"), and it is not on the trail,
+because nothing was written.
 
 **A read-only page is not written either**, and that IS checked before the
 write, from the page's mode bits (no write bit for owner, group or anyone):
