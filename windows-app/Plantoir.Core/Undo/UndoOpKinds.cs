@@ -938,9 +938,11 @@ internal static class UndoMoveSides
     /// matched to the listing by <see cref="UndoOp.PartInside"/>, the one
     /// comparison, and keeps the disk's spelling.
     /// </summary>
+    /// <param name="isAtFrom">Which side <paramref name="fullPath"/> is, for a link's move: a relink reads <c>from</c> by
+    /// <c>linkShaBefore</c> and <c>to</c> by <c>linkShaAfter</c> (<see cref="UndoOp.LinkText"/>, #899 W8b-21b1).</param>
     internal static UndoMoveSide Read(UndoOp op, string fullPath, Func<string, bool>? cannotRead = null,
-                                      IReadOnlyDictionary<string, UndoCurrent>? overriding = null) =>
-        ReadNamingFoldersLeftOut(op, fullPath, cannotRead, overriding).Side;
+                                      IReadOnlyDictionary<string, UndoCurrent>? overriding = null, bool isAtFrom = true) =>
+        ReadNamingFoldersLeftOut(op, fullPath, cannotRead, overriding, isAtFrom).Side;
 
     /// <summary>
     /// <see cref="Read"/>, naming too the folders inside the place that were
@@ -950,10 +952,12 @@ internal static class UndoMoveSides
     /// side that holds the content names any.
     /// </summary>
     internal static (UndoMoveSide Side, IReadOnlyList<string> FoldersLeftOut) ReadNamingFoldersLeftOut(
-        UndoOp op, string fullPath, Func<string, bool>? cannotRead = null, IReadOnlyDictionary<string, UndoCurrent>? overriding = null)
+        UndoOp op, string fullPath, Func<string, bool>? cannotRead = null, IReadOnlyDictionary<string, UndoCurrent>? overriding = null,
+        bool isAtFrom = true)
     {
         if (op.Sha is not null) return (ReadAFile(op, fullPath, cannotRead, overriding), []);
-        if (op.LinkSha is { } linkSha) return (ReadALink(linkSha, fullPath, cannotRead), []);
+        // A link's move, plain or relinking, by the one test; each side by its own text (#899 W8b-21b1).
+        if (op.IsALinksMove) return (op.LinkText(isAtFrom) is { } linkSha ? ReadALink(linkSha, fullPath, cannotRead) : UndoMoveSide.CannotRead, []);
         switch (UndoTreeReading.Read(fullPath, cannotRead: cannotRead))
         {
             case UndoTreeReading.Absent: return (UndoMoveSide.Free, []);

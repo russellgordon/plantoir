@@ -57,6 +57,9 @@ internal sealed record UndoSwapTarget(string FullPath, string RelativePath, byte
     /// written through. The look before its own change judges the place whole.
     /// </summary>
     internal bool HandedOver { get; init; }
+
+    /// <summary>A relinking move's two texts, each side's own (#899 W8b-21b1); null for every other change.</summary>
+    internal UndoRelink? Relink { get; init; }
 }
 
 /// <summary>How a swap went.</summary>
@@ -273,6 +276,14 @@ internal static class UndoSwap
                 {
                     case UndoSwapChange.MoveHere move:
                         LetGoOwnFilesInside(target.RelativePath);
+                        if (target.Relink is { } relink)
+                        {
+                            // Made back the same way the other way round: the
+                            // source's text made beside from, renamed in, the
+                            // link this swap made removed (#899 W8b-21b1).
+                            if (RelinkLink(target.FullPath, relink.DestinationText, move.FromFull, relink.SourceText, label, seams) is not null) whole = false;
+                            continue;
+                        }
                         if (RenameWithRetries(target.FullPath, move.FromFull, replace: false, seams) != 0) whole = false;
                         else FollowTheMove(target.RelativePath, move.FromRelative, target.FullPath, move.FromFull);
                         continue;
@@ -487,7 +498,7 @@ internal static class UndoSwap
                     // And what the step's EARLIER swaps left inside it (U4b, M1; #899 W8-3),
                     // never inside a link's move: nothing of the step's is there,
                     // and what the link leads to is never walked (U4b2-14; W8-6).
-                    if (moving.Op.LinkSha is null && SeqOfLabel(label) is { } seq)
+                    if (!moving.Op.IsALinksMove && SeqOfLabel(label) is { } seq)
                     {
                         foreach ((string inside, UndoCurrent absent) in StepsOwnFilesInside(moving.FromFull, seq))
                             ownLeftOut.TryAdd(inside, absent);
@@ -497,7 +508,8 @@ internal static class UndoSwap
                     ? new UndoRefusal(UndoRefusalKind.ChangedSince, leadingOut)
                     : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders, ownLeftOut, foldersLeftOutOfAMove);
                 wentIn = refusal is null;
-                if (wentIn && target.Change is UndoSwapChange.MoveHere moved) FollowTheMove(moved.FromRelative, target.RelativePath, moved.FromFull, target.FullPath);
+                // A relink moves nothing: the old link is removed, a new one made (the mac's relink branch).
+                if (wentIn && target.Change is UndoSwapChange.MoveHere moved && target.Relink is null) FollowTheMove(moved.FromRelative, target.RelativePath, moved.FromFull, target.FullPath);
             }
             if (wentIn) swapsMade++;
             if (refusal is not null)
@@ -571,8 +583,10 @@ internal static class UndoSwap
                 // the place it leaves, nothing where it goes.
                 // The folders it names as left out are where the folder goes,
                 // once it has moved (U4b2-10; #899 W8-4).
-                (UndoMoveSide atFrom, IReadOnlyList<string> foldersLeftOut) = UndoMoveSides.ReadNamingFoldersLeftOut(move.Op, move.FromFull, overriding: ownLeftOut);
-                UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath);
+                // Each side by its own text for a relink (#899 W8b-21b1): the source's, then the destination's.
+                bool sourceIsFrom = target.Relink?.SourceIsFrom ?? true;
+                (UndoMoveSide atFrom, IReadOnlyList<string> foldersLeftOut) = UndoMoveSides.ReadNamingFoldersLeftOut(move.Op, move.FromFull, overriding: ownLeftOut, isAtFrom: sourceIsFrom);
+                UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath, isAtFrom: !sourceIsFrom);
                 if (move.Op.IsCaseOnlyMove && UndoMoveSides.SpellingListed(move.FromFull, target.FullPath) is { } spelled)
                 {
                     // One item under two spellings (U4b; W8-5): it goes in
@@ -599,6 +613,15 @@ internal static class UndoSwap
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException)
                 {
                     return new UndoRefusal(UndoRefusalKind.CouldNotWrite, move.FromRelative);
+                }
+                if (target.Relink is { } relink)
+                {
+                    // A relink: the new link made beside its place, renamed in
+                    // without replacing, then the old one removed once re-read.
+                    // Nothing is written through either link (#899 W8b-21b1).
+                    return RelinkLink(move.FromFull, relink.SourceText, target.FullPath, relink.DestinationText, label, seams) is { } failed
+                        ? new UndoRefusal(failed, move.FromRelative)
+                        : null;
                 }
                 // MoveFileEx WITHOUT MOVEFILE_REPLACE_EXISTING: never over
                 // anything that appeared at the destination since. A rename
@@ -1235,6 +1258,67 @@ internal static class UndoSwap
         catch (InvalidOperationException) { return false; }
         catch (System.ComponentModel.Win32Exception) { return true; }
     }
+
+    /// <summary>
+    /// A link moved and given a new text (#899 W8b-21b1; the mac's
+    /// <c>UndoSwap.relinkLink</c>): a new link holding <paramref name="newText"/>
+    /// made under the staged <c>-new</c> name beside <paramref name="newFull"/>,
+    /// renamed in without replacing, and only then the link at
+    /// <paramref name="oldFull"/> removed, once re-read holding
+    /// <paramref name="oldText"/>. Neither link is ever followed or written
+    /// through. Null when it went in. A make that fails (a link this process
+    /// may not make, 1314, included: an ordinary failed make, never retried,
+    /// never a fallback) is <see cref="UndoRefusalKind.CouldNotWrite"/>; a
+    /// rename-in that fails, or an old link changed or that will not go, is
+    /// <see cref="UndoRefusalKind.FileIsInUse"/>. Whatever this call made is
+    /// then taken away again and the old link left whole.
+    /// </summary>
+    internal static UndoRefusalKind? RelinkLink(string oldFull, byte[] oldText, string newFull, byte[] newText, string label, UndoSeams? seams)
+    {
+        string staged = BesidePath(newFull, label, "new");
+        UndoStagedFile.RemoveByName(staged);
+        if (MakeALink(staged, newText, seams) != 0)
+        {
+            UndoStagedFile.RemoveByName(staged);
+            return UndoRefusalKind.CouldNotWrite;
+        }
+        if (seams?.RelinkRenameInFails?.Invoke(newFull) == true || RenameWithRetries(staged, newFull, replace: false, seams) != 0)
+        {
+            UndoStagedFile.RemoveByName(staged);
+            return UndoRefusalKind.FileIsInUse;
+        }
+        if (LinkHolds(oldFull, oldText) && RemoveALink(oldFull)) return null;
+        // The old link changed under the swap, or would not go: the new one is
+        // taken away again (it is this call's own), the old left whole.
+        if (LinkHolds(newFull, newText)) RemoveALink(newFull);
+        return UndoRefusalKind.FileIsInUse;
+    }
+
+    /// <summary>
+    /// A file symbolic link at <paramref name="fullPath"/> holding exactly
+    /// <paramref name="text"/> (UTF-8, as <see cref="UndoLinks.LinkSha"/>
+    /// reads it back; measured on the PC to be stored byte for byte, forward
+    /// slashes included), never over anything: 0 when made, else the Win32
+    /// error (1314 where this process may not make a link).
+    /// </summary>
+    internal static int MakeALink(string fullPath, byte[] text, UndoSeams? seams)
+    {
+        if (seams?.MakingALinkAnswers is { } answers) return answers(fullPath);
+        string target;
+        try { target = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(text); }
+        catch (DecoderFallbackException) { return InvalidData; }
+        if (target.Length == 0 || target.Contains('\0')) return InvalidData;
+        try
+        {
+            File.CreateSymbolicLink(fullPath, target);
+            return 0;
+        }
+        catch (UnauthorizedAccessException) { return 5; }
+        catch (IOException error) { return error.HResult & 0xFFFF; }
+    }
+
+    /// <summary>ERROR_INVALID_DATA: a link text that is not a path's (not UTF-8, empty, or holding a NUL).</summary>
+    private const int InvalidData = 13;
 
     /// <summary>
     /// Whether <paramref name="fullPath"/> is a link (<see cref="UndoLinks.Look"/>)

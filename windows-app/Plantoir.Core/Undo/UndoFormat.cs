@@ -116,7 +116,7 @@ internal sealed record UndoOp
     /// alone, or a relink would be read through, judged leading out, or carry
     /// edits.
     /// </summary>
-    internal bool IsALinksMove => LinkSha is not null;
+    internal bool IsALinksMove => LinkSha is not null || LinkShaBefore is not null;
 
     /// <summary>Whether the op is a relinking move: a link's move that changes the text the link holds (the mac's <c>isARelink</c>).</summary>
     internal bool IsARelink => LinkShaBefore is not null;
@@ -135,7 +135,7 @@ internal sealed record UndoOp
     /// <paramref name="linkShaBefore"/> and at <c>to</c> by
     /// <paramref name="linkShaAfter"/>, both texts kept as blobs. Swapped as:
     /// a new link made beside <c>to</c>, renamed in without replacing, the old
-    /// one removed once re-read (<c>UndoSwap.RelinkLink</c>).
+    /// one removed once re-read (<see cref="UndoSwap.RelinkLink"/>).
     /// </summary>
     internal static UndoOp RelinkLink(string from, string to, string linkShaBefore, string linkShaAfter) => new()
     {
@@ -260,7 +260,7 @@ internal sealed record UndoOp
     internal static bool MoveCarries(UndoOp move, UndoOp edit)
     {
         if (move.Kind != Move || !move.Readable || move.From is not { } from || move.To is not { } to || edit.Path is not { } path) return false;
-        if (move.LinkSha is not null) return false;
+        if (move.IsALinksMove) return false;
         if (edit.Kind is not (WriteFile or EditLine or ReplaceText or EditJson)) return false;
         if (edit.From is not null || edit.To is not null || edit.Target is not null) return false;
         if (PartInside(to, path) is null) return false;
@@ -334,7 +334,7 @@ internal sealed record UndoOp
                 UndoOp filler = ops[fillerIndex];
                 if (PlaceFilledBy(filler) is not { } filled || PartInside(place, filled) is not "") continue;
                 if (!HandsOverAsAMove(leaver) && !HandsOverAsAMove(filler)) continue;
-                found.Add(new UndoHandover(leaverIndex, fillerIndex, place, leaver.LinkSha is not null || filler.LinkSha is not null));
+                found.Add(new UndoHandover(leaverIndex, fillerIndex, place, leaver.IsALinksMove || filler.IsALinksMove));
                 break;
             }
         }
@@ -350,7 +350,7 @@ internal sealed record UndoOp
     internal static bool HandsOverAsAMove(UndoOp op)
     {
         if (op.Kind != Move || op.ListingSha is not null || op.IsCaseOnlyMove) return false;
-        return op.Sha is not null || op.LinkSha is not null;
+        return op.Sha is not null || op.IsALinksMove;
     }
 
     /// <summary>The place an op leaves: a handing-over move's <c>from</c>, or a removed file's path (the mac's <c>placeLeft(by:)</c>).</summary>
