@@ -61,11 +61,17 @@ def lay_out(case: dict, course_folder: Path, content_root: Path) -> None:
     remembers one against the other, the way build_section_site does."""
     build_site.forget_vault_sources(course_folder)
     published = []
+    links_to_make = []
     for page in case["pages"]:
         place = page["path"]
         source = course_folder / (place + ".md")
         is_section_page = place.startswith("section1/")
         copied = content_root / ((place[len("section1/"):] if is_section_page else place) + ".md")
+        if page.get("linkHolds") is not None:
+            # A symbolic link in the teacher's folder; its copy holds the
+            # file it leads to (#1048b), made once every file is written.
+            links_to_make.append((source, copied, page["linkHolds"], is_section_page))
+            continue
         front = []
         if not page.get("visible", True):
             front.append("publish: false")
@@ -84,6 +90,18 @@ def lay_out(case: dict, course_folder: Path, content_root: Path) -> None:
         build_site.remember_vault_source(copied, source, is_section_page)
         if page.get("published"):
             published.append(place)
+    for source, copied, holds, is_section_page in links_to_make:
+        source.parent.mkdir(parents=True, exist_ok=True)
+        # The contract writes the link's text with forward slashes. Windows
+        # stores a relative link's text as given and cannot follow one that
+        # holds "/" (reading it fails with Errno 22), so it goes through Path,
+        # which spells it with this system's separator, as a teacher's own
+        # link on that system is spelled. The arrangement is the same on every
+        # system; only the separator differs.
+        source.symlink_to(Path(holds))
+        copied.parent.mkdir(parents=True, exist_ok=True)
+        copied.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+        build_site.remember_vault_source(copied, source, is_section_page)
     if published:
         record = course_folder / ".publish_state" / "section1.published-pages"
         record.mkdir(parents=True, exist_ok=True)

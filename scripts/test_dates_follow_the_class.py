@@ -41,11 +41,14 @@ if _sys.platform == "darwin" and _sys.argv[1:2] != ["--site"]:
         _sys.exit(77)
 # ---- end of runs in the image ----
 
+import io
+import json
 import os
 import shutil
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -54,6 +57,7 @@ import build_site
 import class_pages
 import contracts
 import frontmatter
+import my_progress
 import toolchain_paths
 
 
@@ -633,6 +637,145 @@ class DatesFollowTheClassTests(unittest.TestCase):
         self.assertEqual(again["rewritten"], [], "a second build rewrote pages")
         self.assertEqual({path: path.read_bytes() for path in course.rglob("*.md")}, settled)
 
+    def test_a_file_a_numbered_class_owns_keeps_that_classs_date(self):
+        # #1048b: the cases are class-planning.json →
+        # datingPagesAClassBrings.frontmatterKey.firstClassKeepsASharedLessonCases,
+        # each built for every section it has classes in, then built again.
+        cases = _load("datingPagesAClassBrings", "frontmatterKey", "firstClassKeepsASharedLessonCases")
+        self.assertGreater(len(cases), 0)
+        for index, case in enumerate(cases):
+            with self.subTest(case=case["name"]):
+                self.run_a_first_class_case(case, index)
+
+    def run_a_first_class_case(self, case: dict, index: int) -> None:
+        course = self.temporary / f"first-class-{index}" / "courses" / "TEST"
+        for place, keys in case["files"].items():
+            file = course / place
+            file.parent.mkdir(parents=True, exist_ok=True)
+            lines = ["---", f"title: {file.stem}"]
+            for key, value in keys.items():
+                lines.append(f"{key}: {value}")
+            lines.extend(["---", "The lesson.", ""])
+            file.write_text("\n".join(lines), encoding="utf-8")
+        sections: list = []
+        for page in case["classes"]:
+            place = course / page["page"]
+            place.parent.mkdir(parents=True, exist_ok=True)
+            section = int(page["page"].split("/")[0][len("section"):])
+            if section not in sections:
+                sections.append(section)
+            if page.get("linkHolds") is not None:
+                _link_or_skip(self, place, Path(page["linkHolds"]))
+                continue
+            place.write_text(
+                f"---\ntitle: {place.stem}\npublish: true\ncreated: {page['created']}\n---\n"
+                f"{page.get('says', '')}\n", encoding="utf-8")
+
+        def build(section: int) -> dict:
+            content = self.temporary / f"first-class-{index}" / f"content{section}"
+            if content.exists():
+                shutil.rmtree(content)
+            content.mkdir()
+            build_site.forget_vault_sources(course)
+            for root, _dirs, files in os.walk(course / "Shared"):
+                relative = Path(root).relative_to(course)
+                (content / relative).mkdir(parents=True, exist_ok=True)
+                for file in files:
+                    shutil.copy2(Path(root) / file, content / relative / file)
+                    build_site.remember_vault_source(content / relative / file, Path(root) / file, False)
+                    build_site.process_frontmatter(content / relative / file, section)
+            # Every folder of the section, as a course with Handouts beside
+            # its classes copies them (#1048b review 1, LOW 3).
+            folders_of_the_section: list = []
+            for entry in sorted((course / f"section{section}").iterdir()):
+                if entry.is_dir() and not entry.is_symlink():
+                    folders_of_the_section.append(entry.name)
+            build_site.copy_the_per_section_folders(course / f"section{section}", content,
+                                                    folders_of_the_section, section)
+            first = build_site._find_first_class_created(content)
+            if first is not None:
+                build_site._sync_non_class_pages_created(content, first)
+            return build_site._date_pages_from_their_classes(content, section)
+
+        def every_file() -> dict:
+            files: dict = {}
+            for path in sorted(course.rglob("*.md")):
+                if not path.is_symlink():
+                    files[path] = path.read_bytes()
+            return files
+
+        for section in sections:
+            build(section)
+        for place, expected in case["expect"].items():
+            metadata = frontmatter.load(course / place).metadata
+            for key, value in expected.items():
+                self.assertEqual(str(metadata.get(key)), value, f"{place}: {key}")
+            for key in metadata:
+                if key.startswith("created"):
+                    self.assertIn(key, expected, f"{place}: a key the case does not expect, {key}")
+        settled = every_file()
+        for section in sections:
+            again = build(section)
+            self.assertEqual(again["rewritten"], [], "a second build rewrote pages")
+        self.assertEqual(every_file(), settled, "a second build changed the teacher's files")
+        self.assert_the_owner_is_the_contracts(case, course, sections)
+
+    def assert_the_owner_is_the_contracts(self, case: dict, course: Path, sections: list) -> None:
+        """The RULE on the case, not only the build outcome (#1048b review 1,
+        LOW 4): for each section, whether a numbered class owns each file, and
+        which class page owns it, by the build's one rule."""
+        class_pages_of = getattr(build_site, "_class_pages_of_the_section", None)
+        owners_of = getattr(build_site, "_owners_of_the_files_the_numbered_classes_own", None)
+        self.assertIsNotNone(class_pages_of, "the build has no list of a section's class pages")
+        self.assertIsNotNone(owners_of, "the build names no owner of a file")
+        for section in sections:
+            build_site.forget_vault_sources(course)
+            build_site.set_class_folders(["All Classes"])
+            owners = owners_of(class_pages_of(section))
+            for place in case["files"]:
+                identity = build_site._identity_of_the_file(course / place)
+                owner = owners.get(identity)
+                self.assertEqual(owner is not None, case["ownedByANumberedClass"],
+                                 f"section {section}: {place} owned")
+                expected = case["owningClass"].get(f"section{section}")
+                named = Path(owner).relative_to(course).as_posix() if owner is not None else None
+                self.assertEqual(named, expected, f"section {section}: the class that owns {place}")
+
+    def test_the_class_pages_are_the_section_class_folders_pages_as_the_mac_lists_them(self):
+        # #1048b review 1, LOWs 1 to 3: every page under section<N>/<class
+        # folder>/, its settings readable or not; never a hidden file or
+        # folder, a folder's index.md, or a folder of the same name deeper in.
+        class_pages_of = getattr(build_site, "_class_pages_of_the_section", None)
+        self.assertIsNotNone(class_pages_of, "the build has no list of a section's class pages")
+        course = self.temporary / "list" / "courses" / "TEST"
+        classes = course / "section1" / "All Classes"
+        pages = {
+            "section1/All Classes/Unit 1, Day 1.md": "---\ntitle: Unit 1, Day 1\n---\nDay.\n",
+            "section1/All Classes/Unit 1, Day 2.md": "---\ntitle: [unclosed\n---\nSettings no reader accepts.\n",
+            "section1/All Classes/Unit 2/Unit 2, Day 1.md": "Day.\n",
+            "section1/All Classes/Overview.MD": "Overview.\n",
+            "section1/All Classes/index.md": "Index.\n",
+            "section1/All Classes/.drafts/Unit 1, Day 3.md": "Hidden folder.\n",
+            "section1/All Classes/.Unit 1, Day 4.md": "Hidden file.\n",
+            "section1/Handouts/All Classes/Unit 1, Day 5.md": "Same name, deeper.\n",
+            "section2/All Classes/Unit 1, Day 6.md": "Another section.\n",
+        }
+        for place, text in pages.items():
+            (course / place).parent.mkdir(parents=True, exist_ok=True)
+            (course / place).write_text(text, encoding="utf-8")
+        build_site.forget_vault_sources(course)
+        build_site.set_class_folders(["All Classes"])
+        listed = []
+        for page in class_pages_of(1):
+            listed.append(Path(page).relative_to(course).as_posix())
+        self.assertEqual(sorted(listed), sorted([
+            "section1/All Classes/Unit 1, Day 1.md",
+            "section1/All Classes/Unit 1, Day 2.md",
+            "section1/All Classes/Unit 2/Unit 2, Day 1.md",
+            "section1/All Classes/Overview.MD",
+        ]))
+        self.assertTrue(classes.is_dir())
+
     # MARK: - Assertions
 
     def copy_of(self, content: Path, title: str) -> Path:
@@ -646,6 +789,77 @@ class DatesFollowTheClassTests(unittest.TestCase):
             content, result = folder.build(section)
             self.assertEqual(result["rewritten"], [], "a second build rewrote pages")
         self.assertEqual(folder.snapshot(), settled, "a second build changed the teacher's files")
+
+
+def _quietly(function, *arguments, **keywords):
+    """`function`'s result, with what it prints kept off the test's output."""
+    said = io.StringIO()
+    with redirect_stdout(said):
+        return function(*arguments, **keywords)
+
+
+class AnOwnedLessonStaysUnderItsClass(unittest.TestCase):
+    """Moved here from test_my_progress.py (day27-4): it needs python-frontmatter
+    for the build's date pass, which test_my_progress.py, stdlib only, cannot
+    have on a Mac's own Python. #1048b review 1, MEDIUM 1: a shared lesson a numbered class owns
+    (Unit 1, Day 2 is a link to it) is grouped under THAT class, not under
+    Other pages and not under an earlier class that only says [[Lesson]]
+    (`class-planning.json` -> `datingPagesAClassBrings.frontmatterKey.
+    firstClassKeepsASharedLessonCasesLayout`)."""
+
+    def setUp(self):
+        # My Progress reads its words from the contract; natively the
+        # toolchain's default is the container's /opt/contracts, so point it
+        # at the repository's own, as `_load` does (test_my_progress.py did
+        # this at import; here no other test may have run first).
+        _load()
+        self.folder = Path(tempfile.mkdtemp())
+        self.course = self.folder / "courses" / "TEST"
+        self.content = self.folder / "content"
+        self.output = self.folder / "output"
+        (self.output / "quartz").mkdir(parents=True)
+
+    def tearDown(self):
+        build_site.forget_vault_sources()
+        build_site.set_class_folders(None)
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def page(self, place: str, teachers_text: str, copy_text: str, is_section_page: bool) -> None:
+        source = self.course / place
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text(teachers_text, encoding="utf-8")
+        relative = place[len("section1/"):] if is_section_page else place
+        copy = self.content / relative
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        copy.write_text(copy_text, encoding="utf-8")
+        build_site.remember_vault_source(copy, source, is_section_page)
+
+    def test_the_lesson_is_grouped_under_the_class_that_owns_it(self):
+        build_site.forget_vault_sources(self.course)
+        build_site.set_class_folders(["All Classes"])
+        criteria = "## Success criteria\n\n- [ ] I can add fractions\n"
+        self.page("Shared/Lesson.md",
+                  "---\ncreatedSection1: 2026-09-10T07:00:00.000+0000\n---\n" + criteria,
+                  "---\ncreated: 2026-09-10T07:00:00.000+0000\n---\n" + criteria, False)
+        day_one = "---\ntitle: Unit 1, Day 1\ncreated: 2026-09-08T07:00:00.000+0000\n---\n[[Lesson]]\n"
+        self.page("section1/All Classes/Unit 1, Day 1.md", day_one, day_one, True)
+        day_two = self.course / "section1" / "All Classes" / "Unit 1, Day 2.md"
+        day_two.symlink_to(Path("../../Shared/Lesson.md"))
+        day_two_copy = self.content / "All Classes" / "Unit 1, Day 2.md"
+        day_two_copy.write_text("---\ncreated: 2026-09-10T07:00:00.000+0000\n---\n" + criteria, encoding="utf-8")
+        build_site.remember_vault_source(day_two_copy, day_two, True)
+
+        dating = _quietly(build_site._date_pages_from_their_classes, self.content, 1, write_back=False)
+        if isinstance(dating, tuple):
+            dating = dating[0]
+        self.assertEqual(dating["first_class_of"].get(self.content / "Shared" / "Lesson.md"), day_two_copy,
+                         "the lesson is not claimed by the class that owns it")
+        _quietly(build_site._prepare_my_progress, self.content, self.output,
+                {"per_section_folders": ["All Classes"]}, 1, "ICS3U", dating,
+                "2026-09-03T09:00:00.000-0400")
+        plan = json.loads((self.output / "quartz" / my_progress.PLAN_FILE).read_text(encoding="utf-8"))
+        self.assertEqual(plan["firstClassOf"].get("Shared/Lesson.md"), "All Classes/Unit 1, Day 2.md")
+        self.assertIn("Shared/Lesson.md", plan["gate"])
 
 
 if __name__ == "__main__":
