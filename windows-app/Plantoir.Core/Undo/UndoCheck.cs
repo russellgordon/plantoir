@@ -69,6 +69,13 @@ internal abstract record UndoCurrent
     /// <param name="open">A seam for tests (a cloud or network failure); the real open by default.</param>
     internal static UndoCurrent Read(string fullPath, Func<string, Stream>? open = null)
     {
+        // A link is not a file, and what it leads to is never read as the
+        // page (the mac's UndoItem.read, by lstat: notAFile). Read through, a
+        // link the mac writes (../library/Day 2.md) was cannot tell, so
+        // recovery left a step in flight for good and a page it removed stayed
+        // hidden (#899 W8b-21c2); a link Windows writes was judged by its
+        // target's bytes. One function says what a link is: UndoLinks.Look.
+        if (UndoLinks.Look(fullPath) == UndoLinks.What.Link) return new NotAFile();
         if (Directory.Exists(fullPath)) return new Folder();
         try
         {
@@ -165,7 +172,7 @@ internal static class UndoCheck
 
             case UndoOp.WriteFile:
             {
-                if (current is UndoCurrent.Folder) return UndoOpState.Neither;
+                if (current is UndoCurrent.Folder or UndoCurrent.NotAFile) return UndoOpState.Neither;
                 string? sha = current is UndoCurrent.Bytes bytes ? Sha(bytes.Content) : null;
                 if (string.Equals(sha, op.BeforeSha, StringComparison.Ordinal)) return UndoOpState.Before;
                 if (string.Equals(sha, op.AfterSha, StringComparison.Ordinal)) return UndoOpState.After;
