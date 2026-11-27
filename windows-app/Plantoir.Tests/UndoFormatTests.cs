@@ -132,7 +132,7 @@ public sealed class UndoFormatTests
     /// #1055 (no relinking move): a move carrying <c>linkShaBefore</c> and
     /// <c>linkShaAfter</c>, the shape W8b-21b2 made readable, is a barrier
     /// again, as on the mac after M4: a move holds exactly one of
-    /// <c>sha</c>, <c>listingSha</c> and <c>linkSha</c>, and this one holds none.
+    /// <c>sha</c> and <c>listingSha</c>, and this one holds neither.
     /// </summary>
     [Fact]
     public void AStepWithARelinkingMoveIsUnreadable()
@@ -145,6 +145,62 @@ public sealed class UndoFormatTests
         Assert.Equal(UndoStepState.Done, folded.Steps[2].State);
         Assert.False(folded.Steps[2].Readable);
         Assert.Equal(UndoAnswerKind.NotAvailable, Offer(folded).Undo.Kind);
+    }
+
+    /// <summary>
+    /// An earlier build's link move (W8-6; the mac's U4b2-14): the hash of
+    /// the target <c>../library</c>, the link the contract row names.
+    /// </summary>
+    private static readonly string AnOlderBuildsLinkMove =
+        "{\"kind\":\"move\",\"from\":\"Tasks\",\"to\":\"Notes\",\"linkSha\":\"" + UndoCheck.Sha(Encoding.UTF8.GetBytes("../library")) + "\"}";
+
+    /// <summary>
+    /// #1055 W4 (the mac's M6, <c>JournaledStepTests</c> test 1): no build
+    /// moves a link as itself, so a step whose move carries a <c>linkSha</c>
+    /// and neither <c>sha</c> nor <c>listingSha</c> is one this version
+    /// cannot read: a barrier, neither undone nor redone, nothing cleared.
+    /// </summary>
+    [Fact]
+    public void AStepWhoseMoveCarriesALinkShaIsUnreadable()
+    {
+        UndoFolded folded = Fold(Begin(1), Applied(1), Begin(2, AnOlderBuildsLinkMove), Applied(2));
+        Assert.Equal(UndoStepState.Done, folded.Steps[2].State);
+        Assert.False(folded.Steps[2].Readable);
+        Assert.True(folded.Steps[1].Readable, "the step below it is kept, never cleared");
+        UndoOffered offered = Offer(folded);
+        Assert.Equal(UndoAnswerKind.NotAvailable, offered.Undo.Kind);
+        Assert.Equal(UndoAnswerKind.NotAvailable, offered.Redo.Kind);
+        Assert.Equal(2, offered.Head?.Seq);
+    }
+
+    private static UndoOp ReadOp(string json)
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        return UndoFormat.ReadOp(document.RootElement);
+    }
+
+    /// <summary>
+    /// W3 review 1, LOW 2: the places a step leaves and fills are named by a
+    /// file's own move (by its <c>sha</c>) alone, as the mac's
+    /// <c>UndoCheck.handsOverAsAMove</c>: never by a folder's move, a
+    /// capitalisation-only one, or an older build's link move.
+    /// </summary>
+    [Fact]
+    public void OnlyAFilesOwnMoveLeavesAndFillsAPlace()
+    {
+        string two = UndoCheck.Sha(Encoding.UTF8.GetBytes("Two.\n"));
+        UndoOp filesMove = ReadOp("{\"kind\":\"move\",\"from\":\"Unit 1, Day 2.md\",\"to\":\"Unit 1, Day 3.md\",\"sha\":\"" + two + "\"}");
+        Assert.Equal("Unit 1, Day 2.md", UndoOp.PlaceLeftBy(filesMove));
+        Assert.Equal("Unit 1, Day 3.md", UndoOp.PlaceFilledBy(filesMove));
+
+        UndoOp foldersMove = ReadOp("{\"kind\":\"move\",\"from\":\"Tasks\",\"to\":\"Notes\",\"listingSha\":\"" + two + "\"}");
+        UndoOp caseOnly = ReadOp("{\"kind\":\"move\",\"from\":\"m/a.json\",\"to\":\"m/A.json\",\"sha\":\"" + two + "\"}");
+        Assert.True(caseOnly.IsCaseOnlyMove);
+        foreach (UndoOp move in new[] { foldersMove, caseOnly, ReadOp(AnOlderBuildsLinkMove) })
+        {
+            Assert.Null(UndoOp.PlaceLeftBy(move));
+            Assert.Null(UndoOp.PlaceFilledBy(move));
+        }
     }
 
     [Fact]

@@ -302,6 +302,32 @@ public sealed class UndoRenameFolderStepTests : IDisposable
     /// goes through as one step; Undo puts the old capitalisation back and
     /// Redo the new.
     /// </summary>
+    /// <summary>
+    /// #1055 W4 (as before W8b-21, taken back from <c>5e86468cd^</c>): a place
+    /// of the folder that is a link is never moved as itself. It meets
+    /// <see cref="UndoActionStep.MoveFolder"/>'s own guard, which stops the
+    /// plan <c>cannotTellNow</c> before anything is changed.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void APlaceOfTheFolderThatIsALinkStopsThePlanCannotTellNowAndChangesNothing()
+    {
+        Write("section1/Tasks/Quiz 1.md", "See [[Tasks/Quiz 2]].\n");
+        Write("section1/index.md", "Start with [[Tasks/Quiz 1]].\n");
+        Directory.CreateDirectory(Path.Combine(CourseFolder, "section2"));
+        string library = Path.Combine(_root, "library");
+        Directory.CreateDirectory(library);
+        File.WriteAllText(Path.Combine(library, "Quiz 2.md"), "Quiz two.\n");
+        Directory.CreateSymbolicLink(Path.Combine(CourseFolder, "section2", "Tasks"), library);
+        SortedDictionary<string, string?> before = Tree();
+
+        var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(() => Rename());
+
+        Assert.Contains("Tasks", refused.Message);
+        Assert.Equal(before, Tree());
+        Assert.Empty(AppliedSteps());
+        Assert.False(File.Exists(SpecialFolderRenamer.RenameRecordPath(CourseFolder)), "nothing started, nothing recorded");
+    }
+
     [Fact]
     public void ACapitalisationOnlyRenameThroughTheDoorIsOneStepAndUndoPutsTheOldCaseBack()
     {
