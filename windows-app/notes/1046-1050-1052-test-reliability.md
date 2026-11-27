@@ -245,3 +245,57 @@ this branch, as in round one.
   run (`step05-fix2.log`) was 138 and 1: the one FAIL was round one's
   `scripts/__pycache__` (written at 12:19, before that run began), which was
   removed before the second run; this change writes none.
+
+
+## Fix round three (the second Mac's gate)
+
+The second Mac's gate went red on one line, `scripts/test_grove_colours.py,
+found by the discovery`, with `No module named 'PIL'`: that Mac's Python has
+no Pillow, this Mac's (Homebrew 3.14.4) does. The file imports
+`social_card.py`, which imports Pillow at its top.
+
+**Which files, proved without this Mac's luck.** A fresh
+`python3 -m venv --without-pip` in the scratchpad (no site packages: no PIL,
+frontmatter or yaml) ran each of the 23 `scripts/test_*.py` that no
+`ran_by_name` line or `tests_run_by_name_later` names (the 13 the discovery
+runs plus the six marking files run by name in a loop, and four more):
+22 exit 0, one fails on import, `test_grove_colours.py` (PIL). The other
+three test files that touch PIL (`test_course_names.py`,
+`test_social_card_fonts.py`, `test_swift_windows.py`) already skip without it.
+
+**The fix, the #907 convention.** `test_grove_colours.py` opens with a
+runs-in-the-image block for Pillow: on a Mac without it, one line naming
+`PIL` and `verify.sh`, exit 77; on Windows and in the image (Linux) it does
+nothing, so Windows' PythonToolchainTests, whose runtime has Pillow, runs the
+file exactly as before. `verify.sh` runs the file in the image (beside the
+dates-follow-the-class run, mounting only the test file; `build_site`,
+`setup_course`, `social_card`, `support/` and `contracts/` are baked) through
+`ran_by_name`, and it is in `tests_run_by_name_later`, so the discovery skips
+it and the end-of-run check holds it to that run.
+
+`scripts/test_image_only_tests_say_so.py` now allows one block per module
+(the module read from the block's `import <module> as _...` line): every
+frontmatter file carries the identical frontmatter block, every Pillow file
+the identical Pillow block. It hides PIL as well as frontmatter and yaml
+from its child runs, names the block's own module in the line it expects,
+and runs the darwin, win32 and linux checks for each block. The seven
+frontmatter files are unchanged.
+
+### Runs (fix round three)
+
+- Step 0.5 alone, extracted as round one did (lines 1 to 109 and 255 to 1471
+  of `verify.sh`), with the bare venv first on PATH: **PASS 138, FAIL 0,
+  `FAILED=false`**, no "No module named" anywhere; "120 run by name in this
+  script, 13 found and run by the discovery".
+- The same with this Mac's normal Python (Pillow installed): **PASS 138,
+  FAIL 0, `FAILED=false`**, the same 120 and 13.
+- By script against the run's own list and log: each of the 133 files ran
+  once in step 0.5, or is in `tests_run_by_name_later` and did not run there,
+  `test_grove_colours.py` included. Three later-list files also run once on
+  the host in step 0.5 by design (`test_folder_titles.py`,
+  `test_netlify_paths.py`, `test_social_card_fonts.py`), as before this round.
+- `test_image_only_tests_say_so.py` 7 of 7 OK with either Python;
+  `test_image_runs_find_their_modules.py` OK; `test_grove_colours.py` with
+  the bare venv prints the one line and exits 77, with this Mac's Python OK.
+- Not run: the image steps (the new grove run in the image and the
+  end-of-run check); the director's gate runs them.

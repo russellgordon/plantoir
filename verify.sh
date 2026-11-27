@@ -265,7 +265,7 @@ take_verify_lock
 _ran_by_name_list="/tmp/verify_ran_by_name.list"
 : >"$_ran_by_name_list"
 ran_by_name() { printf '%s\n' "$1" >>"$_ran_by_name_list"; printf '%s' "$1"; }
-tests_run_by_name_later="test_build_site_domain_resolution.py test_class_folder.py test_coverage_tab.py test_dates_follow_the_class.py test_folder_titles.py test_front_page_lines_resolve.py test_front_page_title_repair.py test_graded_folders.py test_links_checklist.py test_links_into_hidden_pages.py test_netlify_paths.py test_page_sources.py test_published_pages_record.py test_social_card_fonts.py test_unreadable_page_settings.py"
+tests_run_by_name_later="test_build_site_domain_resolution.py test_class_folder.py test_coverage_tab.py test_dates_follow_the_class.py test_folder_titles.py test_front_page_lines_resolve.py test_front_page_title_repair.py test_graded_folders.py test_grove_colours.py test_links_checklist.py test_links_into_hidden_pages.py test_netlify_paths.py test_page_sources.py test_published_pages_record.py test_social_card_fonts.py test_unreadable_page_settings.py"
 # A run line that hands python3 a scripts/test_*.py without ran_by_name would
 # be missing from the list, so the discovery would run that file a second
 # time (#1052). Comment, echo, printf, pass and fail lines are left out. The
@@ -755,14 +755,15 @@ else
   cat /tmp/verify_swift_windows_test.log
 fi
 
-# The seven shared tests this run takes into the image because they need
-# python-frontmatter say so when run directly on a Mac without it (#907): one
+# The shared tests this run takes into the image because they need
+# python-frontmatter (seven) or Pillow (test_grove_colours.py, #1052) say so
+# when run directly on a Mac without it (#907): one
 # line and exit 77, while in the image and on Windows a missing module stays a
 # failure. Read here, on the host, with the modules kept from the child.
 if (cd scripts && python3 "$(ran_by_name test_image_only_tests_say_so.py)") >/tmp/verify_image_only_tests_say_so.log 2>&1; then
-  pass "the shared tests that need python-frontmatter open with one block: on a Mac without it, one line naming the module and verify.sh, exit 77; anywhere else a missing module stays a failure (scripts/test_image_only_tests_say_so.py, #907)"
+  pass "the shared tests that need python-frontmatter or Pillow open with one block per module: on a Mac without it, one line naming the module and verify.sh, exit 77; anywhere else a missing module stays a failure (scripts/test_image_only_tests_say_so.py, #907)"
 else
-  fail "a shared test that needs python-frontmatter does not say so on a Mac, or turns a missing module into something other than a failure elsewhere (scripts/test_image_only_tests_say_so.py, #907)"
+  fail "a shared test that needs python-frontmatter or Pillow does not say so on a Mac, or turns a missing module into something other than a failure elsewhere (scripts/test_image_only_tests_say_so.py, #907)"
   cat /tmp/verify_image_only_tests_say_so.log
 fi
 
@@ -1394,9 +1395,10 @@ fi
 # Windows, scripts/test_make_undo_traces.py failing among them. A file counts
 # as run by name when ran_by_name has listed it by now, or it is in
 # tests_run_by_name_later; every other one is run here, from scripts/ as the
-# others are, and must pass. A file needing python-frontmatter exits 77 on a
-# Mac without it, which fails here on purpose: it belongs in the image's runs
-# with the others that do. A unittest case a file skips (skipUnless, skipIf)
+# others are, and must pass. A file needing a module only the image has
+# (python-frontmatter, Pillow) exits 77 on a Mac without it, which fails here
+# on purpose: it belongs in the image's runs with the others that do (#907;
+# test_grove_colours.py moved there for Pillow, 2026-11-27). A unittest case a file skips (skipUnless, skipIf)
 # leaves the file's exit at 0, so the number skipped is printed on a line of
 # its own; it does not fail the gate. Files deliberately not run here go in
 # not_run_on_this_mac with the reason beside each, as Windows' NotRunHere does;
@@ -1564,6 +1566,22 @@ if docker run --rm \
 else
   fail "folder titles: every titleQuoting case and the sweep read back as their names in the build's reader (scripts/test_folder_titles.py in the image, #506)"
   cat /tmp/verify_folder_titles_image_test.log
+fi
+
+# ---- Grove Colours' two ids, with the image's Pillow (#891, #1052) ----
+# scripts/test_grove_colours.py imports social_card.py, which needs Pillow; a
+# Mac's own Python may not have it (the second Mac's did not, 2026-11-27), so
+# it runs here against the baked scripts, support/ and contracts/, and on a
+# Mac without Pillow a direct run prints one line and exits 77 (#907).
+echo ""
+echo "🔎 Checking Grove Colours' two ids in the image…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_grove_colours.py" /opt/scripts/test_grove_colours.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_grove_colours.py)" >/tmp/verify_grove_colours_image_test.log 2>&1; then
+  pass "Grove Colours: one scheme under two ids, listed once, its colours unchanged (scripts/test_grove_colours.py in the image, #891)"
+else
+  fail "Grove Colours: one scheme under two ids, listed once, its colours unchanged (scripts/test_grove_colours.py in the image, #891)"
+  cat /tmp/verify_grove_colours_image_test.log
 fi
 
 # ---- build_site.py: pages take their class's date, in the teacher's files ----
