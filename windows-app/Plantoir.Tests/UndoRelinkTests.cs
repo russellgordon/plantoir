@@ -576,6 +576,56 @@ public sealed class UndoRelinkTests : IDisposable
         Assert.Empty(StagedLeft());
     }
 
+    /// <summary>
+    /// W8b-21b4's kill (the harness's teacher's rows, twoChainedRelinks at
+    /// Day 5): beside a place that only link moves name (a relink's and a
+    /// second relink's, or a plain link move's), no op of the step stages a
+    /// page, so a page under the relink's staged name there is the teacher's:
+    /// given back to its place, never deleted as a staged copy.
+    /// </summary>
+    [SymbolicLinkTheory]
+    [InlineData("a second relink")]
+    [InlineData("a plain link move")]
+    public void APageUnderAStagedNameBesideAPlaceOnlyLinkMovesNameIsTheTeachers(string other)
+    {
+        LaidRelink laid = LayARelink("inside");
+        UndoOp second = other == "a second relink"
+            ? UndoOp.RelinkLink(Day(5), Day(6), Store("Unit 1, Day 2.md"), Store("Unit 1, Day 5.md"))
+            : new UndoOp { Kind = UndoOp.Move, Readable = true, From = Day(5), To = Day(6), LinkSha = Store("Unit 1, Day 2.md") };
+        string staged = UndoSwap.BesidePath(Full(Day(5)), "1-apply", "new");
+        File.WriteAllText(staged, "Someone's.\n");
+
+        UndoSwap.TidyLeftovers(StepOf(second, laid.Op), _root);
+
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
+        Assert.Equal("Someone's.\n", File.ReadAllText(Full(Day(5))));
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>
+    /// The director's shape (Insert Class at a day whose page is a link, the
+    /// mac's sister piece): the new class page staged beside the relink's
+    /// <c>from</c> is Undo's own (a page op names that place), removed by the
+    /// tidy as a staged copy, never kept under a visible name nor said.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void UndosOwnStagedPageBesideARelinksPlaceIsNeverKeptAsTheTeachers()
+    {
+        LaidRelink laid = LayARelink("inside");
+        UndoOp newPage = new UndoOp { Kind = UndoOp.WriteFile, Readable = true, Path = Day(4), AfterSha = Store("New.\n") };
+        string staged = UndoSwap.BesidePath(Full(Day(4)), "1-apply", "new");
+        File.WriteAllText(staged, "New.\n");
+        var said = new List<string>();
+
+        UndoSwap.TidyLeftovers(StepOf(laid.Op, newPage), _root, onKeptVisibly: (at, kept) => said.Add(Path.GetFileName(kept)));
+
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
+        Assert.Empty(said);
+        Assert.False(StandsAnything(Section + "/Unit 1, Day 4 (kept by Undo).md"));
+        Assert.Equal(laid.OldText, LinkText(Day(4)));
+        Assert.Empty(StagedLeft());
+    }
+
     /// <summary>A relink's pre-clean never removes what is not its own: something of the teacher's under the staged name stays, and the make fails over it (could not write), the old link whole.</summary>
     [SymbolicLinkFact]
     public void ARelinksPreCleanNeverRemovesWhatIsNotItsOwn()
