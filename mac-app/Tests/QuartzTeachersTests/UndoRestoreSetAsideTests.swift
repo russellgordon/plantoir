@@ -33,10 +33,10 @@ final class UndoRestoreSetAsideTests: XCTestCase {
         let stopped: StartOfYearRestoreOfferTests.Stopped = try await offerTests.stopPartWay(sections: [1])
         defer { try? FileManager.default.removeItem(at: stopped.root) }
         let journal: UndoJournal = UndoJournalLocation.standardJournal()
-        let folderID: String = try XCTUnwrap(FolderIdentityFile.existingIdentifier(forWorkingFolder: stopped.root))
         let baseline: Int = UndoRestoreSetAsideTests.highestSeq(in: try journal.read())
 
         try await stopped.goAhead()
+        let folderID: String = try XCTUnwrap(FolderIdentityFile.existingIdentifier(forWorkingFolder: stopped.root))
         let firstSteps: [UndoStepRecord] = UndoRestoreSetAsideTests.steps(in: try journal.read(), after: baseline, folderID: folderID)
         let inFlightBefore: Int = UndoRestoreSetAsideTests.countInFlight(firstSteps)
         XCTAssertEqual(inFlightBefore, 1, "Get Ready's stopped step is in flight before the restore")
@@ -46,7 +46,7 @@ final class UndoRestoreSetAsideTests: XCTestCase {
         let afterRestore: [UndoStepRecord] = UndoRestoreSetAsideTests.steps(in: try journal.read(), after: baseline, folderID: folderID)
         XCTAssertEqual(UndoRestoreSetAsideTests.countInFlight(afterRestore), 0, "the restore left a step in flight")
         let trail: String = ActivityTrail.store.activityText(includingPrompts: false)
-        let pieces: [String] = trail.components(separatedBy: ActivityTrail.Event.undoSetAsideByARestore.rawValue)
+        let pieces: [String] = trail.components(separatedBy: "because a restore is replacing the course; it is not judged again")
         XCTAssertEqual(pieces.count - 1, 1, "one trail line for the step set aside: \(trail)")
 
         // Get Ready again, all the way, on the restored course.
