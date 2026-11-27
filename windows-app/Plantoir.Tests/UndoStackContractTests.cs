@@ -37,6 +37,8 @@ public sealed class UndoStackContractTests
         "keptWhatItReplacedSays",
         // U4a review 1, LOW 4's (W8-10)
         "keptBesideThePage",
+        // U4b3 door-4's (W8b-21a4)
+        "handedOver",
     };
 
     /// <summary>Every case but those that lay a symbolic link (<see cref="LinkCases"/>).</summary>
@@ -56,7 +58,8 @@ public sealed class UndoStackContractTests
             .Select(stackCase => new object[] { stackCase.GetProperty("name").GetString()! });
 
     private static bool LaysASymbolicLink(JsonElement stackCase) =>
-        stackCase.GetProperty("calls").EnumerateArray().Any(call => call.GetString() is "moveALinkToAFolder" or "renameAPerSectionFolderThatIsALink");
+        stackCase.GetProperty("calls").EnumerateArray().Any(call => call.GetString() is "moveALinkToAFolder" or "renameAPerSectionFolderThatIsALink"
+                                                                          or "handAPlaceOverAfterALinksMove" or "handAPlaceOverBeforeALinksMove");
 
     [Fact]
     public void TheContractHoldsTheStackCases()
@@ -144,6 +147,8 @@ public sealed class UndoStackContractTests
             Assert.Equal(madeFolder.GetString(), replay.MadeFolder());
         if (stackCase.TryGetProperty("foldersInside", out JsonElement foldersInside))
             Assert.Equal(foldersInside.GetString(), replay.FoldersInside());
+        if (stackCase.TryGetProperty("handedOver", out JsonElement handedOver))
+            Assert.Equal(handedOver.GetString(), replay.HandedOver());
         if (stackCase.TryGetProperty("refusalNamed", out JsonElement refusalNamed))
             Assert.Equal(refusalNamed.GetString(), replay.RefusalNamed);
         if (stackCase.TryGetProperty("cleared", out JsonElement cleared))
@@ -681,6 +686,41 @@ public sealed class UndoStackContractTests
                     _scribe.Finish(seq);
                     return;
                 }
+                // U4b3 door-4 (W8b-21a4): a place handed over within one step
+                // (opKinds.wholeOps' second exception), through the door.
+                case "handAPlaceOverAfterALinksMove":
+                {
+                    if (Nothing(ClassPage(3)) && Nothing(ClassPage(4))) Handover.LayAfterALinksMove();
+                    (JsonArray ops, List<byte[]> blobs) = Handover.HandAPlaceOverAfterALinksMove();
+                    Ops(ops, blobs);
+                    return;
+                }
+                case "handAPlaceOverBeforeALinksMove":
+                {
+                    if (Nothing(ClassPage(2)) && Nothing(ClassPage(3))) Handover.LayBeforeALinksMove();
+                    (JsonArray ops, List<byte[]> blobs) = Handover.HandAPlaceOverBeforeALinksMove();
+                    Ops(ops, blobs);
+                    return;
+                }
+                case "editTheHandedOverPageByHand":
+                    _scribe.WritePage("A", ClassPage(3), "Hand.\n"u8.ToArray());
+                    return;
+                case "stepFillingAPlaceBeforeItIsLeft":
+                {
+                    long seq = _scribe.Fold().NextSeq;
+                    _scribe.Append(_scribe.BeginLine(seq, new JsonArray(ClassPageOp(3, null, "New.\n"), TheClassLinksMove(3, 4)), "A"));
+                    _scribe.Finish(seq);
+                    return;
+                }
+                case "stepHandingOverAFoldersPlace":
+                {
+                    long seq = _scribe.Fold().NextSeq;
+                    var folderMove = new JsonObject { ["kind"] = "move", ["from"] = LinkPlace, ["to"] = LinkRenamed, ["listingSha"] = new UndoTreeListing([], []).Sha };
+                    JsonNode write = _scribe.OpsFor(LinkPlace, null, "New.\n"u8.ToArray())[0]!.DeepClone();
+                    _scribe.Append(_scribe.BeginLine(seq, new JsonArray(folderMove, write), "A"));
+                    _scribe.Finish(seq);
+                    return;
+                }
                 case "spellTheFolderAnotherWay":
                     Assert.Equal(0, UndoSwap.Rename(_scribe.FullPath("A", MediaFolder), _scribe.FullPath("A", "courses/TST1O/MEDIA"), replace: false));
                     return;
@@ -814,6 +854,24 @@ public sealed class UndoStackContractTests
             string library = _libraryListing is not null && UndoTreeReading.Read(_scribe.FullPath("A", LinkLibrary)).ListingSha == _libraryListing ? "untouched" : "changed";
             return place + ", " + target + ", " + library;
         }
+
+        // ---- U4b3 door-4 (stackCasesHow): the class pages and their links --
+        // Laid and read by UndoHandoverForTheCases, which the recovery replay
+        // shares (W8b-21a5).
+
+        private UndoHandoverForTheCases? _handover;
+        private UndoHandoverForTheCases Handover => _handover ??= new UndoHandoverForTheCases(_scribe);
+
+        private static string ClassPage(int day) => UndoHandoverForTheCases.ClassPage(day);
+
+        private static JsonObject TheClassLinksMove(int from, int to) => UndoHandoverForTheCases.TheClassLinksMove(from, to);
+
+        private JsonNode ClassPageOp(int day, string? before, string? after) => Handover.ClassPageOp(day, before, after);
+
+        private bool Nothing(string relative) => Handover.Nothing(relative);
+
+        /// <summary><c>handedOver</c>, as <see cref="UndoHandoverForTheCases.HandedOver"/> reads it.</summary>
+        internal string HandedOver() => Handover.HandedOver();
 
         /// <summary>The spelling courses/TST1O lists for the media folder, as spelled, or null when it lists none.</summary>
         private string? CaseOnlySpellingListed()

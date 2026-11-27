@@ -310,6 +310,14 @@ public static class ActivityTrail
         /// </summary>
         UndoFoundAFolderSetAside,
         /// <summary>
+        /// Undo's recovery kept a page a stopped step removed or moved away
+        /// under a visible name beside its place, <c>&lt;name&gt; (kept by Undo).md</c>,
+        /// because something else now holds that place (#899 W8b-21c, U4b3
+        /// kept-original-named): the place and the visible name. Written just
+        /// before the rename. Never page text.
+        /// </summary>
+        UndoKeptAPageUnderAVisibleName,
+        /// <summary>
         /// Undo's recovery closed a step that stopped part way and could not
         /// be put back (what it needs is no longer in the list, and no kept
         /// original matches), and cleared the list: naming each kept original
@@ -973,6 +981,7 @@ public static class ActivityTrail
         Event.SectionRestored => "section restored",
         Event.UndoRolledBack => "undo rolled back",
         Event.UndoFoundAFolderSetAside => "undo found a folder set aside",
+        Event.UndoKeptAPageUnderAVisibleName => "undo kept a page under a visible name",
         Event.UndoCouldNotPutBack => "undo could not put back a change that stopped",
         Event.UndoKeptWhatAPageHeld => "undo kept what a page held",
         Event.UndoKeptWhatItReplaced => "undo kept what it replaced",
