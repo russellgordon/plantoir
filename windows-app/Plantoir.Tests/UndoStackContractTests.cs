@@ -94,7 +94,8 @@ public sealed class UndoStackContractTests
     {
         if (NamedGapLedger.Holding(NamedGapLedger.UndoStackCases, name, entries) is { } held)
         {
-            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, walk, "this replay does not know", "this replay does not check");
+            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, walk, "this replay does not know", "this replay does not check",
+                                                      "is not built on Windows yet");
             return;
         }
         walk();
@@ -186,8 +187,7 @@ public sealed class UndoStackContractTests
             Assert.Equal(keptSays.GetString(), AsTheTrailWritesIt(last!));
         }
         if (stackCase.TryGetProperty("keptBesideThePage", out JsonElement keptBeside))
-            Assert.True(keptBeside.GetInt32() == replay.KeptBesideP1().Count,
-                        $"{replay.KeptBesideP1().Count} files kept beside the page, not {keptBeside.GetInt32()}");
+            CheckTheFilesKeptBesideThePage(keptBeside.GetInt32(), replay.KeptBesideP1());
         if (stackCase.TryGetProperty("foreignKeptOriginalUntouched", out JsonElement untouched) && untouched.GetBoolean())
         {
             Assert.NotNull(replay.ForeignKept);
@@ -202,6 +202,26 @@ public sealed class UndoStackContractTests
             Assert.True(keptOriginalLeft && leftover.EndsWith("-orig", StringComparison.Ordinal), "a staged file left behind: " + leftover);
         if (stackCase.TryGetProperty("keptOriginalLeft", out _))
             Assert.Equal(keptOriginalLeft, leftovers.Count > 0);
+    }
+
+    /// <summary>
+    /// <c>keptBesideThePage</c>: how many files are kept beside p1. When there
+    /// are more than wanted and some hold a content another of them holds, the
+    /// failure names the gap it is: kept copies are not yet thinned to one per
+    /// content per page on Windows (the mac's
+    /// <c>UndoRecovery.removeSupersededKeptCopies</c>; #899 W8-10 left it for a
+    /// piece of its own). The piece that builds the thinning takes that branch
+    /// out, so only the plain count is left.
+    /// </summary>
+    private static void CheckTheFilesKeptBesideThePage(int wanted, List<string> kept)
+    {
+        if (kept.Count == wanted) return;
+        var contents = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string file in kept) contents.Add(UndoCheck.Sha(File.ReadAllBytes(file)));
+        if (kept.Count > wanted && contents.Count < kept.Count)
+            Assert.Fail($"{kept.Count} files kept beside the page, not {wanted}: they hold {contents.Count} contents, and the thinning " +
+                        "of kept copies to one per content per page is not built on Windows yet");
+        Assert.Fail($"{kept.Count} files kept beside the page, not {wanted}");
     }
 
     /// <summary>
