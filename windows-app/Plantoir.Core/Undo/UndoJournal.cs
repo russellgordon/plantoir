@@ -357,7 +357,7 @@ internal sealed class UndoJournal
         // it stays (the mac's U3c, pruning's tidy).
         try
         {
-            UndoSwap.TidyLeftovers(seq, step.PathsToTidy, root, UndoRecovery.AsideListings(step, root),
+            UndoSwap.TidyLeftovers(step, root, trail, UndoRecovery.AsideListings(step, root),
                                    found => UndoRecovery.NoteAnAsideFolder(found, step, root, this, trail), keepingOnlyCopies: true);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }

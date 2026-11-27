@@ -1374,6 +1374,14 @@ nonisolated enum UndoTrailHook {
     /// place and the visible name, both inside the working folder.
     nonisolated(unsafe) static var keptAPageLine: ((_ course: String, _ section: Int?, _ place: String, _ keptAs: String) -> Void)?
 
+    /// mac-2 (the day27b-2 sweep, finding 1): an item that was not
+    /// Plantoir's, a page, a folder or a link with another text, was found
+    /// under a relink's own hidden name where a link was being changed, live
+    /// or by recovery, and is about to be kept under the visible name
+    /// `keptAs` beside `place`. Never the kept-page or kept-folder line: no
+    /// change removed, moved or set it aside. Both inside the working folder.
+    nonisolated(unsafe) static var keptAnItemFoundWhereALinkWasChangedLine: ((_ course: String, _ section: Int?, _ place: String, _ keptAs: String) -> Void)?
+
     /// #899, ahead of U5: a restore replacing a course closed a step left
     /// in flight there (`UndoRestoreSetAside`), so recovery never judges the
     /// restored files against it. The course and section, which work had

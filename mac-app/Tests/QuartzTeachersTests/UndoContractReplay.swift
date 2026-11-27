@@ -826,7 +826,7 @@ nonisolated enum UndoContractReplay {
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
         "movedFolder", "caseOnlyFolder", "refusalNamed", "keptWhatItReplacedSays", "madeFolder", "foldersInside",
-        "linkedFolder", "handedOver", "linkedPage", "laterLinks",
+        "linkedFolder", "handedOver", "linkedPage", "laterLinks", "hopLink",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1102,6 +1102,11 @@ nonisolated enum UndoContractReplay {
                     let stackJournal: UndoJournal = journal()
                     last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
                         root: root, journal: stackJournal, places: places, day4LinkedToDay3: true, day3Plain: true
+                    )
+                } else if value == "makeRoomWithALaterClassLinkedThroughALinkInside" {
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
+                        root: root, journal: stackJournal, places: places, day3Plain: true, throughAHopInside: true
                     )
                 } else if value == "makeRoomWithALaterClassLinkedToALinkedClass" {
                     let stackJournal: UndoJournal = journal()
@@ -1495,6 +1500,9 @@ nonisolated enum UndoContractReplay {
             }
             if let wanted = string(testCase["laterLinks"]), UndoContractKinds.laterLinks(in: root) != wanted {
                 failures.append("stackCases '\(name)': the later classes are \(UndoContractKinds.laterLinks(in: root)), not \(wanted)")
+            }
+            if let wanted = string(testCase["hopLink"]), UndoContractKinds.hopLink(in: root) != wanted {
+                failures.append("stackCases '\(name)': the in-between link holds \(UndoContractKinds.hopLink(in: root)), not \(wanted)")
             }
             if let wanted = string(testCase["handedOver"]), UndoContractKinds.handedOver(in: root) != wanted {
                 failures.append("stackCases '\(name)': the handed-over class pages are \(UndoContractKinds.handedOver(in: root)), not \(wanted)")

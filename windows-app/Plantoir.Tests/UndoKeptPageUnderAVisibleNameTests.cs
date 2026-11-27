@@ -140,6 +140,27 @@ public sealed class UndoKeptPageUnderAVisibleNameTests
     }
 
     /// <summary>
+    /// Review 3 of the 21a line, LOW 1: a place whose reparse tag cannot be
+    /// read (<see cref="UndoLinks.What.CannotLook"/>, here by the seam on
+    /// the look) is CANNOT READ NOW, never read through: what it leads to
+    /// would otherwise be judged as the page, or called a copy of a kept
+    /// original (the mac's failing <c>lstat</c>, <c>.unreadable</c>). MUST
+    /// FAIL with the <c>CannotLook</c> arm removed.
+    /// </summary>
+    [Fact]
+    public void APlaceThatCannotBeLookedAtIsCannotReadNowAndNeverReadThrough()
+    {
+        string place = Path.Combine(RunOwnedTempFolders.Create("plantoir-undo-cannot-look-"), "Unit 1, Day 2.md");
+        File.WriteAllText(place, "Two.\n");
+
+        UndoCurrent read = UndoCurrent.ReadWithoutFollowingALink(place, look: _ => UndoLinks.What.CannotLook);
+
+        Assert.IsType<UndoCurrent.CannotReadNow>(read);
+        Assert.IsType<UndoCurrent.Bytes>(UndoCurrent.ReadWithoutFollowingALink(place, look: _ => UndoLinks.What.File));
+        Directory.Delete(Path.GetDirectoryName(place)!, recursive: true);
+    }
+
+    /// <summary>
     /// Through recovery: a step that died with Day 3's page removed and Day 5
     /// changed, the list's content gone and Day 5's kept original no longer
     /// what it held, so Day 5 cannot be put back (couldNotPutBack), and
