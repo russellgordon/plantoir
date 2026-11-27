@@ -6286,7 +6286,7 @@ recorded; the #518 correction in `_vault_relative_source` is gone.
   four page-source tests and the new date test fail.
 - **`lexists`, not `exists`**: a section page that is a link to a file
   elsewhere is the section's page all the same, and the write-back must see
-  it as one to say "left linked".
+  it as one (since #1055 S2 it is dated through the link).
 - **Left as it was, and known:** two names that differ only by case. In the
   container the content root is on ext4, so a shared `x.md` and a section
   `X.md` both land there; `lexists(section/…/x.md)` asks the host's

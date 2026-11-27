@@ -1,3 +1,5 @@
+Fixes 2 to 4 removed by #1055 (2026-11-27), M1 and S1, and fix 1's handed-over LOW by M5: Insert Class has no link pre-pass, retitles no link and dates a class under its own page's key; fix 1's exclusive put-back (`UndoSwap.putBackAKeptOriginal`) stays.
+
 # U4b3 review fixes (#899), 2026-11-26
 
 Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from 26559c3b7. `origin/dev` merged in at the start: already up to date (no merge commit); the second merge is named under "Runs".

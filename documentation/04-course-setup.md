@@ -611,7 +611,7 @@ functions (in the image by `verify.sh`, on Windows by `PythonToolchainTests`).
   `_replace_the_page_safely` (a hidden `.plantoir-quoting` file beside the
   page, flushed and renamed over it, only if the page still holds what was
   read) — unless the course is kept for reference (or cannot be told), the
-  page is a link to a file kept elsewhere, or it is locked or read-only: the
+  page has a second name (a hard link), or it is locked or read-only: the
   same three the date pass leaves alone. Then only the copy is quoted and the
   console says why (`sentenceLeftAsItWas`, with `reasons`). A rewrite refused
   at its last step — the page saved in Obsidian after the build read it,
