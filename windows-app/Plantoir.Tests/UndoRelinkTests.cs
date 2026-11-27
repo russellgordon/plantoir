@@ -518,19 +518,122 @@ public sealed class UndoRelinkTests : IDisposable
         Assert.Empty(StagedLeft());
     }
 
-    /// <summary>A staged <c>-new</c> link a stopped swap left is removed by the tidy as the link itself: what it leads to is untouched.</summary>
+    /// <summary>A step holding one op, as recovery and the tidy read it.</summary>
+    private static UndoStep StepOf(params UndoOp[] ops) => new() { Seq = 1, Readable = true, Ops = ops };
+
+    /// <summary>A staged <c>-new</c> link a stopped swap left, holding the text the step's relink stages there, is removed by the tidy as the link itself: what it leads to is untouched.</summary>
     [SymbolicLinkFact]
     public void AStagedNewLinkIsTidiedAsTheLinkItself()
     {
-        WritePage(Day(3), "Three.\n");
+        LaidRelink laid = LayARelink("inside");
         string staged = UndoSwap.BesidePath(Full(Day(5)), "1-apply", "new");
-        File.CreateSymbolicLink(staged, "Unit 1, Day 3.md");
+        File.CreateSymbolicLink(staged, laid.NewText);
         Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(staged));
 
-        Assert.True(UndoSwap.TidyLeftovers(1, [Day(5)], _root));
+        Assert.True(UndoSwap.TidyLeftovers(StepOf(laid.Op), _root));
 
         Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
         Assert.Equal("Three.\n", File.ReadAllText(Full(Day(3))));
+    }
+
+    /// <summary>
+    /// The invariant of every tidy (W8b-21b3; the mac's mac-1 review 2): under
+    /// a relink's staged name, anything but a link holding the text the step
+    /// staged there is the teacher's, never removed by name. A link holding
+    /// another text, a plain file, or a link where no relink of the step
+    /// stages, is given back to its place when that is free, or kept under a
+    /// visible name beside it and said, never deleted and never left hidden.
+    /// </summary>
+    [SymbolicLinkTheory]
+    [InlineData("a link holding another text", "free")]
+    [InlineData("a link holding another text", "taken")]
+    [InlineData("a plain file", "taken")]
+    [InlineData("a link where no relink stages", "taken")]
+    public void AnythingElseUnderAStagedNameIsTheTeachersAndKeptVisibly(string item, string place)
+    {
+        LaidRelink laid = LayARelink("inside");
+        // Where no relink stages: a plain link move leaving Day 5 (it stages nothing).
+        UndoOp plainFromDay5 = new UndoOp { Kind = UndoOp.Move, Readable = true, From = Day(5), To = Day(6), LinkSha = Store(laid.NewText) };
+        UndoStep step = item == "a link where no relink stages" ? StepOf(plainFromDay5) : StepOf(laid.Op);
+        string staged = UndoSwap.BesidePath(Full(Day(5)), "1-apply", "new");
+        if (item == "a plain file") File.WriteAllText(staged, "Someone's.\n");
+        else File.CreateSymbolicLink(staged, item == "a link where no relink stages" ? laid.NewText : "Someone's.md");
+        if (place == "taken") WritePage(Day(5), "Five.\n");
+        var said = new List<string>();
+
+        UndoSwap.TidyLeftovers(step, _root, onKeptVisibly: (at, kept) => said.Add(Path.GetFileName(at) + " -> " + Path.GetFileName(kept)));
+
+        Assert.Equal(UndoLinks.What.Nothing, UndoLinks.Look(staged));
+        string visible = Full(Section + "/Unit 1, Day 5 (kept by Undo).md");
+        string holder = place == "free" ? Full(Day(5)) : visible;
+        if (item == "a plain file") Assert.Equal("Someone's.\n", File.ReadAllText(holder));
+        else Assert.Equal(item == "a link where no relink stages" ? laid.NewText : "Someone's.md", new FileInfo(holder).LinkTarget);
+        if (place == "taken")
+        {
+            Assert.Equal("Five.\n", File.ReadAllText(Full(Day(5))));
+            Assert.Equal(["Unit 1, Day 5.md -> Unit 1, Day 5 (kept by Undo).md"], said);
+        }
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>A relink's pre-clean never removes what is not its own: something of the teacher's under the staged name stays, and the make fails over it (could not write), the old link whole.</summary>
+    [SymbolicLinkFact]
+    public void ARelinksPreCleanNeverRemovesWhatIsNotItsOwn()
+    {
+        LaidRelink laid = LayARelink("inside");
+        string staged = UndoSwap.BesidePath(Full(Day(5)), "1-apply", "new");
+        File.WriteAllText(staged, "Someone's.\n");
+
+        UndoSwapResult result = UndoSwap.Swap(ReadyTargets(Plan([laid.Op], backward: false)), "1-apply", _root);
+
+        Assert.True(result is UndoSwapResult.Refused { Refusal.Kind: UndoRefusalKind.CouldNotWrite }, Described(result));
+        Assert.Equal("Someone's.\n", File.ReadAllText(staged));
+        Assert.Equal(laid.OldText, LinkText(Day(4)));
+        Assert.False(StandsAnything(Day(5)));
+    }
+
+    /// <summary>
+    /// Recovery re-reads the link just made before it goes (W8b-21b3, the
+    /// mac's removeTheLinksJustMade): one that changed between the reading
+    /// and the removal (another program put a link holding another text
+    /// there) is never removed.
+    /// </summary>
+    [SymbolicLinkFact]
+    public void TheLinkJustMadeIsReReadBeforeItIsRemoved()
+    {
+        LaidRelink laid = LayARelink("inside");
+        LayLink(Day(5), laid.NewText);
+
+        string? unreadable = UndoRecovery.RemoveTheLinksJustMade(StepOf(laid.Op), _root, goingForward: true, beforeTheRemoval: full =>
+        {
+            File.Delete(full);
+            File.CreateSymbolicLink(full, "Someone's.md");
+        });
+
+        Assert.Null(unreadable);
+        Assert.Equal("Someone's.md", LinkText(Day(5)));
+        Assert.Equal(laid.OldText, LinkText(Day(4)));
+    }
+
+    /// <summary>Both links standing: going forward the one at to goes, for an Undo the one at from; a plain link move is never one just made.</summary>
+    [SymbolicLinkTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheLinkJustMadeIsTheOneAtTheSwapsDestination(bool goingForward)
+    {
+        LaidRelink laid = LayARelink("inside");
+        LayLink(Day(5), laid.NewText);
+
+        Assert.Null(UndoRecovery.RemoveTheLinksJustMade(StepOf(laid.Op), _root, goingForward));
+
+        Assert.Equal(goingForward ? laid.OldText : null, LinkText(Day(4)));
+        Assert.Equal(goingForward ? null : laid.NewText, LinkText(Day(5)));
+        UndoOp plain = new UndoOp { Kind = UndoOp.Move, Readable = true, From = Day(6), To = Day(7), LinkSha = Store("Unit 1, Day 6.md") };
+        LayLink(Day(6), "Unit 1, Day 6.md");
+        LayLink(Day(7), "Unit 1, Day 6.md");
+        Assert.Null(UndoRecovery.RemoveTheLinksJustMade(StepOf(plain), _root, goingForward));
+        Assert.Equal("Unit 1, Day 6.md", LinkText(Day(6)));
+        Assert.Equal("Unit 1, Day 6.md", LinkText(Day(7)));
     }
 
     // MARK: Readable (21b2; the mac's relink-2, UndoFormat.relinkShapeIsKnown)
