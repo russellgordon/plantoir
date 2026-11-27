@@ -415,6 +415,14 @@ internal sealed class UndoActionStep
             return UndoRelinkPlanned.Moved;
         }
         if (_after.TryGetValue(to, out byte[]? plannedThere) && plannedThere is not null) RefuseCannotTellNow(to);
+        // A junction is a kind of link Undo cannot make (window E review 2,
+        // LOW 5): the relink is refused before anything is planned, as any
+        // link it cannot make (could not write), never re-made as a symbolic link.
+        if (UndoLinks.IsAJunction(from))
+        {
+            var refusal = new UndoRefusal(UndoRefusalKind.CouldNotWrite, RelativeOf(to) ?? to);
+            throw new UndoStepRefusedException(refusal, Reason(refusal));
+        }
         if (!UndoLinks.CanMakeALink(_plainSeams))
         {
             if (CopyTheLessonInsteadOfALink(from, to)) return UndoRelinkPlanned.Copied;

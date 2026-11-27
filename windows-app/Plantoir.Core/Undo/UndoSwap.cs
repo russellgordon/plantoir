@@ -1295,6 +1295,10 @@ internal static class UndoSwap
     internal static UndoRelinkAnswer RelinkLink(string oldFull, byte[] oldText, string newFull, byte[] newText, string label, UndoSeams? seams,
                                                 int? stoppingAt = null)
     {
+        // A junction is a kind of link this swap cannot make (window E review
+        // 2, LOW 5): refused before anything changes, as any link it cannot
+        // make, never re-made as a symbolic link.
+        if (UndoLinks.IsAJunction(oldFull)) return UndoRelinkAnswer.Failed(UndoRefusalKind.CouldNotWrite);
         string staged = BesidePath(newFull, label, "new");
         string newSha = UndoCheck.Sha(newText);
         RemoveOurStagedLink(staged, newSha);
