@@ -237,3 +237,38 @@ view with `CourseSettingsView.putBackOffer` / `putBack`.
   changed" sentence is then rarely reached. Not changed; for him to rule.
 - LOW 2: Put It Back keeps its own small put-back core (pinned by the
   tests here, not by a shared contract case with recovery's mixed branch).
+
+### Must-fail log (fix round one)
+
+Tests first in their own commit (8c1d97bdc): RED on dd318181d, by not
+compiling (`.notMade`, `SettingPutBackAlert.alertClosed`/`answered`,
+`SetSchoolYearSheet.answer`, `CourseSettingsView.putBackOffer`/`putBack`,
+`settingsCanBePutBack` do not exist there).
+
+The six fixes broken together in one run of UndoStoppedStepTests (each
+break in a different place, each RED test's message naming its own break;
+one run, not six, for the budget), then restored (tree equal to the commit):
+
+| Break | RED |
+|---|---|
+| `.interrupted/.leftAlone` answered `.couldNotFinish` (the old offer) | testAStepWhoseFileHoldsNeitherValueIsClosedWithNoOffer (both rows), testJudgedDirectlyAThirdValueIsNotMade, testTheContractsStoppedSettingCases (two rows) |
+| already closed, not made → `.finished` | testAStepAlreadyClosedIsNotOffered |
+| lock not got → `.finished` | testALockNotGotLeavesTheStepInFlightForTheOffer |
+| alert closing answers Not Now (the HIGH) | testPutItBackWritesTheOldYearWhicheverOrderTheAlertCloses (answered twice), testClosingTheAlertAloneWritesNothing |
+| `couldNotFinish` names the file again | testCouldNotFinishNamesNoFile, testSaveCourseSettingsOfOneField… (XCTAssertFalse) |
+| Save's offer always "course settings" | testSaveCourseSettingsOfOneField… (offer and informative text) |
+
+6 of 6 RED. Restored: UndoStoppedStepTests 19, UndoCourseSettingsStepTests 17,
+ReferenceCourseTests 18: 54 of 54 green (the committed tree). `origin/dev`
+fetched: nothing to merge (already contained).
+
+### Self-check (fix round one)
+
+- Broke each fix and watched its test fail: yes, 6 of 6 (above).
+- No timed waits, no GCD: none added; the lock wait is the door's own.
+- Every sentence on the failure paths true: neither value says
+  `couldNotSetSchoolYear` with nothing in flight (a second try works); a
+  failed Put It Back's "Try again in a moment" is LOW 3, for Russell; no
+  sentence on these paths names a file.
+- Contract cases run from the JSON: `settingStoppedCases`, five rows.
+- Windows ledger edit unbuilt (no Windows here).
