@@ -162,3 +162,15 @@ From `vm-tools/briefs/2026-11-27-899-w8c-1-review-1.md` (CLEAN, five LOWs). `ori
   Documentation 12 is left to the merge clerk (this file's "For documentation 12").
 
 Tests first: 1bad2c870 (the four tests), fixes 845a2db3f.
+A merge fix after dev: dev's W8b-21b3 changed `UndoSwap.TidyLeftovers`, so Put It Back's
+tidy calls the step's own overload, as recovery does (8b72ac865). LOW 4 changes what
+`PutItBackNeverSwapsAStepClosedMeanwhile` expects: `WasMade`, still never swapped (8d7e21111).
+Director's ruling on LOW 4: no new trail line; saying nothing is right.
+
+Runs (PC, `vm-tools/guest/899-w8c-1-lows-pc-run.ps1`):
+- `w8c-1-lows-r1` (845a2db3f): void, the merge's build break (CS1503 at `UndoStoppedStep.cs:224`).
+- `w8c-1-lows-r2` (8b72ac865, red ref be72efd74 = the tests on the merged product with only
+  the compile fix): red 4 of 4 failing (the four new tests); both builds 0 errors; the 13
+  classes plus the new tidy test 434 of 435, `PutItBackNeverSwapsAStepClosedMeanwhile` red
+  as LOW 4 meant; must-fail `899-w8c-1-lows-mustfail.json` **3 of 3 RED** (LOW 3, LOW 4, LOW 1).
+- `w8c-1-lows-r3` (8d7e21111): both builds 0 errors; **435 of 435**.
