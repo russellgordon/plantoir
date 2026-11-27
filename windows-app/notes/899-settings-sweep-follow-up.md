@@ -154,3 +154,24 @@ StartOfYearRestoreOfferTests: 123 of 123 green on the committed tree.
   shorthand; explicit types; `// MARK: -` on the new enum.
 - Every sentence on the rename's failure paths true; none names a file.
 - `origin/dev` (8046ca2e8) already contained.
+
+## Fix round one (review 1: the gate's scan test, L2, L3)
+
+- **The scan test.** `CourseNameCharactersTests.testEveryReadAndWriteOfTheKeyGoesThroughTheRule`
+  was red on `"course_name": "course name",` in `CourseSettingsView`. Its rule:
+  every line naming the key is in `CourseConfiguration.swift` or cleans the
+  name. The table (`settingsNamedOneAtATime`) moved beside the rule in
+  `CourseConfiguration`, and the old value the alert shows is now read through
+  it (`oldValueAsTheAlertSaysIt`: the course name cleaned by
+  `courseNameCharacters`, then trimmed), which it was not before: a name
+  holding a control character would have been shown raw. No other quoted
+  settings key was added in a view (`origin/dev...HEAD`).
+- **L2 / A2.** The `.couldNotFinish` case in `RenameRecordClaim.stepWasNotMade`
+  had no effect (a one-file rename never writes the rename record), so the
+  change is taken out and a comment says why. The claim that a test proved it
+  is withdrawn: nothing proved it.
+- **L3.** "Plantoir settles it the next time it opens" is kept: U7, in v2.0.0
+  (`undo.laterPieces.U7`: "recovery at every launch"), makes it true by the
+  release. **For U7:** keep that true for a Not Now step of a Save, a rename
+  and Set School Year, or change the two Help lines (`course-settings.md`,
+  `school-year.md`).

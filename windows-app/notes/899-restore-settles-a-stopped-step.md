@@ -134,3 +134,81 @@ ActivityTrailWiringTests, UndoStoppedStepTests: 37 of 37 green.
 - Contract cases from the JSON: the trail event is pinned by
   ActivityTrailWiringTests from `mustRecord`. There is no new case list.
 - `origin/dev` merged (already contained).
+
+## Fix round one (review 1: M1, M2, L1)
+
+- **M1, when.** The set-aside no longer runs before the swap. It runs in
+  `UndoRestoreSetAside.swapHoldingTheList`, which takes the list's lock
+  just before the first move (after the `swapping` record is written),
+  runs the swap and, when it stops, its way back, inside that lock, and
+  sets aside only when the restore has replaced files: every move made
+  (the `done` record is written first, inside the lock), or stopped part
+  way with some moved and not put back. Whole course: every door through
+  `WholeCourseRestore.restore` (Backups, Archived, Restore Course in the
+  Get Ready sheet), via the new `RestoreSwap.Context.holdingTheListAcrossTheSwap`.
+  One section: `swapSectionInPlace`, its moves now in `swapTheSectionsFiles`.
+  - Fails before the first move, or every file put back (`leftAsItWas`):
+    nothing is set aside, the step stays `begun` with its staged files,
+    and recovery settles it by content as before (tests: the first move
+    fails; the second fails and all go back; both then recovered `done`).
+  - Stopped part way, some moved and not put back: the step is closed
+    `interrupted`, `setAsideByARestore`. True of the disk: the course is
+    part backup, part its own, kept aside in the set-aside folder, so the
+    step's files are partly applied or unknown; recovery writing its start
+    content would write into backup files. Test: recovery changes nothing.
+  - `leftAsItWas` with newcomers kept counts as "as it was": every file of
+    the course is back; the newcomers are files written into the backup's
+    items during the swap, kept beside the backups, never the step's.
+- **L1 closed by the same lock.** A step cannot begin during the swap (a
+  begin needs the lock); one begun before the lock is in flight when the
+  set-aside runs and is judged by it.
+- **M2, per file (the director's ruling).** An op is inside when any file
+  it names is under what the restore replaced. A step whose every op is
+  inside is closed `interrupted` as before. Otherwise a new journal event
+  `setAside` (reason `setAsideByARestore`, `paths` the files replaced) is
+  written and the step stays in flight. The fold keeps them in
+  `UndoStepRecord.setAsidePaths`. Recovery (`UndoRecovery.settle`, and so
+  the at-once judgement) judges only the ops naming none of them, never
+  re-derives one (`UndoMaintainers.rederive`), and when those settle (made,
+  nothing took effect, or put back) closes the step `interrupted`,
+  `setAsideByARestore`, naming the files set aside, no clearing: never on
+  the list, so Undo and Redo never act on a set-aside file. Changed by hand
+  and could-not-put-back endings are unchanged. **Format changed**:
+  `file-formats.json` → `undoJournal.events.setAside`, the moves row, the
+  `reason` and `paths` keys; `shared-rules.json` mustRecord why; ledger
+  reason updated (`Reason899RestoreSetsAsideAStoppedStep`). An event was
+  chosen over a note because a reader that does not know it must stop at it
+  (a barrier), never pass over it and judge a restored file.
+- Trail line: now says the files were replaced (not "is replacing"), and
+  for a partial set-aside how many other files are still settled.
+- Residual, for the director: a one-section restore rewrites the section's
+  `publishForSection<N>` keys in shared pages (`restorePerSectionKeys`).
+  Those pages are not "replaced" here (they are the outside files the ruling
+  says are judged by content), so a stopped step's whole-file op on
+  `index.md` can still be judged against a page whose key the restore put
+  back. The reviewer's case is covered (the outside file settled by content).
+- Parked: a crash after the last move and before the set-aside line (inside
+  the lock, a few renames and one append) leaves the step in flight over the
+  restored files; the settle that finds a `done` restore record could set
+  aside again. For U5, whose restore step is written in the same lock.
+
+### Must-fail, fix round one (each break on its own, the two set-aside classes)
+
+| Break | RED |
+|---|---|
+| B1 set aside even when the swap replaced nothing | testARestoreThatFailsBeforeItsFirstMove…, testARestoreThatPutsEveryFileBack… |
+| B2 a step partly inside closed whole | testAOneSectionRestoreSetsAsideTheFilesItReplaces, testRecoveryNeverWritesARestoredPage… |
+| B3 recovery judges the files set aside | testRecoveryNeverWritesARestoredPage… |
+| B4 a restore stopped part way sets nothing aside | testARestoreThatStopsPartWaySetsTheStepAside |
+
+4 of 4 RED; each break was restored by the script after its run. Tests first
+in b2f9a94b2 (RED on a934b5805: they do not compile there, `setAsidePaths`).
+
+### Self-check, fix round one
+
+- Broke each fix and watched its test fail: above.
+- No timed waits: the lock wait is the existing `UndoSwitch.finishWaitSeconds`.
+- Failure paths: lock not had → the swap still runs, the trail says any
+  change left part way is still open (true: nothing was set aside).
+- No number tuned by trial. `origin/dev` merged (already contained).
+- Contract: the events test (`UndoJournalContractTests`) pins the new event.
