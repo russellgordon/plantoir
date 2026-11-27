@@ -17,9 +17,11 @@ set -euo pipefail
 #      --image and a Keychain user that does not exist, so they need no
 #      container, no network and no credentials — because a launcher that is
 #      only ever read is a launcher nobody has started (GitHub issues #129 and
-#      #124). Note that these tests are a written LIST here, not a discovery:
-#      a new scripts/test_*.py must be added below or it runs on Windows (whose
-#      PythonToolchainTests does discover them) and nowhere on the mac.
+#      #124). Most of these tests are run by name below, each with its own
+#      pass line; any scripts/test_*.py this file does not name is then found
+#      and run by a discovery at the end of step 0.5, as Windows'
+#      PythonToolchainTests discovers them, so a new file can never run on
+#      Windows and nowhere on the mac (#1052).
 #   1. Ensures the container runtime is up (shares an already-running Colima;
 #      never stops it — safe to run alongside other Colima-based toolchains).
 #   2. docker build -t quartz-teacher:dev-test .
@@ -842,12 +844,14 @@ fi
 # printablePages.agentGuidance.held): their folders are in
 # held/agent_guidance/skills, which neither app copies into a working folder,
 # and these tests find them there through the contract's held.place.
-for marking_test in redact names guard sheets comments results; do
-  if (cd scripts && python3 -B "test_marking_${marking_test}.py") >"/tmp/verify_marking_${marking_test}_test.log" 2>&1; then
-    pass "marking: scripts/test_marking_${marking_test}.py (#750, 750a and 750c; comments #752)"
+# The file names are written out whole so that the discovery at the end of
+# step 0.5 sees them as run here (#1052).
+for marking_test in test_marking_redact.py test_marking_names.py test_marking_guard.py test_marking_sheets.py test_marking_comments.py test_marking_results.py; do
+  if (cd scripts && python3 -B "$marking_test") >"/tmp/verify_${marking_test%.py}.log" 2>&1; then
+    pass "marking: scripts/$marking_test (#750, 750a and 750c; comments #752)"
   else
-    fail "marking: scripts/test_marking_${marking_test}.py (#750, 750a and 750c; comments #752)"
-    cat "/tmp/verify_marking_${marking_test}_test.log"
+    fail "marking: scripts/$marking_test (#750, 750a and 750c; comments #752)"
+    cat "/tmp/verify_${marking_test%.py}.log"
   fi
 done
 
@@ -1349,6 +1353,41 @@ else
     fail "a temporary-file template has text after its X's, so its name is fixed"
     echo "$_literal_temp_names"
   fi
+fi
+
+# Every scripts/test_*.py, discovered rather than listed (#1052). The tests
+# above are run by name, each with a pass line that says what it checks, and
+# some of them run in the image later on; a hand-kept list of them fell behind,
+# so on 2026-11-27 the gate was green on a tree where 22 of the 133 files ran
+# only on Windows, scripts/test_make_undo_traces.py failing among them. A file
+# counts as run by name when its file name is written on a line of this script
+# that is not a comment; every other one is run here, from scripts/ as the
+# others are, and must pass. A file needing python-frontmatter exits 77 on a
+# Mac without it, which fails here on purpose: it belongs in the image's runs
+# with the others that do. Files deliberately not run here go in
+# not_run_on_this_mac with the reason beside each, as Windows' NotRunHere
+# does; it is empty because every file passed on this Mac on 2026-11-27.
+not_run_on_this_mac=""
+_lines_that_run="$(grep -v '^[[:space:]]*#' "$(basename "${BASH_SOURCE[0]}")")"
+_found_by_discovery=0
+for _discovered_test in scripts/test_*.py; do
+  _discovered_name="$(basename "$_discovered_test")"
+  case " $not_run_on_this_mac " in
+    *" $_discovered_name "*) continue ;;
+  esac
+  if grep -qF "$_discovered_name" <<<"$_lines_that_run"; then
+    continue
+  fi
+  _found_by_discovery=$((_found_by_discovery + 1))
+  if (cd scripts && python3 "$_discovered_name") >"/tmp/verify_discovered_${_discovered_name%.py}.log" 2>&1; then
+    pass "scripts/$_discovered_name, found by the discovery of every scripts/test_*.py (#1052)"
+  else
+    fail "scripts/$_discovered_name, found by the discovery of every scripts/test_*.py (#1052)"
+    cat "/tmp/verify_discovered_${_discovered_name%.py}.log"
+  fi
+done
+if [ "$_found_by_discovery" -eq 0 ]; then
+  pass "every scripts/test_*.py is run by name in this script, so the discovery had none left to run (#1052)"
 fi
 
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
