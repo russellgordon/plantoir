@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # U4b3 (#899): Insert Class renames a later class that is a link by moving the link
 
 Base `origin/dev` 253f8915f (the brief's 0e12bc8ac or later). Branch `issue/899-u4b3-linked-class-page-moves-its-link`.

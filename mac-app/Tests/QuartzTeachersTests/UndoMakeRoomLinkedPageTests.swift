@@ -145,6 +145,20 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         return result
     }
 
+    /// `everything(under:)` without the assistant's own backups
+    /// (`courses/_backups`), which the assistant takes before it changes
+    /// anything, whatever the action then does.
+    func everythingButTheBackups(under made: (root: URL, course: Course, classes: URL)) -> [String: String] {
+        var result: [String: String] = [:]
+        for (path, held) in everything(under: made) {
+            if path.hasPrefix("courses/_backups") {
+                continue
+            }
+            result[path] = held
+        }
+        return result
+    }
+
     /// Insert Class at `day` must refuse with the refusal it gave before
     /// U4b3 part 2 ("cannot tell now", said as the file named that could
     /// not be saved), naming `named`, and leave the whole working folder,
@@ -225,7 +239,7 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         let day3: URL = AssistFixture.pageURL(of: "Unit 1, Day 3", in: made.course)
         try FileManager.default.createSymbolicLink(atPath: day3.path, withDestinationPath: "../../Concepts/Unit 1, Day 3.md")
         let classes: URL = ClassPages.folderURL(forSection: 1, in: made.course)
-        let before: [String: String] = everything(under: (root: made.root, course: made.course, classes: classes))
+        let before: [String: String] = everythingButTheBackups(under: (root: made.root, course: made.course, classes: classes))
         let stepsBefore: Int = try stepCount()
 
         let outcome: AssistToolOutcome = await AssistFixture.run(
@@ -239,7 +253,10 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
             FileManager.default.fileExists(atPath: AssistFixture.pageURL(of: "Unit 1, Day 4", in: made.course).path),
             "no class moved to Day 4"
         )
-        XCTAssertEqual(everything(under: (root: made.root, course: made.course, classes: classes)), before, "nothing changed, no copy made")
+        XCTAssertEqual(
+            everythingButTheBackups(under: (root: made.root, course: made.course, classes: classes)), before,
+            "nothing changed, no copy made"
+        )
         XCTAssertEqual(try stepCount(), stepsBefore, "no step recorded")
     }
 

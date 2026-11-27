@@ -826,7 +826,7 @@ nonisolated enum UndoContractReplay {
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
         "movedFolder", "caseOnlyFolder", "refusalNamed", "keptWhatItReplacedSays", "madeFolder", "foldersInside",
-        "linkedFolder", "handedOver", "linkedPage", "laterLinks", "hopLink",
+        "linkedFolder", "handedOver",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1084,35 +1084,6 @@ nonisolated enum UndoContractReplay {
                     lastLeftApart = leftApart(of: outcome)
                     lastStartsAtTheNextLogin = startsAtTheNextLogin(of: outcome)
                     lastRefusalNamed = refusalNamed(of: outcome)
-                } else if value == "makeRoomWithALaterClassThatIsALink" {
-                    // U4b3 part 2: Insert Class runs on the main actor.
-                    let stackJournal: UndoJournal = journal()
-                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(root: root, journal: stackJournal, places: places)
-                } else if value == "makeRoomWithALaterClassThatIsABrokenLink" {
-                    let stackJournal: UndoJournal = journal()
-                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
-                        root: root, journal: stackJournal, places: places, broken: true
-                    )
-                } else if value == "makeRoomWithALaterClassLinkedToAnEarlierClass" {
-                    let stackJournal: UndoJournal = journal()
-                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
-                        root: root, journal: stackJournal, places: places, linkedToDay1: true
-                    )
-                } else if value == "makeRoomWithALaterClassLinkedToAClassItRenames" {
-                    let stackJournal: UndoJournal = journal()
-                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
-                        root: root, journal: stackJournal, places: places, day4LinkedToDay3: true, day3Plain: true
-                    )
-                } else if value == "makeRoomWithALaterClassLinkedThroughALinkInside" {
-                    let stackJournal: UndoJournal = journal()
-                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
-                        root: root, journal: stackJournal, places: places, day3Plain: true, throughAHopInside: true
-                    )
-                } else if value == "makeRoomWithALaterClassLinkedToALinkedClass" {
-                    let stackJournal: UndoJournal = journal()
-                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
-                        root: root, journal: stackJournal, places: places, day4LinkedToDay3: true
-                    )
                 } else if UndoContractKinds.calls.contains(value) {
                     if let answered = try UndoContractKinds.call(value, root: root, journal: journal(), places: places) {
                         last = answered
@@ -1494,15 +1465,6 @@ nonisolated enum UndoContractReplay {
             }
             if let wanted = string(testCase["linkedFolder"]), UndoContractKinds.linkedFolder(in: root) != wanted {
                 failures.append("stackCases '\(name)': the moved link is \(UndoContractKinds.linkedFolder(in: root)), not \(wanted)")
-            }
-            if let wanted = string(testCase["linkedPage"]), UndoContractKinds.linkedPage(in: root) != wanted {
-                failures.append("stackCases '\(name)': the linked later class is \(UndoContractKinds.linkedPage(in: root)), not \(wanted)")
-            }
-            if let wanted = string(testCase["laterLinks"]), UndoContractKinds.laterLinks(in: root) != wanted {
-                failures.append("stackCases '\(name)': the later classes are \(UndoContractKinds.laterLinks(in: root)), not \(wanted)")
-            }
-            if let wanted = string(testCase["hopLink"]), UndoContractKinds.hopLink(in: root) != wanted {
-                failures.append("stackCases '\(name)': the in-between link holds \(UndoContractKinds.hopLink(in: root)), not \(wanted)")
             }
             if let wanted = string(testCase["handedOver"]), UndoContractKinds.handedOver(in: root) != wanted {
                 failures.append("stackCases '\(name)': the handed-over class pages are \(UndoContractKinds.handedOver(in: root)), not \(wanted)")

@@ -333,11 +333,7 @@ enum ClassInsertionPlanner {
         if plan.added.isEmpty {
             throw Problem.wouldNotFit(plan.problems.joined(separator: " "))
         }
-        // Where each later class that is a link leads, judged hop by hop on
-        // the disk as it stands, before anything is planned (#899 U4b3
-        // relink-5, `undo.rule.shadow`).
-        let classPagePlaces: [ClassPagePlace] = classPagePlaces(of: plan, in: course)
-        let workingFolder: URL? = workingFolderURL(of: course)
+
 
         // ONE step through the door (#899, U3): every rename, link, date and
         // new page planned first, each read as the step will leave it, then
@@ -365,114 +361,24 @@ enum ClassInsertionPlanner {
 
         // 1. The renames, highest day first.
         var renamed: [String: String] = [:]
-        // The in-between links inside the working folder already re-pointed
-        // where they stand (mac-2): each once, however many classes reach it.
-        var hopsRePointed: [HopEntry] = []
         for rename in plan.renames {
-            // A later class that is a link leading to nothing is still a
-            // class: its link is renamed as any other (Russell, 2026-11-26:
-            // "Why would it refuse? Why does it care where a later class
-            // links to?"), and nothing is written for it or through it.
-            let reach: LinkedClassReach = reachOfALinkedClass(at: rename.fromURL, classPagePlaces: classPagePlaces)
-            let isABrokenLink: Bool = isALinkToNothing(rename.fromURL)
-            if reach == .elsewhere && !isABrokenLink && !step.fileExists(rename.fromURL) {
+            if !step.fileExists(rename.fromURL) {
                 continue
             }
             if step.fileExists(rename.toURL) {
                 notFinished.notRenamed.append(rename.from)
                 continue
             }
-            if case .aRenamedPageThrough(let hop, let newPlace) = reach, isInside(workingFolder, hop) {
-                // mac-2 (#899, ruling 6 of U4b3, Russell, 2026-11-26): the
-                // class reaches a renamed class page only through a link
-                // inside the working folder that is not a class page. The
-                // class is renamed as itself, its text kept, and the link in
-                // between is re-pointed WHERE IT STANDS at the page's new
-                // name, so the chain still leads to the same lesson. Nothing
-                // is written through either link.
-                guard let linkSha = UndoTreeReading.linkSha(at: rename.fromURL),
-                      rePointWhereItStands(hop, at: newPlace, in: step, done: &hopsRePointed) else {
-                    notFinished.notRenamed.append(rename.from)
-                    continue
-                }
-                step.moveLink(spelledAsItsNewPlace(rename.fromURL, beside: rename.toURL), to: rename.toURL, linkSha: linkSha)
-            } else if reach != .elsewhere {
-                // A later class whose link leads to another class page of
-                // this section (Russell, 2026-11-26): renamed, kept leading
-                // to the same lesson, and nothing written through it, no
-                // title and no date (that lesson's page takes its own date
-                // from its own move, or keeps its own when the plan leaves
-                // it).
-                guard let textAfter = textAfterTheMove(of: rename.fromURL, reach: reach) else {
-                    notFinished.notRenamed.append(rename.from)
-                    continue
-                }
-                let linkPlace: URL = spelledAsItsNewPlace(rename.fromURL, beside: rename.toURL)
-                if !step.relinkLink(linkPlace, to: rename.toURL, textAfter: textAfter) {
-                    notFinished.notRenamed.append(rename.from)
-                    continue
-                }
-            } else if isABrokenLink || isALinkToAFile(rename.fromURL) {
-                // A later class that is a symbolic link to a file (#899
-                // U4b3, `undo.rule.shadow`): the LINK is moved as itself to
-                // the new name, judged by the target it holds, never
-                // followed, as Rename folder moves a linked folder. The
-                // file it leads to is never moved, renamed or removed, and
-                // never retitled: "Shared pages never have day “x” titles
-                // in them" (Russell, 2026-11-26). Only the moved date is
-                // written into it (step 3). The place the link leaves is
-                // handed over, in this same step, to the class below it or
-                // the new class. A broken link is moved the same way, and
-                // as it leads to no file, no date is written for it.
-                guard let linkSha = UndoTreeReading.linkSha(at: rename.fromURL) else {
-                    notFinished.notRenamed.append(rename.from)
-                    continue
-                }
-                step.moveLink(spelledAsItsNewPlace(rename.fromURL, beside: rename.toURL), to: rename.toURL, linkSha: linkSha)
-            } else {
-                guard let text = step.readText(rename.fromURL) else {
-                    notFinished.notRenamed.append(rename.from)
-                    continue
-                }
-                // The title inside the file follows the file name: a page
-                // whose name and title disagree is worse than either being
-                // wrong alone.
-                let retitled: String = PageFrontmatter.settingTitle(in: text, to: rename.to)
-                step.write(retitled, to: rename.toURL)
-                step.remove(rename.fromURL)
+            guard let text = step.readText(rename.fromURL) else {
+                notFinished.notRenamed.append(rename.from)
+                continue
             }
+            // The title inside the file follows the file name: a page whose
+            // name and title disagree is worse than either being wrong alone.
+            let retitled: String = PageFrontmatter.settingTitle(in: text, to: rename.to)
+            step.write(retitled, to: rename.toURL)
+            step.remove(rename.fromURL)
             renamed[rename.from] = rename.to
-        }
-
-        // 1b. A class the plan only re-dates, not renames, whose link reaches
-        //     a renamed class page (mac-2): re-pointed where it stands by the
-        //     same rules. Its own text when its text names the page; the
-        //     in-between link when the hop is inside the working folder; its
-        //     own link straight at the page's new place when the hop is
-        //     outside, where Plantoir never writes. Nothing written through.
-        var renamedPlaces: [String] = []
-        for rename in plan.renames {
-            renamedPlaces.append(rename.fromURL.standardizedFileURL.path)
-        }
-        for move in plan.moves {
-            if renamedPlaces.contains(move.fileURL.standardizedFileURL.path) {
-                continue
-            }
-            let reach: LinkedClassReach = reachOfALinkedClass(at: move.fileURL, classPagePlaces: classPagePlaces)
-            switch reach {
-            case .elsewhere, .aClassPageTheyLeave:
-                continue
-            case .aRenamedPageThrough(let hop, let newPlace) where isInside(workingFolder, hop):
-                if !rePointWhereItStands(hop, at: newPlace, in: step, done: &hopsRePointed) {
-                    notFinished.linksNotUpdated.append(move.title)
-                }
-            case .aRenamedPageByItsOwnText, .aRenamedPageThrough:
-                guard let textAfter = textAfterTheMove(of: move.fileURL, reach: reach),
-                      step.relinkLink(move.fileURL, to: move.fileURL, textAfter: textAfter) else {
-                    notFinished.linksNotUpdated.append(move.title)
-                    continue
-                }
-            }
         }
 
         // 2. The links that pointed at the old names. Ours to do — Obsidian
@@ -515,18 +421,6 @@ enum ClassInsertionPlanner {
         // it was about it.
         var notDated: [String] = []
         for move in plan.moves {
-            // A class that is a link leading to nothing has no file to date,
-            // and nothing is ever written through it (Russell, 2026-11-26):
-            // its new name would be read back through the place it leaves.
-            if isALinkToNothing(move.fileURL) {
-                continue
-            }
-            // Nor through a class that is a link to another class page of
-            // this section (Russell, 2026-11-26): writing this class's date
-            // through it would give that lesson another class's date.
-            if reachOfALinkedClass(at: move.fileURL, classPagePlaces: classPagePlaces) != .elsewhere {
-                continue
-            }
             // A renamed page is found under its NEW name by now — but only if
             // THIS run renamed it (#425): when its rename could not be done,
             // the page under the new name is somebody else's, and re-dating it
@@ -637,112 +531,14 @@ enum ClassInsertionPlanner {
         )
     }
 
-    /// Whether the page at `url` is a symbolic link (read without following
-    /// it, `lstat`) whose target is a regular file. A link to a folder, a
-    /// dangling link or anything else is not, and is handled as before.
-    static func isALinkToAFile(_ url: URL) -> Bool {
-        var linkStatus: stat = stat()
-        let linkResult: Int32 = url.withUnsafeFileSystemRepresentation { path in
-            guard let path else {
-                return -1
-            }
-            return lstat(path, &linkStatus)
-        }
-        if linkResult != 0 || (linkStatus.st_mode & S_IFMT) != S_IFLNK {
-            return false
-        }
-        var targetStatus: stat = stat()
-        let targetResult: Int32 = url.withUnsafeFileSystemRepresentation { path in
-            guard let path else {
-                return -1
-            }
-            return stat(path, &targetStatus)
-        }
-        return targetResult == 0 && (targetStatus.st_mode & S_IFMT) == S_IFREG
-    }
-
-    /// The link's place spelled from the same folder as its new place, when
-    /// the two are in one folder. The step finds a place by its spelling,
-    /// and a listed page can carry a spelling of the folder its new name
-    /// does not: the folder lister names `/private/var/...` where the plan
-    /// names `/var/...`, and standardizing drops `/private` only from a path
-    /// that leads somewhere, never from a link that leads to nothing. Spelled
-    /// apart, the class below would not find the place the link leaves and
-    /// would write THROUGH the link.
-    static func spelledAsItsNewPlace(_ url: URL, beside newPlace: URL) -> URL {
-        let folder: URL = url.deletingLastPathComponent().resolvingSymlinksInPath()
-        let newFolder: URL = newPlace.deletingLastPathComponent().resolvingSymlinksInPath()
-        if folder.path != newFolder.path {
-            return url
-        }
-        return newPlace.deletingLastPathComponent().appendingPathComponent(url.lastPathComponent)
-    }
-
     /// Whether the page at `url` is a symbolic link that leads to nothing:
     /// `lstat` sees the link, `stat` cannot follow it to anything (its
     /// target, or a link further along, is not there, or the links go
     /// round). Insert Class renames such a link as itself and writes
     /// nothing through it (Russell, 2026-11-26).
+    /// Kept for `ClassPages` until #1055 S1.
     static func isALinkToNothing(_ url: URL) -> Bool {
         return ResolvedFile.isALink(url) && ResolvedFile.throughLinks(at: url) == nil
-    }
-
-    /// The file a symbolic link at `url` leads to, followed link by link
-    /// (each target read as written, a relative one against its link's
-    /// folder), or nil when `url` is not a link or the chain does not end
-    /// at a file within 32 links. The folders above keep the spelling the
-    /// course uses, so the answer compares with the course's own paths.
-    static func fileALinkLeadsTo(_ url: URL) -> URL? {
-        if !ResolvedFile.isALink(url) {
-            return nil
-        }
-        var here: URL = url
-        var hops: Int = 0
-        while ResolvedFile.isALink(here) {
-            hops += 1
-            guard hops <= 32, let written = try? FileManager.default.destinationOfSymbolicLink(atPath: here.path) else {
-                return nil
-            }
-            if written.hasPrefix("/") {
-                here = URL(fileURLWithPath: written).standardizedFileURL
-            } else {
-                here = URL(fileURLWithPath: written, relativeTo: here.deletingLastPathComponent()).standardizedFileURL
-            }
-        }
-        return here
-    }
-
-    /// Every class page of the section as it stands (a plain page or a
-    /// link), by its own `lstat` identity, with its new place when the plan
-    /// renames it.
-    static func classPagePlaces(of plan: ClassInsertionPlan, in course: Course) -> [ClassPagePlace] {
-        var renamedPlaces: [(identity: ResolvedFile, newPlace: URL)] = []
-        for rename in plan.renames {
-            if let identity = ResolvedFile.ofThePlace(at: rename.fromURL) {
-                renamedPlaces.append((identity: identity, newPlace: rename.toURL))
-            }
-        }
-        var result: [ClassPagePlace] = []
-        for page in ClassPages.list(forSection: plan.sectionNumber, in: course) {
-            guard let identity = ResolvedFile.ofThePlace(at: page.fileURL) else {
-                continue
-            }
-            var newPlace: URL? = nil
-            for renamed in renamedPlaces where renamed.identity == identity {
-                newPlace = renamed.newPlace
-            }
-            result.append(ClassPagePlace(identity: identity, newPlace: newPlace))
-        }
-        return result
-    }
-
-    /// The working folder holding the course's `courses` folder, or nil.
-    static func workingFolderURL(of course: Course) -> URL? {
-        let coursesFolder: URL = course.directoryURL.standardizedFileURL.deletingLastPathComponent()
-        if coursesFolder.lastPathComponent != "courses" {
-            return nil
-        }
-        return coursesFolder.deletingLastPathComponent()
     }
 
     /// Where the later class at `place` leads, when it is a symbolic link,
@@ -753,6 +549,7 @@ enum ClassInsertionPlanner {
     /// page of the section as it stands, at most 32 hops. The first class
     /// page met decides. The link's own place is never counted, so a chain
     /// that comes round to it leads nowhere (`.elsewhere`).
+    /// Kept for `ClassPages` until #1055 S1.
     static func reachOfALinkedClass(at place: URL, classPagePlaces: [ClassPagePlace]) -> LinkedClassReach {
         if !ResolvedFile.isALink(place) {
             return .elsewhere
@@ -787,107 +584,6 @@ enum ClassInsertionPlanner {
             here = next
         }
         return .elsewhere
-    }
-
-    /// The text the class's link at `place` holds after the step, for a
-    /// link that leads to another class page of the section, or nil when it
-    /// cannot be read now.
-    ///
-    /// * Its own text names a renamed page: that text with ONLY its last
-    ///   path part replaced by the page's new file name. Insert Class
-    ///   renames the page within its own folder and the link within its
-    ///   own, so neither folder changes, and every other part of the text,
-    ///   relative (`./`, `../Unit 1/`) or absolute, still leads to the
-    ///   page's folder: the text keeps its own form.
-    /// * It reaches a renamed page only through a link that is not a class
-    ///   page, and that link is outside the working folder, where Plantoir
-    ///   never writes: the class's own link is re-pointed straight at the
-    ///   page's new place (relative to the link's own folder, as the
-    ///   section's own links are written), so it still leads to the same
-    ///   lesson; the link outside is left as it is.
-    /// * It reaches a class page the plan leaves: its text as it is.
-    static func textAfterTheMove(of place: URL, reach: LinkedClassReach) -> Data? {
-        guard let written = try? FileManager.default.destinationOfSymbolicLink(atPath: place.path) else {
-            return nil
-        }
-        switch reach {
-        case .elsewhere, .aClassPageTheyLeave:
-            return Data(written.utf8)
-        case .aRenamedPageByItsOwnText(let newName):
-            var folderPart: String = ""
-            if let lastSlash = written.lastIndex(of: "/") {
-                folderPart = String(written[...lastSlash])
-            }
-            return Data((folderPart + newName).utf8)
-        case .aRenamedPageThrough(_, let newPlace):
-            return Data(relativeText(from: place.deletingLastPathComponent(), to: newPlace).utf8)
-        }
-    }
-
-    /// The text a link in `folder` holds to lead to `file`: the path from
-    /// one to the other, `../` for each folder up, both read with the links
-    /// above them resolved, so `/var` and `/private/var` are one.
-    static func relativeText(from folder: URL, to file: URL) -> String {
-        let fromParts: [String] = folder.resolvingSymlinksInPath().standardizedFileURL.pathComponents
-        let toParts: [String] = file.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.pathComponents
-        var shared: Int = 0
-        while shared < fromParts.count && shared < toParts.count && fromParts[shared] == toParts[shared] {
-            shared += 1
-        }
-        var text: String = ""
-        var up: Int = shared
-        while up < fromParts.count {
-            text += "../"
-            up += 1
-        }
-        var down: Int = shared
-        while down < toParts.count {
-            text += toParts[down] + "/"
-            down += 1
-        }
-        return text + file.lastPathComponent
-    }
-
-    /// mac-2 (#899, ruling 6 of U4b3): re-points the in-between link at
-    /// `hop` (inside the working folder, not a class page) where it stands,
-    /// its own text with only the last path part replaced by `newPlace`'s
-    /// file name, planned once however many classes reach it. `done` holds
-    /// the hops already planned, each by the DIRECTORY ENTRY it is
-    /// (`HopEntry`: its folder's identity and its name as that folder holds
-    /// it), because the exchange re-points one entry: two spellings of one
-    /// entry, by letter case or through a linked folder, are one hop
-    /// (review 1 of mac-2, LOW 2), and two names of one hard-linked link are
-    /// two (review 2 of mac-2, LOW 1). False when its text cannot be read
-    /// now or the step will not take the relink.
-    static func rePointWhereItStands(_ hopAsReached: URL, at newPlace: URL, in step: JournaledStep, done: inout [HopEntry]) -> Bool {
-        // Only the folders above are tidied (`..` taken out there): the
-        // link itself is never followed, as tidying a whole path holding
-        // `..` would follow it to the page it leads to.
-        let hop: URL = hopAsReached.deletingLastPathComponent().standardizedFileURL
-            .appendingPathComponent(hopAsReached.lastPathComponent)
-        guard let entry = HopEntry.of(hop) else {
-            return false
-        }
-        if done.contains(entry) {
-            return true
-        }
-        guard let textAfter = textAfterTheMove(of: hop, reach: .aRenamedPageByItsOwnText(newName: newPlace.lastPathComponent)) else {
-            return false
-        }
-        if !step.relinkLink(hop, to: hop, textAfter: textAfter) {
-            return false
-        }
-        done.append(entry)
-        return true
-    }
-
-    /// Whether the link at `place` is inside `workingFolder` (the folders
-    /// above it resolved, the link itself never followed).
-    static func isInside(_ workingFolder: URL?, _ place: URL) -> Bool {
-        guard let workingFolder else {
-            return false
-        }
-        return UndoFolderPlaces.placeResolvingOnlyAbove(workingFolder, of: place) != nil
     }
 
     /// Making room in a numbered course (#267) — a club's "Week 1", "Week 2".
@@ -1517,6 +1213,7 @@ struct PlanProblem: Equatable, Sendable {
 /// Where a later class that is a symbolic link leads, among the class pages
 /// of its own section (#899 U4b3 relink-5): the first class page its hops
 /// reach decides.
+/// Kept for `ClassPages` until #1055 S1.
 enum LinkedClassReach: Equatable {
     /// Not a link, or a link that reaches no class page of the section at
     /// any hop: it leads to a file elsewhere, or nowhere.
@@ -1533,6 +1230,7 @@ enum LinkedClassReach: Equatable {
 
 /// One class page of a section as it stands, by its own place's identity,
 /// with its new place when the plan renames it (#899 U4b3 relink-5).
+/// Kept for `ClassPages` until #1055 S1.
 struct ClassPagePlace {
 
     // MARK: - Stored properties
@@ -1542,56 +1240,9 @@ struct ClassPagePlace {
     let newPlace: URL?
 }
 
-/// One directory entry, as the exchange that re-points a link sees it: the
-/// folder that holds it (by its identity, reached through any linked
-/// folder) and its name as that folder holds it (review 2 of mac-2, LOW 1).
-/// Two spellings of one entry (letter case, a linked folder) are one entry;
-/// two names of one hard-linked link are two.
-struct HopEntry: Equatable {
-
-    // MARK: - Stored properties
-
-    let folder: ResolvedFile
-
-    let name: String
-
-    // MARK: - Functions
-
-    /// The entry at `url` (the entry itself never followed), or nil when
-    /// nothing is there or its folder cannot be listed.
-    static func of(_ url: URL) -> HopEntry? {
-        guard let itself = ResolvedFile.ofThePlace(at: url) else {
-            return nil
-        }
-        let folderURL: URL = url.deletingLastPathComponent()
-        guard let folder = ResolvedFile.throughLinks(at: folderURL),
-              let names = try? FileManager.default.contentsOfDirectory(atPath: folderURL.path) else {
-            return nil
-        }
-        let asReached: String = url.lastPathComponent
-        // The name byte for byte, when the folder holds it so.
-        for name in names where name == asReached {
-            return HopEntry(folder: folder, name: name)
-        }
-        // Otherwise the entry of this item the name was another spelling
-        // of (letter case, Unicode form), as the volume matched it.
-        let folded: String = HopEntry.folded(asReached)
-        for name in names where HopEntry.folded(name) == folded {
-            if ResolvedFile.ofThePlace(at: folderURL.appendingPathComponent(name)) == itself {
-                return HopEntry(folder: folder, name: name)
-            }
-        }
-        return nil
-    }
-
-    /// A name with letter case and Unicode form set aside.
-    private static func folded(_ name: String) -> String {
-        return name.precomposedStringWithCanonicalMapping.lowercased()
-    }
-}
-
 /// A file by its device and inode: one file under every name and every
 /// link that leads to it (#899 U4b3).
+/// Kept for `ClassPages` until #1055 S1.
 struct ResolvedFile: Equatable {
 
     // MARK: - Stored properties

@@ -1,3 +1,5 @@
+Removed by #1055 (2026-11-27): symbolic links in course content are not supported.
+
 # mac-2 (#899 Undo): Insert Class re-points an in-between link where it stands
 
 Brief `vm-tools/briefs/2026-11-27-899-mac-2-insert-class-re-points-an-in-between-link.md`. Base `origin/day27b/integration-2` 35b54c40a (dev 454ef4c6f + mac-1), as the director said. `origin/dev` merged before proving: "Already up to date". **`contracts/` touched (one `undo.rule.shadow` sentence): both gates.** Stopped at the brief's stop figure: the invariant and the three riding lows are built and proven; the contract rows, replay call, Python model, held ledger rows and must-fail log are left (below).
