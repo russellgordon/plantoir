@@ -58,7 +58,9 @@ MISSING_MODULE_EXIT = 77
 # found. On 2026-11-13 verify.sh ran 14 files in the image; seven carried the
 # block and exited 77, the other seven passed without the modules, and the
 # fourteen took 1.5 s on the M4 Pro.
-IMAGE_RUN = re.compile(r"python3 /opt/scripts/(test_[a-z0-9_]+\.py)")
+# Since #1052 verify.sh names each file through ran_by_name, which lists it
+# as run: python3 "/opt/scripts/$(ran_by_name test_<name>.py)".
+IMAGE_RUN = re.compile(r'python3 "?/opt/scripts/(?:\$\(ran_by_name )?(test_[a-z0-9_]+\.py)')
 
 # A HOST run, in either form verify.sh writes one: `python3 scripts/test_<name>.py
 # <arguments>` from the checkout's root, or `(cd scripts && python3 test_<name>.py
@@ -67,7 +69,9 @@ IMAGE_RUN = re.compile(r"python3 /opt/scripts/(test_[a-z0-9_]+\.py)")
 # ran 93 files on the host this way, and one of them carries the block: step
 # 6a2's `python3 scripts/test_page_sources.py --site ...`. No other script ran
 # a test file on the host.
-HOST_RUN = re.compile(r"python3(?: -[A-Za-z]+)* +(scripts/)?(test_[a-z0-9_]+\.py)([^\n>|;&)]*)")
+# verify.sh's form since #1052: python3 "$(ran_by_name test_<name>.py)" and
+# python3 "scripts/$(ran_by_name test_<name>.py)" --site ...
+HOST_RUN = re.compile(r'python3(?: -[A-Za-z]+)* +"?(scripts/)?(?:\$\(ran_by_name )?(test_[a-z0-9_]+\.py)(?:\)")?([^\n>|;&)]*)')
 SCRIPTS_THAT_RUN_THEM = ("verify.sh", "verify-deploy.sh", "setup.sh", "preview.sh", "deploy.sh")
 
 

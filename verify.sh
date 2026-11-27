@@ -253,6 +253,20 @@ take_verify_lock() {
 take_verify_lock
 
 # -------------------- 0.5. Pure-Python unit tests (no Docker needed) --------------------
+# Every scripts/test_*.py this script hands to python3 by name is named through
+# ran_by_name, which adds the name to ONE list as the run starts and prints it
+# for python3 (#1052). The discovery at the end of this step runs every other
+# file, deciding from that list alone and never from this script's text, so a
+# name in a message or a comment can neither hide a file nor run it twice, and
+# a file named through a loop variable counts like any other. The runs in
+# step 2 onward come after the discovery, so their files are written in
+# tests_run_by_name_later, and the end of the run checks that list against
+# what those steps actually named, both ways.
+_ran_by_name_list="/tmp/verify_ran_by_name.list"
+: >"$_ran_by_name_list"
+ran_by_name() { printf '%s\n' "$1" >>"$_ran_by_name_list"; printf '%s' "$1"; }
+tests_run_by_name_later="test_build_site_domain_resolution.py test_class_folder.py test_coverage_tab.py test_dates_follow_the_class.py test_folder_titles.py test_front_page_lines_resolve.py test_front_page_title_repair.py test_graded_folders.py test_links_checklist.py test_links_into_hidden_pages.py test_netlify_paths.py test_page_sources.py test_published_pages_record.py test_social_card_fonts.py test_unreadable_page_settings.py"
+
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
 # Docker build.
@@ -263,21 +277,21 @@ take_verify_lock
 # sets the same variable.
 export PYTHONDONTWRITEBYTECODE=1
 
-if (cd scripts && python3 test_site_health.py) >/tmp/verify_site_health_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_site_health.py)") >/tmp/verify_site_health_test.log 2>&1; then
   pass "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
 else
   fail "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
   cat /tmp/verify_site_health_test.log
 fi
 
-if (cd scripts && python3 test_machine_line_length.py) >/tmp/verify_machine_line_length_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_machine_line_length.py)") >/tmp/verify_machine_line_length_test.log 2>&1; then
   pass "every machine line the shared Python prints is at most maxCharacters long, and a shortened one says its true count (scripts/test_machine_line_length.py, #666)"
 else
   fail "every machine line the shared Python prints is at most maxCharacters long (scripts/test_machine_line_length.py, #666)"
   cat /tmp/verify_machine_line_length_test.log
 fi
 
-if (cd scripts && python3 test_site_disagreements.py) >/tmp/verify_site_disagreements_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_site_disagreements.py)") >/tmp/verify_site_disagreements_test.log 2>&1; then
   pass "a runnable block the site shows as plain code: one folder problem, worded as the contract's cases say, its line in the teacher's file, and the command line the site's build runs printing exactly one marker (scripts/test_site_disagreements.py, #567)"
 else
   fail "a runnable block the site shows as plain code: one folder problem (scripts/test_site_disagreements.py, #567)"
@@ -359,125 +373,125 @@ else
   cat /tmp/verify_help_test_web_search.log
 fi
 
-if (cd scripts && python3 test_getting_ready_turn.py) >/tmp/verify_getting_ready_turn_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_getting_ready_turn.py)") >/tmp/verify_getting_ready_turn_test.log 2>&1; then
   pass "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
 else
   fail "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
   cat /tmp/verify_getting_ready_turn_test.log
 fi
 
-if (cd scripts && python3 test_section_fingerprint.py) >/tmp/verify_section_fingerprint_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_section_fingerprint.py)") >/tmp/verify_section_fingerprint_test.log 2>&1; then
   pass "section_fingerprint.py: the \"— Edited\" fingerprint's rule 2 leaves How I Teach out, and the default stays rule 1 until Windows moves (scripts/test_section_fingerprint.py, #330)"
 else
   fail "section_fingerprint.py: the \"— Edited\" fingerprint's rule 2 leaves How I Teach out, and the default stays rule 1 until Windows moves (scripts/test_section_fingerprint.py, #330)"
   cat /tmp/verify_section_fingerprint_test.log
 fi
 
-if (cd scripts && python3 test_recipe_folders.py) >/tmp/verify_recipe_folders_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_recipe_folders.py)") >/tmp/verify_recipe_folders_test.log 2>&1; then
   pass "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
 else
   fail "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
   cat /tmp/verify_recipe_folders_test.log
 fi
 
-if (cd scripts && python3 test_toolchain_bytecode.py) >/tmp/verify_toolchain_bytecode_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_toolchain_bytecode.py)") >/tmp/verify_toolchain_bytecode_test.log 2>&1; then
   pass "compiled Python never reaches the bundle or renames the image (scripts/test_toolchain_bytecode.py, #747)"
 else
   fail "compiled Python never reaches the bundle or renames the image (scripts/test_toolchain_bytecode.py, #747)"
   cat /tmp/verify_toolchain_bytecode_test.log
 fi
 
-if (cd scripts && python3 test_starting_content_prompts.py) >/tmp/verify_starting_content_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_starting_content_prompts.py)") >/tmp/verify_starting_content_test.log 2>&1; then
   pass "setup_course.py: what a teacher who declined the ready-made pages is told, and what lands in the course (scripts/test_starting_content_prompts.py)"
 else
   fail "setup_course.py: what a teacher who declined the ready-made pages is told, and what lands in the course (scripts/test_starting_content_prompts.py)"
   cat /tmp/verify_starting_content_test.log
 fi
 
-if (cd scripts && python3 test_install_link_readers.py) >/tmp/verify_install_link_readers_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_install_link_readers.py)") >/tmp/verify_install_link_readers_test.log 2>&1; then
   pass "setup_course.py and the coverage map: every link shape the contract names is read by the installer's and the map's link readers (scripts/test_install_link_readers.py)"
 else
   fail "setup_course.py and the coverage map: every link shape the contract names is read by the installer's and the map's link readers (scripts/test_install_link_readers.py)"
   cat /tmp/verify_install_link_readers_test.log
 fi
 
-if (cd scripts && python3 test_markdown_code.py) >/tmp/verify_markdown_code_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_markdown_code.py)") >/tmp/verify_markdown_code_test.log 2>&1; then
   pass "markdown_code.py: a link written inside code is not a link, for the build's and the installer's readers and the coverage map (scripts/test_markdown_code.py, #313)"
 else
   fail "markdown_code.py: a link written inside code is not a link, for the build's and the installer's readers and the coverage map (scripts/test_markdown_code.py, #313)"
   cat /tmp/verify_markdown_code_test.log
 fi
 
-if (cd scripts && python3 test_graded_folders_rerun.py) >/tmp/verify_graded_rerun_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_graded_folders_rerun.py)") >/tmp/verify_graded_rerun_test.log 2>&1; then
   pass "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
 else
   fail "setup_course.py: a re-run writes a saved marks pool back as it was (scripts/test_graded_folders_rerun.py)"
   cat /tmp/verify_graded_rerun_test.log
 fi
 
-if (cd scripts && python3 test_deploy_sh_destination.py) >/tmp/verify_deploy_sh_destination_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_sh_destination.py)") >/tmp/verify_deploy_sh_destination_test.log 2>&1; then
   pass "deploy.sh with no destination typed deploys where the course's settings say, each saved destination a leg of its own, and a typed --target still wins (scripts/test_deploy_sh_destination.py, #668)"
 else
   fail "deploy.sh with no destination typed deploys where the course's settings say, each saved destination a leg of its own, and a typed --target still wins (scripts/test_deploy_sh_destination.py, #668)"
   cat /tmp/verify_deploy_sh_destination_test.log
 fi
 
-if (cd scripts && python3 test_fetch_obsidian_addons.py) >/tmp/verify_fetch_obsidian_addons_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_fetch_obsidian_addons.py)") >/tmp/verify_fetch_obsidian_addons_test.log 2>&1; then
   pass "mac-app/Vendor/fetch-obsidian-addons.sh reads every pin out of the real contract, the escaped NULs #780 keeps in it included (scripts/test_fetch_obsidian_addons.py, #864)"
 else
   fail "mac-app/Vendor/fetch-obsidian-addons.sh reads every pin out of the real contract (scripts/test_fetch_obsidian_addons.py, #864)"
   cat /tmp/verify_fetch_obsidian_addons_test.log
 fi
 
-if (cd scripts && python3 test_setup_course_deploy_target.py) >/tmp/verify_setup_deploy_target_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_setup_course_deploy_target.py)") >/tmp/verify_setup_deploy_target_test.log 2>&1; then
   pass "setup_course.py: a re-run keeps the destination the new-course window wrote, and a command-line course is given none (scripts/test_setup_course_deploy_target.py, #668)"
 else
   fail "setup_course.py: a re-run keeps the destination the new-course window wrote, and a command-line course is given none (scripts/test_setup_course_deploy_target.py, #668)"
   cat /tmp/verify_setup_deploy_target_test.log
 fi
 
-if (cd scripts && python3 test_graded_folders_new_course.py) >/tmp/verify_graded_new_course_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_graded_folders_new_course.py)") >/tmp/verify_graded_new_course_test.log 2>&1; then
   pass "setup_course.py: a new course is written its marks pool, as both apps write it (scripts/test_graded_folders_new_course.py)"
 else
   fail "setup_course.py: a new course is written its marks pool, as both apps write it (scripts/test_graded_folders_new_course.py)"
   cat /tmp/verify_graded_new_course_test.log
 fi
 
-if (cd scripts && python3 test_folder_titles.py) >/tmp/verify_folder_titles_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_folder_titles.py)") >/tmp/verify_folder_titles_test.log 2>&1; then
   pass "setup_course.py: a folder's index page names it in a title YAML reads back, by the titleQuoting rule (scripts/test_folder_titles.py, #506)"
 else
   fail "setup_course.py: a folder's index page names it in a title YAML reads back, by the titleQuoting rule (scripts/test_folder_titles.py, #506)"
   cat /tmp/verify_folder_titles_test.log
 fi
 
-if (cd scripts && python3 test_course_code_rule.py) >/tmp/verify_course_code_rule_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_course_code_rule.py)") >/tmp/verify_course_code_rule_test.log 2>&1; then
   pass "setup_course.py: a typed course code is asked the apps' rule, every courseCode case (scripts/test_course_code_rule.py, #402)"
 else
   fail "setup_course.py: a typed course code is asked the apps' rule, every courseCode case (scripts/test_course_code_rule.py, #402)"
   cat /tmp/verify_course_code_rule_test.log
 fi
 
-if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_contracts.py)") >/tmp/verify_contracts_test.log 2>&1; then
   pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
 else
   fail "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
   cat /tmp/verify_contracts_test.log
 fi
 
-if (cd scripts && python3 test_deploy_netlify_headers.py) >/tmp/verify_deploy_headers_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_netlify_headers.py)") >/tmp/verify_deploy_headers_test.log 2>&1; then
   pass "deploy.py: Netlify ad-badge suppression (scripts/test_deploy_netlify_headers.py)"
 else
   fail "deploy.py: Netlify ad-badge suppression (scripts/test_deploy_netlify_headers.py)"
   cat /tmp/verify_deploy_headers_test.log
 fi
 
-if (cd scripts && python3 test_quartz_analytics_off.py) >/tmp/verify_analytics_off_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_quartz_analytics_off.py)") >/tmp/verify_analytics_off_test.log 2>&1; then
   pass "build_site.py: Quartz's own page-view counter, which nobody set up, is switched off in every build (#594, scripts/test_quartz_analytics_off.py)"
 else
   fail "build_site.py: Quartz's own page-view counter is not switched off (scripts/test_quartz_analytics_off.py, #594)"
   cat /tmp/verify_analytics_off_test.log
 fi
-if (cd scripts && python3 test_netlify_badge.py) >/tmp/verify_netlify_badge_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_netlify_badge.py)") >/tmp/verify_netlify_badge_test.log 2>&1; then
   pass "netlify_badge.py: shared ad-badge suppression module, and the hosts a page's scripts import code from allowed - Mermaid from cdnjs, never a fetch target (#594, scripts/test_netlify_badge.py)"
 else
   fail "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
@@ -498,35 +512,35 @@ else
   cat /tmp/verify_container_mount_test.log
 fi
 
-if (cd scripts && python3 test_deploy_course_dir_resolution.py) >/tmp/verify_deploy_course_dir_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_course_dir_resolution.py)") >/tmp/verify_deploy_course_dir_test.log 2>&1; then
   pass "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
 else
   fail "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
   cat /tmp/verify_deploy_course_dir_test.log
 fi
 
-if (cd scripts && python3 test_deploy_non_interactive.py) >/tmp/verify_deploy_non_interactive_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_non_interactive.py)") >/tmp/verify_deploy_non_interactive_test.log 2>&1; then
   pass "deploy: a publish nobody is there to answer questions for refuses rather than waiting or guessing (scripts/test_deploy_non_interactive.py)"
 else
   fail "deploy: a publish nobody is there to answer questions for refuses rather than waiting or guessing (scripts/test_deploy_non_interactive.py)"
   cat /tmp/verify_deploy_non_interactive_test.log
 fi
 
-if (cd scripts && python3 test_deploy_cloudflare_project.py) >/tmp/verify_deploy_cloudflare_project_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_cloudflare_project.py)") >/tmp/verify_deploy_cloudflare_project_test.log 2>&1; then
   pass "deploy: Cloudflare's own deploy tool is never left a question to ask, and a deleted project is made again (scripts/test_deploy_cloudflare_project.py)"
 else
   fail "deploy: Cloudflare's own deploy tool is never left a question to ask, and a deleted project is made again (scripts/test_deploy_cloudflare_project.py)"
   cat /tmp/verify_deploy_cloudflare_project_test.log
 fi
 
-if (cd scripts && python3 test_backup_leaves_plantoir_addons.py) >/tmp/verify_backup_addons_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_backup_leaves_plantoir_addons.py)") >/tmp/verify_backup_addons_test.log 2>&1; then
   pass "the setup wizard's backup leaves Plantoir's Obsidian add-ons out and keeps the teacher's own (scripts/test_backup_leaves_plantoir_addons.py, #495)"
 else
   fail "the setup wizard's backup leaves Plantoir's Obsidian add-ons out and keeps the teacher's own (scripts/test_backup_leaves_plantoir_addons.py, #495)"
   cat /tmp/verify_backup_addons_test.log
 fi
 
-if (cd scripts && python3 test_reference_course.py) >/tmp/verify_reference_course_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_reference_course.py)") >/tmp/verify_reference_course_test.log 2>&1; then
   pass "a course kept for reference is never deployed, at every door the shared toolchain owns (scripts/test_reference_course.py)"
 else
   fail "a course kept for reference is never deployed, at every door the shared toolchain owns (scripts/test_reference_course.py)"
@@ -536,7 +550,7 @@ fi
 # The teacher's How I Teach page is never on the website (#209): the name
 # rule against the contract's nameCases, discovery, preflight, the lists the
 # copy loops read and the final sweep. The real build is checked further down.
-if (cd scripts && python3 test_how_i_teach.py) >/tmp/verify_how_i_teach_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_how_i_teach.py)") >/tmp/verify_how_i_teach_test.log 2>&1; then
   pass "the How I Teach page is never listed, copied or left in a site's pages (scripts/test_how_i_teach.py)"
 else
   fail "the How I Teach page is never listed, copied or left in a site's pages (scripts/test_how_i_teach.py)"
@@ -545,7 +559,7 @@ fi
 
 # What the LOCAL model is shown has not moved a byte (#209's plan review):
 # the full digest of toolSchemas.local, made by research/ai-assist/toolhash.py.
-if (cd scripts && python3 test_tool_surface_digest.py) >/tmp/verify_tool_digest_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_tool_surface_digest.py)") >/tmp/verify_tool_digest_test.log 2>&1; then
   pass "the local assistant's thirteen tools are the ones routing was measured against (scripts/test_tool_surface_digest.py)"
 else
   fail "the local assistant's thirteen tools are the ones routing was measured against (scripts/test_tool_surface_digest.py)"
@@ -555,7 +569,7 @@ fi
 # DEPLOY puts a site online; PUBLISH only marks a page (#443, v1.4.4). The
 # sentences that said publish for a deploy were moved; this keeps them moved,
 # in the mac app's Swift, the launchers and the shared Python. Reads files only.
-if (cd scripts && python3 test_deploy_words.py) >/tmp/verify_deploy_words_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_words.py)") >/tmp/verify_deploy_words_test.log 2>&1; then
   pass "no sentence a teacher reads says publish for a deploy (scripts/test_deploy_words.py, #443)"
 else
   fail "no sentence a teacher reads says publish for a deploy (scripts/test_deploy_words.py, #443)"
@@ -566,7 +580,7 @@ fi
 # reason this exists: the flag was written on a machine with no bash, and
 # starting the script found two things in prompt_for_cf_account that reading it
 # had not (GitHub issue #129). No Docker, no network, no credentials.
-if (cd scripts && python3 test_deploy_sh_questions.py) >/tmp/verify_deploy_sh_questions_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_sh_questions.py)") >/tmp/verify_deploy_sh_questions_test.log 2>&1; then
   pass "deploy.sh: every question it can ask refuses under the flag, and is still asked without it (scripts/test_deploy_sh_questions.py)"
 else
   fail "deploy.sh: every question it can ask refuses under the flag, and is still asked without it (scripts/test_deploy_sh_questions.py)"
@@ -577,21 +591,21 @@ fi
 # issue #124) because a scheduled publish BUILDS before it publishes. Its own
 # file rather than a class in the one above: this drives a different launcher,
 # and the twin's completeness test only ever asks about deploy.sh's questions.
-if (cd scripts && python3 test_preview_sh_questions.py) >/tmp/verify_preview_sh_questions_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_preview_sh_questions.py)") >/tmp/verify_preview_sh_questions_test.log 2>&1; then
   pass "preview.sh: the one question it can ask refuses under the flag, and is still asked without it (scripts/test_preview_sh_questions.py)"
 else
   fail "preview.sh: the one question it can ask refuses under the flag, and is still asked without it (scripts/test_preview_sh_questions.py)"
   cat /tmp/verify_preview_sh_questions_test.log
 fi
 
-if (cd scripts && python3 test_preview_while_deploying.py) >/tmp/verify_preview_while_deploying_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_preview_while_deploying.py)") >/tmp/verify_preview_while_deploying_test.log 2>&1; then
   pass "preview.sh: a section being deployed cannot be previewed, whoever deploys it, and a build or an unreadable process table does not refuse (scripts/test_preview_while_deploying.py, #381)"
 else
   fail "preview.sh: a section being deployed cannot be previewed, whoever deploys it, and a build or an unreadable process table does not refuse (scripts/test_preview_while_deploying.py, #381)"
   cat /tmp/verify_preview_while_deploying_test.log
 fi
 
-if (cd scripts && python3 test_deploy_while_its_section_deploys.py) >/tmp/verify_deploy_while_its_section_deploys_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_while_its_section_deploys.py)") >/tmp/verify_deploy_while_its_section_deploys_test.log 2>&1; then
   pass "deploy.sh and preview.sh --build-only: a section still being deployed (a deploy set for later, even one whose run was ended, or deploy.sh) is not deployed again (scripts/test_deploy_while_its_section_deploys.py, #439)"
 else
   fail "deploy.sh and preview.sh --build-only: a section still being deployed (a deploy set for later, even one whose run was ended, or deploy.sh) is not deployed again (scripts/test_deploy_while_its_section_deploys.py, #439)"
@@ -604,49 +618,49 @@ fi
 # six lines, the start read in UTC across the hour the clocks go back, no
 # lease when the start cannot be read, the ways out a trap sees, and kill -9
 # leaving leases whose owner is gone.
-if (cd scripts && python3 test_deploy_sh_work_leases.py) >/tmp/verify_deploy_sh_work_leases_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_sh_work_leases.py)") >/tmp/verify_deploy_sh_work_leases_test.log 2>&1; then
   pass "deploy.sh typed in Terminal holds a build and a publish lease for its section while it works and gives them back, and none when the app holds them (scripts/test_deploy_sh_work_leases.py, #829)"
 else
   fail "deploy.sh typed in Terminal holds a build and a publish lease for its section while it works and gives them back, and none when the app holds them (scripts/test_deploy_sh_work_leases.py, #829)"
   cat /tmp/verify_deploy_sh_work_leases_test.log
 fi
 
-if (cd scripts && python3 test_colour_scheme_names.py) >/tmp/verify_colour_scheme_names_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_colour_scheme_names.py)") >/tmp/verify_colour_scheme_names_test.log 2>&1; then
   pass "a colour scheme's name never names the machinery (scripts/test_colour_scheme_names.py, #383)"
 else
   fail "a colour scheme's name never names the machinery (scripts/test_colour_scheme_names.py, #383)"
   cat /tmp/verify_colour_scheme_names_test.log
 fi
 
-if (cd scripts && python3 test_sidebar_page_marker.py) >/tmp/verify_sidebar_page_marker_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_sidebar_page_marker.py)") >/tmp/verify_sidebar_page_marker_test.log 2>&1; then
   pass "the sidebar's page dot: at least 3:1 on the sidebar in every colour scheme, light and dark, and no rule on a link, its hover or the current page (scripts/test_sidebar_page_marker.py, #515)"
 else
   fail "the sidebar's page dot: too faint in a colour scheme, a rule on the sidebar's links, or not carried to the site (scripts/test_sidebar_page_marker.py, #515)"
   cat /tmp/verify_sidebar_page_marker_test.log
 fi
 
-if (cd scripts && python3 test_explorer_scroll.py) >/tmp/verify_explorer_scroll_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_explorer_scroll.py)") >/tmp/verify_explorer_scroll_test.log 2>&1; then
   pass "the sidebar scrolls only itself when a page opens: Quartz's scrollIntoView replaced on every build, once, skipping an entry in a closed folder (scripts/test_explorer_scroll.py, #611)"
 else
   fail "the sidebar may still move the page as it opens: the build patch did not apply, applied twice, or explorer.inline.ts changed shape (scripts/test_explorer_scroll.py, #611)"
   cat /tmp/verify_explorer_scroll_test.log
 fi
 
-if (cd scripts && python3 test_code_lines_style.py) >/tmp/verify_code_lines_style_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_code_lines_style.py)") >/tmp/verify_code_lines_style_test.log 2>&1; then
   pass "every code block's line numbers: one gutter style with its hairline for static and runnable blocks, no ligatures in code, the editor's colour categories the contract's, and a handout's wrapped line hung under its code (scripts/test_code_lines_style.py, #585)"
 else
   fail "every code block's line numbers or the editor's colours are not as the contract and each other say (scripts/test_code_lines_style.py, #585)"
   cat /tmp/verify_code_lines_style_test.log
 fi
 
-if (cd scripts && python3 test_folder_spelling.py) >/tmp/verify_folder_spelling_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_folder_spelling.py)") >/tmp/verify_folder_spelling_test.log 2>&1; then
   pass "one working folder, one spelling: every spelling of a folder names one website builder and one builds folder (scripts/test_folder_spelling.py, #189)"
 else
   fail "one working folder, one spelling: every spelling of a folder names one website builder and one builds folder (scripts/test_folder_spelling.py, #189)"
   cat /tmp/verify_folder_spelling_test.log
 fi
 
-if (cd scripts && python3 test_launcher_words.py) >/tmp/verify_launcher_words_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_launcher_words.py)") >/tmp/verify_launcher_words_test.log 2>&1; then
   pass "Launchers: no line a teacher reads says container, Docker or image, and every bar can reach the step it watches a launcher for (scripts/test_launcher_words.py, #382)"
 else
   fail "Launchers: no line a teacher reads says container, Docker or image, and every bar can reach the step it watches a launcher for (scripts/test_launcher_words.py, #382)"
@@ -660,7 +674,7 @@ fi
 # runs runnable code's cases too: the language table, which fences run and
 # where they can sit, ids, what a site carries, the engine's overlay, and the
 # words file.
-if (cd scripts && python3 test_page_features.py) >/tmp/verify_page_features_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_page_features.py)") >/tmp/verify_page_features_test.log 2>&1; then
   pass "pages that ask for more: printing, a page's own PDF, runnable code, and the engines a site carries (scripts/test_page_features.py, #454, #455)"
 else
   fail "pages that ask for more: printing, a page's own PDF, runnable code, and the engines a site carries (scripts/test_page_features.py, #454, #455)"
@@ -672,7 +686,7 @@ fi
 # host's MEASURED spelling of a page's path, the marked _headers block -
 # replaced, never appended, beside the badge rule - Cloudflare's 100 rules,
 # and the note lines. Reads the contract; stdlib only.
-if (cd scripts && python3 test_isolation_headers.py) >/tmp/verify_isolation_headers_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_isolation_headers.py)") >/tmp/verify_isolation_headers_test.log 2>&1; then
   pass "live input: which pages a publish lets ask for input as the program runs, each host's spelling of their paths, the _headers block replaced beside the badge rule, Cloudflare's 100 rules and the note lines (scripts/test_isolation_headers.py, #583)"
 else
   fail "live input: which pages a publish lets ask for input as the program runs, each host's spelling of their paths, the _headers block replaced beside the badge rule, Cloudflare's 100 rules and the note lines (scripts/test_isolation_headers.py, #583)"
@@ -684,7 +698,7 @@ fi
 # the query, the fragment, data-slug, <guid> and every script alone; the bytes
 # uploaded are the bytes the manifest names; the router and link previews
 # follow only on a marked page. Reads the contract; stdlib only.
-if (cd scripts && python3 test_netlify_paths.py) >/tmp/verify_netlify_paths_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_netlify_paths.py)") >/tmp/verify_netlify_paths_test.log 2>&1; then
   pass "page addresses on Netlify: every netlifyPageAddresses case, page links lower-cased in memory and nothing else moved (data-slug, the feed's guid, scripts and the CSP's hashes kept, alias pages still found by fetchCanonical), the bytes uploaded are the bytes the manifest names, public/ never written, and the router's edit made once (scripts/test_netlify_paths.py, #628)"
 else
   fail "page addresses on Netlify: the netlifyPageAddresses rule does not hold (scripts/test_netlify_paths.py, #628)"
@@ -695,7 +709,7 @@ fi
 # the launcher's plan writes and what the build's prepare gives the site and
 # says, and that the Swift image's recipe holds every pin and flag the
 # contract names. Stdlib only; the compiler itself is the Swift gate below.
-if (cd scripts && python3 test_swift_blocks.py) >/tmp/verify_swift_blocks_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_swift_blocks.py)") >/tmp/verify_swift_blocks_test.log 2>&1; then
   pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, the trail's PLANTOIR_SWIFT: line from a real build log, and what a failed build tells the teacher and leaves in state.json (scripts/test_swift_blocks.py, #493, #635, #642)"
 else
   fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, the trail's PLANTOIR_SWIFT: line from a real build log, and what a failed build tells the teacher and leaves in state.json (scripts/test_swift_blocks.py, #493, #635, #642)"
@@ -705,7 +719,7 @@ fi
 # preview.sh's Swift step prints the PLANTOIR_SWIFT: line on every ending but
 # "already there" (#635): its block cut out and run with bash 3.2 against a
 # stand-in docker that runs the real swift_blocks.py got-ready.
-if (cd scripts && python3 test_swift_launcher_marker.py) >/tmp/verify_swift_launcher_marker_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_swift_launcher_marker.py)") >/tmp/verify_swift_launcher_marker_test.log 2>&1; then
   pass "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence, which for a failure is the one its reason calls for, and the state.json that reason writes (scripts/test_swift_launcher_marker.py, #635, #642)"
 else
   fail "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence, which for a failure is the one its reason calls for, and the state.json that reason writes (scripts/test_swift_launcher_marker.py, #635, #642)"
@@ -716,7 +730,7 @@ fi
 # PythonToolchainTests (#802): the fetch, the compile wrapper's Windows
 # environment and its tidy, against fake installs that run nothing. The parts
 # that need Windows' own expand.exe or msvcrt are skipped here and say so.
-if (cd scripts && python3 test_swift_windows.py) >/tmp/verify_swift_windows_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_swift_windows.py)") >/tmp/verify_swift_windows_test.log 2>&1; then
   pass "runnable Swift on Windows: the fetch's pins and trim, the compile wrapper's environment (the toolchain's bin and System32 and nothing else), its tidy and what it caches, read on this Mac against fake installs (scripts/test_swift_windows.py, #570, #802)"
 else
   fail "runnable Swift on Windows: the fetch, the compile wrapper's environment, its tidy or what it caches does not hold (scripts/test_swift_windows.py, #570, #802)"
@@ -727,7 +741,7 @@ fi
 # python-frontmatter say so when run directly on a Mac without it (#907): one
 # line and exit 77, while in the image and on Windows a missing module stays a
 # failure. Read here, on the host, with the modules kept from the child.
-if (cd scripts && python3 test_image_only_tests_say_so.py) >/tmp/verify_image_only_tests_say_so.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_image_only_tests_say_so.py)") >/tmp/verify_image_only_tests_say_so.log 2>&1; then
   pass "the shared tests that need python-frontmatter open with one block: on a Mac without it, one line naming the module and verify.sh, exit 77; anywhere else a missing module stays a failure (scripts/test_image_only_tests_say_so.py, #907)"
 else
   fail "a shared test that needs python-frontmatter does not say so on a Mac, or turns a missing module into something other than a failure elsewhere (scripts/test_image_only_tests_say_so.py, #907)"
@@ -737,7 +751,7 @@ fi
 # No launcher a test runs writes the teacher's real trail (#738): every test
 # file that runs one imports launcher_test_trail, and deploy.sh's own
 # note_on_the_trail, run under a scratch HOME, writes into the helper's folder.
-if (cd scripts && python3 test_launcher_tests_keep_their_trail.py) >/tmp/verify_launcher_tests_trail.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_launcher_tests_keep_their_trail.py)") >/tmp/verify_launcher_tests_trail.log 2>&1; then
   pass "every test that runs a launcher keeps its trail in a temporary folder: each imports launcher_test_trail, and deploy.sh's own note_on_the_trail writes there and not into HOME, which it does with the redirect taken away (scripts/test_launcher_tests_keep_their_trail.py, #738)"
 else
   fail "a test that runs a launcher could write the teacher's real trail (scripts/test_launcher_tests_keep_their_trail.py, #738)"
@@ -747,7 +761,7 @@ fi
 # KaTeX served by the site itself (#494): the copy from Quartz's own package
 # and the latex.ts patch that links it; and (#455) the edits that wire
 # Plantoir's additions into a section's Quartz copy. Stdlib only.
-if (cd scripts && python3 test_katex_assets.py) >/tmp/verify_katex_assets_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_katex_assets.py)") >/tmp/verify_katex_assets_test.log 2>&1; then
   pass "maths: KaTeX's stylesheet, copy-tex and faces copied into every site, and latex.ts linking them instead of a CDN (scripts/test_katex_assets.py, #494)"
 else
   fail "maths: KaTeX's stylesheet, copy-tex and faces copied into every site, and latex.ts linking them instead of a CDN (scripts/test_katex_assets.py, #494)"
@@ -757,7 +771,7 @@ fi
 # gets the system stack first (#629). The generated-CSS cases need a node of
 # 22.6 or later and skip without one; 6h's index.css check below reads the
 # real built stylesheet either way. Stdlib only.
-if (cd scripts && python3 test_font_variables.py) >/tmp/verify_font_variables_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_font_variables.py)") >/tmp/verify_font_variables_test.log 2>&1; then
   pass "font variables: each family in a stack quoted on its own, the system-font choice on the system stack, a single family byte for byte as before (scripts/test_font_variables.py, #629)"
 else
   fail "font variables: each family in a stack quoted on its own, the system-font choice on the system stack, a single family byte for byte as before (scripts/test_font_variables.py, #629)"
@@ -767,13 +781,13 @@ fi
 # console (#640): NODE_OPTIONS carries --disable-warning=DEP0040 for Quartz
 # and the figure helper alike. Section 5 reads the real build log for it.
 # Stdlib only.
-if (cd scripts && python3 test_node_warnings.py) >/tmp/verify_node_warnings_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_node_warnings.py)") >/tmp/verify_node_warnings_test.log 2>&1; then
   pass "Node's punycode deprecation silenced for Quartz and the figure helper, that one warning only, an existing NODE_OPTIONS kept (scripts/test_node_warnings.py, #640)"
 else
   fail "Node's punycode deprecation is not silenced for every node the build starts, or more than it is silenced (scripts/test_node_warnings.py, #640)"
   cat /tmp/verify_node_warnings_test.log
 fi
-if (cd scripts && python3 test_quartz_additions_wiring.py) >/tmp/verify_quartz_wiring_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_quartz_additions_wiring.py)") >/tmp/verify_quartz_wiring_test.log 2>&1; then
   pass "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
 else
   fail "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
@@ -783,7 +797,7 @@ fi
 # Task boxes students tick (#519): the box's edge, its tick and a ticked
 # item's words stand out in every colour scheme, light and dark, and the dark
 # theme's paper ink on white. Stdlib only.
-if (cd scripts && python3 test_task_box_contrast.py) >/tmp/verify_task_box_contrast_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_task_box_contrast.py)") >/tmp/verify_task_box_contrast_test.log 2>&1; then
   pass "task boxes: the edge and the tick at least 3:1, a ticked item's words at least 4.5:1, in every colour scheme, light and dark, with no fill, and the dark theme's paper ink (scripts/test_task_box_contrast.py, #519)"
 else
   fail "task boxes: a colour too faint in a colour scheme, a fill on a ticked box, or no paper ink for the dark theme (scripts/test_task_box_contrast.py, #519)"
@@ -794,7 +808,7 @@ fi
 # the folder check's mirror, the line in the teacher's file, the
 # quizzesNotReady finding, the words and pages files the site reads, and the
 # pages the check reads. Stdlib only.
-if (cd scripts && python3 test_quizzes.py) >/tmp/verify_quizzes_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_quizzes.py)") >/tmp/verify_quizzes_test.log 2>&1; then
   pass "self-check quizzes: every quiz shape the contract names read by the folder check, its lines in the teacher's file, the quizzesNotReady finding, and the files the site reads (scripts/test_quizzes.py, #563)"
 else
   fail "self-check quizzes: every quiz shape the contract names read by the folder check, its lines in the teacher's file, the quizzesNotReady finding, and the files the site reads (scripts/test_quizzes.py, #563)"
@@ -806,14 +820,14 @@ fi
 # tables' labels, Key Links first, the words, the marker lines, and the
 # build's own steps - the page, the plan, the sidebar pin and the emitter's
 # wiring - over temporary folders. Stdlib only.
-if (cd scripts && python3 test_my_progress.py) >/tmp/verify_my_progress_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_my_progress.py)") >/tmp/verify_my_progress_test.log 2>&1; then
   pass "My Progress: the settings, the headings, the build's gate over every contract case, the labels, Key Links first, the words, the marker, the page, the plan, the sidebar pin and the emitter's wiring (scripts/test_my_progress.py, #545)"
 else
   fail "My Progress: the settings, the headings, the build's gate over every contract case, the labels, Key Links first, the words, the marker, the page, the plan, the sidebar pin and the emitter's wiring (scripts/test_my_progress.py, #545)"
   cat /tmp/verify_my_progress_test.log
 fi
 
-if (cd scripts && python3 test_unit_plan_template.py) >/tmp/verify_unit_plan_template_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_unit_plan_template.py)") >/tmp/verify_unit_plan_template_test.log 2>&1; then
   pass "unit plans: the template's two stylesheets are the example's blocks plus the one --ok edit, every shipped class keeps its rule, the fonts are the pinned bytes, and every page is noindex with every link resolving (scripts/test_unit_plan_template.py, #707)"
 else
   fail "unit plans: the template's stylesheets, fonts and pages (scripts/test_unit_plan_template.py, #707)"
@@ -824,7 +838,7 @@ fi
 # own check_kit.py, the worked example and its marks template, the example
 # checks (OK, and a changed answer named), the Marking Guide's points and its
 # teacher-decides sentence, and no firearms context in any example. Stdlib only.
-if (cd scripts && python3 test_assessment_kit.py) >/tmp/verify_assessment_kit_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_assessment_kit.py)") >/tmp/verify_assessment_kit_test.log 2>&1; then
   pass "test authoring: every kit-format contract case through check_kit.py, the worked example, its marks template, its checks and its Marking Guide (scripts/test_assessment_kit.py, #751)"
 else
   fail "test authoring: the kit format and the skill's templates (scripts/test_assessment_kit.py, #751)"
@@ -847,7 +861,7 @@ fi
 # The file names are written out whole so that the discovery at the end of
 # step 0.5 sees them as run here (#1052).
 for marking_test in test_marking_redact.py test_marking_names.py test_marking_guard.py test_marking_sheets.py test_marking_comments.py test_marking_results.py; do
-  if (cd scripts && python3 -B "$marking_test") >"/tmp/verify_${marking_test%.py}.log" 2>&1; then
+  if (cd scripts && python3 -B "$(ran_by_name "$marking_test")") >"/tmp/verify_${marking_test%.py}.log" 2>&1; then
     pass "marking: scripts/$marking_test (#750, 750a and 750c; comments #752)"
   else
     fail "marking: scripts/$marking_test (#750, 750a and 750c; comments #752)"
@@ -859,14 +873,14 @@ done
 # v2.0.0. A held skill is not where both apps copy skills from, and nothing a
 # working folder receives, no greeting or sentence, neither app, not Help and
 # not the website names or offers it (shared-rules.json -> printablePages.agentGuidance.held).
-if (cd scripts && python3 -B test_held_skills.py) >/tmp/verify_held_skills_test.log 2>&1; then
+if (cd scripts && python3 -B "$(ran_by_name test_held_skills.py)") >/tmp/verify_held_skills_test.log 2>&1; then
   pass "held skills: marking and report comments are installed nowhere and offered by nothing (scripts/test_held_skills.py, #750)"
 else
   fail "held skills: marking and report comments are installed nowhere and offered by nothing (scripts/test_held_skills.py, #750)"
   cat /tmp/verify_held_skills_test.log
 fi
 
-if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_print_settings.py)") >/tmp/verify_print_settings_test.log 2>&1; then
   pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
 else
   fail "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
@@ -877,12 +891,12 @@ fi
 # shares, the cache, the clock, the restart after a diagram that never
 # finishes, the gate and the words - against a stand-in engine, stdlib only.
 # The real engines are checked in the image below.
-if (cd scripts && python3 test_geogebra_engine.py) >/tmp/verify_geogebra_engine_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_geogebra_engine.py)") >/tmp/verify_geogebra_engine_test.log 2>&1; then
   pass "GeoGebra's engine: the pinned zip, the web3d codebase kept, the language files left out, six replacements each made exactly once or nothing written, and the Dockerfile's two addresses and one hash (scripts/test_geogebra_engine.py, #578)"
 else
   fail "GeoGebra's engine: the pinned zip, the six replacements and the Dockerfile layer (scripts/test_geogebra_engine.py, #578)"
 fi
-if (cd scripts && python3 test_figures.py) >/tmp/verify_figures_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_figures.py)") >/tmp/verify_figures_test.log 2>&1; then
   pass "diagrams and graphs: fences, tidying, the cache and its clock, what a site carries, and the words (scripts/test_figures.py, #485)"
 else
   fail "diagrams and graphs: fences, tidying, the cache and its clock, what a site carries, and the words (scripts/test_figures.py, #485)"
@@ -892,7 +906,7 @@ fi
 # settings and commands, geogebra.org addresses, the file lookup, the keys,
 # the gate - the pass that writes the manifest and the thumbnails, the folder
 # problem, and where the transformer stands. Stdlib only.
-if (cd scripts && python3 test_geogebra.py) >/tmp/verify_geogebra_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_geogebra.py)") >/tmp/verify_geogebra_test.log 2>&1; then
   pass "GeoGebra sketches: the fences, settings, commands, files (published once), keys, the gate, the manifest, the folder problem, the transformer's place, and a text pin that the site's loader closes GeoGebra's dialogs rather than removing them (scripts/test_geogebra.py, #578, #755)"
 else
   fail "GeoGebra sketches: the fences, settings, commands, files, keys, gate or folder problem (scripts/test_geogebra.py, #578)"
@@ -902,21 +916,21 @@ fi
 # in (keptDownloads): every phetFences and keptDownloads case, against a PhET
 # of the test's own (never phet.colorado.edu), the stop and where it stands
 # in the build, and the folder problem. Stdlib only.
-if (cd scripts && python3 test_phet.py) >/tmp/verify_phet_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_phet.py)") >/tmp/verify_phet_test.log 2>&1; then
   pass "PhET simulations and kept downloads: the fences, settings, names, languages, the address that always starts yotta=false&allowLinks=false, the kept folder and its checks, prune, marker and stop lines, the build stopping before Quartz when a simulation cannot be downloaded, the site's files and the folder problem - $(grep '^Ran ' /tmp/verify_phet_test.log) (scripts/test_phet.py, #674)"
 else
   fail "PhET simulations or kept downloads (scripts/test_phet.py, #674)"
   cat /tmp/verify_phet_test.log
 fi
 
-if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_port_blocks.py)") >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
 else
   fail "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
   cat /tmp/verify_port_blocks_test.log
 fi
 
-if (cd scripts && python3 test_trail_lock.py) >/tmp/verify_trail_lock_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_trail_lock.py)") >/tmp/verify_trail_lock_test.log 2>&1; then
   pass "every launcher adds its line to the activity trail holding the app's lock, so a trim never loses it (scripts/test_trail_lock.py)"
 else
   fail "every launcher adds its line to the activity trail holding the app's lock, so a trim never loses it (scripts/test_trail_lock.py)"
@@ -926,7 +940,7 @@ fi
 # RUNS deploy.sh's folder publish from a working folder whose own name has a
 # colon, to relative folders with colons in them (GitHub issue #227): where
 # each one lands, and that a copy that did not finish is never "Published".
-if (cd scripts && python3 test_deploy_folder_target.py) >/tmp/verify_deploy_folder_target_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_folder_target.py)") >/tmp/verify_deploy_folder_target_test.log 2>&1; then
   pass "deploy.sh: a publish to a folder lands in the folder it names, and a copy that did not finish says so (scripts/test_deploy_folder_target.py)"
 else
   fail "deploy.sh: a publish to a folder lands in the folder it names, and a copy that did not finish says so (scripts/test_deploy_folder_target.py)"
@@ -936,7 +950,7 @@ fi
 # A site an earlier version of Plantoir built is built again before it is
 # deployed (GitHub #746): deploy.sh's stamp comparison, the real launcher
 # publishing to a folder, build_site.py's stamp and deploy.py's one rebuild.
-if (cd scripts && python3 test_deploy_toolchain_stamp.py) >/tmp/verify_deploy_toolchain_stamp_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_toolchain_stamp.py)") >/tmp/verify_deploy_toolchain_stamp_test.log 2>&1; then
   pass "a site an earlier version of Plantoir built is built again before it is deployed, once (scripts/test_deploy_toolchain_stamp.py, #746)"
 else
   fail "a site an earlier version of Plantoir built is built again before it is deployed, once (scripts/test_deploy_toolchain_stamp.py, #746)"
@@ -950,7 +964,7 @@ fi
 # (Windows' PythonToolchainTests runs it on the runtime's). The card's half
 # runs again inside the image, against the baked script and contract, after
 # the image is built.
-if (cd scripts && python3 test_social_card_fonts.py) >/tmp/verify_social_card_fonts_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_social_card_fonts.py)") >/tmp/verify_social_card_fonts_test.log 2>&1; then
   pass "the social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py, #766)"
 else
   fail "the social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py, #766)"
@@ -963,7 +977,7 @@ fi
 # (Netlify, GitHub, AWS, Slack, a private key) not named by its SHA-256 in the
 # test's allow-list. A secret scanner flagged two invented #709 fixtures on
 # 2026-11-13; this fails first. Pure stdlib.
-if (cd scripts && python3 test_no_stored_credentials.py) >/tmp/verify_no_stored_credentials_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_no_stored_credentials.py)") >/tmp/verify_no_stored_credentials_test.log 2>&1; then
   pass "no tracked file stores a credential-shaped literal (scripts/test_no_stored_credentials.py, #844)"
 else
   fail "no tracked file stores a credential-shaped literal (scripts/test_no_stored_credentials.py, #844)"
@@ -974,7 +988,7 @@ fi
 # #780): every contract case, and the three readers (the landing title, the
 # sharing card, setup_course's saved name). Pure stdlib apart from the card,
 # which skips without Pillow.
-if (cd scripts && python3 test_course_names.py) >/tmp/verify_course_names_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_course_names.py)") >/tmp/verify_course_names_test.log 2>&1; then
   pass "a course's name is cleaned of control characters where it is read (scripts/test_course_names.py, #780)"
 else
   fail "a course's name is cleaned of control characters where it is read (scripts/test_course_names.py, #780)"
@@ -985,7 +999,7 @@ fi
 # contracts/file-formats.json -> customDomainReading against
 # custom_domains.for_destination. Pure stdlib; build_site's use of it runs
 # against the real image further down (test_build_site_domain_resolution.py).
-if (cd scripts && python3 test_custom_domains.py) >/tmp/verify_custom_domains_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_custom_domains.py)") >/tmp/verify_custom_domains_test.log 2>&1; then
   pass "a section's custom domain is read as the contract says, a folder never has one and a wrong type is none (scripts/test_custom_domains.py, #904)"
 else
   fail "a section's custom domain is read as the contract says, a folder never has one and a wrong type is none (scripts/test_custom_domains.py, #904)"
@@ -997,7 +1011,7 @@ fi
 # (title, locale, baseUrl, fonts, colours, footer) read back from its file and
 # run again over its own output. Pure stdlib; Node reads the literals back
 # when it is on PATH.
-if (cd scripts && python3 test_typescript_strings.py) >/tmp/verify_typescript_strings_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_typescript_strings.py)") >/tmp/verify_typescript_strings_test.log 2>&1; then
   pass "a quote or a backslash in a short label, a footer, a domain or a font reads back as typed (scripts/test_typescript_strings.py, #871)"
 else
   fail "a quote or a backslash in a short label, a footer, a domain or a font reads back as typed (scripts/test_typescript_strings.py, #871)"
@@ -1007,7 +1021,7 @@ fi
 # A deploy reuses the last build only when nothing has changed (GitHub #768,
 # #741): every buildFreshness.reuseTheLastBuild case through toolchain_paths
 # and deploy.sh's own question, and the real deploy.sh and deploy.py.
-if (cd scripts && python3 test_build_freshness_reuse.py) >/tmp/verify_build_freshness_reuse_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_build_freshness_reuse.py)") >/tmp/verify_build_freshness_reuse_test.log 2>&1; then
   pass "a deploy reuses the last build only when nothing in the course changed, a deletion included (scripts/test_build_freshness_reuse.py, #768)"
 else
   fail "a deploy reuses the last build only when nothing in the course changed, a deletion included (scripts/test_build_freshness_reuse.py, #768)"
@@ -1018,7 +1032,7 @@ fi
 # SAVED token is cleared only when the service says no (GitHub #695, #716):
 # pins both launchers' lines to app-rules.json -> failureExplanations, and
 # RUNS deploy.sh's saved-token checks with curl answering 000/4xx/5xx.
-if (cd scripts && python3 test_deploy_token_refusal.py) >/tmp/verify_deploy_token_refusal_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_token_refusal.py)") >/tmp/verify_deploy_token_refusal_test.log 2>&1; then
   pass "deploy.sh: a refused token is explained in the launchers' words, and a saved one is cleared only when the service says no (scripts/test_deploy_token_refusal.py)"
 else
   fail "deploy.sh: a refused token is explained in the launchers' words, and a saved one is cleared only when the service says no (scripts/test_deploy_token_refusal.py)"
@@ -1030,7 +1044,7 @@ fi
 # websites before a token is saved, at Settings and at a deploy's own paste,
 # all run from contracts/shared-rules.json -> deployTokens with the Keychain
 # and curl stubbed.
-if (cd scripts && python3 test_deploy_tokens.py) >/tmp/verify_deploy_tokens_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_deploy_tokens.py)") >/tmp/verify_deploy_tokens_test.log 2>&1; then
   pass "deploy.sh: a deploy token is checked before it is saved, from Settings and at a deploy's paste (scripts/test_deploy_tokens.py, #696)"
 else
   fail "deploy.sh: a deploy token is checked before it is saved, from Settings and at a deploy's paste (scripts/test_deploy_tokens.py, #696)"
@@ -1042,7 +1056,7 @@ fi
 # config and its shared pages survive two builds writing them together; and a
 # serving preview never stops another one handed the same address.
 for _two_at_once in test_deploy_token_handoff test_shared_writes_two_at_once test_two_previews_one_address; do
-  if (cd scripts && python3 "${_two_at_once}.py") >"/tmp/verify_${_two_at_once}.log" 2>&1; then
+  if (cd scripts && python3 "$(ran_by_name "${_two_at_once}.py")") >"/tmp/verify_${_two_at_once}.log" 2>&1; then
     pass "two at once: scripts/${_two_at_once}.py (#835)"
   else
     fail "two at once: scripts/${_two_at_once}.py (#835)"
@@ -1050,7 +1064,7 @@ for _two_at_once in test_deploy_token_handoff test_shared_writes_two_at_once tes
   fi
 done
 
-if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_verify_lock.py)") >/tmp/verify_lock_test.log 2>&1; then
   pass "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
 else
   fail "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
@@ -1060,7 +1074,7 @@ fi
 # An empty answer (lsof, grep, find or docker port finding nothing) is not
 # the end of a run under pipefail, and the #684 port check's retry loop
 # really looks again (GitHub #972).
-if (cd scripts && python3 test_verify_empty_looks.py) >/tmp/verify_empty_looks_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_verify_empty_looks.py)") >/tmp/verify_empty_looks_test.log 2>&1; then
   pass "an empty answer does not end verify.sh, and the port check's retry loop looks again (scripts/test_verify_empty_looks.py, #972)"
 else
   fail "an empty answer does not end verify.sh, and the port check's retry loop looks again (scripts/test_verify_empty_looks.py, #972)"
@@ -1070,7 +1084,7 @@ fi
 # preview.sh announces the address the app opens, or says it cannot and stops;
 # it never announces a port it guessed (GitHub #235). Runs the launcher's own
 # functions with docker answering as told, so it needs no Docker at all.
-if (cd scripts && python3 test_preview_address.py) >/tmp/verify_preview_address_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_preview_address.py)") >/tmp/verify_preview_address_test.log 2>&1; then
   pass "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
 else
   fail "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
@@ -1083,7 +1097,7 @@ fi
 # network, no waiting. The previews verify.sh runs are --build-only, which
 # asks nothing, so none of them exercises the probe against a real forward;
 # a serving preview checked by hand is that proof (documentation/03).
-if (cd scripts && python3 test_preview_reach.py) >/tmp/verify_preview_reach_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_preview_reach.py)") >/tmp/verify_preview_reach_test.log 2>&1; then
   pass "preview.sh checks this Mac can reach the builder before building, and stops only on a refusal (scripts/test_preview_reach.py)"
 else
   fail "preview.sh checks this Mac can reach the builder before building, and stops only on a refusal (scripts/test_preview_reach.py)"
@@ -1095,14 +1109,14 @@ fi
 # copied out of the Mac app or downloaded and checked, the install stamp, and
 # the website builder created from the app's starting disk. Stand-ins for the
 # network and the programs; real shasum, cp -c, xattr and bash 3.2.
-if (cd scripts && python3 test_helper_bootstrap.py) >/tmp/verify_helper_bootstrap_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_helper_bootstrap.py)") >/tmp/verify_helper_bootstrap_test.log 2>&1; then
   pass "the launchers install the helper programs from inside the app, or download and check them, and create the website builder from the app's starting disk (scripts/test_helper_bootstrap.py)"
 else
   fail "the launchers install the helper programs from inside the app, or download and check them, and create the website builder from the app's starting disk (scripts/test_helper_bootstrap.py)"
   cat /tmp/verify_helper_bootstrap_test.log
 fi
 
-if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_preflight_exclusions.py)") >/tmp/verify_preflight_exclusions_test.log 2>&1; then
   pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
 else
   fail "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
@@ -1110,7 +1124,7 @@ else
 fi
 
 # Issue #128: one coverage map per curriculum folder, and what setup records.
-if (cd scripts && python3 test_coverage_maps.py) >/tmp/verify_coverage_maps_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_coverage_maps.py)") >/tmp/verify_coverage_maps_test.log 2>&1; then
   pass "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
 else
   fail "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
@@ -1118,7 +1132,7 @@ else
 fi
 
 # Issue #505: an overall expectation's backlinks gather its specific expectations'.
-if (cd scripts && python3 test_overall_backlinks.py) >/tmp/verify_overall_backlinks_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_overall_backlinks.py)") >/tmp/verify_overall_backlinks_test.log 2>&1; then
   pass "build_site.py: an overall expectation's page lists the pages of its specific expectations, once each (scripts/test_overall_backlinks.py)"
 else
   fail "build_site.py: an overall expectation's page lists the pages of its specific expectations, once each (scripts/test_overall_backlinks.py)"
@@ -1127,14 +1141,14 @@ fi
 
 # Issue #520: folder pages (a curriculum folder's index among them) get the
 # table of contents, wired through wire_quartz_additions.
-if (cd scripts && python3 test_folder_page_toc.py) >/tmp/verify_folder_page_toc_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_folder_page_toc.py)") >/tmp/verify_folder_page_toc_test.log 2>&1; then
   pass "build_site.py: folder pages get the table of contents, once, and the page layout keeps its own (scripts/test_folder_page_toc.py)"
 else
   fail "build_site.py: folder pages get the table of contents, once, and the page layout keeps its own (scripts/test_folder_page_toc.py)"
   sed 's/^/     /' /tmp/verify_folder_page_toc_test.log | tail -40
 fi
 
-if (cd scripts && python3 test_setup_curriculum_folders.py) >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_setup_curriculum_folders.py)") >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
   pass "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
 else
   fail "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
@@ -1143,7 +1157,7 @@ fi
 
 # Issue #265: the build never changes `hidden`, the sidebar filter keeps the
 # stored names, and an older section's filter is repaired.
-if (cd scripts && python3 test_sidebar_hiding.py) >/tmp/verify_sidebar_hiding_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_sidebar_hiding.py)") >/tmp/verify_sidebar_hiding_test.log 2>&1; then
   pass "build_site.py: the build keeps hidden as saved, and the sidebar filter and its repair (scripts/test_sidebar_hiding.py)"
 else
   fail "build_site.py: the build keeps hidden as saved, and the sidebar filter and its repair (scripts/test_sidebar_hiding.py)"
@@ -1152,7 +1166,7 @@ fi
 
 # Issue #265: the build notes when it STARTED, so a Save made during a
 # publish's build makes the next Publish build again.
-if (cd scripts && python3 test_build_started_marker.py) >/tmp/verify_build_started_marker_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_build_started_marker.py)") >/tmp/verify_build_started_marker_test.log 2>&1; then
   pass "build_site.py: the build notes when it started, for the freshness check (scripts/test_build_started_marker.py)"
 else
   fail "build_site.py: the build notes when it started, for the freshness check (scripts/test_build_started_marker.py)"
@@ -1162,35 +1176,35 @@ fi
 # Issue #136: one rule for "this built site is a preview's" — deploy.sh's
 # check and deploy.py's, run against contracts/app-rules.json ->
 # buildFreshness.previewBuild, the cases the apps read too.
-if (cd scripts && python3 test_preview_build_detection.py) >/tmp/verify_preview_build_detection_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_preview_build_detection.py)") >/tmp/verify_preview_build_detection_test.log 2>&1; then
   pass "deploy.sh and deploy.py call a site a preview's by every page, as the apps do (scripts/test_preview_build_detection.py)"
 else
   fail "deploy.sh and deploy.py call a site a preview's by every page, as the apps do (scripts/test_preview_build_detection.py)"
   cat /tmp/verify_preview_build_detection_test.log
 fi
 
-if (cd scripts && python3 test_publishable_site.py) >/tmp/verify_publishable_site_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_publishable_site.py)") >/tmp/verify_publishable_site_test.log 2>&1; then
   pass "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
 else
   fail "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
   cat /tmp/verify_publishable_site_test.log
 fi
 
-if (cd scripts && python3 test_class_pages.py) >/tmp/verify_class_pages_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_class_pages.py)") >/tmp/verify_class_pages_test.log 2>&1; then
   pass "class_pages.py: what a course calls a unit, and what the build counts as a class page (scripts/test_class_pages.py)"
 else
   fail "class_pages.py: what a course calls a unit, and what the build counts as a class page (scripts/test_class_pages.py)"
   cat /tmp/verify_class_pages_test.log
 fi
 
-if (cd scripts && python3 test_club_start.py) >/tmp/verify_club_start_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_club_start.py)") >/tmp/verify_club_start_test.log 2>&1; then
   pass "setup_course.py: a club starts with its front page heading and a published first page, and keeps its recorded class folder (scripts/test_club_start.py)"
 else
   fail "setup_course.py: a club starts with its front page heading and a published first page, and keeps its recorded class folder (scripts/test_club_start.py)"
   cat /tmp/verify_club_start_test.log
 fi
 
-if (cd scripts && python3 test_page_visibility.py) >/tmp/verify_page_visibility_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_page_visibility.py)") >/tmp/verify_page_visibility_test.log 2>&1; then
   pass "page_visibility.py: whether the built site shows a page, against contracts/file-formats.json (scripts/test_page_visibility.py)"
 else
   fail "page_visibility.py: whether the built site shows a page, against contracts/file-formats.json (scripts/test_page_visibility.py)"
@@ -1199,7 +1213,7 @@ fi
 
 # Runs BEFORE the image build below, on purpose: it answers in a tenth of a
 # second the question the image build answers in three minutes.
-if (cd scripts && python3 test_baked_modules.py) >/tmp/verify_baked_modules_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_baked_modules.py)") >/tmp/verify_baked_modules_test.log 2>&1; then
   pass "every module a baked script imports is baked into the image too (scripts/test_baked_modules.py)"
 else
   fail "every module a baked script imports is baked into the image too (scripts/test_baked_modules.py)"
@@ -1209,35 +1223,35 @@ fi
 # The same question of the scripts this file RUNS in the image, test modules
 # included: each finds what it imports among the baked scripts and its own
 # run's mounts (#883). Also before the image build, and on Windows too.
-if (cd scripts && python3 test_image_runs_find_their_modules.py) >/tmp/verify_image_runs_modules_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_image_runs_find_their_modules.py)") >/tmp/verify_image_runs_modules_test.log 2>&1; then
   pass "every script this run starts in the image finds the modules it imports there, baked or mounted (scripts/test_image_runs_find_their_modules.py, #883)"
 else
   fail "a script this run starts in the image imports a module that is neither baked nor mounted (scripts/test_image_runs_find_their_modules.py, #883)"
   cat /tmp/verify_image_runs_modules_test.log
 fi
 
-if (cd scripts && python3 test_stop_preview.py) >/tmp/verify_stop_preview_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_stop_preview.py)") >/tmp/verify_stop_preview_test.log 2>&1; then
   pass "a build for publishing stops only THIS section's preview (scripts/test_stop_preview.py)"
 else
   fail "a build for publishing stops only THIS section's preview (scripts/test_stop_preview.py)"
   cat /tmp/verify_stop_preview_test.log
 fi
 
-if (cd scripts && python3 test_stop_quietly.py) >/tmp/verify_stop_quietly_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_stop_quietly.py)") >/tmp/verify_stop_quietly_test.log 2>&1; then
   pass "pressing Cancel ends a build or a publish quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
 else
   fail "pressing Cancel ends a build or a publish quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
   cat /tmp/verify_stop_quietly_test.log
 fi
 
-if (cd scripts && python3 test_config_write_race.py) >/tmp/verify_config_race_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_config_write_race.py)") >/tmp/verify_config_race_test.log 2>&1; then
   pass "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
 else
   fail "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
   cat /tmp/verify_config_race_test.log
 fi
 
-if (cd scripts && python3 test_build_reads_settings_once.py) >/tmp/verify_settings_once_test.log 2>&1; then
+if (cd scripts && python3 "$(ran_by_name test_build_reads_settings_once.py)") >/tmp/verify_settings_once_test.log 2>&1; then
   pass "one build reads course_config.json once, so a Save mid-build cannot mix settings (scripts/test_build_reads_settings_once.py)"
 else
   fail "one build reads course_config.json once, so a Save mid-build cannot mix settings (scripts/test_build_reads_settings_once.py)"
@@ -1357,38 +1371,52 @@ fi
 
 # Every scripts/test_*.py, discovered rather than listed (#1052). The tests
 # above are run by name, each with a pass line that says what it checks, and
-# some of them run in the image later on; a hand-kept list of them fell behind,
-# so on 2026-11-27 the gate was green on a tree where 22 of the 133 files ran
-# only on Windows, scripts/test_make_undo_traces.py failing among them. A file
-# counts as run by name when its file name is written on a line of this script
-# that is not a comment; every other one is run here, from scripts/ as the
+# some run in the image later on; a hand-kept list of them fell behind, so on
+# 2026-11-27 the gate was green on a tree where 14 of the 133 files ran only on
+# Windows, scripts/test_make_undo_traces.py failing among them. A file counts
+# as run by name when ran_by_name has listed it by now, or it is in
+# tests_run_by_name_later; every other one is run here, from scripts/ as the
 # others are, and must pass. A file needing python-frontmatter exits 77 on a
 # Mac without it, which fails here on purpose: it belongs in the image's runs
-# with the others that do. Files deliberately not run here go in
-# not_run_on_this_mac with the reason beside each, as Windows' NotRunHere
-# does; it is empty because every file passed on this Mac on 2026-11-27.
+# with the others that do. A unittest case a file skips (skipUnless, skipIf)
+# leaves the file's exit at 0, so the number skipped is printed on a line of
+# its own; it does not fail the gate. Files deliberately not run here go in
+# not_run_on_this_mac with the reason beside each, as Windows' NotRunHere does;
+# it is empty because every file passed on this Mac on 2026-11-27.
 not_run_on_this_mac=""
-_lines_that_run="$(grep -v '^[[:space:]]*#' "$(basename "${BASH_SOURCE[0]}")")"
+_named_so_far="$(sort -u "$_ran_by_name_list")"
 _found_by_discovery=0
+_run_by_name_count=0
 for _discovered_test in scripts/test_*.py; do
   _discovered_name="$(basename "$_discovered_test")"
   case " $not_run_on_this_mac " in
     *" $_discovered_name "*) continue ;;
   esac
-  if grep -qF "$_discovered_name" <<<"$_lines_that_run"; then
+  if grep -qxF "$_discovered_name" <<<"$_named_so_far"; then
+    _run_by_name_count=$((_run_by_name_count + 1))
     continue
   fi
+  case " $tests_run_by_name_later " in
+    *" $_discovered_name "*)
+      _run_by_name_count=$((_run_by_name_count + 1))
+      continue
+      ;;
+  esac
   _found_by_discovery=$((_found_by_discovery + 1))
-  if (cd scripts && python3 "$_discovered_name") >"/tmp/verify_discovered_${_discovered_name%.py}.log" 2>&1; then
+  _discovered_log="/tmp/verify_discovered_${_discovered_name%.py}.log"
+  if (cd scripts && python3 "$_discovered_name") >"$_discovered_log" 2>&1; then
     pass "scripts/$_discovered_name, found by the discovery of every scripts/test_*.py (#1052)"
   else
     fail "scripts/$_discovered_name, found by the discovery of every scripts/test_*.py (#1052)"
-    cat "/tmp/verify_discovered_${_discovered_name%.py}.log"
+    cat "$_discovered_log"
+  fi
+  _skipped_cases="$(grep -oE 'skipped=[0-9]+' "$_discovered_log" | tail -1 | cut -d= -f2 || true)"
+  if [ -n "$_skipped_cases" ] && [ "$_skipped_cases" -gt 0 ]; then
+    echo "   scripts/$_discovered_name skipped $_skipped_cases of its own test case(s) (unittest skipUnless or skipIf); not a failure (#1052)"
   fi
 done
-if [ "$_found_by_discovery" -eq 0 ]; then
-  pass "every scripts/test_*.py is run by name in this script, so the discovery had none left to run (#1052)"
-fi
+echo "   scripts/test_*.py: $_run_by_name_count run by name in this script, $_found_by_discovery found and run by the discovery (#1052)"
+printf '%s\n' "--discovery--" >>"$_ran_by_name_list"
 
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
 # the runs in THIS script, but `patches/`, `scripts/`, `support/` and
@@ -1480,7 +1508,7 @@ echo ""
 echo "🔎 Checking build_site.py's graded-folder rule against the shared contract…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_graded_folders.py" /opt/scripts/test_graded_folders.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_graded_folders.py >/tmp/verify_graded_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_graded_folders.py)" >/tmp/verify_graded_test.log 2>&1; then
   pass "build_site.py: graded-folder rule matches contracts/shared-rules.json (scripts/test_graded_folders.py)"
 else
   fail "build_site.py: graded-folder rule matches contracts/shared-rules.json (scripts/test_graded_folders.py)"
@@ -1497,7 +1525,7 @@ echo ""
 echo "🔎 Checking build_site.py's class-folder rule against the shared contract…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_class_folder.py" /opt/scripts/test_class_folder.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_class_folder.py >/tmp/verify_class_folder_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_class_folder.py)" >/tmp/verify_class_folder_test.log 2>&1; then
   pass "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
 else
   fail "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
@@ -1513,7 +1541,7 @@ echo "🔎 Checking that every folder title reads back through the build's reade
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_folder_titles.py" /opt/scripts/test_folder_titles.py),readonly" \
   -e PLANTOIR_REQUIRE_FRONTMATTER=1 \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_folder_titles.py >/tmp/verify_folder_titles_image_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_folder_titles.py)" >/tmp/verify_folder_titles_image_test.log 2>&1; then
   pass "folder titles: every titleQuoting case and the sweep read back as their names in the build's reader (scripts/test_folder_titles.py in the image, #506)"
 else
   fail "folder titles: every titleQuoting case and the sweep read back as their names in the build's reader (scripts/test_folder_titles.py in the image, #506)"
@@ -1529,7 +1557,7 @@ echo ""
 echo "🔎 Checking that pages take their class's date, against the shared contract…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_dates_follow_the_class.py" /opt/scripts/test_dates_follow_the_class.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_dates_follow_the_class.py >/tmp/verify_dates_follow_the_class_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_dates_follow_the_class.py)" >/tmp/verify_dates_follow_the_class_test.log 2>&1; then
   pass "build_site.py: the front page and linked pages take their class's date, per section (scripts/test_dates_follow_the_class.py)"
 else
   fail "build_site.py: the front page and linked pages take their class's date, per section (scripts/test_dates_follow_the_class.py)"
@@ -1545,7 +1573,7 @@ echo ""
 echo "🔎 Checking that every front-page line the app writes still names its class on the site…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_front_page_lines_resolve.py" /opt/scripts/test_front_page_lines_resolve.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_front_page_lines_resolve.py >/tmp/verify_front_page_lines_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_front_page_lines_resolve.py)" >/tmp/verify_front_page_lines_test.log 2>&1; then
   pass "the app's front-page line names its class once the build has read it (scripts/test_front_page_lines_resolve.py)"
 else
   fail "the app's front-page line names its class once the build has read it (scripts/test_front_page_lines_resolve.py)"
@@ -1562,7 +1590,7 @@ echo ""
 echo "🔎 Checking that a page whose settings cannot be read is hidden and named…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_unreadable_page_settings.py" /opt/scripts/test_unreadable_page_settings.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_unreadable_page_settings.py >/tmp/verify_unreadable_page_settings_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_unreadable_page_settings.py)" >/tmp/verify_unreadable_page_settings_test.log 2>&1; then
   pass "build_site.py: a page whose settings cannot be read is hidden and named (scripts/test_unreadable_page_settings.py)"
 else
   fail "build_site.py: a page whose settings cannot be read is hidden and named (scripts/test_unreadable_page_settings.py)"
@@ -1582,7 +1610,7 @@ if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_front_page_title_repair.py" /opt/scripts/test_front_page_title_repair.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_dates_follow_the_class.py" /opt/scripts/test_dates_follow_the_class.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_unreadable_page_settings.py" /opt/scripts/test_unreadable_page_settings.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_front_page_title_repair.py >/tmp/verify_front_page_title_repair_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_front_page_title_repair.py)" >/tmp/verify_front_page_title_repair_test.log 2>&1; then
   pass "build_site.py: a front page whose title holds an unquoted colon is quoted by the build (scripts/test_front_page_title_repair.py, #584)"
 else
   fail "build_site.py: a front page whose title holds an unquoted colon is quoted by the build (scripts/test_front_page_title_repair.py, #584)"
@@ -1598,7 +1626,7 @@ echo ""
 echo "🔎 Checking that links into hidden pages are named…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_links_into_hidden_pages.py" /opt/scripts/test_links_into_hidden_pages.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_links_into_hidden_pages.py >/tmp/verify_links_into_hidden_pages_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_links_into_hidden_pages.py)" >/tmp/verify_links_into_hidden_pages_test.log 2>&1; then
   pass "build_site.py: a link on a page students can see into a hidden page is named (scripts/test_links_into_hidden_pages.py, #333)"
 else
   fail "build_site.py: a link on a page students can see into a hidden page is named (scripts/test_links_into_hidden_pages.py, #333)"
@@ -1615,7 +1643,7 @@ echo ""
 echo "🔎 Checking the links checklist the build offers…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_links_checklist.py" /opt/scripts/test_links_checklist.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_links_checklist.py >/tmp/verify_links_checklist_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_links_checklist.py)" >/tmp/verify_links_checklist_test.log 2>&1; then
   pass "build_site.py: the links checklist offers what the contract says (scripts/test_links_checklist.py, #379)"
 else
   fail "build_site.py: the links checklist offers what the contract says (scripts/test_links_checklist.py, #379)"
@@ -1632,7 +1660,7 @@ echo ""
 echo "🔎 Checking the list of which file each page came from…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_page_sources.py" /opt/scripts/test_page_sources.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_page_sources.py >/tmp/verify_page_sources_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_page_sources.py)" >/tmp/verify_page_sources_test.log 2>&1; then
   pass "build_site.py: the list of which file each page came from says what the contract says (scripts/test_page_sources.py, #518)"
 else
   fail "build_site.py: the list of which file each page came from does not say what the contract says (scripts/test_page_sources.py, #518)"
@@ -1662,7 +1690,7 @@ if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/preview.sh" /opt/preview.sh),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/setup.sh" /opt/setup.sh),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_coverage_tab.py >/tmp/verify_coverage_tab_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_coverage_tab.py)" >/tmp/verify_coverage_tab_test.log 2>&1; then
   pass "build_site.py: the coverage map for a section's Coverage tab counts, says and sits where the contract says (scripts/test_coverage_tab.py, #793)"
 else
   fail "build_site.py: the coverage map for a section's Coverage tab does not count, say or sit where the contract says (scripts/test_coverage_tab.py, #793)"
@@ -1679,7 +1707,7 @@ if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_published_pages_record.py" /opt/scripts/test_published_pages_record.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/scripts/launcher_test_trail.py" /opt/scripts/launcher_test_trail.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_published_pages_record.py >/tmp/verify_published_pages_record_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_published_pages_record.py)" >/tmp/verify_published_pages_record_test.log 2>&1; then
   pass "build_site.py, deploy.py, deploy.sh: the pages a publish put on a site are recorded, and only then (scripts/test_published_pages_record.py, #379)"
 else
   fail "build_site.py, deploy.py, deploy.sh: the pages a publish put on a site are recorded, and only then (scripts/test_published_pages_record.py, #379)"
@@ -2013,7 +2041,7 @@ echo ""
 echo "🔎 Checking build_site.py's custom-domain resolution against the real image…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_build_site_domain_resolution.py" /opt/scripts/test_build_site_domain_resolution.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_build_site_domain_resolution.py >/dev/null 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_build_site_domain_resolution.py)" >/dev/null 2>&1; then
   pass "build_site.py: custom-domain resolution follows the primary destination (scripts/test_build_site_domain_resolution.py)"
 else
   fail "build_site.py: custom-domain resolution follows the primary destination (scripts/test_build_site_domain_resolution.py)"
@@ -2583,7 +2611,7 @@ fi
 # baked contract and the image's own Pillow, which is the one that decodes.
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_social_card_fonts.py" /opt/scripts/test_social_card_fonts.py),readonly" \
-  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_social_card_fonts.py TheCardsFontRule >/tmp/verify_social_card_fonts_image_test.log 2>&1; then
+  "$DEV_TEST_IMAGE" python3 "/opt/scripts/$(ran_by_name test_social_card_fonts.py)" TheCardsFontRule >/tmp/verify_social_card_fonts_image_test.log 2>&1; then
   pass "the image's social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py TheCardsFontRule, #766)"
 else
   fail "the image's social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py TheCardsFontRule, #766)"
@@ -4604,7 +4632,7 @@ fi
 # actually wrote: every address a page students see is listed under must be a
 # page of this site, and every file named must be in the course folder. This
 # measures the build's slug rule against Quartz itself.
-if python3 scripts/test_page_sources.py --site "courses/EXC2O/.merged_output/section1" "courses/EXC2O" >/tmp/verify_page_sources_site.log 2>&1; then
+if python3 "scripts/$(ran_by_name test_page_sources.py)" --site "courses/EXC2O/.merged_output/section1" "courses/EXC2O" >/tmp/verify_page_sources_site.log 2>&1; then
   pass "The build's list of which file each page came from matches the pages Quartz wrote ($(tail -1 /tmp/verify_page_sources_site.log), #518)"
 else
   fail "The build's list of which file each page came from does not match the site (#518)"
@@ -5476,7 +5504,7 @@ fi
 # edit once each (the function reads dataset.plantoirPaths once per file; a
 # doubled edit would read it six times). The build keeps no scaffold beside public/, so the
 # script is where the edit is seen; test_netlify_paths.py pins the marker.
-if (cd scripts && python3 test_netlify_paths.py --site "../$SITE_PUBLIC") >/tmp/verify_netlify_paths_site.log 2>&1 \
+if (cd scripts && python3 "$(ran_by_name test_netlify_paths.py)" --site "../$SITE_PUBLIC") >/tmp/verify_netlify_paths_site.log 2>&1 \
    && [ "$(grep -o 'plantoirPaths' "$SITE_PUBLIC/postscript.js" 2>/dev/null | wc -l | tr -d ' ')" = "3" ]; then
   pass "page addresses on Netlify: the built site's links lower-case as a Netlify publish sends them with nothing else moved - $(tail -1 /tmp/verify_netlify_paths_site.log) - and the router and link previews carry the edit once (#628)"
 else
@@ -7800,6 +7828,30 @@ if [[ "$RUNNING_IMAGE" == "$DEV_TEST_IMAGE" ]]; then
   pass "Container '$CONTAINER_NAME' is running from $DEV_TEST_IMAGE"
 else
   fail "Container '$CONTAINER_NAME' is running from '$RUNNING_IMAGE', not $DEV_TEST_IMAGE"
+fi
+
+# The files step 2 onward run by name are written in tests_run_by_name_later
+# so that the discovery in step 0.5 does not run them too (#1052). That list
+# and what those steps named must agree: a run named later but not listed was
+# also run by the discovery, and a file listed but never named later ran
+# nowhere.
+_named_later="$(sed -n '/^--discovery--$/,$p' "$_ran_by_name_list" | grep -v '^--discovery--$' | sort -u || true)"
+_later_mismatch=""
+for _later_name in $_named_later; do
+  case " $tests_run_by_name_later " in
+    *" $_later_name "*) ;;
+    *) _later_mismatch="$_later_mismatch $_later_name (run by name after step 0.5 but not in tests_run_by_name_later)" ;;
+  esac
+done
+for _later_name in $tests_run_by_name_later; do
+  if ! grep -qxF "$_later_name" <<<"$_named_later"; then
+    _later_mismatch="$_later_mismatch $_later_name (in tests_run_by_name_later but not run by name after step 0.5)"
+  fi
+done
+if [ -z "$_later_mismatch" ]; then
+  pass "tests_run_by_name_later matches the scripts/test_*.py files run by name after step 0.5 (#1052)"
+else
+  fail "tests_run_by_name_later does not match the files run by name after step 0.5 (#1052):$_later_mismatch"
 fi
 
 # -------------------- Summary --------------------
