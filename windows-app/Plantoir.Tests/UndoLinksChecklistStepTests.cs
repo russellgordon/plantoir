@@ -348,6 +348,31 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
     }
 
     /// <summary>
+    /// W7b2-3 review 1, L2: a page the press's PLAN cannot read (held by
+    /// another program with no sharing while the plan reads it) is said
+    /// through the press itself as the mac's unreadable-page sentence naming
+    /// the course, and nothing is written. The conversation's copy of the
+    /// course is made first, so the held page meets the plan, not the copy.
+    /// </summary>
+    [Fact]
+    public void APageThePlanCannotReadIsSaidThroughThePressAsTheMacSaysIt()
+    {
+        AssistWorkspace workspace = Open();
+        LinksChecklistSheet sheet = Sheet(workspace);
+        workspace.BackUpBeforeARolloverFromTheMenu(Course, 1);
+
+        AssistRefusal refusal;
+        using (new FileStream(_pages["Worksheet"], FileMode.Open, FileAccess.Read, FileShare.None))
+            refusal = Assert.Throws<AssistRefusal>(() => workspace.PublishAndRemember(sheet));
+
+        Assert.Equal($"“{Course}” could not be read, so nothing was changed.", refusal.Message);
+        AssertNoPageChanged();
+        Assert.False(File.Exists(Answered));
+        Assert.False(File.Exists(Kept));
+        Assert.Empty(WindowsActionsOnTheMacFixture.AppliedBegins(ListFolder));
+    }
+
+    /// <summary>
     /// The press's code writes no page itself (W7b2-8's done list: no
     /// <c>Save</c> of the press), and the sheet tells a refused press rather
     /// than dropping it.

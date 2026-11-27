@@ -165,4 +165,49 @@ public sealed class UndoMenuDuplicateStepTests : IDisposable
         Assert.DoesNotContain("Nothing was", said.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("couldn’t be read", said.Message, StringComparison.Ordinal);
     }
+    /// <summary>
+    /// W7b2-3 review 1, L1: whether a page was at the new name is read ONCE,
+    /// as the step's own before when the copy is planned, never by a second
+    /// look at the disk. A page dropped at the new name after that read (a
+    /// seam between the step's read and the copy's question) is a change
+    /// since the plan, for the door to refuse; a page there when planned is
+    /// there, whatever the disk says later.
+    /// </summary>
+    [Fact]
+    public void WhetherThePageWasThereIsWhatTheStepPlannedAsItsBefore()
+    {
+        string target = Page("Unit 2, Day 2");
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        var absentWhenPlanned = new UndoActionStep(new UndoStepMaker("menu", StepName), Folder, "ICS3U", 1,
+            undo: new UndoForThisProcess(ListFolder, UndoMode.Shadow, null));
+        absentWhenPlanned.Write(target, "the copy");
+        File.WriteAllText(target, "Dropped here after the step read its before.\n");
+
+        Assert.False(absentWhenPlanned.WasThereWhenPlanned(target));
+
+        var presentWhenPlanned = new UndoActionStep(new UndoStepMaker("menu", StepName), Folder, "ICS3U", 1,
+            undo: new UndoForThisProcess(ListFolder, UndoMode.Shadow, null));
+        presentWhenPlanned.Write(target, "the copy");
+        File.Delete(target);
+
+        Assert.True(presentWhenPlanned.WasThereWhenPlanned(target));
+    }
+
+    /// <summary>
+    /// W7b2-3 review 1, L1, in the action: the menu's copy asks the step what
+    /// it planned, after the step read its before, and never looks at the
+    /// disk again for it.
+    /// </summary>
+    [Fact]
+    public void TheCopyAsksTheStepWhetherThePageWasThere()
+    {
+        string copy = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Core", "Assist", "AssistWorkspace.MenuDuplicate.cs"));
+
+        int planned = copy.IndexOf("step.Write(request.NewPath, request.CopyText);", StringComparison.Ordinal);
+        int asked = copy.IndexOf("bool alreadyThere = step.WasThereWhenPlanned(request.NewPath);", StringComparison.Ordinal);
+        Assert.True(planned >= 0, "the copy is planned into the step");
+        Assert.True(asked > planned, "whether the page was there is asked of the step after it read its before");
+        Assert.DoesNotContain("File.Exists(request.NewPath);", copy, StringComparison.Ordinal);
+        Assert.DoesNotContain("step.Exists(request.NewPath)", copy, StringComparison.Ordinal);
+    }
 }
