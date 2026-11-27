@@ -338,15 +338,6 @@ enum ClassInsertionPlanner {
         // relink-5, `undo.rule.shadow`).
         let classPagePlaces: [ClassPagePlace] = classPagePlaces(of: plan, in: course)
         let workingFolder: URL? = workingFolderURL(of: course)
-        // The one arrangement still refused before anything changes: a link
-        // that reaches a renamed class page only through a link inside the
-        // working folder, whose own text must change where it stands.
-        if let notMovable = firstLinkThatCannotBeMoved(
-            in: plan, classPagePlaces: classPagePlaces, workingFolder: workingFolder
-        ) {
-            let refusal: UndoRefusal = .cannotTellNow(path: notMovable.path)
-            throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
-        }
 
         // ONE step through the door (#899, U3): every rename, link, date and
         // new page planned first, each read as the step will leave it, then
@@ -374,6 +365,9 @@ enum ClassInsertionPlanner {
 
         // 1. The renames, highest day first.
         var renamed: [String: String] = [:]
+        // The in-between links inside the working folder already re-pointed
+        // where they stand (mac-2): each once, however many classes reach it.
+        var hopsRePointed: [String] = []
         for rename in plan.renames {
             // A later class that is a link leading to nothing is still a
             // class: its link is renamed as any other (Russell, 2026-11-26:
@@ -388,7 +382,21 @@ enum ClassInsertionPlanner {
                 notFinished.notRenamed.append(rename.from)
                 continue
             }
-            if reach != .elsewhere {
+            if case .aRenamedPageThrough(let hop, let newPlace) = reach, isInside(workingFolder, hop) {
+                // mac-2 (#899, ruling 6 of U4b3, Russell, 2026-11-26): the
+                // class reaches a renamed class page only through a link
+                // inside the working folder that is not a class page. The
+                // class is renamed as itself, its text kept, and the link in
+                // between is re-pointed WHERE IT STANDS at the page's new
+                // name, so the chain still leads to the same lesson. Nothing
+                // is written through either link.
+                guard let linkSha = UndoTreeReading.linkSha(at: rename.fromURL),
+                      rePointWhereItStands(hop, at: newPlace, in: step, done: &hopsRePointed) else {
+                    notFinished.notRenamed.append(rename.from)
+                    continue
+                }
+                step.moveLink(spelledAsItsNewPlace(rename.fromURL, beside: rename.toURL), to: rename.toURL, linkSha: linkSha)
+            } else if reach != .elsewhere {
                 // A later class whose link leads to another class page of
                 // this section (Russell, 2026-11-26): renamed, kept leading
                 // to the same lesson, and nothing written through it, no
@@ -434,6 +442,37 @@ enum ClassInsertionPlanner {
                 step.remove(rename.fromURL)
             }
             renamed[rename.from] = rename.to
+        }
+
+        // 1b. A class the plan only re-dates, not renames, whose link reaches
+        //     a renamed class page (mac-2): re-pointed where it stands by the
+        //     same rules. Its own text when its text names the page; the
+        //     in-between link when the hop is inside the working folder; its
+        //     own link straight at the page's new place when the hop is
+        //     outside, where Plantoir never writes. Nothing written through.
+        var renamedPlaces: [String] = []
+        for rename in plan.renames {
+            renamedPlaces.append(rename.fromURL.standardizedFileURL.path)
+        }
+        for move in plan.moves {
+            if renamedPlaces.contains(move.fileURL.standardizedFileURL.path) {
+                continue
+            }
+            let reach: LinkedClassReach = reachOfALinkedClass(at: move.fileURL, classPagePlaces: classPagePlaces)
+            switch reach {
+            case .elsewhere, .aClassPageTheyLeave:
+                continue
+            case .aRenamedPageThrough(let hop, let newPlace) where isInside(workingFolder, hop):
+                if !rePointWhereItStands(hop, at: newPlace, in: step, done: &hopsRePointed) {
+                    notFinished.linksNotUpdated.append(move.title)
+                }
+            case .aRenamedPageByItsOwnText, .aRenamedPageThrough:
+                guard let textAfter = textAfterTheMove(of: move.fileURL, reach: reach),
+                      step.relinkLink(move.fileURL, to: move.fileURL, textAfter: textAfter) else {
+                    notFinished.linksNotUpdated.append(move.title)
+                    continue
+                }
+            }
         }
 
         // 2. The links that pointed at the old names. Ours to do — Obsidian
@@ -809,50 +848,30 @@ enum ClassInsertionPlanner {
         return text + file.lastPathComponent
     }
 
-    /// The first later class that is a symbolic link Insert Class cannot
-    /// yet keep leading to its lesson, or nil. Every other link is renamed
-    /// and never refused because of where it leads (Russell, 2026-11-26).
-    /// Two arrangements remain, both needing a link's text changed WHERE IT
-    /// STANDS, which the door cannot yet do (a relinking move whose two
-    /// places are one; #899 U4b3, left for the next piece):
-    ///
-    /// * a renamed class whose link reaches a renamed class page of the
-    ///   section only through a link that is not a class page and is INSIDE
-    ///   the working folder: Russell's ruling (2026-11-26) is that the link
-    ///   in between is re-pointed where it stands;
-    /// * a class the plan only re-dates, not renames, whose link reaches a
-    ///   renamed class page at any hop: its own text would change where it
-    ///   stands.
-    static func firstLinkThatCannotBeMoved(
-        in plan: ClassInsertionPlan, classPagePlaces: [ClassPagePlace], workingFolder: URL?
-    ) -> URL? {
-        var renamedPlaces: [URL] = []
-        for rename in plan.renames {
-            renamedPlaces.append(rename.fromURL)
-            let reach: LinkedClassReach = reachOfALinkedClass(at: rename.fromURL, classPagePlaces: classPagePlaces)
-            guard case .aRenamedPageThrough(let link, _) = reach else {
-                continue
-            }
-            if isInside(workingFolder, link) {
-                return rename.fromURL
-            }
+    /// mac-2 (#899, ruling 6 of U4b3): re-points the in-between link at
+    /// `hop` (inside the working folder, not a class page) where it stands,
+    /// its own text with only the last path part replaced by `newPlace`'s
+    /// file name, planned once however many classes reach it (`done` holds
+    /// the hops already planned). False when its text cannot be read now or
+    /// the step will not take the relink.
+    static func rePointWhereItStands(_ hopAsReached: URL, at newPlace: URL, in step: JournaledStep, done: inout [String]) -> Bool {
+        // Only the folders above are tidied (`..` taken out there): the
+        // link itself is never followed, as tidying a whole path holding
+        // `..` would follow it to the page it leads to.
+        let hop: URL = hopAsReached.deletingLastPathComponent().standardizedFileURL
+            .appendingPathComponent(hopAsReached.lastPathComponent)
+        let hopPath: String = hop.path
+        if done.contains(hopPath) {
+            return true
         }
-        for move in plan.moves {
-            var isRenamed: Bool = false
-            for renamed in renamedPlaces where renamed.standardizedFileURL.path == move.fileURL.standardizedFileURL.path {
-                isRenamed = true
-            }
-            if isRenamed {
-                continue
-            }
-            switch reachOfALinkedClass(at: move.fileURL, classPagePlaces: classPagePlaces) {
-            case .aRenamedPageByItsOwnText, .aRenamedPageThrough:
-                return move.fileURL
-            case .elsewhere, .aClassPageTheyLeave:
-                continue
-            }
+        guard let textAfter = textAfterTheMove(of: hop, reach: .aRenamedPageByItsOwnText(newName: newPlace.lastPathComponent)) else {
+            return false
         }
-        return nil
+        if !step.relinkLink(hop, to: hop, textAfter: textAfter) {
+            return false
+        }
+        done.append(hopPath)
+        return true
     }
 
     /// Whether the link at `place` is inside `workingFolder` (the folders
