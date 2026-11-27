@@ -604,6 +604,10 @@ internal sealed class UndoDoor
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
         }
         Finish(seq, backward ? "undone" : "redone", null, null);
+        // One kept copy per content per page, never a pile (the mac's U3c
+        // review 3, LOW 1, called in its door only, so here only).
+        if (notTaken.OutgoingOf.Count > 0 && root.Length > 0)
+            UndoRecovery.RemoveSupersededKeptCopies(record.Step, root, notTaken.OutgoingOf, label);
         if (!notTaken.IsEmpty && root.Length > 0) SayWhatItKept(record.Step, root, label, notTaken, backward, uses);
         Rederive(record.Step.Ops, root);
         return new UndoOutcome(backward ? UndoOutcomeKind.Undone : UndoOutcomeKind.Redone, seq);

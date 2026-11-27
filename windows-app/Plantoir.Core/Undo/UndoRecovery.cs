@@ -692,6 +692,47 @@ internal static class UndoRecovery
     }
 
     /// <summary>
+    /// Thins the kept originals of this step beside each of these pages to ONE
+    /// per content (the mac's <c>UndoRecovery.removeSupersededKeptCopies</c>,
+    /// U3c review 3, LOW 1, fixed in U4a): with both contents gone and the list
+    /// taking no new file, every Undo and Redo keeps its outgoing bytes under a
+    /// new name, so without this the copies pile up, alternating between two
+    /// contents. A kept copy whose bytes another kept copy of the same step and
+    /// page holds too is superseded: no offer rests on it, since an offer rests
+    /// on content, and that content stays beside the page. The copy this move
+    /// just made (<paramref name="newestLabel"/>) is the one kept for its
+    /// content; otherwise the first by name. A copy that cannot be read is
+    /// never removed, and nothing but this step's own kept copies is touched.
+    /// </summary>
+    internal static void RemoveSupersededKeptCopies(UndoStep step, string root, IEnumerable<string> paths, string newestLabel)
+    {
+        foreach (string path in paths)
+        {
+            var keptFor = new Dictionary<string, string>(StringComparer.Ordinal);
+            var others = new List<(string Kept, string Sha)>();
+            foreach (string kept in KeptOriginalFiles(step, UndoDoor.FullPath(root, path)))
+            {
+                if (UndoCurrent.Read(kept) is not UndoCurrent.Bytes bytes) continue;
+                string sha = UndoCheck.Sha(bytes.Content);
+                if (UndoSwap.IsStaged(Path.GetFileName(kept), newestLabel) && keptFor.TryGetValue(sha, out string? earlier))
+                {
+                    others.Add((earlier, sha));
+                    keptFor[sha] = kept;
+                    continue;
+                }
+                if (!keptFor.ContainsKey(sha)) keptFor[sha] = kept;
+                else others.Add((kept, sha));
+            }
+            foreach ((string kept, string sha) in others)
+            {
+                if (keptFor[sha] == kept) continue;
+                try { UndoSwap.RemoveByName(kept); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+            }
+        }
+    }
+
+    /// <summary>
     /// What a step's own swap kept beside a page as its original (any of the
     /// step's labels), answered for a page's path and the sha of the whole
     /// content wanted there only when a kept original's bytes hash to exactly
