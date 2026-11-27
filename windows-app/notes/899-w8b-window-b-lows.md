@@ -22,11 +22,13 @@ Branch `issue/899-w8b-window-b-lows` from `origin/dev` 6dc36fcea. Tests first at
 
 ## Must-fail lines
 
-`vm-tools/guest/899-w8b-wbl-mustfail.json`, three rows (see "Runs").
+`vm-tools/guest/899-w8b-wbl-mustfail.json`, three rows, each RED in run `w8b-wbl-b` (see "Runs"). Script: `899-w8b-wbl-pc-run.ps1` with launchers `-a` and `-b`.
 
 ## Runs
 
-(filled from the PC run)
+- `w8b-wbl-a` (PC, 9c666947c, red half at b3d51d8db): RED 4 of 65 in `SpecialFolderRenamerTests` at the tests' commit (`ABugsNullReferenceFromTheMakeLeavesNoRecord`, `ABugsArgumentExceptionFromTheMakePutsTheEarlierRecordBack`, and the two deny-entry tests); at 9c666947c the two deny-entry tests still failed (the look saw a Folder: the PC's account reads past a deny), so they were rewritten on a refused name (1e8204f9f).
+- `w8b-wbl-b` (PC, 1e8204f9f): both builds 0 errors; 348 of 348 passed in `SpecialFolderRenamerTests`, `RenameRecordShapeTests`, `FolderRenameApplyTests`, `UndoRenameFolderStepTests`, `NamedGapLedgerTests`, `UndoWriterScanTests`, `UndoOpKindsContractTests`, `UndoStackContractTests`; must-fail 3 of 3 RED (row 1: both `ABugs…`; row 2: `AnUnreadablePlaceIsToldWithAShortReasonAndNoPath`; row 3: `ALookTheSystemRefusesKeepsItsReason`); restored 348 of 348; HEAD unchanged, status clean, lock released (ours).
+- Merges of `origin/dev`: none needed before proving or before hand-back (`origin/dev` stayed 6dc36fcea).
 
 ## Left for the next piece
 
