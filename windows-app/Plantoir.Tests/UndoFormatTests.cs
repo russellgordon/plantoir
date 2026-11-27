@@ -147,6 +147,22 @@ public sealed class UndoFormatTests
         Assert.Equal(UndoAnswerKind.NotAvailable, Offer(folded).Undo.Kind);
     }
 
+    [Fact]
+    public void AStepThatHandsAPlaceOverIsUnreadable()
+    {
+        // #1055 W3 (the mac's M5): an earlier writeFile removes Day 3 and a
+        // later file move (by sha) fills it. The two share a place and one is
+        // a whole op, so the step is a barrier, as before W8b-21a4.
+        string three = UndoCheck.Sha(Encoding.UTF8.GetBytes("Three.\n"));
+        string two = UndoCheck.Sha(Encoding.UTF8.GetBytes("Two.\n"));
+        string removal = "{\"kind\":\"writeFile\",\"path\":\"Unit 1, Day 3.md\",\"beforeSha\":\"" + three + "\",\"blobs\":[\"" + three + "\"]}";
+        string move = "{\"kind\":\"move\",\"from\":\"Unit 1, Day 2.md\",\"to\":\"Unit 1, Day 3.md\",\"sha\":\"" + two + "\",\"blobs\":[\"" + two + "\"]}";
+        UndoFolded folded = Fold(Begin(1), Applied(1), Begin(2, removal + "," + move), Applied(2));
+        Assert.Equal(UndoStepState.Done, folded.Steps[2].State);
+        Assert.False(folded.Steps[2].Readable);
+        Assert.Equal(UndoAnswerKind.NotAvailable, Offer(folded).Undo.Kind);
+    }
+
     [Theory]
     [InlineData(",\"holds\":\"workingFolder\"")]
     [InlineData(",\"holds\":3")]
