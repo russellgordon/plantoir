@@ -23938,6 +23938,22 @@ keeps an item visible (`tellingKept`, threaded through `UndoSwap.swap`); a
 rename back refused because the place filled meanwhile keeps the item
 visible rather than hidden; and an item that cannot be read refuses
 `cannotTellNow`, only a refused move `couldNotWrite`.
+Review 2 and the pass after it (final behaviour). One function,
+`UndoSwap.settleUnderARelinksStagedName`, decides every tidy and pre-clean of
+a relink's staged name: an item there is removed only when it is a link
+holding one of the step's texts; anything else is the teacher's, renamed back
+when the place is empty, otherwise kept under `<name> (kept by Undo)` with the
+kept-page or kept-folder line said first. In the live swap only, a teacher's
+item is exchanged back while the place holds the swap's own new link; a
+recovery tidy never takes a step's link out (it cannot tell which way a
+stopped exchange went), so the place keeps the swap's link and the item is
+kept visible. Two names are one part when equal after NFC normalisation and
+lowercasing (Python's `part_inside` and `is_case_only_move` now do the same);
+only the one-place test of a relink where the link stands compares bytes.
+`opKinds.move` is written from THE GUARANTEE on, with Windows' recovery as a
+rule by state. Known and left for mac-2: the two-place relink's pre-clean
+removes only the step's own links and leaves anything else under its staged
+name hidden (see the notes' "For mac-2").
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

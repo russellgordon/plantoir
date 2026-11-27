@@ -1518,7 +1518,10 @@ nonisolated enum UndoSwap {
                     if relinked == .cannotReadNow {
                         // Review 3 of mac-1, LOW 3: what stands under the
                         // staged name, or at the place, cannot be read just
-                        // now; nothing moved.
+                        // now. At that point the swap has been made: the
+                        // step's new link stands at the place, and the
+                        // item that could not be read or moved stays under
+                        // the staged name; the refusal names the place.
                         refusal = .cannotTellNow(path: namedAs)
                     }
                 } else {
