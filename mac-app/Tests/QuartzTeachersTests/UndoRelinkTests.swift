@@ -1404,6 +1404,91 @@ final class UndoRelinkTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(reachedInsideTheSwap, 1)
     }
 
+    // MARK: - Where the link stands: fix round two (mac-1)
+
+    /// Review 2, MEDIUM case (a): another program replaces the link at the
+    /// place with the teacher's own file (or folder) between the staging
+    /// and the exchange, and the process is killed just after the exchange
+    /// (`relinkSwapped`): the teacher's item is under the staged name, the
+    /// swap's new link at the place. Recovery never removes the teacher's
+    /// item for its name: it is given back to the place (the swap's own
+    /// link exchanged out and removed by its text), nothing staged is left.
+    /// MUST FAIL with the item deleted by the tidy.
+    func testAKillAfterTheExchangeOnceThePlaceChangedGivesTheTeachersItemBack() async throws {
+        for kind in ["file", "folder"] {
+            let laid: LaidRelink = try layARelinkWhereItStands(named: "replaced-\(kind)", leads: .inside)
+            let root: URL = laid.root
+            let place: URL = root.appendingPathComponent(section + "Unit 1, Day 4.md")
+            let journalFolder: URL = root.deletingLastPathComponent().appendingPathComponent("undo", isDirectory: true)
+            let draft: UndoOpsDraft = UndoContractKinds.draft(
+                ops: [laid.op], blobs: [Data(laid.oldText.utf8), Data(laid.newText.utf8)], root: root, action: "insertClass"
+            )
+            let places: UndoMemoryPlaces = UndoMemoryPlaces()
+            let dying: UndoJournal = UndoJournal(
+                folderURL: journalFolder,
+                process: UndoContractReplay.goneProcess,
+                processIsAlive: { process in process.pid != 2_000_000_001 }
+            )
+            UndoKillPoints.hook = { reached in
+                if reached == .relinkStaged(0) {
+                    _ = UndoSwap.removeALink(at: place)
+                    if kind == "file" {
+                        try? Data("The teacher's own.\n".utf8).write(to: place)
+                    } else {
+                        try? FileManager.default.createDirectory(at: place, withIntermediateDirectories: false)
+                        try? Data("Inside.\n".utf8).write(to: place.appendingPathComponent("inside.md"))
+                    }
+                }
+                return reached == .relinkSwapped(0)
+            }
+            _ = JournaledWrite.perform(ops: draft, in: dying, mode: .live, places: places)
+            UndoKillPoints.hook = nil
+            XCTAssertEqual(linkText(section + "Unit 1, Day 4.md", root: root), laid.newText, kind)
+            XCTAssertEqual(stagedLeft(under: root).count, 1, kind)
+
+            let survivor: UndoJournal = UndoJournal(folderURL: journalFolder)
+            await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in root }, places: places)
+            XCTAssertFalse(UndoSwap.isALink(place), kind)
+            if kind == "file" {
+                XCTAssertEqual(try? text(section + "Unit 1, Day 4.md", root: root), "The teacher's own.\n", kind)
+            } else {
+                XCTAssertEqual(try? text(section + "Unit 1, Day 4.md/inside.md", root: root), "Inside.\n", kind)
+            }
+            XCTAssertEqual(stagedLeft(under: root), [], kind)
+        }
+    }
+
+    /// Review 2, MEDIUM case (b): the place is written twice by another
+    /// program inside one live swap: the teacher's X replaces the link
+    /// before the exchange, and the newest save X2 replaces the swap's own
+    /// link after it. The newest save ends at the place, the older one is
+    /// kept under a visible name beside it, nothing is under a hidden name,
+    /// and the swap is refused changed since. MUST FAIL with X2 under the
+    /// staged name.
+    func testASecondWriteAtThePlaceInsideTheSwapLeavesTheNewestSaveAtThePlace() throws {
+        let laid: LaidRelink = try layARelinkWhereItStands(named: "written-twice", leads: .inside)
+        let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 4.md")
+        let forward: [UndoSwapTarget] = try readyTargets(UndoCheck.plan([laid.op], direction: .forward, root: laid.root, journal: laid.journal))
+        UndoKillPoints.hook = { reached in
+            if reached == .relinkStaged(0) {
+                _ = UndoSwap.removeALink(at: place)
+                try? Data("First save.\n".utf8).write(to: place)
+            }
+            if reached == .relinkSwapped(0) {
+                let saved: URL = place.deletingLastPathComponent().appendingPathComponent("saving.tmp")
+                try? Data("Newest save.\n".utf8).write(to: saved)
+                _ = rename(saved.path, place.path)
+            }
+            return false
+        }
+        let result: UndoSwapResult = UndoSwap.swap(forward, label: "1-apply", root: laid.root)
+        UndoKillPoints.hook = nil
+        XCTAssertEqual(result, .refused(.changedSince(firstPath: section + "Unit 1, Day 4.md", others: 0)))
+        XCTAssertEqual(try? text(section + "Unit 1, Day 4.md", root: laid.root), "Newest save.\n")
+        XCTAssertEqual(try? text(section + "Unit 1, Day 4 (kept by Undo).md", root: laid.root), "First save.\n")
+        XCTAssertEqual(stagedLeft(under: laid.root), [])
+    }
+
     /// A step for the course the laid folder holds.
     func stepWhereItStands(_ root: URL) -> JournaledStep {
         return JournaledStep(
