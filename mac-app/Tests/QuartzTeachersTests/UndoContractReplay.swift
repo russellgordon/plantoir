@@ -484,9 +484,16 @@ nonisolated enum UndoContractReplay {
             }
         }
         if current["cannotBeRead"] as? Bool == true {
-            // Unreadable just now: no permission (`cannotBeRead`).
-            _ = chmod(url.path, 0)
-            madeUnreadable.append(url)
+            // Unreadable just now: no permission (`cannotBeRead`). A link
+            // is read with lstat and readlink, which never ask the link's
+            // own permissions (and chmod would follow it), so its folder's
+            // are taken away instead (U4b3 relink-2).
+            var unreadable: URL = url
+            if string(current["link"]) != nil {
+                unreadable = url.deletingLastPathComponent()
+            }
+            _ = chmod(unreadable.path, 0)
+            madeUnreadable.append(unreadable)
         }
     }
 
@@ -602,6 +609,22 @@ nonisolated enum UndoContractReplay {
                 // U4b2-14: a link's move, judged by the bytes it holds.
                 given["linkSha"] = UndoHash.sha256(of: Data(target.utf8))
                 given["linkTarget"] = nil
+            }
+            // U4b3 relink: a link's move that changes its text, each text
+            // given; both hashes in `blobs` unless the case gives its own.
+            var relinkNames: [String] = []
+            if let target = string(given["linkTargetBefore"]) {
+                given["linkShaBefore"] = UndoHash.sha256(of: Data(target.utf8))
+                relinkNames.append(UndoHash.sha256(of: Data(target.utf8)))
+                given["linkTargetBefore"] = nil
+            }
+            if let target = string(given["linkTargetAfter"]) {
+                given["linkShaAfter"] = UndoHash.sha256(of: Data(target.utf8))
+                relinkNames.append(UndoHash.sha256(of: Data(target.utf8)))
+                given["linkTargetAfter"] = nil
+            }
+            if !relinkNames.isEmpty && given["blobs"] == nil {
+                given["blobs"] = relinkNames
             }
             if let tree = given["listing"] as? [String: Any] {
                 let made: UndoTreeListing = listing(from: tree)
@@ -803,7 +826,7 @@ nonisolated enum UndoContractReplay {
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
         "movedFolder", "caseOnlyFolder", "refusalNamed", "keptWhatItReplacedSays", "madeFolder", "foldersInside",
-        "linkedFolder",
+        "linkedFolder", "handedOver", "linkedPage", "laterLinks",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1061,6 +1084,30 @@ nonisolated enum UndoContractReplay {
                     lastLeftApart = leftApart(of: outcome)
                     lastStartsAtTheNextLogin = startsAtTheNextLogin(of: outcome)
                     lastRefusalNamed = refusalNamed(of: outcome)
+                } else if value == "makeRoomWithALaterClassThatIsALink" {
+                    // U4b3 part 2: Insert Class runs on the main actor.
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(root: root, journal: stackJournal, places: places)
+                } else if value == "makeRoomWithALaterClassThatIsABrokenLink" {
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
+                        root: root, journal: stackJournal, places: places, broken: true
+                    )
+                } else if value == "makeRoomWithALaterClassLinkedToAnEarlierClass" {
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
+                        root: root, journal: stackJournal, places: places, linkedToDay1: true
+                    )
+                } else if value == "makeRoomWithALaterClassLinkedToAClassItRenames" {
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
+                        root: root, journal: stackJournal, places: places, day4LinkedToDay3: true, day3Plain: true
+                    )
+                } else if value == "makeRoomWithALaterClassLinkedToALinkedClass" {
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
+                        root: root, journal: stackJournal, places: places, day4LinkedToDay3: true
+                    )
                 } else if UndoContractKinds.calls.contains(value) {
                     if let answered = try UndoContractKinds.call(value, root: root, journal: journal(), places: places) {
                         last = answered
@@ -1443,6 +1490,15 @@ nonisolated enum UndoContractReplay {
             if let wanted = string(testCase["linkedFolder"]), UndoContractKinds.linkedFolder(in: root) != wanted {
                 failures.append("stackCases '\(name)': the moved link is \(UndoContractKinds.linkedFolder(in: root)), not \(wanted)")
             }
+            if let wanted = string(testCase["linkedPage"]), UndoContractKinds.linkedPage(in: root) != wanted {
+                failures.append("stackCases '\(name)': the linked later class is \(UndoContractKinds.linkedPage(in: root)), not \(wanted)")
+            }
+            if let wanted = string(testCase["laterLinks"]), UndoContractKinds.laterLinks(in: root) != wanted {
+                failures.append("stackCases '\(name)': the later classes are \(UndoContractKinds.laterLinks(in: root)), not \(wanted)")
+            }
+            if let wanted = string(testCase["handedOver"]), UndoContractKinds.handedOver(in: root) != wanted {
+                failures.append("stackCases '\(name)': the handed-over class pages are \(UndoContractKinds.handedOver(in: root)), not \(wanted)")
+            }
             if let wanted = int(testCase["keptWhatItReplacedLines"]), keptWhatItReplacedLines != wanted {
                 failures.append("stackCases '\(name)': \(keptWhatItReplacedLines) 'undo kept what it replaced' lines, not \(wanted)")
             }
@@ -1607,6 +1663,10 @@ nonisolated enum UndoContractReplay {
     // MARK: - undo.recoveryCases
 
     /// A process that never existed, standing for one that died.
+    /// U4b3 kept-original-named: the visible name recovery keeps the
+    /// removed Day 3 page under when something else holds Day 3.
+    static let keptPageName: String = "courses/TST1O/section1/Unit 1, Day 3 (kept by Undo).md"
+
     static let goneProcess: UndoProcess = UndoProcess(host: "", pid: 2_000_000_001, name: "gone", started: "1.000000")
 
     static let recoveryKeys: Set<String> = [
@@ -1615,10 +1675,11 @@ nonisolated enum UndoContractReplay {
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
         "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace", "nextWrite", "ordinaryWriteOn",
-        "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
+        "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines", "keptPageLines",
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
         "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored", "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
+        "withAHandedOverPlace", "handedOver", "withARelink",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1707,6 +1768,61 @@ nonisolated enum UndoContractReplay {
             }
             let places: UndoMemoryPlaces = UndoMemoryPlaces()
             _ = places.write(UndoContractKinds.preference, .string("a"))
+            // U4b3 door-5: in place of the two pages, a step that hands a
+            // place over, made as stackCases' call of the same name makes
+            // it. What section 1's class pages hold before and after it is
+            // read from a twin folder: the step made whole, then undone.
+            let handedOverCalls: [String: String] = [
+                "afterALinksMove": "handAPlaceOverAfterALinksMove",
+                "beforeALinksMove": "handAPlaceOverBeforeALinksMove",
+            ]
+            // U4b3 relink-3: the same, a step holding a relinking move,
+            // its class pages read on Day 3 to Day 5.
+            let relinkCalls: [String: String] = [
+                "alone": "relinkALink",
+                "leavingAHandedOverPlace": "relinkALinkLeavingAHandedOverPlace",
+                "chained": "relinkTwoChainedLinks",
+                "chainedThree": "relinkThreeChainedLinks",
+                "thenAMove": "relinkThenMoveALinkIntoItsPlace",
+            ]
+            var handedOverCall: String? = nil
+            var handedOverBefore: String = ""
+            var handedOverAfter: String = ""
+            var classDays: [Int] = UndoContractKinds.handedOverDays
+            var shapeCall: String? = nil
+            if let shape = string(testCase["withAHandedOverPlace"]) {
+                guard let call = handedOverCalls[shape] else {
+                    failures.append("recoveryCases '\(name)': withAHandedOverPlace '\(shape)' is not a value this replay knows")
+                    continue
+                }
+                shapeCall = call
+            }
+            if let shape = string(testCase["withARelink"]) {
+                guard let call = relinkCalls[shape] else {
+                    failures.append("recoveryCases '\(name)': withARelink '\(shape)' is not a value this replay knows")
+                    continue
+                }
+                shapeCall = call
+                classDays = UndoContractKinds.relinkedDays
+                if shape == "chained" || shape == "thenAMove" {
+                    classDays = UndoContractKinds.chainedRelinkDays
+                } else if shape == "chainedThree" {
+                    classDays = UndoContractKinds.threeChainedRelinkDays
+                }
+            }
+            if let call = shapeCall {
+                handedOverCall = call
+                let twin: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "recovery-\(number)-twin")
+                let twinJournal: UndoJournal = UndoJournal(folderURL: twin.journalFolder)
+                let twinPlaces: UndoMemoryPlaces = UndoMemoryPlaces()
+                let made: String? = try UndoContractKinds.call(call, root: twin.root, journal: twinJournal, places: twinPlaces)
+                handedOverAfter = UndoContractKinds.handedOver(in: twin.root, days: classDays)
+                let undone: UndoOutcome = twinJournal.undoNewest(resolveRoot: { _ in twin.root }, places: twinPlaces)
+                handedOverBefore = UndoContractKinds.handedOver(in: twin.root, days: classDays)
+                if made != "applied" || outcomeWord(undone) != "undone" || handedOverBefore == handedOverAfter {
+                    failures.append("recoveryCases '\(name)': the twin of \(call) came to \(made ?? "nil") and \(outcomeWord(undone))")
+                }
+            }
             var treeBlobs: [Data] = []
             var treeOp: UndoOp? = nil
             if withATree {
@@ -1722,6 +1838,13 @@ nonisolated enum UndoContractReplay {
                 }
             }
             func makeTheStep() -> JournaledWriteOutcome {
+                if let handedOverCall {
+                    // The call answers in a word: only "stopped by a test"
+                    // is compared, so anything else is answered as
+                    // changedNothing, which no row asks for.
+                    let made: String? = try? UndoContractKinds.call(handedOverCall, root: root, journal: dying, places: places)
+                    return made == UndoContractKinds.word(.stoppedByATest) ? .stoppedByATest : .changedNothing
+                }
                 if !withAMove && !withATree && !withAPreference && !withAMovedFolder {
                     return JournaledWrite.perform(stepDraft, in: dying, mode: mode)
                 }
@@ -1824,7 +1947,15 @@ nonisolated enum UndoContractReplay {
                 failures.append("recoveryCases '\(name)': handEdit is not a string, so not a value this replay knows")
             }
             if let page = string(testCase["handEdit"]) {
-                if page == "carried" && withAMovedFolder {
+                if page == "handedOverPlace" && handedOverCall != nil {
+                    // U4b3 door-5: someone's page written at Day 3, the
+                    // place the link's move hands over.
+                    let day3: URL = root.appendingPathComponent(UndoContractKinds.classPage(3))
+                    if UndoItem.read(at: day3) != .absent {
+                        try FileManager.default.removeItem(at: day3)
+                    }
+                    try write("Someone else's.\n", to: UndoContractKinds.classPage(3), in: root)
+                } else if page == "carried" && withAMovedFolder {
                     // U4b2-13: the page inside the moved folder, wherever
                     // the folder is now, its line `Line one: …` set by hand.
                     if !(try UndoContractKinds.editTheCarriedPageByHand(in: root)) {
@@ -1949,7 +2080,12 @@ nonisolated enum UndoContractReplay {
                 try Data(held.utf8).write(to: UndoSwap.besideURL(for: page, label: "\(workSeq)-undo", role: "orig"))
             }
             if testCase["visibleNameTaken"] as? Bool == true {
-                try write("earlier\n", to: UndoContractKinds.extraFolder + " (kept by Undo)/earlier.md", in: root)
+                if handedOverCall != nil {
+                    // U4b3 kept-original-named: the removed page's visible name.
+                    try write("earlier\n", to: UndoContractReplay.keptPageName, in: root)
+                } else {
+                    try write("earlier\n", to: UndoContractKinds.extraFolder + " (kept by Undo)/earlier.md", in: root)
+                }
             }
             if testCase["deployBeforeRecovery"] as? Bool == true {
                 // A deploy wrote a new marker in the place the move emptied.
@@ -1961,6 +2097,11 @@ nonisolated enum UndoContractReplay {
             let trailHookBefore = UndoTrailHook.foundAFolderSetAsideLine
             UndoTrailHook.foundAFolderSetAsideLine = { _, _, _, _, _, _ in
                 folderLines += 1
+            }
+            var keptPageLines: Int = 0
+            let keptAPageHookBefore = UndoTrailHook.keptAPageLine
+            UndoTrailHook.keptAPageLine = { _, _, _, _ in
+                keptPageLines += 1
             }
             var keptNamedOnTheTrail: [String] = []
             var couldNotPutBackLines: Int = 0
@@ -1983,6 +2124,7 @@ nonisolated enum UndoContractReplay {
             }
             defer {
                 UndoTrailHook.foundAFolderSetAsideLine = trailHookBefore
+                UndoTrailHook.keptAPageLine = keptAPageHookBefore
                 UndoTrailHook.couldNotPutBackLine = couldNotPutBackHookBefore
                 UndoTrailHook.keptAnOriginalLine = keptAnOriginalHookBefore
                 UndoTrailHook.leftNewestLine = leftHookBefore
@@ -2076,10 +2218,25 @@ nonisolated enum UndoContractReplay {
                 failures.append("recoveryCases '\(name)': the preference is \(places.read(UndoContractKinds.preference)), not \(wanted)")
             }
             if let wanted = string(testCase["keptVisibleAs"]) {
-                let keptFile: URL = root.appendingPathComponent(wanted).appendingPathComponent("a.md")
-                if !FileManager.default.fileExists(atPath: keptFile.path) {
-                    failures.append("recoveryCases '\(name)': the folder is not kept as \(wanted)")
+                if handedOverCall != nil {
+                    // U4b3 kept-original-named: the removed page, a file
+                    // holding `Three.` byte for byte.
+                    if UndoItem.read(at: root.appendingPathComponent(wanted)) != .file(Data("Three.\n".utf8)) {
+                        failures.append("recoveryCases '\(name)': the page is not kept as \(wanted) (\(UndoItem.read(at: root.appendingPathComponent(wanted))))")
+                    }
+                } else {
+                    let keptFile: URL = root.appendingPathComponent(wanted).appendingPathComponent("a.md")
+                    if !FileManager.default.fileExists(atPath: keptFile.path) {
+                        failures.append("recoveryCases '\(name)': the folder is not kept as \(wanted)")
+                    }
                 }
+            }
+            if testCase["visibleNameTaken"] as? Bool == true && handedOverCall != nil,
+               UndoItem.read(at: root.appendingPathComponent(UndoContractReplay.keptPageName)) != .file(Data("earlier\n".utf8)) {
+                failures.append("recoveryCases '\(name)': the taken name \(UndoContractReplay.keptPageName) was changed")
+            }
+            if let wanted = int(testCase["keptPageLines"]), keptPageLines != wanted {
+                failures.append("recoveryCases '\(name)': \(keptPageLines) 'undo kept a page under a visible name' lines, not \(wanted)")
             }
             if let wanted = int(testCase["folderLines"]), folderLines != wanted {
                 failures.append("recoveryCases '\(name)': \(folderLines) 'undo found a folder set aside' lines, not \(wanted)")
@@ -2124,7 +2281,7 @@ nonisolated enum UndoContractReplay {
                 if stillAside != wanted {
                     failures.append("recoveryCases '\(name)': a folder kept aside is \(stillAside) (\(leftovers))")
                 }
-            } else if withATree && !leftovers.isEmpty {
+            } else if (withATree || handedOverCall != nil) && !leftovers.isEmpty {
                 failures.append("recoveryCases '\(name)': staged items left: \(leftovers)")
             }
             if let heldChange {
@@ -2132,6 +2289,28 @@ nonisolated enum UndoContractReplay {
                 JournaledWrite.finish(seq: heldSeq, with: .applied, phase: nil, reason: nil, in: UndoJournal(folderURL: place.journalFolder), mode: .live)
             }
 
+            if let wanted = string(testCase["handedOver"]), UndoContractKinds.handedOver(in: root) != wanted {
+                failures.append("recoveryCases '\(name)': the class pages are \(UndoContractKinds.handedOver(in: root)), not \(wanted)")
+            }
+            if handedOverCall != nil {
+                // files: section 1's class pages and the library, exactly as
+                // before or after the step (the two pages are not in it).
+                let nowHandedOver: String = UndoContractKinds.handedOver(in: root, days: classDays)
+                switch string(testCase["files"]) ?? "" {
+                case "before":
+                    if nowHandedOver != handedOverBefore {
+                        failures.append("recoveryCases '\(name)': the class pages are not before (\(nowHandedOver))")
+                    }
+                case "after":
+                    if nowHandedOver != handedOverAfter {
+                        failures.append("recoveryCases '\(name)': the class pages are not after (\(nowHandedOver))")
+                    }
+                case "unchecked":
+                    break
+                default:
+                    failures.append("recoveryCases '\(name)': files '\(string(testCase["files"]) ?? "")' is not a value this replay knows with withAHandedOverPlace")
+                }
+            }
             let now: [String?] = [hash(of: first, in: root), hash(of: second, in: root)]
             var wanted: [String?]? = nil
             switch string(testCase["files"]) ?? "" {
@@ -2149,6 +2328,9 @@ nonisolated enum UndoContractReplay {
                 wanted = nil
             default:
                 failures.append("recoveryCases '\(name)': files '\(string(testCase["files"]) ?? "")' is not a value this replay knows")
+            }
+            if handedOverCall != nil {
+                wanted = nil
             }
             if let wanted, now != wanted {
                 failures.append("recoveryCases '\(name)': the files are not \(string(testCase["files"]) ?? "?")")
@@ -2235,6 +2417,12 @@ nonisolated enum UndoContractReplay {
     static func killPoint(named name: String) -> UndoKillPoint {
         if name.hasPrefix("beforeSwap:") {
             return .beforeSwap(Int(name.dropFirst("beforeSwap:".count)) ?? 0)
+        }
+        if name.hasPrefix("relinkStaged:") {
+            return .relinkStaged(Int(name.dropFirst("relinkStaged:".count)) ?? 0)
+        }
+        if name.hasPrefix("relinkRenamedIn:") {
+            return .relinkRenamedIn(Int(name.dropFirst("relinkRenamedIn:".count)) ?? 0)
         }
         switch name {
         case "afterBegin":

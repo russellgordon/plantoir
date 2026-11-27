@@ -1,0 +1,38 @@
+# #899 U4b3 door-1 must-fail log (UndoHandedOverPlaceTests; each sabotage in UndoCheck.swift, built, run, restored with git checkout, git diff clean)
+# M1: file branch 'if !fillsAPlaceHandedOver {' -> 'if true {' (filler read from disk)
+# M2: 'if !handovers.isEmpty {' -> 'if false {' (today's order kept)
+# M3: placeLeadingOut 'if atStaging && target.handedOver {' -> 'if false {' (flag ignored at staging)
+# M4: 'if !handovers.isEmpty {' -> 'if true {' (step order for every step)
+# RED 4 of 4
+== M1 (exit 65)
+testALinkReplacedBeforeTheSwapIsRefusedAndNothingChanges] : failed - the plan came to refused(QuartzTeachers.UndoRefusal.changedSince(firstPath: "courses/TST1O/section1/Unit 1, Day 3.md", others: 0)), not ready
+testALinkReplacedBeforeTheSwapIsRefusedAndNothingChanges] : failed: caught error: "Error Domain=NSCocoaErrorDomain Code=3328 "The requested operation couldn’t be completed because the feature is not supported.""
+testAPlaceFilledSinceTheLinkLeftIsRefused] : failed - the plan came to refused(QuartzTeachers.UndoRefusal.changedSince(firstPath: "courses/TST1O/section1/Unit 1, Day 3.md", others: 0)), not ready
+testAPlaceFilledSinceTheLinkLeftIsRefused] : failed: caught error: "Error Domain=NSCocoaErrorDomain Code=3328 "The requested operation couldn’t be completed because the feature is not supported.""
+testShapeAAfterALinksMoveIsPlannedAndSwapped] : failed - the plan came to refused(QuartzTeachers.UndoRefusal.changedSince(firstPath: "courses/TST1O/section1/Unit 1, Day 3.md", others: 0)), not ready
+testShapeAAfterALinksMoveIsPlannedAndSwapped] : failed: caught error: "Error Domain=NSCocoaErrorDomain Code=3328 "The requested operation couldn’t be completed because the feature is not supported.""
+	 Executed 10 tests, with 16 failures (8 unexpected) in 0.153 (0.155) seconds
+restored, git diff clean
+== M2 (exit 65)
+testAPlaceFilledSinceTheLinkLeftIsRefused] : XCTAssertEqual failed: ("refused(QuartzTeachers.UndoRefusal.changedSince(firstPath: "courses/TST1O/section1/Unit 1, Day 3.md", others: 0))") is not equal to ("notPutBack(QuartzTeachers.UndoRefusal.changedSince(firstPath: "courses/TST1O/section1/Unit 1, Day 3.md", others: 0), keptOriginals: [])")
+testAPlaceFilledSinceTheLinkLeftIsRefused] : XCTAssertEqual failed: ("Linked.
+testAPlaceFilledSinceTheLinkLeftIsRefused] : XCTAssertEqual failed: threw error "Error Domain=NSCocoaErrorDomain Code=260 "The file “Unit 1, Day 4.md” couldn’t be opened because there is no such file." UserInfo={NSFilePath=/var/folders/23/hdyncr1d1j74cglsgvqbd0t40000gn/T/handed-over-BAD0AB7F-5959-4156-A7A1-998AD0562FF3/filled/wf/courses/TST1O/section1/Unit 1, Day 4.md, NSURL=file:///var/folders/23
+testAPlaceFilledSinceTheLinkLeftIsRefused] : XCTAssertEqual failed: ("[]") is not equal to ("["courses/TST1O/section1/.Unit 1, Day 3.md.plantoir-undo-1-apply-new"]")
+testShapeAAfterALinksMoveIsPlannedAndSwapped] : XCTAssertEqual failed: ("["courses/TST1O/section1/Unit 1, Day 3.md", "courses/TST1O/section1/Unit 1, Day 4.md"]") is not equal to ("["courses/TST1O/section1/Unit 1, Day 4.md", "courses/TST1O/section1/Unit 1, Day 3.md"]")
+testShapeAAfterALinksMoveIsPlannedAndSwapped] : XCTAssertEqual failed: ("refused(QuartzTeachers.UndoRefusal.changedSince(firstPath: "courses/TST1O/section1/Unit 1, Day 3.md", others: 0))") is not equal to ("swapped")
+	 Executed 10 tests, with 32 failures (9 unexpected) in 0.151 (0.153) seconds
+restored, git diff clean
+== M3 (exit 65)
+testShapeAWithTheLinkLeadingOutIsPlannedAndSwapped] : XCTAssertEqual failed: ("refused(QuartzTeachers.UndoRefusal.changedSince(firstPath: "courses/TST1O/section1/Unit 1, Day 3.md", others: 0))") is not equal to ("swapped")
+testShapeAWithTheLinkLeadingOutIsPlannedAndSwapped] : XCTAssertEqual failed: threw error "Error Domain=NSCocoaErrorDomain Code=260 "The file “Unit 1, Day 4.md” couldn’t be opened because there is no such file." UserInfo={NSFilePath=/var/folders/23/hdyncr1d1j74cglsgvqbd0t40000gn/T/handed-over-3B54ADDB-3C65-468A-8F4E-A7B930B0183A/a/wf/courses/TST1O/section1/Unit 1, Day 4.md, NSURL=file:///var/folder
+testShapeAWithTheLinkLeadingOutIsPlannedAndSwapped] : XCTAssertEqual failed: ("Linked.
+testShapeBWithTheLinkLeadingOutIsPlannedAndSwapped] : XCTAssertEqual failed: ("refused(QuartzTeachers.UndoRefusal.changedSince(firstPath: "courses/TST1O/section1/Unit 1, Day 2.md", others: 0))") is not equal to ("swapped")
+testShapeBWithTheLinkLeadingOutIsPlannedAndSwapped] : XCTAssertEqual failed: threw error "Error Domain=NSCocoaErrorDomain Code=260 "The file “Unit 1, Day 4.md” couldn’t be opened because there is no such file." UserInfo={NSFilePath=/var/folders/23/hdyncr1d1j74cglsgvqbd0t40000gn/T/handed-over-1B5A9D75-6F70-4161-A5CA-B0DE16F2CD50/b/wf/courses/TST1O/section1/Unit 1, Day 4.md, NSURL=file:///var/folder
+testShapeBWithTheLinkLeadingOutIsPlannedAndSwapped] : XCTAssertEqual failed: threw error "Error Domain=NSCocoaErrorDomain Code=256 "The file “Unit 1, Day 3.md” couldn’t be opened." UserInfo={NSFilePath=/var/folders/23/hdyncr1d1j74cglsgvqbd0t40000gn/T/handed-over-1B5A9D75-6F70-4161-A5CA-B0DE16F2CD50/b/wf/courses/TST1O/section1/Unit 1, Day 3.md, NSURL=file:///var/folders/23/hdyncr1d1j74cglsgvqbd0t40
+	 Executed 10 tests, with 11 failures (4 unexpected) in 0.604 (0.606) seconds
+restored, git diff clean
+== M4 (exit 65)
+testAReadableStepKeepsTodaysTargetsInTodaysOrder] : XCTAssertEqual failed: ("["courses/TST1O/b.md", "courses/TST1O/d.md", "courses/TST1O/New", "courses/TST1O/New/a.md"]") is not equal to ("["courses/TST1O/New", "courses/TST1O/b.md", "courses/TST1O/New/a.md", "courses/TST1O/d.md"]")
+	 Executed 10 tests, with 1 failure (0 unexpected) in 0.142 (0.145) seconds
+restored, git diff clean
+DONE

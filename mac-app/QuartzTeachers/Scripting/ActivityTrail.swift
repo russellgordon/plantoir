@@ -1310,6 +1310,12 @@ nonisolated enum ActivityTrail {
         /// place because something else holds that place, both named.
         /// Written just before the rename. Never page text.
         case undoFoundAFolderSetAside = "undo found a folder set aside"
+        /// Recovery kept a page a step that died removed or moved away,
+        /// found only in its hidden kept original, under a visible name
+        /// beside its place, `<name> (kept by Undo).md`, because something
+        /// else holds that place (#899, U4b3 kept-original-named). Both
+        /// named. Written just before the rename. Never page text.
+        case undoKeptAPageUnderAVisibleName = "undo kept a page under a visible name"
         /// Recovery could not put back a step left part way (#899, U3c):
         /// content it needs is gone from the list and no kept original beside
         /// its page matches what the journal recorded. The course and

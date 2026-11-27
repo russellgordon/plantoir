@@ -1,0 +1,49 @@
+== M1: replaced [if opStates[filler] == .after && !freeFrom[leaver]] with [if false && opStates[filler] == .after && !freeFrom[leaver]]
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape A forward stopped before swap 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape A backward stopped before swap 0
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape B forward stopped before swap 3
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B forward stopped before swap 4
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B backward stopped before swap 0
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape B backward stopped before swap 1
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape C forward stopped before swap 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape C forward stopped before swap 3
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape C backward stopped before swap 0
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape C backward stopped before swap 1
+testRecoveryJudgesShapeAsPairTogether] : XCTAssertEqual failed: ("["courses/TST1O/section1/Unit 1, Day 3.md → courses/TST1O/section1/Unit 1, Day 4.md": QuartzTeachers.UndoOpState.neither, "courses/TST1O/section1/Unit 1, Day 3.md": QuartzTeachers.UndoOpState.after]") is not equal to ("["courses/TST1O/section1/Unit 1, Day 3.md → courses/TST1O/section1/Unit 1, Day 4.md": QuartzTeachers.UndoOpState.after, "courses/TST1O/section1/Unit 1, Day 3.md": QuartzTeachers.UndoOpState.after]")
+testRecoveryJudgesShapeBsPairTogether] : XCTAssertEqual failed: ("Optional(QuartzTeachers.UndoOpState.neither)") is not equal to ("Optional(QuartzTeachers.UndoOpState.after)")
+	 Executed 26 tests, with 13 failures (0 unexpected) in 0.644 (0.649) seconds
+restored, git diff clean
+== M2: replaced [if opStates[leaver] == .before && !freeTo[filler]] with [if false && opStates[leaver] == .before && !freeTo[filler]]
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape A forward stopped before swap 0
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape A backward stopped before swap 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B forward stopped before swap 0
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B forward stopped before swap 1
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape B forward stopped before swap 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape B backward stopped before swap 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B backward stopped before swap 3
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B backward stopped before swap 4
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape C forward stopped before swap 0
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape C forward stopped before swap 1
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("1") is not equal to ("0") - shape C backward stopped before swap 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape C backward stopped before swap 3
+	 Executed 26 tests, with 15 failures (0 unexpected) in 0.331 (0.335) seconds
+restored, git diff clean
+== M3: replaced [if opStates[filler] == .after && !freeFrom[leaver]] with [if !freeFrom[leaver]]
+testAPlaceFilledSinceTheLinkLeftIsInTheWayForRecovery] : XCTAssertEqual failed: ("1") is not equal to ("2")
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape A forward stopped before swap 0
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape A backward stopped before swap 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B forward stopped before swap 0
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B forward stopped before swap 1
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertGreaterThan failed: ("0") is not greater than ("0") - shape B forward at 1
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B forward stopped before swap 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertGreaterThan failed: ("0") is not greater than ("0") - shape B forward at 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B backward stopped before swap 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertGreaterThan failed: ("0") is not greater than ("0") - shape B backward at 2
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertEqual failed: ("2") is not equal to ("0") - shape B backward stopped before swap 3
+testAStepStoppedAtAnySwapIsNeverInTheWay] : XCTAssertGreaterThan failed: ("0") is not greater than ("0") - shape B backward at 3
+	 Executed 26 tests, with 27 failures (0 unexpected) in 0.338 (0.343) seconds
+restored, git diff clean
+== M4: replaced [if !partners.isEmpty {] with [if false && !partners.isEmpty {]
+testTheListHoldsAKeptOriginalAtAHandedOverPlace] : XCTAssertTrue failed
+	 Executed 26 tests, with 1 failure (0 unexpected) in 0.334 (0.339) seconds
+restored, git diff clean

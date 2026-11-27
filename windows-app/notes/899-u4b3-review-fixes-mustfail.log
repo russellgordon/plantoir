@@ -1,0 +1,5 @@
+fix1 RED 3/40 (exclusive branch removed)
+fix2 RED 9/13 (identity loop removed)
+fix3 RED 4/13 (dangling guard continue)
+fix4 RED 9/18 (key forced to created); title half red on pre-fix-4 code 9/16
+All restored, git diff clean.

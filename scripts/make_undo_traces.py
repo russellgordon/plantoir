@@ -1010,7 +1010,7 @@ def move_state(op, at_from, at_to, listed_as=None):
     `.another`), whatever the item holds."""
     if listed_as is not None and is_case_only_move(op) and listed_as not in (op["from"], op["to"]):
         return "neither"
-    def side(item):
+    def side(item, is_at_from):
         reading = tree_reading(item)
         if reading[0] == "absent":
             return "free"
@@ -1019,8 +1019,14 @@ def move_state(op, at_from, at_to, listed_as=None):
         if "linkSha" in op:
             # U4b2-14: a link moved as itself, judged by its target.
             return "holds" if reading == ("link", op["linkSha"]) else "else"
+        if "linkShaBefore" in op:
+            # U4b3 relink: a link whose text the move changes, each side
+            # judged by its own text (`from` by linkShaBefore, `to` by
+            # linkShaAfter), never followed.
+            text = op["linkShaBefore"] if is_at_from else op["linkShaAfter"]
+            return "holds" if reading == ("link", text) else "else"
         return "holds" if reading == ("tree", op["listingSha"]) else "else"
-    source, destination = side(at_from), side(at_to)
+    source, destination = side(at_from, True), side(at_to, False)
     if source == "free" and destination == "holds":
         return "after"
     if source == "holds" and destination == "free":
@@ -1083,6 +1089,20 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
     # is before the move and made after it; backward it is taken back first,
     # and the move is judged as if it were.
     carriers = carried_edits(ops)
+    # U4b3 (opKinds.wholeOps' second exception): a place handed over. The
+    # second of the pair in this plan's order is judged against the place
+    # free when the first is a change of this plan, and the step's changes
+    # go in this plan's order.
+    handed = handovers(ops)
+    position = {}
+    for index, op in enumerate(ordered):
+        position[id(op)] = index
+    second_of = {}
+    for leaver, filler in handed:
+        first, second = (filler, leaver) if backward else (leaver, filler)
+        second_of[id(ops[second])] = ops[first]
+    changed = set()
+    in_order = []
     moving_now = set()
     group_stays_apart = leaves_apart and any(
         op["kind"] == "moveApart" and whole_state(op, pages_by_path) == "neither" for op in ordered
@@ -1124,6 +1144,12 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                             seen.pop(path, None)
                         else:
                             seen[path] = working[path]
+            first = second_of.get(id(op))
+            if first is not None and id(first) in changed:
+                # The place this move fills (forward, its `to`) or left
+                # (backward, its `from`) is free.
+                seen = dict(seen)
+                seen.pop(op["from"] if backward else op["to"], None)
             state = whole_state(op, seen)
             place = op.get("path") or op.get("from") or op.get("target")
             if group_stays_apart and kind == "moveApart" and state in ("neither", wanted_from):
@@ -1145,10 +1171,20 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                 return ("contentMissing", place)
             if carries and not backward:
                 moving_now.add(op["to"])
-            whole_changes.update(whole_moved(op, backward, seen))
+            moved_now = whole_moved(op, backward, seen)
+            whole_changes.update(moved_now)
+            changed.add(id(op))
+            in_order.append(moved_now)
             continue
         path = op["path"]
-        if path not in original:
+        first = second_of.get(id(op))
+        if first is not None and id(first) in changed:
+            # A new file (forward) or a removal taken back (backward) at a
+            # handed-over place starts from the place free, never read
+            # through what is leaving it.
+            original.setdefault(path, pages_by_path.get(path))
+            working[path] = None
+        elif path not in original:
             read_path = path
             carrier = carriers.get(path)
             if carrier is not None and carrier["to"] in moving_now:
@@ -1162,6 +1198,7 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             continue
         if state != wanted_from:
             continue
+        changed.add(id(op))
         if op["kind"] == "writeFile":
             target = op["beforeText"] if backward else op["afterText"]
             if content_missing and target is not None:
@@ -1189,8 +1226,16 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             source = op["after"] if backward else op["before"]
             target = op["before"] if backward else op["after"]
             working[path] = moving(op, source, target, working[path])
+        in_order.append({path: working[path]})
     if in_the_way:
         return ("changedSince", in_the_way[0], len(in_the_way) - 1)
+    if handed:
+        # Each change in this plan's order: what each place holds once the
+        # last op naming it is made.
+        changes = {}
+        for made in in_order:
+            changes.update(made)
+        return ("ready", changes, left_apart)
     file_changes = {}
     for path in original:
         if original[path] != working[path]:
@@ -1207,6 +1252,58 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
 
 
 EDIT_KINDS = ("writeFile", "editLine", "replaceText", "editJSON")
+
+
+def handovers(ops):
+    """UndoCheck.handovers (U4b3 door-1, opKinds.wholeOps' second
+    exception): each handed-over place of a step, as (leaver index, filler
+    index), in the step's order. A leaver is a file's or a link's move (its
+    `from`) or a removal; a filler such a move (its `to`) or a new file; the
+    filler later, the exact place by part_inside, at least one a move. Each
+    leaver hands its place to the first filler after it."""
+    found = []
+    for leaver_index, leaver in enumerate(ops):
+        place = place_left(leaver)
+        if place is None:
+            continue
+        for filler_index in range(leaver_index + 1, len(ops)):
+            filler = ops[filler_index]
+            filled = place_filled(filler)
+            if filled is not None and part_inside(place, filled) == "" and (
+                    hands_over_as_a_move(leaver) or hands_over_as_a_move(filler)):
+                found.append((leaver_index, filler_index))
+                break
+    return found
+
+
+def hands_over_as_a_move(op):
+    """UndoCheck.handsOverAsAMove: a file's or a link's `move`, never a
+    folder's, a capitalisation-only one, a moveApart or a setAside."""
+    if op.get("kind") != "move" or "listingSha" in op or is_case_only_move(op):
+        return False
+    return "sha" in op or is_a_links_move(op)
+
+
+def is_a_links_move(op):
+    """UndoOp.isALinksMove (U4b3 relink-1): a plain link's move (linkSha)
+    or a relinking one (linkShaBefore and linkShaAfter)."""
+    return "linkSha" in op or "linkShaBefore" in op
+
+
+def place_left(op):
+    if hands_over_as_a_move(op):
+        return op["from"]
+    if op.get("kind") == "writeFile" and op.get("afterSha") is None and op.get("beforeSha") is not None:
+        return op["path"]
+    return None
+
+
+def place_filled(op):
+    if hands_over_as_a_move(op):
+        return op["to"]
+    if op.get("kind") == "writeFile" and op.get("beforeSha") is None and op.get("afterSha") is not None:
+        return op["path"]
+    return None
 
 
 def place_as_found(op, backward):
@@ -1257,8 +1354,9 @@ def move_carries(move, edit):
     without regard to case (U4b2-9)."""
     if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
         return False
-    if "linkSha" in move:
-        # A link's move carries nothing (review 1 of U4b2-14).
+    if is_a_links_move(move):
+        # A link's move carries nothing (review 1 of U4b2-14), a relinking
+        # one included (U4b3 relink).
         return False
     if part_inside(move["to"], edit["path"]) is None:
         return False
@@ -1303,8 +1401,25 @@ def swap_groups(ops, backward):
     one group of ops per target: forward, each move that carries edits
     first, then each file in the order the ops first name it, then every
     other whole op; backward, each file in the reversed ops' order, then
-    every whole op, reversed (U4b, opKinds.wholeOps' order)."""
+    every whole op, reversed (U4b, opKinds.wholeOps' order). A step with a
+    handed-over place goes in the step's order instead (U4b3)."""
     ordered = list(reversed(ops)) if backward else list(ops)
+    if handovers(ops):
+        # U4b3 (opKinds.wholeOps' second exception): a step that hands a
+        # place over goes in the step's order, reversed going back; a file
+        # at the first op naming it.
+        groups, by_path = [], {}
+        for op in ordered:
+            if op["kind"] == "recompute":
+                continue
+            if op["kind"] in WHOLE_KINDS:
+                groups.append([op])
+                continue
+            if op["path"] not in by_path:
+                by_path[op["path"]] = []
+                groups.append(by_path[op["path"]])
+            by_path[op["path"]].append(op)
+        return groups
     carriers = carried_edits(ops)
     carrying = [op for op in ordered if any(carrier is op for carrier in carriers.values())]
     leading = [] if backward else [[op] for op in carrying]
@@ -1322,10 +1437,14 @@ def swap_groups(ops, backward):
     return leading + files + wholes
 
 
-def stopped_part_way(ops, backward, pages, swapped):
+def stopped_part_way(ops, backward, pages, swapped, inside=None):
     """What a step's swap leaves when its process is killed before the
     target numbered `swapped` (None: every target in): each group made in
-    turn, judged and moved on its own."""
+    turn, judged and moved on its own. `inside` (U4b3 relink-3) stops
+    INSIDE that target's swap instead, a relinking move's: relinkStaged
+    (its new link made under its staged name, which the model, holding no
+    staged files, does not show) or relinkRenamedIn (the new link renamed
+    in at its destination, the old one not yet removed: both stand)."""
     pages = dict(pages)
     groups = swap_groups(ops, backward)
     for group in groups[:len(groups) if swapped is None else swapped]:
@@ -1336,6 +1455,62 @@ def stopped_part_way(ops, backward, pages, swapped):
                 pages.pop(path, None)
             else:
                 pages[path] = text
+    if inside is not None:
+        op = groups[swapped][0]
+        assert "linkShaBefore" in op and inside in ("relinkStaged", "relinkRenamedIn"), (op, inside)
+        if inside == "relinkRenamedIn":
+            made = whole_moved(op, backward, pages)
+            for path, value in made.items():
+                if value is not None:
+                    pages[path] = value
+    return pages
+
+
+def remove_the_links_just_made(ops, pages, started_from_before):
+    """UndoRecovery.removeTheLinksJustMade (U4b3 relink-3): a relinking
+    move with both links standing, each holding its own side's text, loses
+    the link its interrupted swap had just made: at `to` going forward, at
+    `from` going back. A plan never does this.
+
+    Review F of U4b3, MEDIUM: at most ONE link is removed, and only when
+    the folder reads as a point INSIDE one relink's swap. In the work's
+    swap order (index order going forward, reversed for an Undo), a move
+    passes when it stands both ways, every relink before it holds its end
+    text at its end side and every relink after it holds its start text at
+    its start side; of the moves that pass, the last one's just-made link
+    is removed, and none when no move passes. Every link move is read, a
+    plain one (linkSha, one text at both sides) as a constraint only: its
+    swap is one rename, so it is never the one in flight."""
+    pages = dict(pages)
+
+    def holds(place, text_sha):
+        held = pages.get(place)
+        return isinstance(held, tuple) and held[0] == "link" and sha(held[1]) == text_sha
+
+    ordered = list(ops) if started_from_before else list(reversed(ops))
+    relinks = []
+    for op in ordered:
+        if op.get("kind") != "move" or ("linkShaBefore" not in op and "linkSha" not in op):
+            continue
+        is_a_relink = "linkShaBefore" in op
+        from_holds = holds(op["from"], op["linkShaBefore"] if is_a_relink else op["linkSha"])
+        to_holds = holds(op["to"], op["linkShaAfter"] if is_a_relink else op["linkSha"])
+        start_holds, end_holds = (from_holds, to_holds) if started_from_before else (to_holds, from_holds)
+        relinks.append((op, is_a_relink and from_holds and to_holds, start_holds, end_holds))
+    in_flight = None
+    for index, (op, stands_both_ways, _, _) in enumerate(relinks):
+        if not stands_both_ways:
+            continue
+        consistent = True
+        for other_index, (_, _, start_holds, end_holds) in enumerate(relinks):
+            if other_index < index and not end_holds:
+                consistent = False
+            if other_index > index and not start_holds:
+                consistent = False
+        if consistent:
+            in_flight = op["to"] if started_from_before else op["from"]
+    if in_flight is not None:
+        pages.pop(in_flight, None)
     return pages
 
 
@@ -1352,17 +1527,31 @@ def recovery_states(ops, pages):
     judged as if the step's edits inside it were taken back (U4b). The
     model holds no staged files, so it cannot show the swap's own kept
     originals inside the folder being left out: only the Swift replay
-    shows that."""
+    shows that.
+
+    A handed-over place's two ops are judged together (U4b3 door-3, the
+    one rule `handovers`): the leaver with the place free once its filler
+    stands after, the filler with the place absent while its leaver stands
+    before, again until nothing changes. A move that hands a place over is
+    judged under its two places (`place_judged`), apart from the page at
+    the same place."""
     carriers = carried_edits(ops)
-    states = {}
-    for op in ops:
+    pairs = handovers(ops)
+    moving = moves_handing_over(ops, pairs)
+    free_from, free_to, absent = set(), set(), set()
+
+    def judge(index):
+        op = ops[index]
         kind = op["kind"]
-        if kind == "recompute":
-            continue
         if kind in WHOLE_KINDS:
-            place = op.get("path") or op.get("from") or op.get("target")
             seen = pages
-            if any(carrier is op for carrier in carriers.values()):
+            if index in free_from or index in free_to:
+                seen = dict(pages)
+                if index in free_from:
+                    seen.pop(op["from"], None)
+                if index in free_to:
+                    seen.pop(op["to"], None)
+            elif any(carrier is op for carrier in carriers.values()):
                 old_place = move_is_at_its_old_place(op, pages)
                 seen = dict(pages)
                 for path, carrier in carriers.items():
@@ -1373,17 +1562,86 @@ def recovery_states(ops, pages):
                     taken_back = plan(edits, True, seen)
                     if taken_back[0] == "ready" and side in taken_back[1]:
                         seen[side] = taken_back[1][side]
-            states[place] = whole_state(op, seen)
-            continue
+            return whole_state(op, seen)
+        if index in absent:
+            return op_state(op, None)
         path = op["path"]
         read_path = path
         carrier = carriers.get(path)
         if carrier is not None and move_is_at_its_old_place(carrier, pages):
             read_path = place_before_the_move(path, carrier)
-        state = op_state(op, pages.get(read_path))
-        earlier = states.get(path)
-        states[path] = state if earlier in (None, state) else "neither"
+        current = pages.get(read_path)
+        if current is not None and not isinstance(current, str):
+            # A link or a folder where a page is named: neither of its sides.
+            return "neither"
+        return op_state(op, current)
+
+    judged = [None if op["kind"] == "recompute" else judge(index) for index, op in enumerate(ops)]
+    for _ in range(len(ops) + 1):
+        changed = False
+        for leaver, filler in pairs:
+            if judged[filler] == "after" and leaver not in free_from and leaver not in absent:
+                (free_from if ops[leaver]["kind"] in WHOLE_KINDS else absent).add(leaver)
+                judged[leaver] = judge(leaver)
+                changed = True
+            if judged[leaver] == "before" and filler not in free_to and filler not in absent:
+                (free_to if ops[filler]["kind"] in WHOLE_KINDS else absent).add(filler)
+                judged[filler] = judge(filler)
+                changed = True
+        if not changed:
+            break
+    states = {}
+    for index, op in enumerate(ops):
+        if op["kind"] == "recompute":
+            continue
+        place = place_judged(op, index, moving)
+        if op["kind"] in WHOLE_KINDS:
+            states[place] = judged[index]
+            continue
+        earlier = states.get(place)
+        states[place] = judged[index] if earlier in (None, judged[index]) else "neither"
     return states
+
+
+def moves_handing_over(ops, pairs):
+    """UndoRecovery.movesHandingOver: the indices of the step's moves that
+    leave or fill a handed-over place."""
+    found = set()
+    for leaver, filler in pairs:
+        for index in (leaver, filler):
+            if ops[index]["kind"] in WHOLE_KINDS:
+                found.add(index)
+    return found
+
+
+def place_judged(op, index, moving):
+    """UndoRecovery.placeJudged: the name recovery judges an op under: a
+    move that hands a place over by its two places ("from → to"), every
+    other op by its path, its from or its target."""
+    if index in moving:
+        return op["from"] + " → " + op["to"]
+    return op.get("path") or op.get("from") or op.get("target")
+
+
+def place_shown(ops, place):
+    """U4b3 door-5: the plain path a judged place is shown as on the trail
+    and to a teacher: a handed-over move under its own place (its from),
+    as every other move is named."""
+    moving = moves_handing_over(ops, handovers(ops))
+    for index, op in enumerate(ops):
+        if index in moving and place_judged(op, index, moving) == place:
+            return op["from"]
+    return place
+
+
+def places_shown(ops, places):
+    """Each judged place shown as a plain path, each path once, in order."""
+    shown = []
+    for place in places:
+        plain = place_shown(ops, place)
+        if plain not in shown:
+            shown.append(plain)
+    return shown
 
 
 def recover(ops, pages, started_from_before):
@@ -1391,12 +1649,13 @@ def recover(ops, pages, started_from_before):
     took effect put back, judged by content alone. A place that is neither
     is in the way (changed by hand since): every place NOT in the way that
     took effect is still put back, and the step is interrupted naming the
-    places in the way (U4b2-13, as Swift's settle does). Answers (outcome,
+    places in the way (U4b2-13, as Swift's settle does), each a plain path
+    once (`places_shown`, U4b3 door-5). Answers (outcome,
     pages, the places the interrupted line names).
 
     Two known differences from settle, which no row run through this model
-    reaches today (it runs only the withAMovedFolder rows, none of which has
-    an external op or stops after the edit inside with a hand edit), so a
+    reaches today (it runs only the withAMovedFolder and withAHandedOverPlace
+    rows, none of which has an external op or stops after the edit inside with a hand edit), so a
     new row of either kind must not be trusted because it passes here:
     - the model names an external op's target among the places; settle
       never does (`pathsOnly`);
@@ -1406,6 +1665,9 @@ def recover(ops, pages, started_from_before):
       step's own kept copy inside the folder out, is refused and the step
       closes couldNotPutBack with nothing put back (the U7 gap)."""
     start, end = ("before", "after") if started_from_before else ("after", "before")
+    # U4b3 relink-3: the link an interrupted relink had just made goes
+    # first, so its op stands where its swap began.
+    pages = remove_the_links_just_made(ops, pages, started_from_before)
     states = recovery_states(ops, pages)
     in_the_way = [place for place, state in states.items() if state == "neither"]
     if not in_the_way and all(state == start for state in states.values()):
@@ -1422,10 +1684,57 @@ def recover(ops, pages, started_from_before):
         for place in in_the_way:
             if place not in named:
                 named.append(place)
-        return ("interrupted", pages, named)
+        return ("interrupted", pages, places_shown(ops, named))
     if in_the_way:
-        return ("interrupted", put_back, in_the_way)
+        return ("interrupted", put_back, places_shown(ops, in_the_way))
     return ("rolledBack", put_back, [])
+
+
+def visible_name(place, number, is_a_page=False):
+    """UndoSwap.visibleName: `<name> (kept by Undo)`, then `(kept by Undo
+    2)` and on; a page's words go before its extension (U4b3
+    kept-original-named, Russell's ruling of 2026-11-26)."""
+    words = " (kept by Undo)" if number <= 1 else " (kept by Undo %d)" % number
+    folder, _, name = place.rpartition("/")
+    stem, dot, extension = name.rpartition(".")
+    if is_a_page and dot and stem:
+        name = stem + words + "." + extension
+    else:
+        name = name + words
+    return folder + "/" + name if folder else name
+
+
+def keep_pages_whose_place_is_taken(ops, starting, stopped, settled, outcome):
+    """UndoRecovery.keepPagesWhosePlaceIsTaken (U4b3 kept-original-named),
+    as the model can see it: for a step that did not settle
+    (interrupted), a page a whole-file op's swap removed or moved away
+    (it held a page when the work began, `starting`, and its swap had taken
+    it when the work stopped, `stopped`), whose place something else now
+    holds (`settled`), is kept under the first visible name nothing holds,
+    never over anything. Answers (pages, [(place, visible name)], one per
+    trail line)."""
+    if outcome != "interrupted":
+        return settled, []
+    pages = dict(settled)
+    lines = []
+    places = []
+    for op in ops:
+        if op["kind"] == "writeFile" and op.get("path") not in places:
+            places.append(op["path"])
+    for place in places:
+        page = starting.get(place)
+        if not isinstance(page, str) or stopped.get(place) == page:
+            continue
+        now = pages.get(place)
+        if now is None or now == page:
+            continue
+        number = 1
+        while visible_name(place, number, True) in pages:
+            number += 1
+        kept = visible_name(place, number, True)
+        pages[kept] = page
+        lines.append((place, kept))
+    return pages, lines
 
 
 def put_back_what_took_effect(ops, places, started_from_before, pages):
@@ -1435,8 +1744,9 @@ def put_back_what_took_effect(ops, places, started_from_before, pages):
     are."""
     if not places:
         return pages
-    at_end = [op for op in ops if op["kind"] != "recompute"
-              and (op.get("path") or op.get("from") or op.get("target")) in places]
+    moving = moves_handing_over(ops, handovers(ops))
+    at_end = [op for index, op in enumerate(ops) if op["kind"] != "recompute"
+              and place_judged(op, index, moving) in places]
     result = plan(at_end, started_from_before, pages)
     if result[0] != "ready":
         return None
@@ -1550,6 +1860,12 @@ def whole_moved(op, backward, pages):
                 if isinstance(path, str) and path.startswith(prefix):
                     moved[destination + path[len(source):]] = value
             return moved
+        if "linkShaBefore" in op:
+            # U4b3 relink: the link made again at its destination holding
+            # that side's own text (the model's `linkTexts` stands for the
+            # list's two blobs: each sha's text).
+            wanted = op["linkShaBefore"] if backward else op["linkShaAfter"]
+            return {destination: ("link", op["linkTexts"][wanted]), source: None}
         return {destination: pages.get(source), source: None}
     if kind in ("createTree", "removeTree"):
         makes = (kind == "createTree") != backward

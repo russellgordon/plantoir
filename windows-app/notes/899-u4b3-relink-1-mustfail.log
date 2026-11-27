@@ -1,0 +1,8 @@
+U4b3 relink-1 (#899) must-fail, 2026-11-26. Each sabotage applied by script, built, UndoRelinkTests run, then restored with git checkout (git diff clean after each).
+
+M1 to read by linkShaBefore (UndoOp.linkText returns linkShaBefore for both sides): run-r1-mf1, 7 failures. testARelinkGoesForwardAndBackHoldingEachSidesOwnText: plan back "refused(changedSince(firstPath: .../Unit 1, Day 5.md))", not ready. RED.
+M2 the swap renames the old link over (renameExclusively(from, onto:) for the relink): run-r1-mf2, 15 failures. testARelinkGoesForwardAndBackHoldingEachSidesOwnText: Day 5 holds "Unit 1, Day 3.md", not "Unit 1, Day 4.md". RED.
+M3 the old link removed before the new is renamed in (UndoSwap.relinkLink): run-r1-mf3, 25 failures. testARenameInThatFailsLeavesTheOldLinkWhole: no link at Day 4 (nil, not "Unit 1, Day 3.md"); testALaterFailureReversesTheRelink likewise. RED.
+M4 staysInside(namedBy:) by linkSha != nil instead of isALinksMove: run-r1-mf4, 7 failures. testARelinkGoesForwardAndBackHoldingEachSidesOwnText: plan forward refused changedSince (the link's own place followed and judged leading out). RED.
+
+RED 4 of 4.

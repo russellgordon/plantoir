@@ -196,14 +196,31 @@ nonisolated final class JournaledStep {
     /// folder and its two pages), as one `createTree`, in the order planned.
     private(set) var plannedTrees: [(url: URL, listing: UndoTreeListing, contents: [String: Data])] = []
 
+    /// One planned folder move, a link's move or a relinking move.
+    typealias PlannedFolderMove = (
+        from: URL, to: URL, listingSha: String?, linkSha: String?, textBefore: Data?, textAfter: Data?
+    )
+
     /// Each FOLDER planned to be moved whole (#899 U4b: Rename folder), in
     /// the order planned, with the SHA-256 of its listing when planned. A
     /// file planned at or inside a folder move's `to` is an edit the move
     /// carries (`undoJournal.opKinds.wholeOps`): its `before` is read where
     /// the file is now, under `from`, and its op goes after the move. A
     /// symbolic link moved as itself (U4b2-15) carries its `linkSha`
-    /// instead (`moveLink`), and carries no edit.
-    private(set) var plannedFolderMoves: [(from: URL, to: URL, listingSha: String?, linkSha: String?)] = []
+    /// instead (`moveLink`), and carries no edit. A RELINKING move (U4b3
+    /// relink-4, `relinkLink`) carries `linkSha` as the sha of the text the
+    /// link holds now, and both texts, `textBefore` and `textAfter`; every
+    /// other move carries neither text.
+    private(set) var plannedFolderMoves: [PlannedFolderMove] = []
+
+    /// A write planned at a place no step can judge yet, refusing the step
+    /// "cannot tell now" when it is made, before anything changes (#899
+    /// U4b3): a write at a planned link move's `to` when the link moved to
+    /// another folder (a relative target could lead somewhere else from
+    /// there). A write at a link move's `from` is planned as a new file at
+    /// the place the link leaves (U4b3 door-6). The first such place; nil
+    /// otherwise.
+    private(set) var refusedBeforeMaking: UndoRefusal? = nil
 
     // MARK: - Computed properties
 
@@ -366,7 +383,7 @@ nonisolated final class JournaledStep {
         guard let sha = listingSha ?? UndoTreeReading.read(at: from).listingSha else {
             return false
         }
-        plannedFolderMoves.append((from: from, to: to, listingSha: sha, linkSha: nil))
+        plannedFolderMoves.append((from: from, to: to, listingSha: sha, linkSha: nil, textBefore: nil, textAfter: nil))
         return true
     }
 
@@ -377,14 +394,77 @@ nonisolated final class JournaledStep {
     /// What it leads to is never opened, listed or touched. Plan no edit
     /// inside its `to`: a link's move carries none.
     func moveLink(_ from: URL, to: URL, linkSha: String) {
-        plannedFolderMoves.append((from: from, to: to, listingSha: nil, linkSha: linkSha))
+        plannedFolderMoves.append((from: from, to: to, listingSha: nil, linkSha: linkSha, textBefore: nil, textAfter: nil))
     }
 
-    /// A planned folder move as its op, between the paths given: a link's
-    /// move by `linkSha`, a folder's by `listingSha`.
-    static func folderMoveOp(
-        from: String, to: String, planned: (from: URL, to: URL, listingSha: String?, linkSha: String?)
-    ) -> UndoOp {
+    /// Plans the symbolic LINK at `from` to be moved to `to` holding
+    /// `textAfter` instead of the text it holds now (#899 U4b3 relink-4, a
+    /// relinking move: `undoJournal.opKinds.move`). The text now is read
+    /// here, with `readlink`, never followed (the bytes
+    /// `UndoTreeReading.linkSha(at:)` hashes); both texts go to the list as
+    /// blobs before the step begins. As `moveLink`, the place it leaves is
+    /// handed over (a write there makes a new file, a move may fill it,
+    /// U4b3 door-6), and nothing is ever written through either name: a
+    /// write planned at `to` refuses the step before anything changes, as
+    /// the link there holds a text the step is changing. False, planning
+    /// nothing, when the link cannot be read now. A `textAfter` equal to
+    /// the text now is the link's plain move (`moveLink`).
+    @discardableResult
+    func relinkLink(_ from: URL, to: URL, textAfter: Data) -> Bool {
+        guard let textBefore = UndoTreeReading.linkTarget(at: from) else {
+            return false
+        }
+        if textBefore == textAfter {
+            moveLink(from, to: to, linkSha: UndoHash.sha256(of: textBefore))
+            return true
+        }
+        plannedFolderMoves.append((
+            from: from, to: to, listingSha: nil, linkSha: UndoHash.sha256(of: textBefore),
+            textBefore: textBefore, textAfter: textAfter
+        ))
+        return true
+    }
+
+    /// Whether a planned folder move is a symbolic link's (`moveLink` or
+    /// `relinkLink`): the one test every reading of the plan asks.
+    static func isALinksMove(_ planned: PlannedFolderMove) -> Bool {
+        return planned.linkSha != nil
+    }
+
+    /// Whether a planned folder move changes the text its link holds
+    /// (`relinkLink`).
+    static func isARelink(_ planned: PlannedFolderMove) -> Bool {
+        return planned.textBefore != nil && planned.textAfter != nil
+    }
+
+    /// The blobs a planned folder move needs in the list: a relinking
+    /// move's two texts, before then after; none for any other.
+    static func blobs(of planned: PlannedFolderMove) -> [Data] {
+        guard let textBefore = planned.textBefore, let textAfter = planned.textAfter else {
+            return []
+        }
+        return [textBefore, textAfter]
+    }
+
+    /// A planned relinking move's two texts for the swap made without the
+    /// list (`makeWithoutARecord`), going forward; nil for any other move.
+    static func relinkGoingForward(_ planned: PlannedFolderMove) -> UndoRelink? {
+        guard let textBefore = planned.textBefore, let textAfter = planned.textAfter else {
+            return nil
+        }
+        return UndoRelink(sourceText: textBefore, destinationText: textAfter, sourceIsFrom: true)
+    }
+
+    /// A planned folder move as its op, between the paths given: a
+    /// relinking move by both texts' shas, a link's move by `linkSha`, a
+    /// folder's by `listingSha`.
+    static func folderMoveOp(from: String, to: String, planned: PlannedFolderMove) -> UndoOp {
+        if let textBefore = planned.textBefore, let textAfter = planned.textAfter {
+            return UndoOp.relinkLink(
+                from: from, to: to,
+                linkShaBefore: UndoHash.sha256(of: textBefore), linkShaAfter: UndoHash.sha256(of: textAfter)
+            )
+        }
         if let linkSha = planned.linkSha {
             return UndoOp.moveLink(from: from, to: to, linkSha: linkSha)
         }
@@ -397,12 +477,21 @@ nonisolated final class JournaledStep {
     /// changed after that read refuses the step instead of being written
     /// over.
     func write(_ data: Data, to url: URL, plannedFrom read: Data) {
+        if refusesAWrite(at: url) {
+            return
+        }
         let place: URL = placeALinkLeadsTo(url)
         let key: String = JournaledStep.key(of: place)
         if plannedURL[key] == nil {
             plannedOrder.append(key)
             plannedURL[key] = place
-            plannedBefore[key] = .file(read)
+            // The place a link's move leaves holds nothing once it has gone
+            // (U4b3 door-6): the write there makes a new file.
+            if plannedLinkMove(startingAt: place) != nil {
+                plannedBefore[key] = .absent
+            } else {
+                plannedBefore[key] = .file(read)
+            }
         }
         plannedAfter[key] = data
     }
@@ -443,6 +532,15 @@ nonisolated final class JournaledStep {
             }
             let named: String = above + "/" + move.to.lastPathComponent
             return inside.isEmpty ? named : named + "/" + inside
+        }
+        // The place a link's move leaves is named from the folder above it,
+        // never resolved through the link still standing there (U4b3
+        // door-6), as the link's move names its own `from`.
+        if plannedLinkMove(startingAt: url) != nil {
+            guard let above = UndoFolderPlaces.relativePath(of: url.deletingLastPathComponent(), under: root) else {
+                return nil
+            }
+            return above + "/" + url.lastPathComponent
         }
         return UndoFolderPlaces.relativePath(of: url, under: root)
     }
@@ -537,6 +635,9 @@ nonisolated final class JournaledStep {
         if let planned = plannedAfter[key] {
             return planned
         }
+        if isLeftFreeByALinkMove(url) {
+            return nil
+        }
         return try? Data(contentsOf: placeOnDiskNow(url))
     }
 
@@ -551,6 +652,9 @@ nonisolated final class JournaledStep {
             }
             return String(data: data, encoding: .utf8)
         }
+        if isLeftFreeByALinkMove(url) {
+            return nil
+        }
         return try? String(contentsOf: placeOnDiskNow(url), encoding: .utf8)
     }
 
@@ -564,6 +668,9 @@ nonisolated final class JournaledStep {
             }
             return text
         }
+        if isLeftFreeByALinkMove(url) {
+            throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: url.path])
+        }
         return try String(contentsOf: placeOnDiskNow(url), encoding: .utf8)
     }
 
@@ -573,18 +680,36 @@ nonisolated final class JournaledStep {
         if let planned = plannedAfter[key] {
             return planned != nil
         }
+        if isLeftFreeByALinkMove(url) {
+            return false
+        }
         return FileManager.default.fileExists(atPath: placeOnDiskNow(url).path)
     }
 
     /// The `.md` files under a folder, at any depth, once the step is made:
     /// the disk's (`onDisk`, as a lister found them), without those the step
-    /// removes, with those it makes, sorted by path as the listers sort.
+    /// removes, with those it makes, sorted by path as the listers sort. A
+    /// link the step moves or re-points is NOT listed, at either name: the
+    /// place it leaves only when the step writes a page there (U4b3
+    /// door-6), and never at its new name (review E of U4b3, MEDIUM: the
+    /// `[[link]]` rewrite visits each FILE once, at its own place, so a
+    /// page a link leads to is rewritten at its own name when it is one of
+    /// the files listed, and never through the link; writing at a
+    /// re-pointed link's new name is refused, `refusesAWrite`, and refused
+    /// the whole Insert Class).
     func markdownFiles(under folderURL: URL, onDisk: [URL]) -> [URL] {
         var result: [URL] = []
         var seen: Set<String> = []
         for url in onDisk {
             let key: String = JournaledStep.key(of: url)
-            if let planned = plannedAfter[key], planned == nil {
+            if plannedLinkMove(endingAt: url) != nil {
+                continue
+            }
+            if let planned = plannedAfter[key] {
+                if planned == nil {
+                    continue
+                }
+            } else if isLeftFreeByALinkMove(url) {
                 continue
             }
             seen.insert(key)
@@ -632,6 +757,9 @@ nonisolated final class JournaledStep {
     /// the list can take it), then every planned file staged and swapped in
     /// together. Throws, having written nothing, when the door refuses.
     func make() throws {
+        if let refusal = refusedBeforeMaking {
+            throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+        }
         if isMixed {
             try makeAsOps()
             return
@@ -741,6 +869,13 @@ nonisolated final class JournaledStep {
             ops.append(op)
             changedFiles += 1
         }
+        // A relinking move's two texts, written to the list before the step
+        // begins with every other blob (U4b3 relink-4).
+        for planned in plannedFolderMoves {
+            for blob in JournaledStep.blobs(of: planned) {
+                blobs.append(blob)
+            }
+        }
         for change in changes {
             changeIndex += 1
             if change.before == change.after {
@@ -789,6 +924,13 @@ nonisolated final class JournaledStep {
                 ops.append(UndoOp.recompute(path: path, maintainer: kept.maintainer, section: kept.section))
             }
         }
+        // Every handed-over place left before it is filled (U4b3 door-6):
+        // a removal a link moves into goes before that move.
+        var opsOfEach: [[UndoOp]] = []
+        for op in ops {
+            opsOfEach.append([op])
+        }
+        ops = JournaledStep.inHandingOverOrder(ops, opsOf: opsOfEach)
         let draft: UndoOpsDraft = UndoOpsDraft(
             action: action(changedFiles: changedFiles),
             madeBy: maker.madeBy,
@@ -856,7 +998,7 @@ nonisolated final class JournaledStep {
             // A link's `from` is named from the folder above it, never
             // resolved: `relativePath` would name what it leads to.
             var named: String? = nil
-            if planned.linkSha == nil {
+            if !JournaledStep.isALinksMove(planned) {
                 named = UndoFolderPlaces.relativePath(of: planned.from, under: root)
             } else if let above = UndoFolderPlaces.relativePath(of: planned.from.deletingLastPathComponent(), under: root) {
                 named = above + "/" + planned.from.lastPathComponent
@@ -898,14 +1040,24 @@ nonisolated final class JournaledStep {
     /// root to check against.
     func makeWithoutARecord() throws {
         var targets: [UndoSwapTarget] = []
+        // Each target's op with its places spelled one way, to order the
+        // targets so every handed-over place is left before it is filled
+        // (U4b3 door-6).
+        var targetOps: [[UndoOp]] = []
         // A folder's move first, and every file inside it staged only at its
         // turn, once the folder is at its new place (U4b).
         for planned in plannedFolderMoves {
             let op: UndoOp = JournaledStep.folderMoveOp(from: planned.from.path, to: planned.to.path, planned: planned)
+            // A relinking move is made as the door makes it: a new link
+            // holding the new text, renamed in, the old one then removed.
             targets.append(UndoSwapTarget(
                 url: planned.to, relativePath: planned.to.lastPathComponent,
-                change: .moveHere(from: planned.from, fromPath: planned.from.lastPathComponent, op: op)
+                change: .moveHere(from: planned.from, fromPath: planned.from.lastPathComponent, op: op),
+                relink: JournaledStep.relinkGoingForward(planned)
             ))
+            targetOps.append([JournaledStep.folderMoveOp(
+                from: JournaledStep.key(of: planned.from), to: JournaledStep.key(of: planned.to), planned: planned
+            )])
         }
         for key in plannedOrder {
             guard let url = plannedURL[key], let after = plannedAfter[key] else {
@@ -929,9 +1081,14 @@ nonisolated final class JournaledStep {
                 continue
             }
             let carried: Bool = placeOnDiskNow(url) != url
+            // A link leaving or arriving at this place is never followed
+            // (U4b3 door-1's look at staging).
+            let handedOver: Bool = plannedLinkMove(startingAt: url) != nil || plannedLinkMove(endingAt: url) != nil
             targets.append(UndoSwapTarget(
-                url: url, relativePath: url.lastPathComponent, expected: before, replacement: after, stagesAtItsTurn: carried
+                url: url, relativePath: url.lastPathComponent, expected: before, replacement: after,
+                stagesAtItsTurn: carried, handedOver: handedOver
             ))
+            targetOps.append([JournaledStep.wholeFileOp(at: key, before: before, after: after)])
         }
         for planned in plannedMoves {
             let op: UndoOp = UndoOp.moveFile(from: planned.from.path, to: planned.to.path, sha: planned.sha)
@@ -939,12 +1096,16 @@ nonisolated final class JournaledStep {
                 url: planned.to, relativePath: planned.to.lastPathComponent,
                 change: .moveHere(from: planned.from, fromPath: planned.from.lastPathComponent, op: op)
             ))
+            targetOps.append([UndoOp.moveFile(
+                from: JournaledStep.key(of: planned.from), to: JournaledStep.key(of: planned.to), sha: planned.sha
+            )])
         }
         for tree in plannedTrees {
             targets.append(UndoSwapTarget(
                 url: tree.url, relativePath: tree.url.lastPathComponent,
                 change: .makeTree(tree.listing, contents: tree.contents)
             ))
+            targetOps.append([])
         }
         for op in plannedExternals {
             guard let target = op.target else {
@@ -954,7 +1115,9 @@ nonisolated final class JournaledStep {
                 url: URL(fileURLWithPath: "/"), relativePath: target,
                 change: .setExternal(target: target, expected: op.valueBefore, value: op.valueAfter)
             ))
+            targetOps.append([])
         }
+        targets = JournaledStep.inHandingOverOrder(targets, opsOf: targetOps)
         switch UndoShadowStaging.swap(targets, noting: UndoJournalLocation.standardJournal(), places: places) {
         case .swapped:
             return
@@ -1016,6 +1179,7 @@ nonisolated final class JournaledStep {
     /// live step is: its content cannot be checked.
     func writePlainly() throws {
         var targets: [UndoSwapTarget] = []
+        var targetOps: [[UndoOp]] = []
         for key in plannedOrder {
             guard let url = plannedURL[key], let after = plannedAfter[key] else {
                 continue
@@ -1034,10 +1198,14 @@ nonisolated final class JournaledStep {
                 continue
             }
             targets.append(UndoSwapTarget(url: url, relativePath: url.path, expected: expected, replacement: after))
+            targetOps.append([JournaledStep.wholeFileOp(at: key, before: expected, after: after)])
         }
         if targets.isEmpty {
             return
         }
+        // The one handing-over order (U4b3 door-6); files alone hand no
+        // place over, so this keeps their order.
+        targets = JournaledStep.inHandingOverOrder(targets, opsOf: targetOps)
         let journal: UndoJournal = UndoJournalLocation.standardJournal()
         switch UndoShadowStaging.swap(targets, noting: journal) {
         case .swapped:
@@ -1059,15 +1227,30 @@ nonisolated final class JournaledStep {
     /// leads to (`throughALink`, the default), unless its own place is
     /// already planned in this step.
     private func plan(_ data: Data?, at url: URL, throughALink: Bool = true) {
+        if refusesAWrite(at: url) {
+            return
+        }
         var place: URL = url
-        if throughALink && plannedURL[JournaledStep.key(of: url)] == nil {
+        // A link's new place is always the file it leads to, even where the
+        // step removes the page the link moves over (U4b3 door-6).
+        if throughALink && (plannedURL[JournaledStep.key(of: url)] == nil || plannedLinkMove(endingAt: url) != nil) {
             place = placeALinkLeadsTo(url)
         }
         let key: String = JournaledStep.key(of: place)
         if plannedURL[key] == nil {
             plannedOrder.append(key)
             plannedURL[key] = place
-            plannedBefore[key] = UndoItem.read(at: placeOnDiskNow(place))
+            if plannedLinkMove(startingAt: place) != nil {
+                // The place a link's move leaves holds nothing once it has
+                // gone (U4b3 door-6): never read through the leaving link.
+                plannedBefore[key] = .absent
+            } else if plannedLinkMove(endingAt: place) != nil {
+                // The page a link moves over, read where it is now: a link's
+                // move carries nothing.
+                plannedBefore[key] = UndoItem.read(at: place)
+            } else {
+                plannedBefore[key] = UndoItem.read(at: placeOnDiskNow(place))
+            }
         }
         plannedAfter[key] = data
     }
@@ -1079,16 +1262,182 @@ nonisolated final class JournaledStep {
     /// it is not a link. A place carried by a planned folder move is named
     /// as the caller named it: the move decides where it is.
     func placeALinkLeadsTo(_ url: URL) -> URL {
+        // The one place a write after a link's move is resolved (U4b3): a
+        // place that is exactly a planned link move's `to`, within the
+        // same folder, is the file the link at its `from` leads to now,
+        // the same file before and after the move. Never the link's new
+        // place itself, which would be an edit inside a link's `to`.
+        if let linkMove = plannedLinkMove(endingAt: url), JournaledStep.staysInItsFolder(linkMove), !isARelink(endingAt: url) {
+            return CourseConfiguration.fileALinkLeadsTo(linkMove.from)
+        }
+        // The place a link's move leaves is the place itself, never the
+        // file the leaving link leads to (U4b3 door-6).
+        if plannedLinkMove(startingAt: url) != nil {
+            return url
+        }
         if placeOnDiskNow(url) != url {
             return url
         }
         return CourseConfiguration.fileALinkLeadsTo(url)
     }
 
+    /// A file's change as one `writeFile` op at `path`, to order a step's
+    /// targets by (`inHandingOverOrder`).
+    static func wholeFileOp(at path: String, before: Data?, after: Data?) -> UndoOp {
+        return UndoOp.writeFile(
+            path: path, beforeSha: UndoHash.sha256(ofOptional: before), afterSha: UndoHash.sha256(ofOptional: after)
+        )
+    }
+
+    /// Whether `url` is the place a planned link move leaves (U4b3 door-6)
+    /// and nothing is planned there yet: it reads as free, with no file, no
+    /// text and nothing listed, never through the leaving link.
+    func isLeftFreeByALinkMove(_ url: URL) -> Bool {
+        if plannedLinkMove(startingAt: url) == nil || plannedLinkMove(endingAt: url) != nil {
+            return false
+        }
+        return plannedAfter[JournaledStep.key(of: url)] == nil
+    }
+
+    /// The items of a step in an order where every handed-over place is
+    /// left before it is filled (U4b3 door-6; the door-4 rule,
+    /// `undoJournal.opKinds.wholeOps`' second exception): an item that
+    /// fills a place, by the door's own finder (`UndoCheck.placeFilled`,
+    /// `placeLeft`, `handsOverAsAMove`), goes straight after a later item
+    /// that leaves it, until none is left before its filler. `opsOf` holds
+    /// each item's ops, its places spelled one way. A step with no such
+    /// pair keeps its order exactly.
+    static func inHandingOverOrder<Item>(_ items: [Item], opsOf: [[UndoOp]]) -> [Item] {
+        var order: [Int] = []
+        var index: Int = 0
+        while index < items.count {
+            order.append(index)
+            index += 1
+        }
+        // Each pass moves one filler; a step whose places go round in a
+        // circle stops here, and the door refuses it.
+        var passesLeft: Int = items.count * items.count
+        var movedOne: Bool = true
+        while movedOne && passesLeft > 0 {
+            movedOne = false
+            passesLeft -= 1
+            var position: Int = 0
+            while position < order.count && !movedOne {
+                if let leaverPosition = JournaledStep.laterLeaver(
+                    of: opsOf[order[position]], after: position, in: order, opsOf: opsOf
+                ) {
+                    let filler: Int = order.remove(at: position)
+                    order.insert(filler, at: leaverPosition)
+                    movedOne = true
+                }
+                position += 1
+            }
+        }
+        var ordered: [Item] = []
+        for itemIndex in order {
+            ordered.append(items[itemIndex])
+        }
+        return ordered
+    }
+
+    /// The position after `position` of the first item whose op leaves a
+    /// place one of `fillerOps` fills, at least one of the pair a handing
+    /// over move; nil when there is none.
+    static func laterLeaver(of fillerOps: [UndoOp], after position: Int, in order: [Int], opsOf: [[UndoOp]]) -> Int? {
+        for filler in fillerOps {
+            guard let filled = UndoCheck.placeFilled(by: filler) else {
+                continue
+            }
+            var later: Int = position + 1
+            while later < order.count {
+                for leaver in opsOf[order[later]] {
+                    guard let left = UndoCheck.placeLeft(by: leaver), UndoOp.partInside(left, of: filled) == "" else {
+                        continue
+                    }
+                    if UndoCheck.handsOverAsAMove(leaver) || UndoCheck.handsOverAsAMove(filler) {
+                        return later
+                    }
+                }
+                later += 1
+            }
+        }
+        return nil
+    }
+
+    /// The planned move of a symbolic link (`moveLink`) whose `to` is
+    /// exactly `url`, or nil.
+    func plannedLinkMove(endingAt url: URL) -> (from: URL, to: URL)? {
+        let key: String = JournaledStep.key(of: url)
+        for move in plannedFolderMoves where JournaledStep.isALinksMove(move) {
+            if JournaledStep.key(of: move.to) == key {
+                return (from: move.from, to: move.to)
+            }
+        }
+        return nil
+    }
+
+    /// The planned move of a symbolic link whose `from` is exactly `url`,
+    /// or nil.
+    func plannedLinkMove(startingAt url: URL) -> (from: URL, to: URL)? {
+        let key: String = JournaledStep.key(of: url)
+        for move in plannedFolderMoves where JournaledStep.isALinksMove(move) {
+            if JournaledStep.key(of: move.from) == key {
+                return (from: move.from, to: move.to)
+            }
+        }
+        return nil
+    }
+
+    /// Whether a planned RELINKING move (`relinkLink`) ends at `url`.
+    func isARelink(endingAt url: URL) -> Bool {
+        let key: String = JournaledStep.key(of: url)
+        for move in plannedFolderMoves where JournaledStep.isARelink(move) {
+            if JournaledStep.key(of: move.to) == key {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether a link's move keeps it in the folder it was in, so a
+    /// relative target leads to the same file from either name. Never asked
+    /// of a relinking move (U4b3 relink-4): its text is changed on purpose,
+    /// so its new name leads elsewhere whichever folder it is in, and a
+    /// write there is refused (`refusesAWrite`).
+    static func staysInItsFolder(_ move: (from: URL, to: URL)) -> Bool {
+        let fromFolder: String = JournaledStep.key(of: move.from.deletingLastPathComponent())
+        let toFolder: String = JournaledStep.key(of: move.to.deletingLastPathComponent())
+        return fromFolder == toFolder
+    }
+
+    /// Whether a write at `url` is one no step can judge yet (U4b3), noting
+    /// the first such place in `refusedBeforeMaking`: at the `to` of a link
+    /// moved to another folder, or of a relinking move (U4b3 relink-4),
+    /// whose link holds a text the step changes, so a write there would be
+    /// a write through it.
+    private func refusesAWrite(at url: URL) -> Bool {
+        var refused: Bool = false
+        if let linkMove = plannedLinkMove(endingAt: url), !JournaledStep.staysInItsFolder(linkMove) {
+            refused = true
+        }
+        if isARelink(endingAt: url) {
+            refused = true
+        }
+        if refused && refusedBeforeMaking == nil {
+            refusedBeforeMaking = .cannotTellNow(path: url.path)
+        }
+        return refused
+    }
+
     /// The key a read finds a planned file by: `url`'s own when it is
     /// planned, else the file a link at `url` leads to.
     private func plannedKey(of url: URL) -> String {
         let key: String = JournaledStep.key(of: url)
+        // A link's new place reads as the file it leads to, even where the
+        // step removes the page the link moves over (U4b3 door-6).
+        if let linkMove = plannedLinkMove(endingAt: url), JournaledStep.staysInItsFolder(linkMove), !isARelink(endingAt: url) {
+            return JournaledStep.key(of: placeALinkLeadsTo(url))
+        }
         if plannedAfter[key] != nil {
             return key
         }

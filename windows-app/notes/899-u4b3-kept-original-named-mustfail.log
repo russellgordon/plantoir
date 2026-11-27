@@ -1,0 +1,18 @@
+#899 U4b3 kept-original-named: must-fail lines (2026-11-26). Logs in .dd/ at the worktree root.
+
+M1 (also the first red run, run-kon-red-m1): keepPagesWhosePlaceIsTaken returns at once (the kept original left hidden).
+  RED: UndoHandedOverPlaceTests testAPageRemovedWhosePlaceIsTakenIsKeptUnderAVisibleName, testAPageKeptUnderAVisibleNameSkipsATakenName
+       (staged [".Unit 1, Day 3.md.plantoir-undo-1-apply-orig"] not [], the visible file absent, no trail line),
+       testAFileWrittenWhereAPageWasRemovedSurvivesRecovery (the visible file absent);
+       testRecoveryCases: both new rows, "the page is not kept as ... (kept by Undo).md (absent)", "0 'undo kept a page under a visible name' lines, not 1", "staged items left".
+  Restored from a saved copy; git diff clean.
+M2 (run-kon-m2): a page renamed with a plain rename(2) onto the first visible name, the taken-name skip gone.
+  RED: testAPageKeptUnderAVisibleNameSkipsATakenName ("file(7 bytes)" not "file(8 bytes)": the taken name replaced);
+       testRecoveryCases row 2: "the taken name ... (kept by Undo).md was changed", "not kept as ... (kept by Undo 2).md".
+  Restored (git checkout); git diff clean.
+M3 (run-kon-m3): the rule widened to every place an op names (op.pathsNamed).
+  RED: testRecoveryCases, the two U3c rows with keptOriginalsBeside ("kept beside [], not [\"A.md\"]", "not [\"B.md\"]").
+  Restored (git checkout); git diff clean.
+M4 (Python): keep_pages_whose_place_is_taken answers nothing.
+  RED: test_recovery_cases_with_a_handed_over_place, both new rows, "0 != 1". Restored from a saved copy; 40 OK.
+RED 4 of 4.

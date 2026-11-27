@@ -1,0 +1,28 @@
+#899 U4b3 door-5 must-fail log (2026-11-26). Each sabotage built and run on its own, then restored with git checkout; git diff was clean after each.
+Classes for every Mac run: UndoHandedOverPlaceTests, UndoJournalContractTests.
+
+RED-FIRST (UndoRecovery.swift's naming change set aside, rows, replay and kill test in place): run-door5-red.log
+  UndoJournalContractTests.testRecoveryCases: the row "... someone's page is then written at Day 3 ... naming Day 3 as a plain path ...": the interrupted line names ["courses/TST1O/section1/Unit 1, Day 3.md → courses/TST1O/section1/Unit 1, Day 4.md", "courses/TST1O/section1/Unit 1, Day 3.md"]
+  (the other seven rows passed on door-4's base: door-3 built recovery's judgement; the kill test failures in that run were the test's own snapshot including folder-id, fixed before green)
+
+M1 (door-3's leaver judgement removed: `if false && opStates[filler] == .after ...`): run-door5-m1.log, 16 failures
+  testRecoveryCases: "the same step dies with the link moved into Day 3 and the new page not written at Day 2 ...": the step is interrupted, the class pages are not before
+  testRecoveryCases: "the undo of a step that hands places over ... new page taken away from Day 2 ...": the step is interrupted, head nil
+  testAHandedOverStepKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery and the leading-out twin: shape B, forward, killed before swap 3: not whole
+  (and door-3's own testRecoveryJudgesShape{A,B,C}sPairTogether, testAStepStoppedAtAnySwapIsNeverInTheWay)
+
+M2 (door-3's filler judgement removed: `if false && opStates[leaver] == .before ...`): run-door5-m2.log, 46 failures
+  testRecoveryCases: "a step that hands places over ... Day 3's page copied to Day 4 and nothing else ...": the step is interrupted
+  testRecoveryCases: "the same step dies with Day 3's page also removed and the link not yet moved ...": the step is interrupted
+  testRecoveryCases: "the same undo dies with the link also back at Day 2 and Day 3 still free ...": interrupted, class pages not after, head nil
+  both kill tests: 14 kill points each not whole
+
+M3 (Python: recovery_states' pair rounds iterate no pairs): test_make_undo_traces.py, 5 failures
+  test_recovery_cases_with_a_handed_over_place: the five beforeALinksMove rows. The three afterALinksMove rows pass without the pair judgement in the model: there the move and the new page are keyed apart and the place is empty or holds someone's page, so each is judged right alone.
+
+M4 (JournaledWrite.vet's handed-over above-only look absent, the state before this piece's fix): run-door5-green1.log, 8 failures
+  testAHandedOverStepLeadingOutKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery: shape A and shape B: the step was never stopped (refused(notReadable)); 0 kills of 2 and of 4
+
+M5 (Python: recover without places_shown): covered by RED-FIRST's twin in the model; the row's pathsNamed fails in test_make_undo_traces.py when places_shown is the identity (the model named "… → …" first).
+
+RED 5 of 5 (plus the red-first run).

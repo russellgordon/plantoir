@@ -1,0 +1,23 @@
+U4b3 door-6 (#899) must-fail log. Class: JournaledStepTests. Each sabotage put in JournaledStep.swift, built, run, then restored with git checkout (git status clean after).
+
+Red first (door-5's head bf6f9b229, run-d6-red.log): 5 of the 6 new tests failed:
+  testAWriteAtThePlaceALinkMoveLeavesIsRecordedAsANewFile (fileExists true; refusedBeforeMaking cannotTellNow)
+  testARetitleThroughTheMovedLinkIsPlannedAtTheFileItLeadsTo (refused cannotTellNow at Day 3)
+  testARemovalALinkMovesIntoIsRecordedBeforeTheMove (fileExists(Day 2) true; refused cannotTellNow)
+  testTwoLinksInARowMoveUpAsOneStep (refused cannotTellNow at Day 2)
+  testAnUnrecordedHandoverIsMadeInTheHandingOverOrder (readText(Day 3) nil)
+  testALinkMovedOntoAPageTheStepKeepsIsRefusedAndNothingChanges passed on the base: it pins what is unchanged (refused changedSince).
+
+M1 fileExists follows the leaving link again (free check removed): RED, 2 failures
+  testAWriteAtThePlaceALinkMoveLeavesIsRecordedAsANewFile: XCTAssertFalse failed - the place the link leaves reads as taken
+  testARemovalALinkMovesIntoIsRecordedBeforeTheMove: XCTAssertFalse failed
+M2 plannedBefore read from the disk at a link move's from: RED, 5 failures
+  shape A, retitle, shape B, shape C, unrecorded: refused cannotTellNow (the link read as notAFile; the plain write refuses it)
+M3 today's op order (inHandingOverOrder returns its items unchanged): RED, 3 failures
+  testARemovalALinkMovesIntoIsRecordedBeforeTheMove: refused(notReadable)
+  testTwoLinksInARowMoveUpAsOneStep: refused(notReadable)
+  testAnUnrecordedHandoverIsMadeInTheHandingOverOrder: refused(changedSince "Unit 1, Day 2.md")
+M4 refusesAWrite's another-folder clause removed: RED, 2 failures
+  testAWriteThroughALinkMovedToAnotherFolderIsRefusedBeforeAnythingChanges: XCTAssertNotNil failed; refused(notReadable), not cannotTellNow
+
+RED 4 of 4.

@@ -23559,8 +23559,8 @@ clears the list), where an unknown `linkSha` leaves it with neither `sha` nor
 `listingSha`, so it cannot read the op at all, the barrier a step it does not
 understand is meant to be. This piece left the writers unchanged: Rename folder
 went on refusing a per-section folder that is a link until piece 15 (next),
-and Insert Class still refuses renaming a later class that is a link
-(`undo.rule.shadow`).
+and Insert Class went on refusing to rename a later class that is a link
+until U4b3 (below), which moves that link too (`undo.rule.shadow`).
 Review 1 of this piece: a link's move carries no edit (`UndoOp.moveCarries`
 answers false for it), so a step pairing one with an edit under its `to` is
 outside `wholeOps`' exception and not readable, decided from its shape; and
@@ -23593,8 +23593,151 @@ move there, at a place an earlier run's record names or may have moved, was
 dropped from the part-way line and the sheet; it is now told as a place the
 rename cannot tell it moved, since the record does not say which places were
 links. `undo.rule.shadow` no longer promises that pieces 14 and 15 settle a
-linked PAGE: they move a link only for Rename folder's folder, and Insert
-Class on the Mac still refuses renaming a later class that is a link. Review 1: the listing's `link` line takes its hash from the same `linkSha(at:)`; two `stackCases` rows (call `renameAPerSectionFolderThatIsALink`) run Rename folder's own plan on a linked section folder, held on Windows for W8; and a dangling link is skipped, as before U4b, while a link to another place of the same rename is moved as a link.
+linked PAGE: they move a link only for Rename folder's folder; Insert
+Class on the Mac refused renaming a later class that is a link until U4b3
+(below). Review 1: the listing's `link` line takes its hash from the same `linkSha(at:)`; two `stackCases` rows (call `renameAPerSectionFolderThatIsALink`) run Rename folder's own plan on a linked section folder, held on Windows for W8; and a dangling link is skipped, as before U4b, while a link to another place of the same rename is moved as a link.
+
+### U4b3: linked-class-page-moves-its-link
+
+Insert Class (Make Room, and Duplicate Class, which makes room through the
+same code) renames a later class page that is a symbolic link to a file by
+MOVING THE LINK ITSELF to the new name, its target as written, as one op of
+its one step (`JournaledStep.moveLink`, judged by `linkSha`, never followed),
+as Rename folder moves a linked folder (#899, 2026-11-26, Russell's ruling
+option (a); `undo.rule.shadow`). The file the link leads to is never moved,
+renamed or removed, and never retitled ("Shared pages never have day 'x'
+titles in them", Russell, 2026-11-26): only the moved date is written into it,
+under the key the FILE's own place calls for (`created` inside this section's
+folder; `createdSection<N>` for this section only for a file anywhere else, a
+course-level page, another section's folder or outside the course, every
+other date line left byte for byte; fix 4 of the review round), because
+a write planned at a link move's `to`, within the same folder, is
+planned at the file the link leads to (`JournaledStep.placeALinkLeadsTo`,
+this piece's first half). The `[[link]]` rewrite never goes through a
+link: it visits each file once, at its own place, and only the pages the
+section shows (`ClassPages.pagesOfSection`); a moved or re-pointed link is
+listed at neither of its names (`JournaledStep.markdownFiles`), so the page
+it leads to is rewritten at its own (new) name when it is one of those
+pages, and not at all otherwise (review E of U4b3: listing a re-pointed
+link's new name refused the whole Insert Class, "cannot tell now"). The place the link leaves is filled in the same step by the class below
+it or by the new class, a place handed over (the door pieces, next section),
+so two links in a row and a link below a plain class are one step too.
+`ClassInsertionPlanner.apply` decides "a link to a file" by `lstat` and the
+target's `stat` (`isALinkToAFile`); a link to a folder, or one whose target
+cannot be read, is not renamed, as before. A later class whose link leads,
+at any of its hops, to another class page of the same section is never
+refused for it (relink-5; Russell, 2026-11-26). Each hop is judged by the
+device and inode `lstat` gives of the place it names, a link or a file,
+against every class page as it stands, and the first class page reached
+decides (`reachOfALinkedClass`; review C, MEDIUM 1: comparing only the file
+at the end of the chain let Day 4 holding `Unit 1, Day 3.md` through when Day
+3 was itself a link, and Day 5 then led to the old Day 2's lesson). A link
+whose own text names a page the plan renames is renamed and its text changed
+to that page's new name in one relinking move (`JournaledStep.relinkLink`,
+`textAfterTheMove`: only the last path part changes, since the page and the
+link are each renamed within their own folder); a link reaching such a page
+only through a link OUTSIDE the working folder is re-pointed straight at the
+page's new name, the link outside untouched; a link reaching a class page the
+plan leaves is moved as itself, its text kept. Nothing is written through any
+of them, no title and no date (writing this class's date through the link is
+what gave Day 3 the wrong date in review B's probe). Two arrangements are the
+exception, refused before anything changes ("cannot tell now";
+`firstLinkThatCannotBeMoved`), refusals added in U4b3 until the door can
+change a link's text where it stands, which it cannot do yet: a link reaching
+a renamed page only through a link INSIDE the working folder that is not a
+class page of this section (Russell's
+ruling: that link is re-pointed where it stands), and a class the plan only
+re-dates whose link reaches a renamed page.
+A later class whose link leads NOWHERE is never refused (Russell, 2026-11-26:
+"Why would it refuse? Why does it care where a later class links to?", then
+"Never refuse"; this reverses the review round's fix 3): the link is moved as
+itself (`isALinkToNothing`), its text byte for byte, and nothing else is
+written for it, no date and never a write through it, so no file appears
+where it points, inside the working folder or outside it. The step finds the
+place the link leaves by its spelling, so the link's `from` is spelled from
+the same folder as its `to` (`spelledAsItsNewPlace`): the folder lister names
+`/private/var/...` where the plan names `/var/...`, standardizing drops
+`/private` only from a path that leads somewhere, and spelled apart the class
+below wrote THROUGH the broken link (seen in the second fix round's first
+run, where the shadow path then lost Day 2's lesson). Before
+this piece the same Insert Class was refused "cannot tell now" before
+anything changed, because the rename was planned as "write the new name,
+remove the old one" and the door's `remove` never follows a link; that rule
+for a removal stays. A write through a link moved to another folder is still
+refused "cannot tell now" before anything changes (`refusedBeforeMaking`),
+and no writer makes one. Killed before any of its swaps, the step is whole
+before or whole after once recovery has run (`UndoMakeRoomLinkedPageTests`).
+Windows still saves a plain copy and deletes the link until W8b piece 22.
+
+### U4b3 door: a place handed over within a step
+
+`undoJournal.opKinds.wholeOps` has a second exception (#899, 2026-11-26):
+a place HANDED OVER within one step. An earlier op leaves it (a file's or
+a link's `move` away, or a removal) and a later op fills it (a move in, or
+a new file), at least one of the two a move, the exact place by the one
+comparison. A folder's move, a capitalisation-only move, a `moveApart` and a
+`setAside` never hand a place over. One rule finds the pairs,
+`UndoCheck.handovers(in:)`, and the reader, the plan and recovery all use it.
+Insert Class needs the rule because it renames the highest day first: a
+linked class's link moves up a day and leaves its place to the class below
+it or to the new class. The director widened the rule from "a place a move
+leaves" to every handed-over place, so that two links in a row, and a link
+below a plain class, are built once and never refused as an interim state.
+Door-1, going forward: the filler is judged against the place free when the
+leaver is a change of the same plan, and a step with a handed-over place is
+swapped in its ops' order. A file change at a place a link leaves or fills
+is judged, at the plan and before staging, on the folders above it only,
+because the link standing there is moving and is never written through.
+Just before the change itself the place is judged whole, so a file put
+there since is refused `changedSince`. Door-2, going back: the filler is
+taken back first and the leaver is then judged with the place free, in the
+ops' reverse order. A page edited by hand at the place is refused, naming
+the place, before anything changes. Door-3, recovery: each op of the pair
+is judged as the other leaves the place, so a step stopped before, between
+or after their swaps is whole before, part way or whole after. A move that
+hands a place over is judged under its two places (`from → to`). Door-4,
+readable: `UndoStep.wholeOpsStandAlone` accepts exactly such pairs, each
+place handed over once, named by those two ops only, in a step that carries
+no edit (U4b's first exception). A filler before its leaver, a third op at,
+inside or above the place, a place handed over twice, or a handover in a
+step that carries an edit is still `unknown.unreadableStep`, a barrier.
+Before door-4 no readable step could hold a handed-over place, so doors 1
+to 3 were inert. Seven `stackCases` rows ("U4b3 door, …", calls
+`handAPlaceOverAfterALinksMove`, `handAPlaceOverBeforeALinksMove`,
+`editTheHandedOverPageByHand`, `stepFillingAPlaceBeforeItIsLeft`,
+`stepHandingOverAFoldersPlace`, key `handedOver`) pin it on the Mac and in
+the Python model (`make_undo_traces.handovers`, `plan`, `swap_groups`). They
+are held for Windows under `Reason899W8HandedOverPlace` until its door piece
+lands. Door-5, recovery proven end to end: such a step made through the
+door and killed before any of its swaps, going forward or (its Undo) back,
+is settled by `UndoRecovery.run` whole before or whole after, the library
+byte for byte as laid, nothing staged left and, with the links leading out
+of the working folder, nothing outside it touched
+(`UndoHandedOverPlaceTests`, "Killed and recovered"). Eight
+`recoveryCases` rows ("U4b3 door-5: …", key `withAHandedOverPlace`) pin it
+on the Mac and in the Python model (`recovery_states` now judges the pair
+together). A teacher and the trail are shown a handed-over move under its
+own plain place, as every other move is named, each path once; the
+`from → to` key is recovery's judgement only. They are held for Windows
+under the same reason.
+Door-6, the step: `JournaledStep` reads the place a planned link move
+leaves as free (no file, no text, not listed) until something is planned
+there, plans a write there as a new file (before absent, named from the
+folder above, never followed through the leaving link), reads and plans the
+link's new place as the file it leads to even where the step removes the
+page the link moves over, and makes its ops, recorded or not, in one order
+where every handed-over place is left before it is filled
+(`JournaledStep.inHandingOverOrder`, built on the door's own
+`UndoCheck.placeLeft`, `placeFilled` and `handsOverAsAMove`); a step with no
+such pair keeps its order exactly (`JournaledStepTests`, "a place a link's
+move leaves"). A page such a step removed or moved away, found by recovery only in its
+hidden kept original because something else now holds its place, is kept
+under a visible name beside it, `Unit 1, Day 3 (kept by Undo).md` (then
+`(kept by Undo 2)` and on), by the folder's own naming loop
+(`UndoSwap.renameToAVisibleName`, Russell's rulings of 2026-11-19 and
+2026-11-26), with the trail line 'undo kept a page under a visible name'
+written first (`UndoRecovery.keepPagesWhosePlaceIsTaken`, U4b3
+kept-original-named).
 
 ### #1004-a: the journal's own files are judged by what was read
 
@@ -23650,6 +23793,65 @@ has no time of its own. `readRecord` has no caller yet: U6's offer to deploy
 is the first. `UndoWebsite.siteMarkers` still asks `fileExists`, so a marker
 that cannot be looked at reads as absent, on both platforms; that is left
 for the next piece.
+
+### U4b3 relink: a link's text changed within a step
+
+A link's move may change the text the link holds (#899, 2026-11-26;
+`undoJournal.opKinds.move`): `linkShaBefore` is the text at `from` before
+the step, `linkShaAfter` the text at `to` after it, the two different, and
+both texts are the op's only blobs (an Undo makes the old link, a Redo the
+new). The pair is never `linkSha` plus one new key: a reader that knows
+`linkSha` but not the new key would read a plain link's move and Redo it
+with the OLD text, whereas a reader that finds none of `sha`, `listingSha`
+and `linkSha` cannot read the op at all, which is the safe failure.
+`UndoOp.shapeIsKnown` takes exactly one content form, the pair counting as
+one (`relinkShapeIsKnown`: a `move` only, never a capitalisation-only move,
+a `moveApart` or a `setAside`; both blob names, different, `blobs` exactly
+the two). Each side is judged by its own text with `lstat` and `readlink`,
+never followed; both links standing is neither state, so nothing is taken
+back and no link the teacher may have made is removed. It is swapped as:
+make the new link under a staged name beside its place, rename it in
+exclusively, then remove the old link once re-read; a later failure
+reverses it the same way the other way round. Nothing is ever written
+through either link. For every other rule it is a link's move
+(`UndoOp.isALinksMove`): it carries no edit, and it may leave or fill a
+handed-over place. Nine `checkCases` rows ("U4b3 relink, …", keys
+`linkTargetBefore` and `linkTargetAfter`) pin both sides both ways and the
+shape barriers on the Mac and in the Python model (`move_state` judges each
+side by its own text; `readable_op` counts the pair as one). The seven
+whose verdict is not `notReadable` are held for Windows under
+`Reason899W8RelinkedLink`; the two barrier rows pass there unheld. A link
+whose `linkSha` is given beside the pair is unreadable on the Mac
+(`UndoRelinkTests`, "Readable"), but it is no shared row yet: Windows today
+reads `linkSha` and ignores the pair, so such a row could neither pass nor
+be held there until its piece 21b. A relink killed inside its swap (relink-3: the
+stop points `relinkStaged:N`, the new link staged, and `relinkRenamedIn:N`,
+both links standing) is settled whole by a live recovery, which first
+removes the link the interrupted swap had just made (at `to` going forward,
+at `from` for an Undo; `UndoRecovery.removeTheLinksJustMade`), re-read with
+that side's text, so the op stands where its swap began and is then judged
+as any other; a plan never does this, since a link at the other name may be
+the teacher's (seven `recoveryCases` rows, key `withARelink`).
+
+### U4b3 relink-5: Insert Class re-points a linked class
+
+Insert Class is the relinking move's first caller (`ClassInsertionPlanner.apply`,
+the four cases in "U4b3: linked-class-page-moves-its-link" above). It walks
+each later class that is a link once, on the disk as it stands, before
+anything is planned (`classPagePlaces`, `reachOfALinkedClass`), and the same
+answer decides the rename (relink, plain link move, or the page's own write
+and remove), the date (none for a link to a class page) and the one refusal
+left. The page below a re-pointed link fills the place the link leaves with a
+write and a removal, the shape relink-4 proved (a write at a relinked link's
+old name is a new file, never through the link). Six `stackCases` rows
+("U4b3 relink-5, …", calls `makeRoomWithALaterClassLinkedToAClassItRenames`
+and `makeRoomWithALaterClassLinkedToALinkedClass`, the call
+`makeRoomWithALaterClassLinkedToAnEarlierClass` turned round from a refusal,
+key `laterLinks`) replace the refusal row, held for Windows under
+`Reason899W8bLinkedClassPage`. Known limits, not built: an EARLIER class's
+link to a page Insert Class renames keeps its text and then leads to the page
+now at that name; a renamed page's rename that cannot be done (its new name
+taken) leaves a link re-pointed at that new name.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

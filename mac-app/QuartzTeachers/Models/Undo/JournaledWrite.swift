@@ -481,10 +481,28 @@ nonisolated enum JournaledWrite {
               readBack.isReadable else {
             return .refused
         }
-        // 2. Every path inside the working folder, its links resolved.
+        // 2. Every path inside the working folder, its links resolved. A
+        // file change at a place a link's move hands over is judged on the
+        // folders above it only, as the plan judges it (U4b3 door-1): the
+        // link standing there is moved, never written through, wherever it
+        // leads (U4b3 door-5, a link leading out of the working folder).
+        var judgedAbove: Set<Int> = []
+        for handover in UndoCheck.handovers(in: readBack.ops) where handover.aLinkMoves {
+            judgedAbove.insert(handover.leaverIndex)
+            judgedAbove.insert(handover.fillerIndex)
+        }
+        var opIndex: Int = 0
         for op in readBack.ops {
+            let aboveOnly: Bool = judgedAbove.contains(opIndex) && !op.isWhole
+            opIndex += 1
             for path in op.pathsNamed {
-                guard let root = draft.workingFolderURL, UndoPlaces.staysInside(root, path, namedBy: op) else {
+                guard let root = draft.workingFolderURL else {
+                    return .refused
+                }
+                let inside: Bool = aboveOnly
+                    ? UndoPlaces.staysInsideAbove(root, path)
+                    : UndoPlaces.staysInside(root, path, namedBy: op)
+                if !inside {
                     return .refused
                 }
             }
@@ -1081,6 +1099,12 @@ nonisolated enum UndoKillPoint: Equatable, Sendable {
     /// clearing takes a step in flight (`undo.rule.clearing`).
     case afterTheCheck
     case beforeSwap(Int)
+    /// U4b3 relink-3: inside a relinking move's swap at target N, the new
+    /// link made under its staged name and not yet renamed in.
+    case relinkStaged(Int)
+    /// U4b3 relink-3: inside the same swap, the new link renamed in and the
+    /// old one not yet removed: both links stand.
+    case relinkRenamedIn(Int)
     case beforeApplied
     case afterUndoing
     case beforeUndone
@@ -1148,6 +1172,11 @@ nonisolated enum UndoKillPoints {
     /// swap is being reversed, as a file another program holds does on
     /// Windows. Set only by tests.
     nonisolated(unsafe) static var putBackFailsAt: ((Int) -> Bool)?
+
+    /// Answers true to make renaming a relinking move's new link in fail at
+    /// this place (U4b3 relink-1), as a place taken in that instant would.
+    /// Set only by tests.
+    nonisolated(unsafe) static var relinkRenameInFails: ((URL) -> Bool)?
 
     /// Called with the list's folder once its segments are listed and
     /// before any of them is opened: a test takes a segment away there, as
@@ -1267,6 +1296,13 @@ nonisolated enum UndoTrailHook {
     /// name `keptAs` beside its place because something else now holds
     /// that place. The course and section, its place, its hidden name.
     nonisolated(unsafe) static var foundAFolderSetAsideLine: ((_ course: String, _ section: Int?, _ place: String, _ hiddenName: String, _ keptAs: String?, _ changes: String) -> Void)?
+
+    /// U4b3 kept-original-named: recovery is about to keep a page a step
+    /// that stopped removed or moved away, found only in its hidden kept
+    /// original, under the visible name `keptAs` beside its place, because
+    /// something else now holds that place. The course and section, the
+    /// place and the visible name, both inside the working folder.
+    nonisolated(unsafe) static var keptAPageLine: ((_ course: String, _ section: Int?, _ place: String, _ keptAs: String) -> Void)?
 
     // MARK: - Functions
 

@@ -1,0 +1,7 @@
+U4b3 (#899) must-fail, 2026-11-26, JournaledStepTests, Mac, through xlock.sh. Each restored byte for byte (cmp against the saved copy, git diff clean of sabotage).
+
+M1+M2+M3 in place together (run-mustfail), each removing one independent clause; 7 failures, each in the test of its own clause:
+- M1 (exact-`to` resolution removed from placeALinkLeadsTo): testAWriteAtALinkMovesNewPlaceIsPlannedAtTheFileItLeadsTo, JournaledStepTests.swift:537 "the write was not planned at the file the link leads to" (planned at .../All Classes/Unit 1, Day 4.md), and :539 make() refused cannotTellNow at Unit 1, Day 4.md.
+- M3 (refusal at a link move's `from` removed): testAWriteAtThePlaceALinkMoveLeavesIsRefusedBeforeAnythingChanges, :593 "did not throw an error", :599-601 the write followed the leaving link into the linked file and Day 2 was removed.
+- M2 alone (refusal for a link moved to another folder removed; run-mustfail2, after the test gained its planning assertion): testAWriteThroughALinkMovedToAnotherFolderIsRefusedBeforeAnythingChanges, :565 "the write through a link moved to another folder was planned". (Under the combined run M2 did not fail: the door still refused, by "could not record" then cannotTellNow; the test now pins that the refusal is made when planned.)
+RED 3 of 3.

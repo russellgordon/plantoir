@@ -1,0 +1,22 @@
+#899 U4b3 relink-5 must-fail, 2026-11-26. Each sabotage applied by script to
+ClassInsertionPlanner.swift (M1 to M4) or test_make_undo_traces.py (M5), built,
+run (UndoMakeRoomLinkedPageTests + UndoJournalContractTests through xlock.sh),
+then restored byte for byte (git status clean after each).
+
+M1 run-r5-mf1, the refusal put back for every link reaching a class page: RED,
+  10 failing: testStackCases; testALaterClassLinkedToAnotherClassOfTheRunIsRePointed,
+  testARePointedLinkKeepsTheFormOfItsText, testALaterClassLinkedToAClassPageThatIsItselfALinkIsRePointed,
+  testALaterClassLinkedToAnEarlierClassKeepsItsText, testALaterClassLinkedToAnEarlierClassThroughAnotherLinkKeepsItsText,
+  testTwoLinksNamingEachOtherAreEachRePointed, testALinkReachingARenamedPageThroughALinkOutsideIsRePointedStraightAtIt,
+  testARePointedLinkBesideALinkLeadingOutWritesOnlyTheOneDateOutside,
+  testReviewBsProbeKilledAtEverySwapAndRelinkMomentIsWholeAfterRecovery (each "refused").
+M2 run-r5-mf2, case 1 moved as itself (old text kept): RED, testStackCases and six
+  case-1 tests (Day 5 holds `Unit 1, Day 3.md`, leading to the old Day 2's lesson).
+M3 run-r5-mf3, a link to a class page dated through: RED, testStackCases and eight
+  tests (Day 1 re-dated through the earlier-class link; the page below given the
+  next class's date through the re-pointed link).
+M4 run-r5-mf4, hops judged only at the end of the chain: RED, testStackCases,
+  review C's probe, the link-leading-out test and the two links naming each other.
+M5 python, the model's relink replaced by a plain link move: RED, test_stack_cases,
+  the two "undone and redone" relink-5 rows (laterLinks Day 5 holds the old text).
+RED 5 of 5.
