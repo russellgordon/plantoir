@@ -75,3 +75,9 @@ In `quartz-teacher:dev-test` with the worktree's `scripts/` and `contracts/` ove
 
 - The parked sentence (point 1 above) also covers an offer file an earlier build wrote: on the Mac the publisher now refuses its date for an owned lesson; on Windows it would still write it (For Windows).
 - What a deploy publishes beyond the key: `firstClassOf` in `quartz/plantoir_progress.json` names the owning class again (as before #1048b, but the owner rather than the first class saying the name), and the offer file's owned rows carry `claimedBy` the owner.
+
+## Review 2 (2 LOW)
+
+- **LOW 1 (done, code).** `claimedBy` names the owning class for an owned row in EITHER group, as documentation 05 and `file-formats.json` say; it was set only for `fromAClass`. Case t in `fromTheLinksChecklist` (Day 1 → Hub → Mid → Lesson, `notReachedByAClass`): RED on 48909317b (`claimedBy` None), green after.
+- **LOW 2 (done, contract and documentation).** A visible but undated owner (Day 2 made a link to an undated lesson by hand, Day 1 says `[[Lesson]]`): the build leaves the lesson undated (the released build gave it Day 1's date), and My Progress groups it under Day 1, the first visible dated class saying its name, because an undated class is not in the class tables. Day 2 and the lesson stay undated until Re-date. Case "the class that owns the lesson is visible but undated" in `firstClassKeepsASharedLessonCases` (now eleven); documentation 06. For the director: the parked note above also covers this teacher, whose lesson keeps whatever date the released build already wrote into it and gets none from the build after this change.
+- Runs: in `quartz-teacher:dev-test`, `test_dates_follow_the_class.py` 18 of 18, `test_links_checklist.py` 8 of 8, `test_my_progress.py` 28 of 28, `test_class_folder.py` 6 of 6. No Mac code changed. The new owner case runs through the Mac's `testTheContractsOwnerCasesAreTheMacsRule` at the next Mac run; not run here.

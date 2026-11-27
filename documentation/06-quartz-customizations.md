@@ -3276,7 +3276,13 @@ dated classes earliest first, direct links only. A page whose file a
 numbered class of the section owns (#1048b) is claimed by that OWNER when the
 owner is visible and dated, so a shared lesson Unit 1, Day 2 is a link to sits
 under Day 2, not under Day 1 that only says `[[Lesson]]` (and not under Other
-pages); the date pass never writes its date. A class page's own items go
+pages); the date pass never writes its date. When the owner is visible but
+UNDATED (a teacher made Day 2 a link to an undated lesson by hand), the build
+leaves the lesson undated, because the date is the owner's to give, and My
+Progress puts it under the first visible dated class that says its name,
+since an undated class has no row in the class tables; Re-date gives Day 2,
+and so the lesson, a date (contract case "the class that owns the lesson is
+visible but undated"). A class page's own items go
 under itself; everything else under Other pages, last. Tables are
 `<unit word> N`; a club (numbered scheme) gets ONE table named after its class
 folder (ruling F6 — one table per meeting would be tables of one row each).

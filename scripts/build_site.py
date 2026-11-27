@@ -3869,9 +3869,11 @@ def _links_checklist_offer(content_root: Path, section_number: int,
             else:
                 entry["step"] = 2
                 claimant = step_two_claim[page]
-            if kept_by_their_class.get(page) is not None:
-                claimant = kept_by_their_class[page]
             entry["claimedBy"] = _place_in_the_course(claimant, content_root)
+        # A page whose file a numbered class owns names that class, however
+        # it is reached, in either group (#1048b review 2, LOW 1).
+        if kept_by_their_class.get(page) is not None:
+            entry["claimedBy"] = _place_in_the_course(kept_by_their_class[page], content_root)
         if is_structural(page):
             entry["why"] = "structuralNeverDated"
         elif page in kept_by_their_class:
