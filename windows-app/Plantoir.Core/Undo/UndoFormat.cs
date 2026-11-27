@@ -101,7 +101,8 @@ internal sealed record UndoOp
     /// and of the text a new link holds at <c>to</c> (<see cref="LinkShaAfter"/>),
     /// both texts in <see cref="Blobs"/> (an Undo needs the old, a Redo the
     /// new), never beside <see cref="Sha"/>, <see cref="ListingSha"/> or
-    /// <see cref="LinkSha"/>. Built in memory only until 21b2 reads it.
+    /// <see cref="LinkSha"/>. Read from the journal as ONE content form
+    /// (21b2, <see cref="UndoFormat"/>'s <c>RelinkShapeIsKnown</c>).
     /// </summary>
     internal string? LinkShaBefore { get; init; }
 
@@ -855,6 +856,8 @@ internal static class UndoFormat
         if (!OptionalString(element, "sha", out string? sha)) readable = false;
         if (!OptionalString(element, "listingSha", out string? listingSha)) readable = false;
         if (!OptionalString(element, "linkSha", out string? linkSha)) readable = false;
+        if (!OptionalString(element, "linkShaBefore", out string? linkShaBefore)) readable = false;
+        if (!OptionalString(element, "linkShaAfter", out string? linkShaAfter)) readable = false;
         if (!OptionalString(element, "target", out string? target)) readable = false;
         List<string>? keyPath = null;
         if (element.TryGetProperty("keyPath", out JsonElement keyPathElement) && keyPathElement.ValueKind != JsonValueKind.Null)
@@ -934,6 +937,8 @@ internal static class UndoFormat
             Sha = sha,
             ListingSha = listingSha,
             LinkSha = linkSha,
+            LinkShaBefore = linkShaBefore,
+            LinkShaAfter = linkShaAfter,
             Target = target,
             Blobs = blobs.Distinct(StringComparer.Ordinal).ToList(),
         };
@@ -958,8 +963,14 @@ internal static class UndoFormat
             case UndoOp.Move:
                 // No path: from and to follow path's rules, differ, and neither
                 // holds the other, but for a capitalisation-only rename (U4b;
-                // W8-5); exactly one of a file's sha, a folder's listingSha
-                // and a link's linkSha (U4b2-14; W8-6).
+                // W8-5); exactly one content form: a file's sha, a folder's
+                // listingSha, a link's linkSha (U4b2-14; W8-6), or a relinking
+                // link's pair linkShaBefore and linkShaAfter counted as ONE
+                // (U4b3 relink-2; W8b-21b2). The pair is never linkSha plus one
+                // new key: a reader that knew linkSha but not the new key would
+                // read a plain link's move and Redo it with the OLD text;
+                // finding none of sha, listingSha and linkSha, it cannot read
+                // the op instead.
                 if (op.Path is not null || op.From is null || op.To is null) return false;
                 if (!UndoPath.IsWithinTheRules(op.From) || !UndoPath.IsWithinTheRules(op.To)) return false;
                 if (UndoOp.PlacesOverlap(op.From, op.To) && !op.IsCaseOnlyMove) return false;
@@ -967,6 +978,11 @@ internal static class UndoFormat
                 foreach (string? given in new[] { op.Sha, op.ListingSha, op.LinkSha })
                 {
                     if (given is not null) contents++;
+                }
+                if (op.LinkShaBefore is not null || op.LinkShaAfter is not null)
+                {
+                    if (!RelinkShapeIsKnown(op, listedBlobs)) return false;
+                    contents++;
                 }
                 return contents == 1;
             case UndoOp.External:
@@ -996,6 +1012,25 @@ internal static class UndoFormat
                 return op.ListingSha is not null && listedBlobs is not null && listedBlobs.Contains(op.ListingSha, StringComparer.Ordinal);
         }
         return true;
+    }
+
+    /// <summary>
+    /// The shape of a relinking move (U4b3 relink-2, opKinds.move; the mac's
+    /// <c>UndoOp.relinkShapeIsKnown</c>): a <c>move</c>, never a
+    /// capitalisation-only rename (nor a <c>moveApart</c> or <c>setAside</c>,
+    /// kinds this version does not know), carrying BOTH
+    /// <c>linkShaBefore</c> and <c>linkShaAfter</c>, each a blob name, the two
+    /// different (a link whose text did not change is a plain link's move),
+    /// and <c>blobs</c> holding exactly those two, so an Undo has the old text
+    /// and a Redo the new.
+    /// </summary>
+    private static bool RelinkShapeIsKnown(UndoOp op, IReadOnlyList<string>? listedBlobs)
+    {
+        if (op.Kind != UndoOp.Move || op.IsCaseOnlyMove) return false;
+        if (op.LinkShaBefore is not { } before || op.LinkShaAfter is not { } after) return false;
+        if (!IsBlobName(before) || !IsBlobName(after) || string.Equals(before, after, StringComparison.Ordinal)) return false;
+        if (listedBlobs is not { Count: 2 }) return false;
+        return listedBlobs.Contains(before, StringComparer.Ordinal) && listedBlobs.Contains(after, StringComparer.Ordinal);
     }
 
     private static UndoProcess? ReadProcess(JsonElement element)
