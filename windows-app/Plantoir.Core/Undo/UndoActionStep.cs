@@ -343,8 +343,10 @@ internal sealed class UndoActionStep
     /// never followed, so what it leads to is never opened, listed or touched,
     /// wherever it is. Undo, Redo and the unrecorded make move the link with
     /// the swap's own rename (<c>MoveFileEx</c>, never replacing). A link's
-    /// move carries nothing: plan no read or write at or inside its new place
-    /// (<see cref="PlaceOnDiskNow"/> never maps through it). A place that is
+    /// move carries nothing of its own, and (W8b-21a6) the link's new place, in
+    /// the same folder, is read and written as the file the link leads to
+    /// (<see cref="UndoLinks.FileALinkLeadsTo"/>), while the place the link
+    /// leaves reads as free until a new file is written there. A place that is
     /// not a link now, or a link whose target cannot be read (WSL's own),
     /// refuses the action, <c>cannotTellNow</c>, before anything changes.
     /// </summary>

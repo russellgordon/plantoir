@@ -23707,8 +23707,8 @@ to 3 were inert. Seven `stackCases` rows ("U4b3 door, …", calls
 `editTheHandedOverPageByHand`, `stepFillingAPlaceBeforeItIsLeft`,
 `stepHandingOverAFoldersPlace`, key `handedOver`) pin it on the Mac and in
 the Python model (`make_undo_traces.handovers`, `plan`, `swap_groups`). They
-are held for Windows under `Reason899W8HandedOverPlace` until its door piece
-lands. Door-5, recovery proven end to end: such a step made through the
+were held for Windows until its door pieces landed; they pass on Windows now
+(W8b-21a1 to 21a6 and 21c, documentation 12). Door-5, recovery proven end to end: such a step made through the
 door and killed before any of its swaps, going forward or (its Undo) back,
 is settled by `UndoRecovery.run` whole before or whole after, the library
 byte for byte as laid, nothing staged left and, with the links leading out
