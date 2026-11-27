@@ -726,7 +726,7 @@ internal static class UndoRecovery
             foreach ((string kept, string sha) in others)
             {
                 if (keptFor[sha] == kept) continue;
-                try { UndoSwap.RemoveByName(kept); }
+                try { UndoStagedFile.RemoveByName(kept); }
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
             }
         }
