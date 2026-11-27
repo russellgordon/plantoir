@@ -56,3 +56,30 @@ The restore is called as it is (`WorkspaceModel.restoreBackup`). When U5 makes a
 - `dev` merged in: see the hand-back.
 - No number tuned by trial: none.
 - Contract cases run from the JSON: `stoppedPartWayCases`, laid out from `startOfYear.cases[0]`.
+
+## Fix round one (review 1: HIGH 1, LOW 1 to 3, INFO 1 and 2)
+
+- **HIGH 1, Restore Course refused by a running preview.** Fixed by the director's decisions:
+  1. After a part-way stop, `carryOut` no longer starts the section's preview again. `StoppedPartWay.previewWasStopped` says Go stopped it. **Leave As It Is** (`StartOfYearSheetModel.leaveAsItIs` → `StartOfYearPreparation.leaveAsItIs`) starts it again, once. The button now calls `model.leaveAsItIs()` and then `dismiss()`, and changes no file.
+  2. **Restore Course** (`StartOfYearPreparation.restoreCourse`) stops every running preview of the course whose window is open (`SectionWindowControllers.sectionsShowing`, the window's own awaited `stopPreview`, as Go uses), then runs `workspace.restoreBackup`, then starts each stopped preview again once, Go's own included, if the course as restored (`course.asSavedNow().sectionNumbers`) still has that section. It asks nothing, because a preview can always be started again. While another program holds the course, nothing is stopped: the restore refuses that with its own sentence, and a preview stopped then could not be started again (#156).
+  3. **A deploy in flight** holds the restore back (`restoreIsHeldBackByADeploy`, asked before the sheet closes). The sentence is the restore's existing busy sentence (`WholeCourseRestore.sentence(.busy)`), shown in the restore's own alert ("Could not restore {CODE}", OK) over the sheet. The sheet stays open with both buttons. The trail gets the restore's own did-not-go-ahead line (`refused: the course is previewing or deploying here`, asked before the archive). Nothing is stopped or started. The offer works once the deploy has ended.
+  4. The offer is answered once (`offerAnswered`). A second press, or both buttons, never starts a preview twice, and each start also checks `isPreviewRunning()` first.
+- **LOW 1:** `StoppedPartWay` now carries a `BackupItem`, made in `carryOut`. If `BackupItem.from` ever returned nil, the offer is not made. The sheet then says `writeFailed`, which is true here too ("The backup … holds the course as it was before you pressed the button"), and the preview is started again as for any refusal.
+- **LOW 2:** the trail line now says "1 file kept beside its page" or "N files kept beside their pages". When nothing was kept it says no count (`testTheStoppedPartWayLineCountsWhatWasKept`).
+- **LOW 3:** `testRestoreCourseRestoresWhileThisSectionWasPreviewing`, `testRestoreCourseStopsAndRestartsAnotherSectionsPreview` and `testADeployHoldsRestoreCourseBackAndTheOfferStillWorksAfter` run the REAL `WorkspaceModel.restoreBackup` after a part-way stop. The previews are `FakePreview`s that hold a real `PreviewLeases` lease while running (`holdingALease:`). The first two were RED on aa991d513 with the busy sentence (see the log).
+- **INFO 2:** no change asked, and none made.
+- **Windows:** `StartOfYearTests.EverySentenceIsTheContracts` now takes `deferred = NamedGapLedger.GapsIn(StartOfYearSheetWording, keys, ByKey.Keys)`, compares `keys.Except(deferred)` with `ByKey.Keys`, and skips deferred keys in the `ByKey[key]` loop, in the shape of `ContractTests.SharedRules_ActivityTrailEvents_Exist`. It is UNBUILT here; the PC suite on the integration tree proves it. For Windows to copy: no preview restart before the answer; Restore Course stops the course's previews, restores, and starts them again; a deploy holds it back with the busy sentence while the sheet stays open.
+
+### For the director (fix round one)
+
+- **Decision 2 is the director's reading, for Russell to confirm.** Restore Course stops other sections' previews without asking, and starts them again afterwards. Example: Section 2 of SNC1W stops part way while Section 3 of SNC1W is previewing in its own window. Pressing Restore Course stops Section 3's preview, restores SNC1W, and starts Section 3's preview again, with nothing asked. A preview that is not in an open window (none today) is not stopped, and the restore then says its busy sentence in its alert.
+- **The per-file kept sentence stays out (parked).** The candidates are the three listed above. A new sentence with no hidden name, such as "What “{place}” held before is kept beside it.", would need Russell's words.
+- **What Leave As It Is leaves on disk that the sheet does not mention (INFO 1).** While the undo list is in shadow (`UndoSwitch.undoJournalIsLive` false), each kept original whose bytes differ from its page stays beside that page for good, under its hidden name (`.{page}.plantoir-undo-…-orig`, `undo.rule.recovery`). It holds what the page held before Go, which is also in the backup the sheet names. So nothing unique is hidden, and the two sentences the sheet says are true. The backup zip stays in Backups. Restore Course archives the course first, hidden files included, so the hidden files go to Archived with it.
+
+### Self-check (fix round one)
+
+- Broke each fix on its own and watched its test fail: 7 of 7 RED (log).
+- No timed waits: the stops are awaited; nothing sleeps except `FakePreview`'s existing stand-in for a real stop.
+- Every sentence on the failure paths is true: the busy sentence is said only while a deploy (or, from the restore itself, a preview or deploy) is running. `writeFailed` on the LOW 1 path names the backup that was made.
+- `dev` merged in: up to date at 12452f51d.
+- No number tuned by trial; contract cases run from the JSON (the new tests take the door from `stoppedPartWayCases`' "then restore" case).
