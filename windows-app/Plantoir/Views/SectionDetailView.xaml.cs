@@ -1395,6 +1395,12 @@ public sealed partial class SectionDetailView : UserControl
     {
         if (_window.Workspace.WorkspacePath is not { } workspacePath) return null;
 
+        // Never while a Rename folder of the course is under way, in any
+        // window (#899 W8b-19a2): asked at the press, so the preview is
+        // neither stopped nor started, and again after the stop.
+        if (CourseActivity.FolderRenameRefusal(workspacePath, _course.Code) is { } renaming)
+            return new SiteHealthRepair.Outcome("Cannot Preview Yet", renaming, false);
+
         // Said in the same shape as the other two rather than through
         // AnotherProgramStandsInTheWay()'s own dialog: that one is a second
         // ContentDialog raised while the outcome dialog is still closing,
@@ -1627,6 +1633,15 @@ public sealed partial class SectionDetailView : UserControl
             // It used to release that start's lease and overwrite its build
             // record, which nothing then ended, so quitting asked for ever.
             if (SaidAStartIsAlreadyUnderWay()) return;
+            // Never while a Rename folder of the course is under way, in any
+            // window (#899 W8b-19a2): before anything is stopped or started.
+            if (_window.Workspace.WorkspacePath is { } renamingIn
+                && CourseActivity.FolderRenameRefusal(renamingIn, _course.Code) is { } renaming)
+            {
+                decided.TrySetResult(renaming);
+                await ShowPreviewRefusal(renaming);
+                return;
+            }
             if (_previewRunner.IsRunning) { StopPreview(); return; }
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
             // Before any lease is released or taken (#386).
@@ -1713,6 +1728,16 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
+            // Never while a Rename folder of the course is under way, in any
+            // window (#899 W8b-19a2, the mac's AssistToolRunner 2797): asked
+            // before the serving preview is stopped, and said under "Cannot
+            // Preview Yet" as the start's other refusals are.
+            if (_window.Workspace.WorkspacePath is { } renamingIn
+                && CourseActivity.FolderRenameRefusal(renamingIn, _course.Code) is { } renaming)
+            {
+                await ShowPreviewRefusal(renaming);
+                return renaming;
+            }
             await StopPreviewIfRunningAsync();
             // The stop can take a while; a view replaced meanwhile must not
             // start a preview nobody can see (PreviewAgainAfterRepairAsync's reason).

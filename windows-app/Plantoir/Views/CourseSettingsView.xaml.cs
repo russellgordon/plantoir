@@ -1488,6 +1488,22 @@ public sealed partial class CourseSettingsView : UserControl
                 "Preview Again pressed in Course Settings for " + _course.Code + ": no preview was still open");
             return;
         }
+        // Never while a Rename folder of the course is under way, in any
+        // window (#899 W8b-19a2): refused at the press, before anything is
+        // said or stopped, under "Cannot Preview Yet" as #473's refusal is.
+        foreach (var lease in open)
+        {
+            if (CourseActivity.FolderRenameRefusal(lease.FolderPath, _course.Code) is { } renaming)
+            {
+                await ShowAlertSafelyAsync(new ContentDialog
+                {
+                    Title = "Cannot Preview Yet",
+                    Content = renaming,
+                    CloseButtonText = "OK",
+                });
+                return;
+            }
+        }
         // #473: never stop a preview that could not be started again — asked
         // before anything is said or stopped, so the button and the trail
         // line below stay true.

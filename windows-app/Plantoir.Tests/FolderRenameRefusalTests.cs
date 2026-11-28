@@ -39,6 +39,39 @@ public sealed class FolderRenameRefusalTests : IDisposable
         ("Plantoir/Views/SidebarPane.xaml.cs", "private async void AskWhenToDeploy(", One, "new CalendarDatePicker"),
         ("Plantoir/Views/SectionDetailView.xaml.cs", "private async Task PressPreviewAsync(", One, "AnotherProgramStandsInTheWay("),
         ("Plantoir/Views/SectionDetailView.xaml.cs", "private async Task<string?> DeployAsync(", One, "AnotherProgramStandsInTheWay("),
+        ("Plantoir/Views/SectionDetailView.xaml.cs", "public async Task<string?> RebuildPreviewAsync(", One, "StopPreviewIfRunningAsync("),
+        ("Plantoir/Views/SectionDetailView.xaml.cs", "private async void RunTheAutomatedStart(", One, "StopPreview();"),
+        ("Plantoir/Views/SectionDetailView.xaml.cs", "private SiteHealthRepair.Outcome? WhyTheRepairCannotBePreviewedNow(", One, "WorkLease.InTheWay("),
+        ("Plantoir/Views/SectionDetailView.xaml.cs", "private async Task PreviewAgainAfterRepairAsync(", "WhyTheRepairCannotBePreviewedNow(", "PreviewAgainPresses.CarryOutAsync("),
+        ("Plantoir/Views/SectionDetailView.xaml.cs", "private void StartPreviewAgainAfterTheStop(", "WhyTheRepairCannotBePreviewedNow(", "StartAutomatedPreview("),
+        ("Plantoir/Views/CourseSettingsView.xaml.cs", "private async void PreviewAgain_Click(", One, "StopPreviewForAsync("),
+    ];
+
+    /// <summary>
+    /// Methods that ask whether a course is busy (or reach a preview or a
+    /// deploy through #473's check) but are not an entry point above: each
+    /// says where its refusal is decided instead, so a new method that asks
+    /// is listed on purpose or goes red. Keyed by file name and method name.
+    /// </summary>
+    private static readonly (string File, string Method, string Why)[] NotEntryPoints =
+    [
+        ("MainWindow.Menus.cs", "SituationFor", "greys the menus (19b), refuses nothing"),
+        ("MainWindow.Verbs.cs", "MenuRunner", "wires the runner's delegates; the start refuses in RebuildPreviewAsync"),
+        ("MainWindow.Verbs.cs", "RebuildPreviewFor", "reaches RebuildPreviewAsync, which refuses before its stop"),
+        ("MainWindow.xaml.cs", "ShowPreviewFor", "reaches StartPreviewIfIdle, then RunTheAutomatedStart, which refuses"),
+        ("MainWindow.xaml.cs", "DeployFor", "reaches Deploy_Click, then DeployAsync, which refuses"),
+        ("MainWindow.xaml.cs", "DeployForAsync", "reaches DeployAsync, which refuses"),
+        ("MainWindow.xaml.cs", "RefusedWhileTheFolderIsGettingReady", "#473's check itself"),
+        ("SectionDetailView.xaml.cs", "RefusedWhileThisSectionDeploys", "#386's check itself"),
+        ("SectionDetailView.xaml.cs", "RaiseTheProblemsAlertIfDueAsync", "decides whether Preview Again is offered; the press refuses"),
+        ("SectionDetailView.xaml.cs", "RepairFromTheProblemsTabAsync", "decides whether Preview Again is offered; the press refuses"),
+        ("AssistWindow.xaml.cs", "Begin", "the assistant's (19a3)"),
+        ("CopyAPageDialog.cs", "CopyNow", "not among this piece's acts"),
+        ("CourseSettingsView.xaml.cs", "OpenRenameUnitWordDialog", "not among this piece's acts"),
+        ("LinksChecklistDialog.cs", "OfferAsync", "not among this piece's acts"),
+        ("StartOfYearDialog.cs", "OfferAsync", "Restore Course's press refuses in StartOfYearRestoreOffer"),
+        ("StartOfYearDialog.cs", "Go", "not among this piece's acts"),
+        ("StartOfYearDialog.cs", "UndoAsync", "not among this piece's acts"),
     ];
 
     private const string One = "CourseActivity.FolderRenameRefusal(";
@@ -205,23 +238,70 @@ public sealed class FolderRenameRefusalTests : IDisposable
     [Fact]
     public void EveryViewMethodThatRefusesForABusyCourseIsAnEntryPointAbove()
     {
-        var busyCall = new Regex(@"CourseActivity\.(?:IsPreviewingOrPublishing|AssistHoldRefusal)\(");
-        var header = new Regex(@"^    (?:private|public|internal|protected)[^\n]*\(", RegexOptions.Multiline);
-        foreach (string path in Directory.EnumerateFiles(Path.Combine(WindowsApp, "Plantoir", "Views"), "*.cs"))
+        // Widened after review 1 (LOW 1): every busy check a view or the main
+        // window makes, #473's and #386's included, since every way into a
+        // preview or a deploy asks #473's; and the owner is matched by its
+        // method NAME (the old test compared header text, and a header with
+        // a tuple return type never matched its entry).
+        var busyCall = new Regex(@"(?<![A-Za-z])(?:CourseActivity\.(?:IsPreviewingOrPublishing|AssistHoldRefusal|IsPublishing|IsPublishingSection)|RefusedWhileThisSectionDeploys|RefusedWhileTheFolderIsGettingReady|WhyTheRepairCannotBePreviewedNow)\(");
+        var header = new Regex(@"^    (?:private|public|internal|protected)[^\n]*?\s(?<name>\w+)(?:<[^>\n]*>)?\(", RegexOptions.Multiline);
+        var paths = new List<string>();
+        paths.AddRange(Directory.EnumerateFiles(Path.Combine(WindowsApp, "Plantoir", "Views"), "*.cs"));
+        paths.AddRange(Directory.EnumerateFiles(Path.Combine(WindowsApp, "Plantoir"), "*.cs"));
+        int found = 0;
+        foreach (string path in paths)
         {
             string text = File.ReadAllText(path);
-            foreach (Match found in busyCall.Matches(text))
+            string fileName = Path.GetFileName(path);
+            foreach (Match call in busyCall.Matches(text))
             {
                 Match? owner = null;
                 foreach (Match candidate in header.Matches(text))
-                    if (candidate.Index < found.Index) owner = candidate;
+                    if (candidate.Index < call.Index) owner = candidate;
                 Assert.NotNull(owner);
+                string name = owner!.Groups["name"].Value;
                 bool listed = false;
                 foreach (var entry in EntryPoints)
-                    if (owner!.Value.Contains(entry.Method, StringComparison.Ordinal)) listed = true;
-                Assert.True(listed, $"{Path.GetFileName(path)}: {owner!.Value.Trim()} refuses for a busy course but is not an entry point here");
+                    if (fileName == Path.GetFileName(entry.File) && NameOf(entry.Method) == name) listed = true;
+                foreach (var other in NotEntryPoints)
+                    if (fileName == other.File && other.Method == name) listed = true;
+                Assert.True(listed, $"{fileName}: {name} refuses for a busy course but is neither an entry point here nor listed as not one");
+                found++;
             }
         }
+        Assert.True(found >= 30, $"only {found} busy checks found: the scan has lost its files");
+    }
+
+    // 5. Review 1's MEDIUM 1: the three preview starts that still went ahead.
+
+    [Theory]
+    [InlineData("Plantoir/Views/SectionDetailView.xaml.cs", "public async Task<string?> RebuildPreviewAsync(", One, "StopPreviewIfRunningAsync(", "StartAutomatedPreview(")]
+    [InlineData("Plantoir/Views/CourseSettingsView.xaml.cs", "private async void PreviewAgain_Click(", One, "StopPreviewForAsync(", "ShowPreviewFor(")]
+    [InlineData("Plantoir/Views/SectionDetailView.xaml.cs", "private async Task PreviewAgainAfterRepairAsync(", "WhyTheRepairCannotBePreviewedNow(", "PreviewAgainPresses.CarryOutAsync(", "PreviewAgainPresses.CarryOutAsync(")]
+    public void APreviewStartAsksTheOneRefusalBeforeAnythingIsStoppedOrStarted(string file, string method, string call, string stop, string start)
+    {
+        string body = MethodBody(File.ReadAllText(Path.Combine(WindowsApp, file)), method, file);
+        int asked = body.IndexOf(call, StringComparison.Ordinal);
+        int stopped = body.IndexOf(stop, StringComparison.Ordinal);
+        int started = body.IndexOf(start, StringComparison.Ordinal);
+        Assert.True(asked >= 0, $"{method} does not ask {call}");
+        Assert.True(stopped > asked, $"{method} stops a preview before it asks {call}");
+        Assert.True(started > asked, $"{method} starts a preview before it asks {call}");
+        if (call != One)
+        {
+            // The repair's question asks the one function first of all.
+            string why = MethodBody(File.ReadAllText(Path.Combine(WindowsApp, file)), "private SiteHealthRepair.Outcome? " + call, file);
+            int renaming = why.IndexOf(One, StringComparison.Ordinal);
+            Assert.True(renaming >= 0, $"{call} does not ask {One}");
+            Assert.True(renaming < why.IndexOf("WorkLease.InTheWay(", StringComparison.Ordinal), $"{call} asks {One} after another program's build");
+        }
+    }
+
+    private static string NameOf(string method)
+    {
+        string beforeParenthesis = method.Substring(0, method.IndexOf('('));
+        int space = beforeParenthesis.LastIndexOf(' ');
+        return beforeParenthesis.Substring(space + 1);
     }
 
     private static string MethodBody(string text, string method, string file)

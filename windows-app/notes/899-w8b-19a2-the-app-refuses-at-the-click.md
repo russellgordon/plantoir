@@ -19,6 +19,7 @@ Stands on 19a1 (`CourseActivity.BeginFolderRename`, `CourseIsRenamingAFolder`, `
 6. Restore from Backup…: `AskWhichRestore`, before its question, through the table (`CourseRestorer.BusyTitle`). The one-section run's `BusyRefusal` in `RestoreOneSection` asks first too. Restore from Archived: `ConfirmRestore` (`BackupProblemTitle.Restoring`).
 7. Get Ready's Restore Course: `StartOfYearRestoreOffer.RestoreCourseIsPressed`.
 8. Preview: `SectionDetailView.PressPreviewAsync` ("Cannot Preview Yet"). Deploy: `DeployAsync` ("Cannot Deploy Yet", and the assistant's hand-back hears the same sentence). Deploy Later: `AskWhenToDeploy` ("That couldn't be scheduled").
+8b. The preview starts review 1 found going ahead (its MEDIUM 1), each refused before anything is stopped or started, under "Cannot Preview Yet": Section ▸ Rebuild Preview in `SectionDetailView.RebuildPreviewAsync`, before its stop (the menu and the assistant's rebuild both come here; the runner's refusal is the sentence it returns); every automated start in `RunTheAutomatedStart`, before its `StopPreview()`; Course Settings' Preview Again in `PreviewAgain_Click`, before `StopPreviewForAsync`, in this view's own alert; the section window's Preview Again after a repair in `WhyTheRepairCannotBePreviewedNow`, first of all, which the press asks before its stop and again after it.
 9. The section window's structural items: Rename Course and Add Section from the menus reach the same two functions. `BusyReason` itself only greys items (19b's).
 
 Each refusal is shown where that act already shows its busy refusal, under that refusal's own title. No new surface, no new button, no question.
@@ -32,12 +33,14 @@ Each refusal is shown where that act already shows its busy refusal, under that 
 
 The tests went in first, as their own commit, with Core stubs (null or no-op), so the class compiles and fails at runtime. Red: `FolderRenameRefusalTests`, every test except `EveryViewMethodThatRefusesForABusyCourseIsAnEntryPointAbove`, which only fails once an entry is missing. The red lines are the `Assert.Equal(Sentence(...))` and the `asked >= 0` checks.
 
+**Fix round 1 (review 1).** `EveryViewMethodThatRefusesForABusyCourseIsAnEntryPointAbove` failed at 6a2afa903 because it matched an owner by header TEXT: the header regex stops at the last `(` on the line, so `AskWhichRestore`'s header (a tuple return type) never contained its entry's `AskWhichRestore(BackupItem item)`. It now matches by method name. It is widened (LOW 1): it scans `Plantoir/*.cs` as well as `Views`, and counts `IsPublishing`, `IsPublishingSection`, `RefusedWhileThisSectionDeploys`, #473's `RefusedWhileTheFolderIsGettingReady` (asked at every way into a preview or a deploy) and `WhyTheRepairCannotBePreviewedNow`. Every method that asks is either an entry point or in a `NotEntryPoints` list with the reason, so the three preview starts would have gone red. New theory `APreviewStartAsksTheOneRefusalBeforeAnythingIsStoppedOrStarted`, one row per path. Must-fail rows 7 to 9 break each path.
+
 **Owed:** `Plantoir.UiTests/RenameFolderBusyUiTests.cs` and its Debug-only launch argument were not written within the budget.
 
 ## For 19a3
 
 - `Plantoir.Mcp` decides a hold from the leases on disk (`WorkLease`, `CourseActivity.IsAssisting` and `IsBuildingElsewhere`). It cannot see the rename claim, which lives in this process's memory, so it needs a route: a lease kind or a file.
-- The assistant window runs in this process. It deploys through `SectionDetailView.DeployAsync`, which now refuses, and rebuilds the preview through `RebuildPreviewAsync`, which does not refuse yet.
+- The assistant window runs in this process. It deploys through `SectionDetailView.DeployAsync` and rebuilds the preview through `RebuildPreviewAsync`; both refuse now (fix round 1).
 
 ## For documentation 12
 
