@@ -34,6 +34,9 @@ namespace Plantoir.Core.Undo;
 /// </summary>
 internal static class UndoRestoreSetAside
 {
+    /// <summary>Thrown when the list's lock cannot be had within the finish wait: the restore does not start, and nothing has moved (the mac's <c>TheListIsBusy</c>).</summary>
+    internal sealed class TheListIsBusy : Exception;
+
     /// <summary>The reason word on the closing line and on the event (<c>undoJournal.eventKeys.reason</c>).</summary>
     internal const string Reason = "setAsideByARestore";
 
@@ -225,5 +228,20 @@ internal static class UndoRestoreSetAside
                                             UndoTrail.SetAsideByARestoreWords(phase, newlyInside.Count, stillJudged.Count)));
         }
         return touched;
+    }
+}
+
+/// <summary>
+/// The list a restore holds across its swap: its journal, its mode, where
+/// its trail lines go, and how long the lock is waited for (the door's own
+/// finish wait, <see cref="UndoDoor.FinishWait"/>, in the app).
+/// </summary>
+internal sealed record UndoListForARestore(UndoJournal Journal, UndoMode Mode, Action<UndoTrailLine>? Trail, TimeSpan FinishWait)
+{
+    /// <summary>This process's list (<see cref="UndoForThisProcess.Current"/>), asked for only when a restore needs it.</summary>
+    internal static UndoListForARestore OfThisProcess()
+    {
+        UndoForThisProcess process = UndoForThisProcess.Current;
+        return new UndoListForARestore(process.Journal, process.Mode, process.Trail, UndoDoor.FinishWait);
     }
 }

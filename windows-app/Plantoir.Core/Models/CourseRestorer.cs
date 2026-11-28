@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Models;
 
@@ -241,7 +242,12 @@ public static class CourseRestorer
     /// caller passes it yet.</para>
     /// </summary>
     public static OneSectionRestore.Outcome RestoreSectionFromTheMenu(int sectionNumber, BackupItem item, string coursesDirectory,
-        SectionSwapHooks? hooks = null, Action<string>? keepingWhatWasReplaced = null)
+        SectionSwapHooks? hooks = null, Action<string>? keepingWhatWasReplaced = null) =>
+        RestoreSectionFromTheMenu(sectionNumber, item, coursesDirectory, UndoListForARestore.OfThisProcess, hooks, keepingWhatWasReplaced);
+
+    /// <summary>The same, holding <paramref name="theList"/> (this process's list in the app; a test's own in a test).</summary>
+    internal static OneSectionRestore.Outcome RestoreSectionFromTheMenu(int sectionNumber, BackupItem item, string coursesDirectory,
+        Func<UndoListForARestore> theList, SectionSwapHooks? hooks = null, Action<string>? keepingWhatWasReplaced = null)
     {
         hooks ??= SectionSwapHooks.Real;
         string courseDir = Path.Combine(coursesDirectory, item.CourseCode);
@@ -437,6 +443,8 @@ public static class CourseRestorer
         Staged,
         /// <summary>Every live file the swap replaces is aside and none of the backup's is in: the moment the old code had an EMPTY section folder.</summary>
         SetAside,
+        /// <summary>The shared pages' per-section keys are written (the mac's <c>perSectionKeysPutBack</c>), inside the list's lock.</summary>
+        PerSectionKeysPutBack,
     }
 
     /// <summary>
