@@ -1328,6 +1328,16 @@ public sealed partial class CourseSettingsView : UserControl
     {
         try
         {
+            // Never while a Rename folder of the course is under way, in any
+            // window (#899 W8b-19a2): refused at the click, said on Save's own
+            // line, nothing written and the edits left unsaved.
+            if (_window.Workspace.WorkspacePath is { } renamingIn
+                && CourseActivity.FolderRenameRefusal(renamingIn, _course.Code) is { } renaming)
+            {
+                SaveStatus.Text = renaming;
+                SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+                return;
+            }
             // Where the course deployed BEFORE this Save, off disk (#347): a
             // scheduled deploy goes where the course deploys when it RUNS, so a
             // Save that moves or breaks one is said now, while somebody is awake.

@@ -1906,6 +1906,14 @@ public sealed partial class SectionDetailView : UserControl
             // PreviewLeases.Take and be refused by the window's own lease with
             // the sentence about another window.
             if (SaidAStartIsAlreadyUnderWay()) return;
+            // A Rename folder of the course under way, in any window (#899
+            // W8b-19a2): refused at the click, before any question or lease.
+            if (_window.Workspace.WorkspacePath is { } renamingIn
+                && CourseActivity.FolderRenameRefusal(renamingIn, _course.Code) is { } renaming)
+            {
+                await ShowPreviewRefusal(renaming);
+                return;
+            }
             // Before any lease is taken or anything stopped (#386).
             if (_window.Workspace.WorkspacePath is { } deployingFolder &&
                 await RefusedWhileThisSectionDeploys(deployingFolder)) return;
@@ -2842,6 +2850,19 @@ public sealed partial class SectionDetailView : UserControl
             // the first's stop-preview-then-deploy sequence), running, the
             // question below up (M4), or the publish record (#728).
             if (DeployIsUnderWay) return outcomeMessage;
+            // A Rename folder of the course under way, in any window (#899
+            // W8b-19a2): refused before anything is stopped, built or asked.
+            if (_window.Workspace.WorkspacePath is { } renamingIn
+                && CourseActivity.FolderRenameRefusal(renamingIn, _course.Code) is { } renaming)
+            {
+                await ShowDialogSafelyAsync(new ContentDialog
+                {
+                    Title = "Cannot Deploy Yet",
+                    Content = renaming,
+                    CloseButtonText = "OK",
+                });
+                return renaming;
+            }
             // FIRST, before anything is stopped, built or uploaded (#241, door
             // 1): a course kept for reference is never deployed. The button is
             // not drawn on one; this is what the assistant's hand-back, or a

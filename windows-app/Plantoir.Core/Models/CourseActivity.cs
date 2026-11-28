@@ -302,8 +302,16 @@ public static class CourseActivity
     /// </summary>
     public static bool RenameSwapBegins(FolderRenameClaim claim)
     {
-        if (CourseIsBeingRestored(claim.FolderPath, claim.CourseCode)) return false;
-        return FolderRenameSwapBegins(claim);
+        // The restore check and the swap mark in one turn of the gate, as the
+        // mac's are in one main-actor turn (19a1's review, LOW 1): a restore
+        // that takes its claim in between can no longer go ahead beside it.
+        lock (_gate)
+        {
+            if (_restores.Any(r => r.CourseCode == claim.CourseCode && WorkingFolder.IsTheSame(r.FolderPath, claim.FolderPath))) return false;
+            if (!_folderRenames.Contains(claim)) return false;
+            claim.IsSwapping = true;
+            return true;
+        }
     }
 
     /// <summary>Records that a rename has ended, however it ended. Safe to call twice. The mac's <c>endFolderRename</c>.</summary>
@@ -319,7 +327,8 @@ public static class CourseActivity
     /// when no rename holds it. Every act asks this one function, never
     /// <see cref="CourseIsRenamingAFolder"/> itself.
     /// </summary>
-    public static string? FolderRenameRefusal(string folderPath, string courseCode) => null;
+    public static string? FolderRenameRefusal(string folderPath, string courseCode) =>
+        CourseIsRenamingAFolder(folderPath, courseCode) ? FolderRenameIsUnderWay(courseCode) : null;
 
     /// <summary>True while a Rename folder of the course is under way, in any window. The mac's <c>courseIsRenamingAFolder</c>.</summary>
     public static bool CourseIsRenamingAFolder(string folderPath, string courseCode)

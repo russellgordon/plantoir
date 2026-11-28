@@ -37,8 +37,8 @@ public sealed class FolderRenameRefusalTests : IDisposable
         ("Plantoir/Views/SidebarPane.xaml.cs", "private async Task RestoreOneSection(", One, "IsPreviewingOrPublishing("),
         ("Plantoir/Views/SidebarPane.xaml.cs", "public async void ConfirmRestore(ArchivedItem item)", One, "new ContentDialog"),
         ("Plantoir/Views/SidebarPane.xaml.cs", "private async void AskWhenToDeploy(", One, "new CalendarDatePicker"),
-        ("Plantoir/Views/SectionDetailView.xaml.cs", "private async Task PressPreviewAsync(", One, "OfferTodaysClassAsync("),
-        ("Plantoir/Views/SectionDetailView.xaml.cs", "private async Task<string?> DeployAsync(", One, "SectionRuns.Deploy("),
+        ("Plantoir/Views/SectionDetailView.xaml.cs", "private async Task PressPreviewAsync(", One, "AnotherProgramStandsInTheWay("),
+        ("Plantoir/Views/SectionDetailView.xaml.cs", "private async Task<string?> DeployAsync(", One, "AnotherProgramStandsInTheWay("),
     ];
 
     private const string One = "CourseActivity.FolderRenameRefusal(";

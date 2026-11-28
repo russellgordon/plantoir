@@ -1292,6 +1292,12 @@ public sealed partial class SidebarPane : UserControl
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
+        // Never while a Rename folder of the course is under way (#899 W8b-19a2).
+        if (askedIn is not null && CourseActivity.FolderRenameRefusal(askedIn, windowCourse.Code) is { } renaming)
+        {
+            await ShowError("That couldn't be scheduled", renaming);
+            return;
+        }
         // The sheet works from the SAVED settings (#357 / mac #335): what it
         // shows, what it refuses and what it sets. Unreadable: refuse.
         if (SavedSettings.Read(windowCourse) is not { } course)
@@ -1640,6 +1646,14 @@ public sealed partial class SidebarPane : UserControl
         // section's removal into the WHOLE course's here, silently.
         if (sectionNumber is not null && ReferenceCourse.IsKeptForReference(course)) return;
 
+        // Never while a Rename folder of the course is under way, in any
+        // window: refused at the click, before the question (#899 W8b-19a2).
+        if (CourseActivity.FolderRenameRefusal(askedIn, course.Code) is { } renaming)
+        {
+            await ShowError(BackupProblemTitle.Removing(course.Code), renaming);
+            return;
+        }
+
         string title;
         string message;
         if (sectionNumber is int n && course.SectionNumbers.Count > 1)
@@ -1835,20 +1849,25 @@ public sealed partial class SidebarPane : UserControl
         var nothing = (RestoreChoice.Nothing, 0, (OneSectionRestore.BackupFacts?)null);
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
-        // Restoring rewrites the course's folders — never mid-copy (row 104's rule).
-        if (Workspace.WorkspacePath is { } folder
-            && CourseActivity.IsPreviewingOrPublishing(folder, item.CourseCode))
+        // Refused at the click, in refusalWhy's order (#899 W8b-19a2): a
+        // Rename folder of the course first; then a preview or deploy, since
+        // restoring rewrites the course's folders (row 104's rule); then an
+        // assistant's hold, in its own words (#468).
+        if (Workspace.WorkspacePath is { } folder)
         {
-            await ShowError(CourseRestorer.BusyTitle(item.CourseCode), CourseRestorer.BusyMessage);
-            return nothing;
-        }
-        // An assistant's hold, in its own words (#468): a Claude or Codex
-        // session, or this app's own window — never "a preview or deploy".
-        if (Workspace.WorkspacePath is { } heldIn
-            && CourseActivity.AssistHoldRefusal(heldIn, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held)
-        {
-            await ShowError(AssistWording.CourseIsAlreadyBeingRevised(item.CourseCode), held);
-            return nothing;
+            switch (CourseRestorer.FirstWholeCourseRefusal(CourseRestorer.WholeCourseRefusalFactsNow(folder, item.CourseCode)))
+            {
+                case CourseRestorer.WholeCourseRefusal.FolderRenameUnderWay:
+                    await ShowError(CourseRestorer.BusyTitle(item.CourseCode), CourseActivity.FolderRenameIsUnderWay(item.CourseCode));
+                    return nothing;
+                case CourseRestorer.WholeCourseRefusal.Busy:
+                    await ShowError(CourseRestorer.BusyTitle(item.CourseCode), CourseRestorer.BusyMessage);
+                    return nothing;
+                case CourseRestorer.WholeCourseRefusal.ClaudeIsRevisingTheCourseRestore
+                    when CourseActivity.AssistHoldRefusal(folder, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held:
+                    await ShowError(AssistWording.CourseIsAlreadyBeingRevised(item.CourseCode), held);
+                    return nothing;
+            }
         }
 
         // A backup made for ONE section offers that section first (#911, the
@@ -1925,6 +1944,7 @@ public sealed partial class SidebarPane : UserControl
         string? BusyRefusal()
         {
             if (folder is null) return null;
+            if (CourseActivity.FolderRenameRefusal(folder, item.CourseCode) is { } renaming) return renaming;
             if (CourseActivity.IsPreviewingOrPublishing(folder, item.CourseCode))
                 return $"{item.CourseCode} is previewing or deploying right now. Stop that first, then restore.";
             if (CourseActivity.AssistHoldRefusal(folder, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held) return held;
@@ -2097,6 +2117,13 @@ public sealed partial class SidebarPane : UserControl
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
+        // Never while a Rename folder of the course is under way, in any
+        // window: refused at the click, before the question (#899 W8b-19a2).
+        if (askedIn is not null && CourseActivity.FolderRenameRefusal(askedIn, item.CourseCode) is { } renaming)
+        {
+            await ShowError(BackupProblemTitle.Restoring(item.CourseCode), renaming);
+            return;
+        }
         string message = item.SectionNumber is int n
             ? $"Section {n} will be put back into {item.CourseCode}, and will no longer be listed as archived."
             : $"{item.CourseCode} will be put back into Courses & Clubs, and will no longer be listed as archived.";
@@ -2401,6 +2428,13 @@ public sealed partial class SidebarPane : UserControl
         // Belt to the menu's braces: adding a section re-runs the course
         // setup, which rewrites folders a live preview or publish may be
         // mid-copy of. Decline while the course is busy anywhere.
+        // A Rename folder of the course first, at the click (#899 W8b-19a2).
+        if (Workspace.WorkspacePath is { } renamingIn
+            && CourseActivity.FolderRenameRefusal(renamingIn, course.Code) is { } renaming)
+        {
+            await ShowError($"{course.Code} is busy right now", renaming);
+            return;
+        }
         if (Workspace.WorkspacePath is { } folder
             && CourseActivity.IsPreviewingOrPublishing(folder, course.Code))
         {
@@ -2446,6 +2480,12 @@ public sealed partial class SidebarPane : UserControl
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = folder;
 
+        // A Rename folder of the course first, at the click (#899 W8b-19a2).
+        if (CourseActivity.FolderRenameRefusal(folder, course.Code) is { } renaming)
+        {
+            await ShowError("Course is busy", renaming);
+            return;
+        }
         if (CourseActivity.IsPreviewingOrPublishing(folder, course.Code))
         {
             await ShowError("Course is busy", $"{course.Code} is previewing or deploying right now. Stop that first, then rename.");

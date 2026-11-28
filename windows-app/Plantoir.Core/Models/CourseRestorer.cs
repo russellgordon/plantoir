@@ -64,10 +64,22 @@ public static class CourseRestorer
     public sealed record WholeCourseRefusalFacts(bool FolderRenameUnderWay, bool BusyHere, bool RevisingAssistant);
 
     /// <summary>The first refusal of a whole-course restore, or null (the mac's <c>WholeCourseRestore.refusal</c>).</summary>
-    public static WholeCourseRefusal? FirstWholeCourseRefusal(WholeCourseRefusalFacts facts) => null;
+    public static WholeCourseRefusal? FirstWholeCourseRefusal(WholeCourseRefusalFacts facts)
+    {
+        // A Rename folder first (refusalWhy): it moves folders inside the
+        // course the restore would replace, and its sentence is the one every
+        // act it refuses says.
+        if (facts.FolderRenameUnderWay) return WholeCourseRefusal.FolderRenameUnderWay;
+        if (facts.BusyHere) return WholeCourseRefusal.Busy;
+        if (facts.RevisingAssistant) return WholeCourseRefusal.ClaudeIsRevisingTheCourseRestore;
+        return null;
+    }
 
     /// <summary>The facts as they stand now, for the course in the working folder.</summary>
-    public static WholeCourseRefusalFacts WholeCourseRefusalFactsNow(string workingFolder, string courseCode) => new(false, false, false);
+    public static WholeCourseRefusalFacts WholeCourseRefusalFactsNow(string workingFolder, string courseCode) => new(
+        FolderRenameUnderWay: CourseActivity.FolderRenameRefusal(workingFolder, courseCode) is not null,
+        BusyHere: CourseActivity.IsPreviewingOrPublishing(workingFolder, courseCode),
+        RevisingAssistant: CourseActivity.AssistHoldRefusal(workingFolder, courseCode, CourseActivity.StructuralWork.Restore) is not null);
 
     /// <summary>A refusal's name in <c>refusalCases</c>, or null for none.</summary>
     public static string? ContractNameOf(WholeCourseRefusal? refusal) => refusal switch
@@ -103,6 +115,11 @@ public static class CourseRestorer
         string workingFolder = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(coursesDirectory)))!;
         using var holding = CourseActivity.BeginRestore(workingFolder, item.CourseCode);
         WhileRestoringTheWholeCourse?.Invoke();
+        // Taken first, then asked (#899 W8b-19a2): a Rename folder of the
+        // course under way in any window refuses the run before anything is
+        // written, and one that begins after this cannot begin its swap.
+        if (CourseActivity.FolderRenameRefusal(workingFolder, item.CourseCode) is { } renaming)
+            throw new RestoreException(renaming);
         string? archivedFirst = null;
         if (current is not null)
             archivedFirst = CourseArchiver.ArchiveCourseWithoutRemoving(current, coursesDirectory);

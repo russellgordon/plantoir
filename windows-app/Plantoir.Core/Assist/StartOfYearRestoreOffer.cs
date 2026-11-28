@@ -47,6 +47,7 @@ public sealed class StartOfYearRestoreOffer
 
     private readonly Func<bool> _aDeployOfTheCourseRuns;
     private readonly string _workingFolder;
+    private string? _heldBackByARename;
     private bool _answered;
     private bool _restoreChosen;
     private bool _restoreRan;
@@ -66,8 +67,8 @@ public sealed class StartOfYearRestoreOffer
         StartOfYearWording.Fill(StartOfYearWording.RestoreOffer, ("course", Stop.CourseCode), ("backup", Path.GetFileName(Stop.Backup.FilePath))),
     ];
 
-    /// <summary>The restore's own busy sentence, said while a deploy holds Restore Course back.</summary>
-    public string HeldBackSentence => CourseRestorer.BusyTitle(Stop.CourseCode) + "\n" + CourseRestorer.BusyMessage;
+    /// <summary>The sentence said while Restore Course is held back: the rename's, or the restore's own busy sentence while a deploy holds it.</summary>
+    public string HeldBackSentence => _heldBackByARename ?? CourseRestorer.BusyTitle(Stop.CourseCode) + "\n" + CourseRestorer.BusyMessage;
 
     // ---- Initializer -----------------------------------------------------------------
 
@@ -90,6 +91,10 @@ public sealed class StartOfYearRestoreOffer
     public RestoreCoursePress RestoreCourseIsPressed()
     {
         if (_answered) return RestoreCoursePress.AlreadyAnswered;
+        // A Rename folder of the course first, as the whole-course restore's
+        // first refusal is (#899 W8b-19a2): held back the same way.
+        _heldBackByARename = CourseActivity.FolderRenameRefusal(_workingFolder, Stop.CourseCode);
+        if (_heldBackByARename is not null) return RestoreCoursePress.HeldBackByARename;
         if (_aDeployOfTheCourseRuns()) return RestoreCoursePress.HeldBackByADeploy;
         _answered = true;
         _restoreChosen = true;

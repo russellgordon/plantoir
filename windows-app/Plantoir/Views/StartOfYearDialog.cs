@@ -94,6 +94,7 @@ public static class StartOfYearDialog
             // Answered in the press's own turn (the mac's restoreCourseIsPressed).
             switch (offer.RestoreCourseIsPressed())
             {
+                case RestoreCoursePress.HeldBackByARename:
                 case RestoreCoursePress.HeldBackByADeploy:
                     args.Cancel = true;
                     ShowTheOffer(dialog, offer, offer.HeldBackSentence);
