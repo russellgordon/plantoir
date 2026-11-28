@@ -328,7 +328,7 @@ public partial class StartOfYearTests
         var recorder = new AnswersRecorder(this);
         recorder.Previewing.Add(1);
         bool deploying = true;
-        var offer = new StartOfYearRestoreOffer(stop, () => deploying);
+        var offer = new StartOfYearRestoreOffer(stop, () => deploying, Path.GetTempPath());
 
         Assert.Equal(RestoreCoursePress.HeldBackByADeploy, offer.RestoreCourseIsPressed());
         Assert.False(offer.IsAnswered);
