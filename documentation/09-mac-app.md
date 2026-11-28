@@ -23904,7 +23904,7 @@ old name is a new file, never through the link). Six `stackCases` rows
 and `makeRoomWithALaterClassLinkedToALinkedClass`, the call
 `makeRoomWithALaterClassLinkedToAnEarlierClass` turned round from a refusal,
 key `laterLinks`) replace the refusal row, held for Windows under
-`Reason899W8bLinkedClassPage`. Known limits, not built yet: an EARLIER class's
+`Reason899W8bLinkedClassPage` (a constant since removed by #1055). Known limits, not built yet: an EARLIER class's
 link to a page Insert Class renames keeps its text and then leads to the page
 now at that name (ruled 2026-11-26: it will be re-pointed; mac-3); two later classes
 linked to one shared lesson keep the last date written (ruled: it will keep
@@ -24045,7 +24045,7 @@ Russell's rule (2026-11-27): "Plantoir can read OR write through a symbolic link
 - **Write.** A daily action's page that is a link is written through it: the link stays a link and the file it leads to changes (`JournaledStep.placeALinkLeadsTo`, "U4b2: linked-page-written-through" above).
 - **Insert Class (Make Room).** Past a later class page that is a link, the step is refused before anything changes by the door's general guard, which is older than any link work: a file a step removes must be a plain file (`JournaledStep.remove` plans the link's own place, `UndoItem.read` looks with `lstat`, `writePlainly` refuses `.notAFile` as cannot tell now), said as the door's existing sentence ("The file “Unit 1, Day 3.md” couldn’t be saved."). Windows with the switch off writes a plain copy at the new name and deletes the link, as released; nothing makes the two agree.
 - **Duplicate Class.** Makes a plain copy (`testAClassPageThatIsALinkCanBeCopied`); making room past a linked later class is Insert Class's case above.
-- **Rename Folder.** A per-section or shared folder that is a link is refused before anything changes by the plan's general guard: a folder it moves is judged by its listing, and `UndoTreeReading` reads a link as `.notATree`, which has none (`SpecialFolderRenamer.swift`, the "cannot be judged as a pair" check), said as "“Tasks” was not renamed, and nothing was changed: The file “Tasks” couldn’t be saved." (`undo.wording.renameFolderNothingWasChanged`). A folder that only holds a link is renamed with the link inside it, as the fourth part of U4b says.
+- **Rename Folder.** A per-section or shared folder that is a link is refused before anything changes by the plan's general guard: a folder it moves is judged by its listing, and `UndoTreeReading` reads a link as `.notATree`, which has none (`SpecialFolderRenamer.swift`, the "A folder whose content cannot be read" check), said as "“Tasks” was not renamed, and nothing was changed: The file “Tasks” couldn’t be saved." (`undo.wording.renameFolderNothingWasChanged`). A folder that only holds a link is renamed with the link inside it, as the fourth part of U4b says.
 - **Save Course Settings.** A linked `course_config.json` is saved through its link (`CourseConfiguration.fileALinkLeadsTo`).
 - **The site build's date and the front page's title.** Both write through a symbolic link (`_replace_the_page_safely` in `scripts/build_site.py` writes at the file the link leads to); a page with a second name (a hard link) is left as released (`_has_a_second_name`).
 - **The kept page.** A page recovery cannot put back is kept under a visible name (`UndoRecovery.keepPagesWhosePlaceIsTaken`); that is not link work and stays.
