@@ -8,14 +8,14 @@ Stands on 19a2 (`CourseActivity.FolderRenameRefusal`). Base `origin/issue/899-w8
 
 ## Built (the window's assistant)
 
-- `AssistToolRunner.WorkingFolder` and `AssistToolRunner.SiteWork` (`rebuild_preview`, `deploy_section`, `schedule_deploy`: the mac's `AssistSiteWork` 161 and 278 and `bringThePreviewUpToDate`). At the top of `Run`, after the Section menu's claim, a site-work tool on a course a rename holds returns `CourseActivity.FolderRenameRefusal`'s sentence, before the later-classes question, any preview stop, any in-app press or any server call. Reading tools go on.
+- `AssistToolRunner.WorkingFolder` and `AssistToolRunner.SiteWork` (`rebuild_preview`, `deploy_section`: the mac's `AssistSiteWork` 161 and 278). `schedule_deploy` is not refused: the mac's `scheduleDeploy` never reads the rename claim, so a test pins that it still goes ahead. The mac's `bringThePreviewUpToDate` is not a tool; its Windows counterpart is the preview restart after a page edit, which is the parked page-edit case, so no tool is added for it. At the top of `Run`, after the Section menu's claim, a site-work tool on a course a rename holds returns `CourseActivity.FolderRenameRefusal`'s sentence, before the later-classes question, any preview stop, any in-app press or any server call. Reading tools go on.
 - Wired: `AssistAgent.WorkingFolder` (passed in `RunTool`), set by `AssistWindow` to `_folder`; the menu runner (`MainWindow.MenuRunner`) sets `folder`.
 - `AssistSectionRestore.Restore` (the assistant window's Restore Section N…; the mac's `Problem.folderRenameUnderWay`) refuses with the sentence before the backup is read.
 - Page edits are not refused, as on the mac (its runner refuses site work and the section restore only).
 
 ## Tests
 
-`Plantoir.Tests/AssistantRefusesDuringARenameTests.cs`. Tests-first commit 1fc2f38f4 (a stub `WorkingFolder`, unread). Red there: the three site-work cases (the sentence check), the section restore, and the three wiring cases. The reading tool, another course's rename and the ended claim pass on both.
+`Plantoir.Tests/AssistantRefusesDuringARenameTests.cs`. Tests-first commit 1fc2f38f4 (a stub `WorkingFolder`, unread). Red there: the site-work cases (then three; `schedule_deploy` was taken out in fix round 1) (the sentence check), the section restore, and the three wiring cases. The reading tool, another course's rename and the ended claim pass on both.
 
 ## Self-check
 
@@ -23,3 +23,9 @@ Stands on 19a2 (`CourseActivity.FolderRenameRefusal`). Base `origin/issue/899-w8
 - No tool added, no tool description changed, no `contracts/` change, no ledger row.
 - No new control, no confirmation, no timed wait.
 - I left no run going and removed no lock.
+
+## Fix round 1 (review 1)
+
+- MEDIUM: `schedule_deploy` out of `SiteWork` and the theory; new test `WhileARenameHoldsTheCourseTheAssistantStillSchedulesADeployAsOnTheMac`. Must-fail rows: the `schedule_deploy` row now takes out `deploy_section`, and a new row puts `schedule_deploy` back.
+- LOW 1: the restore test's `File.Exists(backup)` check, which proved nothing, is gone.
+- LOW 2 (refusal order on `rebuild_preview`) left: no teacher can see it. LOW 3 (`RestoreSectionButton` greyed during a rename) is for 19b.

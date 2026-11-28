@@ -21,7 +21,7 @@ public sealed class AssistantRefusesDuringARenameTests : IDisposable
     private readonly string _root = RunOwnedTempFolders.Create("plantoir-assistant-refuses-during-a-rename-");
 
     /// <summary>The tools whose work is the course's site, as the mac's <c>AssistSiteWork</c> refuses them.</summary>
-    public static readonly TheoryData<string> SiteWorkTools = new() { "rebuild_preview", "deploy_section", "schedule_deploy" };
+    public static readonly TheoryData<string> SiteWorkTools = new() { "rebuild_preview", "deploy_section" };
 
     // MARK: - Computed properties
 
@@ -137,7 +137,19 @@ public sealed class AssistantRefusesDuringARenameTests : IDisposable
             AssistSectionRestore.Restore(backup, "ICS3U", 1, CoursesDirectory));
 
         Assert.Equal(Sentence("ICS3U"), refused.Message);
-        Assert.False(File.Exists(backup));
+    }
+
+    [Fact]
+    public async Task WhileARenameHoldsTheCourseTheAssistantStillSchedulesADeployAsOnTheMac()
+    {
+        using var claim = CourseActivity.BeginFolderRename(Folder, "ICS3U")!;
+        var tools = new CannedTools();
+        var happened = new List<string>();
+
+        var (answer, _) = await Runner(tools, happened).Run(Call("schedule_deploy"), default);
+
+        Assert.NotEqual(Sentence("ICS3U"), answer.Summary);
+        Assert.Single(tools.Calls);
     }
 
     /// <summary>

@@ -201,10 +201,11 @@ public sealed class AssistToolRunner
     /// <summary>
     /// The tools whose work is the course's site: what the mac's
     /// <c>AssistSiteWork</c> refuses while a Rename folder holds the course (#899 W8b-19a3).
+    /// <c>schedule_deploy</c> is not here: the mac schedules during a rename.
     /// </summary>
     internal static readonly HashSet<string> SiteWork = new(StringComparer.OrdinalIgnoreCase)
     {
-        "rebuild_preview", "deploy_section", "schedule_deploy",
+        "rebuild_preview", "deploy_section",
     };
 
     private bool ThisSectionIsBeingDeployed() => SectionIsBeingDeployed?.Invoke() == true;
