@@ -282,9 +282,19 @@ public static class CourseRestorer
             bool websiteRecordDiffers = WebsiteRecordDiffers(sectionNumber, courseDir, payload);
             hooks.Reached(SwapPoint.Staged);
 
+            (int NotPutBack, int NotSaved, int MadeSinceHidden) keys = (0, 0, 0);
+            SectionSwapHooks theHooks = hooks;
             try
             {
-                SwapSectionInPlace(sectionNumber, courseDir, payload, OneSectionRestore.FilesOutsideTheSection, staging.Aside, hooks, keepingWhatWasReplaced);
+                SwapSectionHoldingTheList(sectionNumber, courseDir, payload, OneSectionRestore.FilesOutsideTheSection, staging.Aside, hooks,
+                    keepingWhatWasReplaced, theList,
+                    thenInsideTheLock: () =>
+                    {
+                        // The shared pages' keys for this section, inside the
+                        // same lock, so no recovery judges them half written.
+                        keys = RestorePerSectionKeysFromTheMenu(sectionNumber, courseDir, payload);
+                        theHooks.Reached(SwapPoint.PerSectionKeysPutBack);
+                    });
             }
             catch (WayBackDidNotFinish)
             {
@@ -293,7 +303,6 @@ public static class CourseRestorer
                 throw new SectionRestoreStoppedPartWay(StoppedPartWaySentence(sectionNumber, kept.PathToSay, archived: true));
             }
 
-            var keys = RestorePerSectionKeysFromTheMenu(sectionNumber, courseDir, payload);
             DiscardBuiltSiteKeepingItsWebsiteMarker(sectionNumber, item.CourseCode, coursesDirectory);
             return new OneSectionRestore.Outcome(keys.NotPutBack, keys.NotSaved, keys.MadeSinceHidden, websiteRecordDiffers);
         }
@@ -702,6 +711,79 @@ public static class CourseRestorer
             throw new RestoreException(OneSectionRestoreWording.LeftAsItWas(sectionNumber, error.Message));
         }
         keepingWhatWasReplaced?.Invoke(aside);
+    }
+
+    /// <summary>The reason a restore refused because the Undo list stayed busy (the mac's <c>RestoreSwap.listBusyReason</c>), in <c>wording.leftAsItWas</c>'s reason slot.</summary>
+    internal const string ListBusyReason = "another change in Plantoir was still being made";
+
+    /// <summary>
+    /// What a one-section restore replaces, as paths from the working folder:
+    /// <c>courses/&lt;CODE&gt;/section&lt;N&gt;</c> and each file outside the
+    /// folder it moves (every one not left as it is). The shared pages whose
+    /// keys it puts back are not among them: they are judged by content.
+    /// </summary>
+    internal static List<string> ReplacedByASectionRestore(int sectionNumber, string courseCode, IReadOnlyList<OneSectionRestore.OutsideFile> outsideFiles)
+    {
+        var replaced = new List<string> { "courses/" + courseCode + "/section" + sectionNumber };
+        foreach (var file in outsideFiles)
+        {
+            if (file.Treatment == OneSectionRestore.Treatment.LeftAsItIs) continue;
+            replaced.Add("courses/" + courseCode + "/" + file.PathFor(sectionNumber).Replace('\\', '/'));
+        }
+        return replaced;
+    }
+
+    /// <summary>
+    /// <see cref="SwapSectionInPlace"/>, then <paramref name="thenInsideTheLock"/>
+    /// (the per-section keys), all inside the Undo list's lock, through the one
+    /// function every restore that replaces files calls
+    /// (<see cref="UndoRestoreSetAside.SwapHoldingTheList"/>, the mac's
+    /// <c>swapSectionInPlace</c> with its <c>thenInsideTheLock</c>): once files
+    /// are replaced, every step in flight naming one is set aside in the same
+    /// lock. A list still busy after the finish wait refuses before anything
+    /// moves, with <c>wording.leftAsItWas</c> and <see cref="ListBusyReason"/>.
+    /// The swap's own error (<c>wording.leftAsItWas</c>,
+    /// <see cref="WayBackDidNotFinish"/>) is thrown once the lock is let go.
+    /// </summary>
+    private static void SwapSectionHoldingTheList(int sectionNumber, string courseDir, string payload,
+        IReadOnlyList<OneSectionRestore.OutsideFile> outsideFiles, string aside, SectionSwapHooks hooks,
+        Action<string>? keepingWhatWasReplaced, Func<UndoListForARestore> theList, Action thenInsideTheLock)
+    {
+        string trimmed = courseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string courseCode = Path.GetFileName(trimmed);
+        string workingFolderRoot = Path.GetDirectoryName(Path.GetDirectoryName(trimmed)!)!;
+        List<string> replaced = ReplacedByASectionRestore(sectionNumber, courseCode, outsideFiles);
+        Exception? swapError = null;
+        try
+        {
+            UndoRestoreSetAside.SwapHoldingTheList(replaced, workingFolderRoot, courseCode, theList, () =>
+            {
+                bool moved = false;
+                try
+                {
+                    SwapSectionInPlace(sectionNumber, courseDir, payload, outsideFiles, aside, hooks, keepingWhatWasReplaced);
+                    moved = true;
+                    thenInsideTheLock();
+                    return true;
+                }
+                catch (WayBackDidNotFinish stoppedPartWay)
+                {
+                    swapError = stoppedPartWay;
+                    return true;
+                }
+                catch (Exception error)
+                {
+                    swapError = error;
+                    return moved;
+                }
+            });
+        }
+        catch (UndoRestoreSetAside.TheListIsBusy)
+        {
+            // Nothing moved: the section is as it was.
+            throw new RestoreException(OneSectionRestoreWording.LeftAsItWas(sectionNumber, ListBusyReason));
+        }
+        if (swapError is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(swapError).Throw();
     }
 
     /// <summary>Where a stopped restore kept what it set aside, and whether a teacher would find anything there.</summary>

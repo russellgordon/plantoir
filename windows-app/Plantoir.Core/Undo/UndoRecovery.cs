@@ -118,6 +118,10 @@ internal static class UndoTrail
               + (stillJudged == 1 ? "1 other file" : $"{stillJudged} other files") + " of it will be settled as before"
             : $"the undo list set aside {What(phase)} that stopped part way ({Files(files)}), because a restore replaced its files; it is not judged again";
 
+    /// <summary>When a restore replaced files and the list could not be had (the mac's <c>setAsideByARestoreLine</c> with <c>closed: false</c>).</summary>
+    internal const string ListNotReachedByARestoreWords =
+        "the undo list could not be reached when a restore replaced files of the course, so any change left part way in it is still open";
+
     /// <summary>"a change", "an undo" or "a redo": the work that stopped.</summary>
     private static string What(UndoPhase phase) => phase switch
     {
