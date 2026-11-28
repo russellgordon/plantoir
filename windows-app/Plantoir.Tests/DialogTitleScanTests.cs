@@ -41,13 +41,13 @@ public class DialogTitleScanTests
         ["Views/AssistantSettingsPane.cs"] = 1,   // #987, D22: the question before a downloaded assistant is removed
         ["Views/AssistWindow.xaml.cs"] = 2,
         ["Views/CopyAPageDialog.cs"] = 1,
-        ["Views/CourseSettingsView.xaml.cs"] = 2,
+        ["Views/CourseSettingsView.xaml.cs"] = 3,   // +1 with #899 W8b-19a2: Preview Again's "Cannot Preview Yet" while a Rename folder holds the course
         ["Views/FolderProblemsDialog.cs"] = 2,
         ["Views/FormBuilders.cs"] = 1,
         ["Views/LinksChecklistDialog.cs"] = 1,
         ["Views/NewCourseDialog.cs"] = 1,
         ["Views/ObsidianWorld.cs"] = 4,   // the add-ons offer and the reopen question (#581); the closing question and its alert (#1003)
-        ["Views/SectionDetailView.xaml.cs"] = 16,   // +1 with #899 W7b2-9: ShowAlertAsync, which renders the kept-file alert and its keptGone; +2 with #736: Fix with…'s refusal and its "didn’t open"; #928: "Cannot Preview Yet" for a start that cannot go ahead is one dialog, ShowPreviewRefusal, for the press's two refusals, the run that never started and the automated start (17 became 15)
+        ["Views/SectionDetailView.xaml.cs"] = 17,   // +1 with #899 W7b2-9: ShowAlertAsync, which renders the kept-file alert and its keptGone; +2 with #736: Fix with…'s refusal and its "didn’t open"; #928: "Cannot Preview Yet" for a start that cannot go ahead is one dialog, ShowPreviewRefusal, for the press's two refusals, the run that never started and the automated start (17 became 15); +1 with #899 W8b-19a2: Deploy's "Cannot Deploy Yet" while a Rename folder holds the course (the preview paths use ShowPreviewRefusal)
         ["Views/SectionScheduleDialog.cs"] = 1,
         ["Views/SectionVerbDialog.cs"] = 1,
         ["Views/SidebarPane.Reference.cs"] = 6,
