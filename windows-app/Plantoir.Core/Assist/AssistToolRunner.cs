@@ -149,6 +149,14 @@ public sealed class AssistToolRunner
     /// </summary>
     public Func<string>? ShownCourseCode { get; init; }
 
+    /// <summary>
+    /// The working folder this runner's course is in (#899 W8b-19a3): while a
+    /// Rename folder of the course holds it there, in any window, the
+    /// assistant's site work is refused before anything is asked, stopped or
+    /// written, with <see cref="Plantoir.Core.Models.CourseActivity.FolderRenameRefusal"/>.
+    /// </summary>
+    public string? WorkingFolder { get; init; }
+
     // ---- Which tools do what to the preview
 
     /// <summary>
