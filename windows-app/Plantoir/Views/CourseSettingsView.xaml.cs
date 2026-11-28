@@ -486,13 +486,20 @@ public sealed partial class CourseSettingsView : UserControl
             // links is not quick on a synced vault, and neither is the door's
             // check of every file in a moved folder. A rename found interrupted
             // (finishing) moves nothing: its folders already moved.
-            outcome = await Task.Run(() =>
+            //
+            // The course's ONE claim is taken here, at the click, and given
+            // back however the rename ends (#899 W8b-19a1): a second rename of
+            // it, from any window, is refused with renameFolderUnderWay, and
+            // its swap is refused while a whole-course restore holds it.
+            string workingFolder = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(courseDirectory)!)!;
+            outcome = await SpecialFolderRenamer.RenameHoldingTheCourse(workingFolder, _course.Code, claim => Task.Run(() =>
             {
                 // The curriculum folders are decided from their pages, so they
                 // are read BEFORE the move (#345).
                 var settings = SpecialFolderRenamer.RenamingTheSettings(configuration, configPath, oldName, newName, scope, courseDirectory);
-                return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections, settings, finishing);
-            });
+                return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections, settings, finishing,
+                                                   () => CourseActivity.RenameSwapBegins(claim));
+            }));
         }
         catch (SpecialFolderRenamer.RenameException error)
         {

@@ -222,6 +222,15 @@ public static class SpecialNames
     public const string RenameFolderNothingWasChanged =
         "“{old}” was not renamed, and nothing was changed: {said}";
 
+    /// <summary>
+    /// <c>undo.wording.renameFolderUnderWay</c>: an act on a course refused at
+    /// its click while a Rename folder of it is under way. Carries {course}.
+    /// Pinned by key (<c>FolderRenameClaimTests.TheUnderWaySentenceIsTheContractsOwnByKey</c>;
+    /// #899 W8b-19a1).
+    /// </summary>
+    public const string RenameFolderUnderWay =
+        "A folder in {course} is being renamed right now. Try again once the rename has finished.";
+
     /// <summary><c>undo.wording.renameFolderStoppedPartWay</c>: part way, no folder at the new name. Carries {old} and {said}.</summary>
     public const string RenameFolderStoppedPartWay =
         "“{old}” was not renamed, and Plantoir could not put everything back as it was: {said}";

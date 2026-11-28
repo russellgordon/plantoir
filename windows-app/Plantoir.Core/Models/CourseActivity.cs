@@ -227,9 +227,132 @@ public static class CourseActivity
     public static bool IsPreviewingOrPublishing(string folderPath, string courseCode) =>
         IsPreviewing(folderPath, courseCode) || IsPublishing(folderPath, courseCode);
 
+    // ---- A Rename folder holds its course (#899 W8b-19a1, mac U4b) ---------
+
+    /// <summary>
+    /// One Rename folder's claim on its course, from the click until the
+    /// rename ends however it ends: the mac's <c>FolderRenameRecord</c>.
+    /// Keyed by working folder and course code, and seen by every window of
+    /// this app. <see cref="IsSwapping"/> turns true once the step's check and
+    /// swap begin. Disposing gives the course back; twice is harmless, and an
+    /// ended claim never begins its swap.
+    /// </summary>
+    public sealed class FolderRenameClaim : IDisposable
+    {
+        internal FolderRenameClaim(string folderPath, string courseCode)
+        {
+            FolderPath = folderPath;
+            CourseCode = courseCode;
+        }
+
+        public string FolderPath { get; }
+        public string CourseCode { get; }
+        internal bool IsSwapping { get; set; }
+
+        public void Dispose() => EndFolderRename(this);
+    }
+
+    private static readonly List<FolderRenameClaim> _folderRenames = new();
+
+    /// <summary>
+    /// The sentence an act on a course is refused with at the click while a
+    /// Rename folder of it is under way: <c>undo.wording.renameFolderUnderWay</c>,
+    /// <c>{course}</c> filled. The mac's <c>folderRenameIsUnderWay(course:)</c>.
+    /// </summary>
+    public static string FolderRenameIsUnderWay(string course) =>
+        SpecialNames.RenameFolderUnderWay.Replace("{course}", course);
+
+    /// <summary>
+    /// Records that a Rename folder of the course has begun and returns its
+    /// claim, or null when one is already under way for the course, from any
+    /// window: one rename at a time per course folder. The mac's
+    /// <c>beginFolderRename</c>.
+    /// </summary>
+    public static FolderRenameClaim? BeginFolderRename(string folderPath, string courseCode)
+    {
+        lock (_gate)
+        {
+            if (CourseIsRenamingAFolderLocked(folderPath, courseCode)) return null;
+            var claim = new FolderRenameClaim(folderPath, courseCode);
+            _folderRenames.Add(claim);
+            return claim;
+        }
+    }
+
+    /// <summary>
+    /// Records that a rename's check and swap have begun. False, marking
+    /// nothing, when the claim is no longer held. The mac's
+    /// <c>folderRenameSwapBegins</c>.
+    /// </summary>
+    public static bool FolderRenameSwapBegins(FolderRenameClaim claim)
+    {
+        lock (_gate)
+        {
+            if (!_folderRenames.Contains(claim)) return false;
+            claim.IsSwapping = true;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// The one place a rename passes from planning to its swap: refused while
+    /// a whole-course restore of the same course is under way in any window,
+    /// and when the claim is no longer held. The mac's
+    /// <c>FolderRenameRun.swapBegins</c>, less its quit half (20b's).
+    /// </summary>
+    public static bool RenameSwapBegins(FolderRenameClaim claim)
+    {
+        if (CourseIsBeingRestored(claim.FolderPath, claim.CourseCode)) return false;
+        return FolderRenameSwapBegins(claim);
+    }
+
+    /// <summary>Records that a rename has ended, however it ended. Safe to call twice. The mac's <c>endFolderRename</c>.</summary>
+    public static void EndFolderRename(FolderRenameClaim claim)
+    {
+        lock (_gate) _folderRenames.Remove(claim);
+    }
+
+    /// <summary>True while a Rename folder of the course is under way, in any window. The mac's <c>courseIsRenamingAFolder</c>.</summary>
+    public static bool CourseIsRenamingAFolder(string folderPath, string courseCode)
+    {
+        lock (_gate) return CourseIsRenamingAFolderLocked(folderPath, courseCode);
+    }
+
+    private static bool CourseIsRenamingAFolderLocked(string folderPath, string courseCode) =>
+        _folderRenames.Any(r => r.CourseCode == courseCode && WorkingFolder.IsTheSame(r.FolderPath, folderPath));
+
+    /// <summary>True once a rename of the course has begun its check and swap. The mac's <c>folderRenameIsSwapping</c>.</summary>
+    public static bool FolderRenameIsSwapping(string folderPath, string courseCode)
+    {
+        lock (_gate)
+            return _folderRenames.Any(r => r.IsSwapping && r.CourseCode == courseCode && WorkingFolder.IsTheSame(r.FolderPath, folderPath));
+    }
+
+    // ---- A whole-course restore holds its course (#899 W8b-19a1, mac #909) --
+
+    private static readonly List<PublishRecord> _restores = new();
+
+    /// <summary>
+    /// Records that a whole course has started being restored from a backup,
+    /// for its whole run: dispose on every exit. The mac's
+    /// <c>beginRestore</c> and <c>endRestore</c>.
+    /// </summary>
+    public static IDisposable BeginRestore(string folderPath, string courseCode)
+    {
+        var record = new PublishRecord(folderPath, courseCode, 0);
+        lock (_gate) _restores.Add(record);
+        return new Token(() => { lock (_gate) _restores.Remove(record); });
+    }
+
+    /// <summary>True while a whole course is being restored, in any window: a Rename folder of it may not begin its swap. The mac's <c>courseIsBeingRestored</c>.</summary>
+    public static bool CourseIsBeingRestored(string folderPath, string courseCode)
+    {
+        lock (_gate) return _restores.Any(r => r.CourseCode == courseCode && WorkingFolder.IsTheSame(r.FolderPath, folderPath));
+    }
+
     public static void Reset()
     {
-        lock (_gate) { _publishes.Clear(); _previewBuilds.Clear(); }
+        lock (_gate) { _publishes.Clear(); _previewBuilds.Clear(); _folderRenames.Clear(); _restores.Clear(); }
         PreviewLeases.Reset();
     }
 }

@@ -57,6 +57,9 @@ public static class CourseRestorer
         try { File.Delete(item.FilePath); } catch { }
     }
 
+    /// <summary>A test's look inside <see cref="RestoreWholeCourse"/> once it holds the course; null in the app.</summary>
+    internal static Action? WhileRestoringTheWholeCourse;
+
     /// <summary>The whole-course restore's busy refusal: its title, while a preview or deploy of the course uses its folders.</summary>
     public static string BusyTitle(string courseCode) => $"{courseCode} is busy right now";
 
@@ -73,6 +76,12 @@ public static class CourseRestorer
     /// </summary>
     public static void RestoreWholeCourse(BackupItem item, Course? current, string coursesDirectory)
     {
+        // The course held for the whole run, given back however it ends
+        // (#899 W8b-19a1, the mac's restoreBackup: take first, then work): a
+        // Rename folder of it may not begin its swap meanwhile.
+        string workingFolder = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(coursesDirectory)))!;
+        using var holding = CourseActivity.BeginRestore(workingFolder, item.CourseCode);
+        WhileRestoringTheWholeCourse?.Invoke();
         string? archivedFirst = null;
         if (current is not null)
             archivedFirst = CourseArchiver.ArchiveCourseWithoutRemoving(current, coursesDirectory);
