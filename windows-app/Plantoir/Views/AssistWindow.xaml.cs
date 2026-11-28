@@ -521,6 +521,8 @@ public sealed partial class AssistWindow : Window
             // a numbered course, on its own page word (#274).
             NumberedPageWord = _course.Configuration.Naming is { IsNumbered: true } naming ? naming.Word : null,
             CourseNoun = _course.Configuration.ClassNoun,
+            // #899 W8b-19a3: the runner refuses site work while a Rename folder holds the course.
+            WorkingFolder = _folder,
             // The full surface, so a tool the model names but was not shown
             // is refused rather than run (#350 / mac #327).
             ServedTools = served

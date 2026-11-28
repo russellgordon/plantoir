@@ -198,6 +198,15 @@ public sealed class AssistToolRunner
 
     internal static bool IsWriteTool(string name) => WriteTools.Contains(name);
 
+    /// <summary>
+    /// The tools whose work is the course's site: what the mac's
+    /// <c>AssistSiteWork</c> refuses while a Rename folder holds the course (#899 W8b-19a3).
+    /// </summary>
+    internal static readonly HashSet<string> SiteWork = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "rebuild_preview", "deploy_section", "schedule_deploy",
+    };
+
     private bool ThisSectionIsBeingDeployed() => SectionIsBeingDeployed?.Invoke() == true;
 
     /// <summary>
@@ -230,6 +239,14 @@ public sealed class AssistToolRunner
         // section. The menu itself, and every read, go ahead.
         if (Surface == AssistSurface.LocalWindow && IsWriteTool(name) && SectionIsChangingFromTheMenu?.Invoke() == true)
             return Handed(AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString(), CourseNoun));
+
+        // #899 W8b-19a3 (the mac's AssistSiteWork and bringThePreviewUpToDate):
+        // while a Rename folder of this course is under way in any window, its
+        // site work is refused here, before a question is asked, a preview
+        // stopped or the server called. Reading tools still answer.
+        if (SiteWork.Contains(name) && WorkingFolder is { } folder
+            && Plantoir.Core.Models.CourseActivity.FolderRenameRefusal(folder, _courseCode) is { } renaming)
+            return Handed(renaming);
 
         // #690: Open in Obsidian is answered by the APP, by pressing the
         // section window's own button (#681's route), never by the server,

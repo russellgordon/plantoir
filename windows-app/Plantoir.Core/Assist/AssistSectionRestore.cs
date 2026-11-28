@@ -97,6 +97,12 @@ public static class AssistSectionRestore
     {
         if (backupPath is null) throw new Problem(NothingToRestore);
         if (coursesDirectory is null) throw new Problem(NoWorkingFolder);
+        // #899 W8b-19a3 (the mac's Problem.folderRenameUnderWay): a Rename
+        // folder of the course under way in any window refuses before the
+        // backup is read or anything is moved.
+        string workingFolder = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(coursesDirectory)))!;
+        if (Plantoir.Core.Models.CourseActivity.FolderRenameRefusal(workingFolder, courseCode) is { } renaming)
+            throw new Problem(renaming);
         if (!File.Exists(backupPath) || BackupItem.From(backupPath, courseCode) is not { } item)
             throw new Problem(UnreadableBackup(Path.GetFileName(backupPath)));
         int notPutBack;

@@ -80,6 +80,7 @@ public sealed partial class MainWindow
         new(tools, code, section, AssistSurface.Menu)
         {
             CourseNoun = Workspace.ClassNounOf(code),
+            WorkingFolder = folder,
             ShowPreviewInApp = () => ShowPreviewFor(code, section),
             RebuildPreviewInApp = () => RebuildPreviewFor(code, section),
             PreviewIsShowing = () => PreviewLeases.Active.Any(lease =>

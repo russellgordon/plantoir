@@ -713,6 +713,9 @@ public sealed class AssistAgent
     /// <summary>Whether the Section menu is changing this section right now (#489's claim, <c>SectionMenuActivity</c>).</summary>
     public Func<bool>? SectionIsChangingFromTheMenu { get; set; }
 
+    /// <summary>The working folder of this conversation's course, handed to the runner (#899 W8b-19a3: its site work is refused while a Rename folder holds the course).</summary>
+    public string? WorkingFolder { get; set; }
+
     /// <summary>
     /// The question about classes dated after the next class, put in the
     /// section's window before the deploy stops anything (#475) — see
@@ -2322,6 +2325,7 @@ public sealed class AssistAgent
             RebuildPreviewInApp = RebuildPreviewInApp,
             SectionIsChangingFromTheMenu = SectionIsChangingFromTheMenu,
             CourseNoun = CourseNoun,
+            WorkingFolder = WorkingFolder,
             StartDeployInApp = StartDeployInApp,
             StartDeployInAppAsync = StartDeployInAppAsync,
             AskAboutClassesDatedLaterInApp = AskAboutClassesDatedLaterInApp,
