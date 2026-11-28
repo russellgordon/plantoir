@@ -276,6 +276,30 @@ public partial class StartOfYearTests
         foreach (string sentence in offer.Sentences) Assert.DoesNotContain(".plantoir-undo", sentence, StringComparison.Ordinal);
     }
 
+    /// <summary>2b's review, LOW 2: a restore that throws still starts each stopped preview again once, and its error still reaches the caller.</summary>
+    [Fact]
+    public void ARestoreThatThrowsStillStartsEachStoppedPreviewOnce()
+    {
+        var stop = StopPartWay();
+        var recorder = new AnswersRecorder(this, sectionsAfter: new[] { 1 });
+        recorder.Previewing.Add(1);
+        StartOfYearRestoreAnswers answers = recorder.Answers with
+        {
+            RestoreWholeCourse = item =>
+            {
+                recorder.Calls.Add("restore");
+                throw new IOException("a test refused the restore");
+            },
+        };
+        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        Assert.Equal(RestoreCoursePress.Closes, offer.RestoreCourseIsPressed());
+
+        var thrown = Assert.Throws<IOException>(() => offer.RestoreCourseAsync(answers).GetAwaiter().GetResult());
+
+        Assert.Equal("a test refused the restore", thrown.Message);
+        Assert.Equal(new[] { "stop 1", "restore", "start 1" }, recorder.Calls);
+    }
+
     [Fact]
     public void RestoreCourseRestoresTheBackupGoMadeWithNoSecondQuestion()
     {

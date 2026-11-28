@@ -205,6 +205,28 @@ public sealed class UndoRestoreSetAsideTests
         Assert.Null(scribe.Fold().LastClearing);
     }
 
+    /// <summary>
+    /// The rest made, with files set aside: the earlier undone step keeps its
+    /// Redo (the guard <c>setAside.Count == 0</c> in recovery's Redo drop; 3a's review, LOW 2).
+    /// </summary>
+    [Fact]
+    public void ARestOfTheStepThatWasMadeLeavesAnEarlierStepsRedoOffered()
+    {
+        using UndoScribe scribe = Scribe();
+        var change = new List<(string, byte[]?)> { (Shared, New(Shared)) };
+        Assert.Equal(UndoOutcomeKind.Applied, scribe.Door().Perform(scribe.Draft("A", change)).Kind);
+        long earlier = scribe.Fold().Steps.Keys.Max();
+        scribe.Undo();
+        Assert.Equal(UndoStepState.Undone, scribe.Fold().Steps[earlier].State);
+        long seq = StopAStep(scribe, [FrontPage, First], stopBefore: 1);
+        SetAside(scribe, [SectionOne]);
+
+        scribe.Door().Recover();
+
+        Assert.Equal(UndoStepState.Interrupted, scribe.Fold().Steps[seq].State);
+        Assert.Equal(UndoStepState.Undone, scribe.Fold().Steps[earlier].State);
+    }
+
     // ---- Which steps --------------------------------------------------------------
 
     /// <summary>Another course's step is never touched, a course whose name only begins the same way included (compared part by part).</summary>

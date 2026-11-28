@@ -84,14 +84,23 @@ public static class AssistSectionRestore
     /// </summary>
     /// <returns>How many shared pages kept their current setting; see <see cref="DoneMessage"/>.</returns>
     public static int Restore(string? backupPath, string courseCode, int sectionNumber, string? coursesDirectory,
-                              CourseRestorer.SectionSwapHooks? hooks = null)
+                              CourseRestorer.SectionSwapHooks? hooks = null) =>
+        Restore(backupPath, courseCode, sectionNumber, coursesDirectory, Plantoir.Core.Undo.UndoListForARestore.OfThisProcess, hooks);
+
+    /// <summary>
+    /// The same, holding <paramref name="theList"/> across the swap (W8c-3b2):
+    /// a list still busy refuses before anything moves, and its reason reaches
+    /// the window through the <see cref="CourseRestorer.RestoreException"/> below.
+    /// </summary>
+    internal static int Restore(string? backupPath, string courseCode, int sectionNumber, string? coursesDirectory,
+                                Func<Plantoir.Core.Undo.UndoListForARestore> theList, CourseRestorer.SectionSwapHooks? hooks = null)
     {
         if (backupPath is null) throw new Problem(NothingToRestore);
         if (coursesDirectory is null) throw new Problem(NoWorkingFolder);
         if (!File.Exists(backupPath) || BackupItem.From(backupPath, courseCode) is not { } item)
             throw new Problem(UnreadableBackup(Path.GetFileName(backupPath)));
         int notPutBack;
-        try { notPutBack = CourseRestorer.RestoreSection(sectionNumber, item, coursesDirectory, hooks); }
+        try { notPutBack = CourseRestorer.RestoreSection(sectionNumber, item, coursesDirectory, theList, hooks); }
         catch (CourseRestorer.SectionRestoreStoppedPartWay stopped) { throw new StoppedPartWay(stopped.Message); }
         catch (CourseRestorer.RestoreException error) { throw new Problem(error.Message); }
         catch (IOException error) { throw new Problem(error.Message); }

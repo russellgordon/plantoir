@@ -177,7 +177,12 @@ public static class CourseRestorer
     /// </summary>
     /// <param name="hooks">The moves and the points a test or the kill harness stops at; <see cref="SectionSwapHooks.Real"/> otherwise.</param>
     /// <returns>How many shared pages kept their current setting because there was nowhere on them to put the backup's back (#308).</returns>
-    public static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory, SectionSwapHooks? hooks = null)
+    public static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory, SectionSwapHooks? hooks = null) =>
+        RestoreSection(sectionNumber, item, coursesDirectory, UndoListForARestore.OfThisProcess, hooks);
+
+    /// <summary>The same, given a list (W8c-3b2's tests first: the list is not held yet).</summary>
+    internal static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory,
+                                       Func<UndoListForARestore> theList, SectionSwapHooks? hooks = null)
     {
         hooks ??= SectionSwapHooks.Real;
         string courseDir = Path.Combine(coursesDirectory, item.CourseCode);

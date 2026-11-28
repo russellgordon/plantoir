@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 using Plantoir.Core.Undo;
@@ -350,5 +351,161 @@ public sealed class UndoRestoreSetAsideSectionTests : IDisposable
         Assert.Equal(OneSectionRestoreWording.LeftAsItWas(1, "another change in Plantoir was still being made"), refused!.Message);
         Assert.Equal(0, moves);
         Assert.Equal(courseBefore, SectionSwapFixture.Snapshot(CourseDir));
+    }
+
+    // ---- 10 and 11. A list that cannot be had (3b1's review, LOW 1 and LOW 3) ----
+
+    /// <summary>A list whose folder is a file: it is had, but its lock can never be taken.</summary>
+    private UndoListForARestore AListThatCannotBeWritten()
+    {
+        string notAFolder = _scribe.FullPath("A", "not-a-folder");
+        File.WriteAllText(notAFolder, "a file where the list's folder would be");
+        var journal = new UndoJournal(notAFolder, _scribe.Clock, process => true, step => true, isLive: true,
+                                      memory: new UndoProcessMemory(), readRetry: TimeSpan.Zero);
+        return new UndoListForARestore(journal, UndoMode.Live, line => { lock (_scribe.TrailLines) _scribe.TrailLines.Add(line); }, TestFinishWait);
+    }
+
+    [Fact]
+    public void AListThatCannotBeWrittenLetsTheRestoreRunAndWritesTheTrailLine()
+    {
+        BackupItem backup = BackUpHoldingTheNewPages();
+
+        CourseRestorer.RestoreSectionFromTheMenu(1, backup, CoursesDir, AListThatCannotBeWritten);
+
+        Assert.True(Same(New(DayOne), _scribe.Page("A", DayOne)), "the restore did not run");
+        UndoTrailLine line = Assert.Single(_scribe.TrailLines, written => written.Event == ActivityTrail.Event.UndoSetAsideByARestore);
+        Assert.Equal(UndoTrail.ListNotReachedByARestoreWords, line.Words);
+    }
+
+    [Fact]
+    public void AListThatCannotBeMadeLetsTheRestoreRun()
+    {
+        BackupItem backup = BackUpHoldingTheNewPages();
+
+        CourseRestorer.RestoreSectionFromTheMenu(1, backup, CoursesDir, () => throw new IOException("a test could not make the list"));
+
+        Assert.True(Same(New(DayOne), _scribe.Page("A", DayOne)), "the restore did not run");
+    }
+
+    // ---- 12 to 16. The assistant window's route (W8c-3b2) ---------------------
+
+    private int RestoreFromTheAssistant(BackupItem backup, CourseRestorer.SectionSwapHooks? hooks = null) =>
+        AssistSectionRestore.Restore(backup.FilePath, Code, 1, CoursesDir, TheList, hooks);
+
+    /// <summary>A step in flight of another course, written as its begin line alone (no door, so nothing recovers it first).</summary>
+    private long BeginAnotherCoursesStep()
+    {
+        long seq = _scribe.Fold().NextSeq;
+        _scribe.Append(_scribe.BeginLine(seq, _scribe.OpsFor(OtherOne, Old(OtherOne), New(OtherOne)), "A", pid: UndoScribe.AProcessThatIsGone));
+        return seq;
+    }
+
+    [Fact]
+    public void TheAssistantsRestoreSetsAsideAStepInTheSectionAndRecoveryNeverWritesIt()
+    {
+        BackupItem backup = BackUpHoldingTheNewPages();
+        // Its files outside the section are mixed (one made, one not), so a
+        // recovery that judged the section's files would put them back.
+        long seq = StopAStep([Syllabus, DayOne, PublishState, DayTwo], stopBefore: 2);
+        long other = BeginAnotherCoursesStep();
+
+        RestoreFromTheAssistant(backup);
+
+        UndoFoldedStep step = _scribe.Fold().Steps[seq];
+        Assert.Contains(DayOne, step.SetAsidePaths);
+        Assert.Contains(DayTwo, step.SetAsidePaths);
+        UndoFoldedStep others = _scribe.Fold().Steps[other];
+        Assert.True(others.IsInFlight);
+        Assert.Empty(others.SetAsidePaths);
+        var restored = SectionSwapFixture.Snapshot(SectionOneDir);
+
+        UndoRecoveryRun run = _scribe.Door().Recover();
+
+        Assert.Equal(restored, SectionSwapFixture.Snapshot(SectionOneDir));
+        Assert.True(Same(New(DayOne), _scribe.Page("A", DayOne)), "recovery wrote into the restored section");
+        Assert.True(Same(New(DayTwo), _scribe.Page("A", DayTwo)), "recovery wrote into the restored section");
+        Assert.True(Same(Old(Syllabus), _scribe.Page("A", Syllabus)), "the step's file outside the section was not settled");
+        Assert.Contains(run.Settled, result => result.Seq == other);
+    }
+
+    [Fact]
+    public void TheAssistantsFirstMoveThatFailsSetsNothingAside()
+    {
+        BackupItem backup = BackUpHoldingTheNewPages();
+        long seq = StopAStep([DayOne, DayTwo], stopBefore: 1);
+        int before = LinesOnDisk;
+
+        Assert.Throws<AssistSectionRestore.Problem>(() => RestoreFromTheAssistant(backup, FailingAt(1)));
+
+        Assert.Empty(LinesAfter(before));
+        Assert.Empty(_scribe.Fold().Steps[seq].SetAsidePaths);
+    }
+
+    [Fact]
+    public void TheAssistantsRestoreRefusesABusyListBeforeAnythingMoves()
+    {
+        BackupItem backup = BackUpHoldingTheNewPages();
+        var courseBefore = SectionSwapFixture.Snapshot(CourseDir);
+        int moves = 0;
+        var hooks = new CourseRestorer.SectionSwapHooks
+        {
+            Move = (from, to) => { moves++; CourseRestorer.MoveEntry(from, to); },
+            Reached = _ => { },
+        };
+        AssistSectionRestore.Problem? refused = null;
+
+        AnotherProcessesList().WithLock(_ =>
+        {
+            refused = Assert.Throws<AssistSectionRestore.Problem>(() => RestoreFromTheAssistant(backup, hooks));
+        });
+
+        Assert.NotNull(refused);
+        Assert.Equal(OneSectionRestoreWording.LeftAsItWas(1, "another change in Plantoir was still being made"), refused!.Message);
+        Assert.Equal(0, moves);
+        Assert.Equal(courseBefore, SectionSwapFixture.Snapshot(CourseDir));
+    }
+
+    [Fact]
+    public void TheAssistantsRestoreHoldsTheLockForEveryMove()
+    {
+        BackupItem backup = BackUpHoldingTheNewPages();
+        int moves = 0, refused = 0;
+        var hooks = new CourseRestorer.SectionSwapHooks
+        {
+            Move = (from, to) =>
+            {
+                moves++;
+                if (!AnotherProcessCouldTakeTheLock()) refused++;
+                CourseRestorer.MoveEntry(from, to);
+            },
+            Reached = _ => { },
+        };
+
+        RestoreFromTheAssistant(backup, hooks);
+
+        Assert.True(moves > 0);
+        Assert.Equal(moves, refused);
+    }
+
+    [Fact]
+    public void TheAssistantsPerSectionKeysAreWrittenInsideTheLock()
+    {
+        BackupItem backup = BackUpHoldingTheNewPages();
+        bool reached = false, refused = false;
+        var hooks = new CourseRestorer.SectionSwapHooks
+        {
+            Move = CourseRestorer.MoveEntry,
+            Reached = point =>
+            {
+                if (point != CourseRestorer.SwapPoint.PerSectionKeysPutBack) return;
+                reached = true;
+                refused = !AnotherProcessCouldTakeTheLock();
+            },
+        };
+
+        RestoreFromTheAssistant(backup, hooks);
+
+        Assert.True(reached, "the keys' point was never reached");
+        Assert.True(refused, "the keys were written with the lock let go");
     }
 }
