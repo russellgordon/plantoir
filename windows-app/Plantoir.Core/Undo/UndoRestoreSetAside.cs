@@ -74,13 +74,16 @@ internal static class UndoRestoreSetAside
             swap();
             return [];
         }
-        UndoListForARestore list = theList();
         var workingFolder = new UndoWorkingFolder(id, workingFolderRoot);
+        UndoListForARestore? list = null;
         bool swapRan = false;
         bool replacedFiles = false;
         IReadOnlyList<long> setAside = [];
         try
         {
+            // Asked for inside the try: a list that cannot be made is a list
+            // that cannot be had, and the restore still runs (3b1's review, LOW 3).
+            list = theList();
             list.Journal.WithLock(writer =>
             {
                 swapRan = true;
@@ -97,7 +100,7 @@ internal static class UndoRestoreSetAside
             // The list could not be had or written: the restore still runs.
             if (!swapRan) replacedFiles = swap();
             if (replacedFiles)
-                list.Trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoSetAsideByARestore, course, null,
+                list?.Trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoSetAsideByARestore, course, null,
                                                      UndoTrail.ListNotReachedByARestoreWords));
         }
         return setAside;

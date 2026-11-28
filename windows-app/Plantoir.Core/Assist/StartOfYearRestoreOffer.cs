@@ -110,8 +110,24 @@ public sealed class StartOfYearRestoreOffer
     {
         if (!_restoreChosen || _restoreRan) return;
         _restoreRan = true;
-        IReadOnlyList<int> stopped = await answers.StopEveryPreviewOfTheCourse();
-        await answers.RestoreWholeCourse(Stop.Backup);
+        IReadOnlyList<int> stopped = [];
+        try
+        {
+            stopped = await answers.StopEveryPreviewOfTheCourse();
+            await answers.RestoreWholeCourse(Stop.Backup);
+        }
+        finally
+        {
+            // A stop or a restore that throws still starts each stopped
+            // preview again once; its error still reaches the caller.
+            StartTheStoppedPreviewsAgain(answers, stopped);
+        }
+    }
+
+    /// <summary>Starts each stopped preview again once, if the course now still has that section and it is not already running.</summary>
+    private static void StartTheStoppedPreviewsAgain(StartOfYearRestoreAnswers answers, IReadOnlyList<int> stopped)
+    {
+        if (stopped.Count == 0) return;
         IReadOnlyCollection<int> sectionsNow = answers.SectionsOfTheCourseNow();
         var started = new HashSet<int>();
         foreach (int section in stopped)

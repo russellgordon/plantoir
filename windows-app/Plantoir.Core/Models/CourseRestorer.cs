@@ -180,7 +180,15 @@ public static class CourseRestorer
     public static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory, SectionSwapHooks? hooks = null) =>
         RestoreSection(sectionNumber, item, coursesDirectory, UndoListForARestore.OfThisProcess, hooks);
 
-    /// <summary>The same, given a list (W8c-3b2's tests first: the list is not held yet).</summary>
+    /// <summary>
+    /// The same, holding <paramref name="theList"/> (this process's list in
+    /// the app; a test's own in a test) across the swap and the per-section
+    /// keys, through the one function (<see cref="SwapSectionHoldingTheList"/>,
+    /// the mac's <c>restoreSection</c> with <c>outsideFiles: []</c> and its
+    /// <c>thenInsideTheLock</c>, W8c-3b2). What it replaces is
+    /// <c>courses/&lt;CODE&gt;/section&lt;N&gt;</c> alone; a list still busy
+    /// refuses before anything moves, with <c>wording.leftAsItWas</c>.
+    /// </summary>
     internal static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory,
                                        Func<UndoListForARestore> theList, SectionSwapHooks? hooks = null)
     {
@@ -200,9 +208,17 @@ public static class CourseRestorer
                 throw new RestoreException($"The copy of {item.CourseCode} does not hold a Section {sectionNumber}.");
             hooks.Reached(SwapPoint.Staged);
 
+            int notPutBack = 0;
+            SectionSwapHooks theHooks = hooks;
             try
             {
-                SwapSectionInPlace(sectionNumber, courseDir, payload, Array.Empty<OneSectionRestore.OutsideFile>(), staging.Aside, hooks);
+                SwapSectionHoldingTheList(sectionNumber, courseDir, payload, Array.Empty<OneSectionRestore.OutsideFile>(), staging.Aside, hooks,
+                    keepingWhatWasReplaced: null, theList,
+                    thenInsideTheLock: () =>
+                    {
+                        notPutBack = RestorePerSectionKeys(sectionNumber, courseDir, payload);
+                        theHooks.Reached(SwapPoint.PerSectionKeysPutBack);
+                    });
             }
             catch (WayBackDidNotFinish)
             {
@@ -211,7 +227,6 @@ public static class CourseRestorer
                 staging.KeepAside = kept.IsStillInStaging;
                 throw new SectionRestoreStoppedPartWay(StoppedPartWaySentence(sectionNumber, kept.PathToSay, archived: false));
             }
-            int notPutBack = RestorePerSectionKeys(sectionNumber, courseDir, payload);
             // The course's kept copies of geogebra.org sketches live at course
             // level (builds\<id>\<CODE>\.geogebra-cache), so a section's discard
             // never reaches them (#805; KeptCopiesTests).
