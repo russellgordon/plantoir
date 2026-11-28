@@ -312,6 +312,15 @@ public static class CourseActivity
         lock (_gate) _folderRenames.Remove(claim);
     }
 
+    /// <summary>
+    /// THE refusal every act on a course says at its click while a Rename
+    /// folder of it is under way, in any window (#899 W8b-19a2, the mac's
+    /// U4b2-6): <see cref="FolderRenameIsUnderWay"/> for the course, or null
+    /// when no rename holds it. Every act asks this one function, never
+    /// <see cref="CourseIsRenamingAFolder"/> itself.
+    /// </summary>
+    public static string? FolderRenameRefusal(string folderPath, string courseCode) => null;
+
     /// <summary>True while a Rename folder of the course is under way, in any window. The mac's <c>courseIsRenamingAFolder</c>.</summary>
     public static bool CourseIsRenamingAFolder(string folderPath, string courseCode)
     {

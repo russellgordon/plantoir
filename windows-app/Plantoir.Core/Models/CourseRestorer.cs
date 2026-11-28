@@ -57,6 +57,27 @@ public static class CourseRestorer
         try { File.Delete(item.FilePath); } catch { }
     }
 
+    /// <summary>The whole-course restore's refusals Windows decides today, in <c>backups.restoreWholeCourse.refusalWhy</c>'s order (the rest of <c>refusalCases</c> is #873-6's).</summary>
+    public enum WholeCourseRefusal { FolderRenameUnderWay, Busy, ClaudeIsRevisingTheCourseRestore }
+
+    /// <summary>The facts of <c>refusalCases</c> Windows reads: a Rename folder under way, a preview or deploy here, an assistant's hold.</summary>
+    public sealed record WholeCourseRefusalFacts(bool FolderRenameUnderWay, bool BusyHere, bool RevisingAssistant);
+
+    /// <summary>The first refusal of a whole-course restore, or null (the mac's <c>WholeCourseRestore.refusal</c>).</summary>
+    public static WholeCourseRefusal? FirstWholeCourseRefusal(WholeCourseRefusalFacts facts) => null;
+
+    /// <summary>The facts as they stand now, for the course in the working folder.</summary>
+    public static WholeCourseRefusalFacts WholeCourseRefusalFactsNow(string workingFolder, string courseCode) => new(false, false, false);
+
+    /// <summary>A refusal's name in <c>refusalCases</c>, or null for none.</summary>
+    public static string? ContractNameOf(WholeCourseRefusal? refusal) => refusal switch
+    {
+        WholeCourseRefusal.FolderRenameUnderWay => "folderRenameUnderWay",
+        WholeCourseRefusal.Busy => "busy",
+        WholeCourseRefusal.ClaudeIsRevisingTheCourseRestore => "claudeIsRevisingTheCourseRestore",
+        _ => null,
+    };
+
     /// <summary>A test's look inside <see cref="RestoreWholeCourse"/> once it holds the course; null in the app.</summary>
     internal static Action? WhileRestoringTheWholeCourse;
 

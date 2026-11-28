@@ -85,7 +85,7 @@ public static class StartOfYearDialog
                 said = Go(folder, course, section, workspace, proposal, out StartOfYearStoppedPartWay? stop);
                 if (stop is not null)
                 {
-                    offer = new StartOfYearRestoreOffer(stop, () => CourseActivity.IsPublishing(folder, course.Code));
+                    offer = new StartOfYearRestoreOffer(stop, () => CourseActivity.IsPublishing(folder, course.Code), folder);
                     args.Cancel = true;
                     ShowTheOffer(dialog, offer);
                 }

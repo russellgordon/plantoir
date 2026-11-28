@@ -8,6 +8,8 @@ public enum RestoreCoursePress
 {
     /// <summary>A deploy of the course is running: nothing is stopped or started, the offer stays open with both buttons and says the restore's busy sentence.</summary>
     HeldBackByADeploy,
+    /// <summary>A Rename folder of the course is under way: nothing is stopped or started, the offer stays open with both buttons and says <c>undo.wording.renameFolderUnderWay</c>.</summary>
+    HeldBackByARename,
     /// <summary>The offer is answered: the dialog closes, then <see cref="StartOfYearRestoreOffer.RestoreCourseAsync"/> runs.</summary>
     Closes,
     /// <summary>The offer was already answered: nothing happens.</summary>
@@ -44,6 +46,7 @@ public sealed class StartOfYearRestoreOffer
     // ---- Stored properties ---------------------------------------------------------
 
     private readonly Func<bool> _aDeployOfTheCourseRuns;
+    private readonly string _workingFolder;
     private bool _answered;
     private bool _restoreChosen;
     private bool _restoreRan;
@@ -69,10 +72,12 @@ public sealed class StartOfYearRestoreOffer
     // ---- Initializer -----------------------------------------------------------------
 
     /// <param name="aDeployOfTheCourseRuns">Asked in the press's own turn (<c>CourseActivity.IsPublishing</c>).</param>
-    public StartOfYearRestoreOffer(StartOfYearStoppedPartWay stop, Func<bool> aDeployOfTheCourseRuns)
+    /// <param name="workingFolder">The working folder the course is in, for the Rename folder refusal (#899 W8b-19a2).</param>
+    public StartOfYearRestoreOffer(StartOfYearStoppedPartWay stop, Func<bool> aDeployOfTheCourseRuns, string workingFolder)
     {
         Stop = stop;
         _aDeployOfTheCourseRuns = aDeployOfTheCourseRuns;
+        _workingFolder = workingFolder;
     }
 
     // ---- Functions -------------------------------------------------------------------
