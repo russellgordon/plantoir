@@ -316,7 +316,9 @@ public sealed class UndoRenameFolderStepTests : IDisposable
 
         var refused = Assert.Throws<SpecialFolderRenamer.RenameException>(() => Rename());
 
-        Assert.Contains("Tasks", refused.Message);
+        // The whole sentence (#1055 W4 review L2): nothing was changed, said
+        // around cannotTellNow's own reason for the link's place.
+        Assert.Equal(SpecialFolderRenamer.NothingWasChanged("Tasks", "“Tasks” could not be read just now."), refused.Message);
         Assert.Equal(before, Tree());
         Assert.Empty(AppliedSteps());
         Assert.False(File.Exists(SpecialFolderRenamer.RenameRecordPath(CourseFolder)), "nothing started, nothing recorded");
