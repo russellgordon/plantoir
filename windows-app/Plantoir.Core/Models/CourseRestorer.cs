@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Models;
 
@@ -56,6 +57,42 @@ public static class CourseRestorer
         try { File.Delete(item.FilePath); } catch { }
     }
 
+    /// <summary>The whole-course restore's refusals Windows decides today, in <c>backups.restoreWholeCourse.refusalWhy</c>'s order (the rest of <c>refusalCases</c> is #873-6's).</summary>
+    public enum WholeCourseRefusal { FolderRenameUnderWay, Busy, ClaudeIsRevisingTheCourseRestore }
+
+    /// <summary>The facts of <c>refusalCases</c> Windows reads: a Rename folder under way, a preview or deploy here, an assistant's hold.</summary>
+    public sealed record WholeCourseRefusalFacts(bool FolderRenameUnderWay, bool BusyHere, bool RevisingAssistant);
+
+    /// <summary>The first refusal of a whole-course restore, or null (the mac's <c>WholeCourseRestore.refusal</c>).</summary>
+    public static WholeCourseRefusal? FirstWholeCourseRefusal(WholeCourseRefusalFacts facts)
+    {
+        // A Rename folder first (refusalWhy): it moves folders inside the
+        // course the restore would replace, and its sentence is the one every
+        // act it refuses says.
+        if (facts.FolderRenameUnderWay) return WholeCourseRefusal.FolderRenameUnderWay;
+        if (facts.BusyHere) return WholeCourseRefusal.Busy;
+        if (facts.RevisingAssistant) return WholeCourseRefusal.ClaudeIsRevisingTheCourseRestore;
+        return null;
+    }
+
+    /// <summary>The facts as they stand now, for the course in the working folder.</summary>
+    public static WholeCourseRefusalFacts WholeCourseRefusalFactsNow(string workingFolder, string courseCode) => new(
+        FolderRenameUnderWay: CourseActivity.FolderRenameRefusal(workingFolder, courseCode) is not null,
+        BusyHere: CourseActivity.IsPreviewingOrPublishing(workingFolder, courseCode),
+        RevisingAssistant: CourseActivity.AssistHoldRefusal(workingFolder, courseCode, CourseActivity.StructuralWork.Restore) is not null);
+
+    /// <summary>A refusal's name in <c>refusalCases</c>, or null for none.</summary>
+    public static string? ContractNameOf(WholeCourseRefusal? refusal) => refusal switch
+    {
+        WholeCourseRefusal.FolderRenameUnderWay => "folderRenameUnderWay",
+        WholeCourseRefusal.Busy => "busy",
+        WholeCourseRefusal.ClaudeIsRevisingTheCourseRestore => "claudeIsRevisingTheCourseRestore",
+        _ => null,
+    };
+
+    /// <summary>A test's look inside <see cref="RestoreWholeCourse"/> once it holds the course; null in the app.</summary>
+    internal static Action? WhileRestoringTheWholeCourse;
+
     /// <summary>The whole-course restore's busy refusal: its title, while a preview or deploy of the course uses its folders.</summary>
     public static string BusyTitle(string courseCode) => $"{courseCode} is busy right now";
 
@@ -72,6 +109,17 @@ public static class CourseRestorer
     /// </summary>
     public static void RestoreWholeCourse(BackupItem item, Course? current, string coursesDirectory)
     {
+        // The course held for the whole run, given back however it ends
+        // (#899 W8b-19a1, the mac's restoreBackup: take first, then work): a
+        // Rename folder of it may not begin its swap meanwhile.
+        string workingFolder = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(coursesDirectory)))!;
+        using var holding = CourseActivity.BeginRestore(workingFolder, item.CourseCode);
+        WhileRestoringTheWholeCourse?.Invoke();
+        // Taken first, then asked (#899 W8b-19a2): a Rename folder of the
+        // course under way in any window refuses the run before anything is
+        // written, and one that begins after this cannot begin its swap.
+        if (CourseActivity.FolderRenameRefusal(workingFolder, item.CourseCode) is { } renaming)
+            throw new RestoreException(renaming);
         string? archivedFirst = null;
         if (current is not null)
             archivedFirst = CourseArchiver.ArchiveCourseWithoutRemoving(current, coursesDirectory);
@@ -176,7 +224,20 @@ public static class CourseRestorer
     /// </summary>
     /// <param name="hooks">The moves and the points a test or the kill harness stops at; <see cref="SectionSwapHooks.Real"/> otherwise.</param>
     /// <returns>How many shared pages kept their current setting because there was nowhere on them to put the backup's back (#308).</returns>
-    public static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory, SectionSwapHooks? hooks = null)
+    public static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory, SectionSwapHooks? hooks = null) =>
+        RestoreSection(sectionNumber, item, coursesDirectory, UndoListForARestore.OfThisProcess, hooks);
+
+    /// <summary>
+    /// The same, holding <paramref name="theList"/> (this process's list in
+    /// the app; a test's own in a test) across the swap and the per-section
+    /// keys, through the one function (<see cref="SwapSectionHoldingTheList"/>,
+    /// the mac's <c>restoreSection</c> with <c>outsideFiles: []</c> and its
+    /// <c>thenInsideTheLock</c>, W8c-3b2). What it replaces is
+    /// <c>courses/&lt;CODE&gt;/section&lt;N&gt;</c> alone; a list still busy
+    /// refuses before anything moves, with <c>wording.leftAsItWas</c>.
+    /// </summary>
+    internal static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory,
+                                       Func<UndoListForARestore> theList, SectionSwapHooks? hooks = null)
     {
         hooks ??= SectionSwapHooks.Real;
         string courseDir = Path.Combine(coursesDirectory, item.CourseCode);
@@ -194,9 +255,17 @@ public static class CourseRestorer
                 throw new RestoreException($"The copy of {item.CourseCode} does not hold a Section {sectionNumber}.");
             hooks.Reached(SwapPoint.Staged);
 
+            int notPutBack = 0;
+            SectionSwapHooks theHooks = hooks;
             try
             {
-                SwapSectionInPlace(sectionNumber, courseDir, payload, Array.Empty<OneSectionRestore.OutsideFile>(), staging.Aside, hooks);
+                SwapSectionHoldingTheList(sectionNumber, courseDir, payload, Array.Empty<OneSectionRestore.OutsideFile>(), staging.Aside, hooks,
+                    keepingWhatWasReplaced: null, theList,
+                    thenInsideTheLock: () =>
+                    {
+                        notPutBack = RestorePerSectionKeys(sectionNumber, courseDir, payload);
+                        theHooks.Reached(SwapPoint.PerSectionKeysPutBack);
+                    });
             }
             catch (WayBackDidNotFinish)
             {
@@ -205,7 +274,6 @@ public static class CourseRestorer
                 staging.KeepAside = kept.IsStillInStaging;
                 throw new SectionRestoreStoppedPartWay(StoppedPartWaySentence(sectionNumber, kept.PathToSay, archived: false));
             }
-            int notPutBack = RestorePerSectionKeys(sectionNumber, courseDir, payload);
             // The course's kept copies of geogebra.org sketches live at course
             // level (builds\<id>\<CODE>\.geogebra-cache), so a section's discard
             // never reaches them (#805; KeptCopiesTests).
@@ -241,7 +309,12 @@ public static class CourseRestorer
     /// caller passes it yet.</para>
     /// </summary>
     public static OneSectionRestore.Outcome RestoreSectionFromTheMenu(int sectionNumber, BackupItem item, string coursesDirectory,
-        SectionSwapHooks? hooks = null, Action<string>? keepingWhatWasReplaced = null)
+        SectionSwapHooks? hooks = null, Action<string>? keepingWhatWasReplaced = null) =>
+        RestoreSectionFromTheMenu(sectionNumber, item, coursesDirectory, UndoListForARestore.OfThisProcess, hooks, keepingWhatWasReplaced);
+
+    /// <summary>The same, holding <paramref name="theList"/> (this process's list in the app; a test's own in a test).</summary>
+    internal static OneSectionRestore.Outcome RestoreSectionFromTheMenu(int sectionNumber, BackupItem item, string coursesDirectory,
+        Func<UndoListForARestore> theList, SectionSwapHooks? hooks = null, Action<string>? keepingWhatWasReplaced = null)
     {
         hooks ??= SectionSwapHooks.Real;
         string courseDir = Path.Combine(coursesDirectory, item.CourseCode);
@@ -276,9 +349,19 @@ public static class CourseRestorer
             bool websiteRecordDiffers = WebsiteRecordDiffers(sectionNumber, courseDir, payload);
             hooks.Reached(SwapPoint.Staged);
 
+            (int NotPutBack, int NotSaved, int MadeSinceHidden) keys = (0, 0, 0);
+            SectionSwapHooks theHooks = hooks;
             try
             {
-                SwapSectionInPlace(sectionNumber, courseDir, payload, OneSectionRestore.FilesOutsideTheSection, staging.Aside, hooks, keepingWhatWasReplaced);
+                SwapSectionHoldingTheList(sectionNumber, courseDir, payload, OneSectionRestore.FilesOutsideTheSection, staging.Aside, hooks,
+                    keepingWhatWasReplaced, theList,
+                    thenInsideTheLock: () =>
+                    {
+                        // The shared pages' keys for this section, inside the
+                        // same lock, so no recovery judges them half written.
+                        keys = RestorePerSectionKeysFromTheMenu(sectionNumber, courseDir, payload);
+                        theHooks.Reached(SwapPoint.PerSectionKeysPutBack);
+                    });
             }
             catch (WayBackDidNotFinish)
             {
@@ -287,7 +370,6 @@ public static class CourseRestorer
                 throw new SectionRestoreStoppedPartWay(StoppedPartWaySentence(sectionNumber, kept.PathToSay, archived: true));
             }
 
-            var keys = RestorePerSectionKeysFromTheMenu(sectionNumber, courseDir, payload);
             DiscardBuiltSiteKeepingItsWebsiteMarker(sectionNumber, item.CourseCode, coursesDirectory);
             return new OneSectionRestore.Outcome(keys.NotPutBack, keys.NotSaved, keys.MadeSinceHidden, websiteRecordDiffers);
         }
@@ -437,6 +519,8 @@ public static class CourseRestorer
         Staged,
         /// <summary>Every live file the swap replaces is aside and none of the backup's is in: the moment the old code had an EMPTY section folder.</summary>
         SetAside,
+        /// <summary>The shared pages' per-section keys are written (the mac's <c>perSectionKeysPutBack</c>), inside the list's lock.</summary>
+        PerSectionKeysPutBack,
     }
 
     /// <summary>
@@ -694,6 +778,79 @@ public static class CourseRestorer
             throw new RestoreException(OneSectionRestoreWording.LeftAsItWas(sectionNumber, error.Message));
         }
         keepingWhatWasReplaced?.Invoke(aside);
+    }
+
+    /// <summary>The reason a restore refused because the Undo list stayed busy (the mac's <c>RestoreSwap.listBusyReason</c>), in <c>wording.leftAsItWas</c>'s reason slot.</summary>
+    internal const string ListBusyReason = "another change in Plantoir was still being made";
+
+    /// <summary>
+    /// What a one-section restore replaces, as paths from the working folder:
+    /// <c>courses/&lt;CODE&gt;/section&lt;N&gt;</c> and each file outside the
+    /// folder it moves (every one not left as it is). The shared pages whose
+    /// keys it puts back are not among them: they are judged by content.
+    /// </summary>
+    internal static List<string> ReplacedByASectionRestore(int sectionNumber, string courseCode, IReadOnlyList<OneSectionRestore.OutsideFile> outsideFiles)
+    {
+        var replaced = new List<string> { "courses/" + courseCode + "/section" + sectionNumber };
+        foreach (var file in outsideFiles)
+        {
+            if (file.Treatment == OneSectionRestore.Treatment.LeftAsItIs) continue;
+            replaced.Add("courses/" + courseCode + "/" + file.PathFor(sectionNumber).Replace('\\', '/'));
+        }
+        return replaced;
+    }
+
+    /// <summary>
+    /// <see cref="SwapSectionInPlace"/>, then <paramref name="thenInsideTheLock"/>
+    /// (the per-section keys), all inside the Undo list's lock, through the one
+    /// function every restore that replaces files calls
+    /// (<see cref="UndoRestoreSetAside.SwapHoldingTheList"/>, the mac's
+    /// <c>swapSectionInPlace</c> with its <c>thenInsideTheLock</c>): once files
+    /// are replaced, every step in flight naming one is set aside in the same
+    /// lock. A list still busy after the finish wait refuses before anything
+    /// moves, with <c>wording.leftAsItWas</c> and <see cref="ListBusyReason"/>.
+    /// The swap's own error (<c>wording.leftAsItWas</c>,
+    /// <see cref="WayBackDidNotFinish"/>) is thrown once the lock is let go.
+    /// </summary>
+    private static void SwapSectionHoldingTheList(int sectionNumber, string courseDir, string payload,
+        IReadOnlyList<OneSectionRestore.OutsideFile> outsideFiles, string aside, SectionSwapHooks hooks,
+        Action<string>? keepingWhatWasReplaced, Func<UndoListForARestore> theList, Action thenInsideTheLock)
+    {
+        string trimmed = courseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string courseCode = Path.GetFileName(trimmed);
+        string workingFolderRoot = Path.GetDirectoryName(Path.GetDirectoryName(trimmed)!)!;
+        List<string> replaced = ReplacedByASectionRestore(sectionNumber, courseCode, outsideFiles);
+        Exception? swapError = null;
+        try
+        {
+            UndoRestoreSetAside.SwapHoldingTheList(replaced, workingFolderRoot, courseCode, theList, () =>
+            {
+                bool moved = false;
+                try
+                {
+                    SwapSectionInPlace(sectionNumber, courseDir, payload, outsideFiles, aside, hooks, keepingWhatWasReplaced);
+                    moved = true;
+                    thenInsideTheLock();
+                    return true;
+                }
+                catch (WayBackDidNotFinish stoppedPartWay)
+                {
+                    swapError = stoppedPartWay;
+                    return true;
+                }
+                catch (Exception error)
+                {
+                    swapError = error;
+                    return moved;
+                }
+            });
+        }
+        catch (UndoRestoreSetAside.TheListIsBusy)
+        {
+            // Nothing moved: the section is as it was.
+            throw new RestoreException(OneSectionRestoreWording.LeftAsItWas(sectionNumber, ListBusyReason));
+        }
+        if (swapError is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(swapError).Throw();
     }
 
     /// <summary>Where a stopped restore kept what it set aside, and whether a teacher would find anything there.</summary>

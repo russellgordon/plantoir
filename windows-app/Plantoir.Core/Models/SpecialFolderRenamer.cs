@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Plantoir.Core.Undo;
 
@@ -400,15 +401,41 @@ public static class SpecialFolderRenamer
     /// </summary>
     public static RenameOutcome Rename(
         string oldName, string newName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers,
-        SettingsChange? settings = null, bool finishing = false)
-        => Rename(oldName, newName, scope, courseDirectory, sectionNumbers, settings, finishing, null, null);
+        SettingsChange? settings = null, bool finishing = false, Func<bool>? swapBegins = null)
+        => Rename(oldName, newName, scope, courseDirectory, sectionNumbers, settings, finishing, null, null, swapBegins);
+
+    /// <summary>
+    /// The click on Rename (#899 W8b-19a1, the mac's <c>renameFolder</c>):
+    /// takes the course's ONE claim (<see cref="CourseActivity.BeginFolderRename"/>)
+    /// before anything else, runs <paramref name="rename"/> holding it, and
+    /// gives it back on every ending, an exception included. A course already
+    /// claimed, from any window, is refused here with
+    /// <c>undo.wording.renameFolderUnderWay</c>, taking no claim and running
+    /// nothing. <paramref name="rename"/> passes the claim's swap question
+    /// (<see cref="CourseActivity.RenameSwapBegins"/>) to <c>Rename</c>.
+    /// </summary>
+    public static async Task<RenameOutcome> RenameHoldingTheCourse(
+        string workingFolder, string courseCode, Func<CourseActivity.FolderRenameClaim, Task<RenameOutcome>> rename)
+    {
+        using var claim = CourseActivity.BeginFolderRename(workingFolder, courseCode)
+            ?? throw new RenameException(CourseActivity.FolderRenameIsUnderWay(courseCode));
+        return await rename(claim);
+    }
 
     /// <param name="undo">The list, mode and trail: this process's by default, a test's own in a test.</param>
     /// <param name="door">A test's door over <paramref name="undo"/>; the list's own by default.</param>
+    /// <param name="swapBegins">
+    /// The claim's swap question, asked ONCE, after the plan and before the
+    /// record and the door's check and swap (#899 W8b-19a1): refused (an ended
+    /// claim, or a whole-course restore holding the course), nothing is
+    /// written and the rename says <c>renameFolderNothingWasChanged</c>. Null
+    /// asks nothing.
+    /// </param>
     internal static RenameOutcome Rename(
         string oldName, string newName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers,
-        SettingsChange? settings, bool finishing, UndoForThisProcess? undo, UndoDoor? door)
+        SettingsChange? settings, bool finishing, UndoForThisProcess? undo, UndoDoor? door, Func<bool>? swapBegins = null)
     {
+        bool swapAsked = false;
         IReadOnlyList<(string From, string To, int? Section)> moves = finishing
             ? new List<(string, string, int?)>()
             : Moves(courseDirectory, oldName, newName, scope, sectionNumbers);
@@ -446,6 +473,14 @@ public static class SpecialFolderRenamer
             {
                 // Only planning: nothing was written.
                 throw new RenameException(NothingWasChanged(oldName, error.Message));
+            }
+
+            // From planning to the swap, once: refused, nothing is written
+            // (the mac's FolderRenameRun.swapBegins, said as its cancellation).
+            if (!swapAsked && swapBegins is not null)
+            {
+                swapAsked = true;
+                if (!swapBegins()) throw new RenameException(NothingWasChanged(oldName, new OperationCanceledException().Message));
             }
 
             if (moves.Count > 0) record.RenameIsStarting(moves, sectionNumbers);

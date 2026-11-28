@@ -23,10 +23,10 @@ public sealed class UndoFoldMovesContractTests
     {
         var contract = ContractRows();
         var here = UndoFold.Moves.Select(move => (move.From, move.On, move.To)).ToList();
-        // A row Windows owes and has not built, named in the ledger with its
-        // issue and milestone (as SharedRules_ActivityTrailEvents_Exist defers
-        // an event); the ledger fails if the row starts existing here or
-        // leaves the contract. Every other row is compared word for word.
+        // Every row of the contract's table is here and compared word for
+        // word. No row is deferred any more: the ledger's UndoFoldMoves list
+        // is empty, and a row named there again (one Windows owes) fails the
+        // ledger once it starts existing here or leaves the contract.
         var deferred = NamedGapLedger.GapsIn(
             NamedGapLedger.UndoFoldMoves, contract.Select(RowKey), here.Select(RowKey));
         Assert.Equal(21, contract.Count - deferred.Count);   // the table, not a case list: any change is one to read
@@ -35,8 +35,9 @@ public sealed class UndoFoldMovesContractTests
 
     private static string RowKey((string From, string On, string To) row) => $"{row.From} --{row.On}--> {row.To}";
 
+    /// <summary>The restore's row (<c>filesReplacedByARestore</c>) is in the contract's table, keyed as the table is.</summary>
     [Fact]
-    public void TheDeferredRowsAreKeyedAsTheTableIs()
+    public void TheRestoresRowIsKeyedAsTheTableIs()
     {
         Assert.Contains(ContractRows().Select(RowKey), key => key.Contains("--filesReplacedByARestore-->", StringComparison.Ordinal));
     }

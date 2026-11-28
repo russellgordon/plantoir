@@ -78,10 +78,14 @@ public static class StartOfYearDialog
             if (offer is null)
             {
                 if (folderMovedMeanwhile()) return;
+                // Go runs inside the handler: safe, because 2a turns every IO
+                // or permission error of Go into an outcome
+                // (AssistWorkspace.PrepareForStartOfYear), so nothing escapes
+                // the handler (2b's review, LOW 3).
                 said = Go(folder, course, section, workspace, proposal, out StartOfYearStoppedPartWay? stop);
                 if (stop is not null)
                 {
-                    offer = new StartOfYearRestoreOffer(stop, () => CourseActivity.IsPublishing(folder, course.Code));
+                    offer = new StartOfYearRestoreOffer(stop, () => CourseActivity.IsPublishing(folder, course.Code), folder);
                     args.Cancel = true;
                     ShowTheOffer(dialog, offer);
                 }
@@ -90,6 +94,7 @@ public static class StartOfYearDialog
             // Answered in the press's own turn (the mac's restoreCourseIsPressed).
             switch (offer.RestoreCourseIsPressed())
             {
+                case RestoreCoursePress.HeldBackByARename:
                 case RestoreCoursePress.HeldBackByADeploy:
                     args.Cancel = true;
                     ShowTheOffer(dialog, offer, offer.HeldBackSentence);
@@ -135,6 +140,14 @@ public static class StartOfYearDialog
             var busy = new TextBlock { Text = heldBack, TextWrapping = TextWrapping.Wrap };
             AutomationProperties.SetAutomationId(busy, "startOfYearRestoreHeldBack");
             AutomationProperties.SetLiveSetting(busy, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Assertive);
+            // A live region is announced only when it says it changed
+            // (Microsoft Learn, AutomationProperties.LiveSetting: "the
+            // 'politeness' level that a client should use to notify the user
+            // of changes to the live region"): raised from its peer once it is
+            // in the visual tree, after the content is set (2b's review, LOW 4).
+            busy.Loaded += (_, _) =>
+                Microsoft.UI.Xaml.Automation.Peers.FrameworkElementAutomationPeer.CreatePeerForElement(busy)?
+                    .RaiseAutomationEvent(Microsoft.UI.Xaml.Automation.Peers.AutomationEvents.LiveRegionChanged);
             lines.Children.Add(busy);
         }
         dialog.Content = new ScrollViewer { Content = lines, MaxHeight = 480 };

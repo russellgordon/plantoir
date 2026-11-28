@@ -34,6 +34,78 @@ namespace Plantoir.Core.Undo;
 /// </summary>
 internal static class UndoRestoreSetAside
 {
+    /// <summary>Thrown when the list's lock cannot be had within the finish wait: the restore does not start, and nothing has moved (the mac's <c>TheListIsBusy</c>).</summary>
+    internal sealed class TheListIsBusy : Exception;
+
+    /// <summary>
+    /// Runs a restore's <paramref name="swap"/> holding the list's lock (the
+    /// mac's <c>swapHoldingTheList</c>), and once it says the restore has
+    /// replaced files (every move made, or stopped part way with some moved
+    /// and not all put back), sets aside every step in flight whose files are
+    /// among <paramref name="replacedPlaces"/> (<see cref="SetAsideSteps"/>) in
+    /// the same lock, so no recovery can judge between the swap and the
+    /// set-aside and no step can begin in between. A swap that moved nothing,
+    /// or put every file back, sets nothing aside: each step stays in flight
+    /// as recovery would have found it.
+    ///
+    /// <para>A lock still held after the finish wait stops the restore before
+    /// it starts (<see cref="TheListIsBusy"/>), never a swap with no
+    /// set-aside. A list that cannot be read or written at all never stops
+    /// the restore, which is how a teacher gets a course back: the swap runs,
+    /// and when it replaced files the trail says any change left part way in
+    /// the course is still open. A working folder with no identifier has never
+    /// had a step made in it: the swap runs and the list is not asked for.</para>
+    ///
+    /// <para><paramref name="swap"/> never throws: it keeps its own error for
+    /// its caller and returns whether it replaced files.</para>
+    /// </summary>
+    /// <param name="replacedPlaces">What the restore replaces, as paths from the working folder (<c>courses/&lt;CODE&gt;/section&lt;N&gt;</c> and the files outside it it moves; <c>courses/&lt;CODE&gt;</c> for a whole course).</param>
+    /// <param name="workingFolderRoot">The working folder the restore is in (the folder holding <c>courses</c>).</param>
+    /// <param name="course">The course code, for the trail line.</param>
+    /// <param name="theList">The list to hold, asked for only when the folder has an identifier.</param>
+    /// <returns>The numbers of the steps it set aside.</returns>
+    internal static IReadOnlyList<long> SwapHoldingTheList(IReadOnlyList<string> replacedPlaces, string workingFolderRoot, string course,
+                                                           Func<UndoListForARestore> theList, Func<bool> swap)
+    {
+        FolderIdentityFile.Answer identity =
+            new FolderIdentityFile(Path.Combine(workingFolderRoot, "courses", ".internal", "folder-id"), TimeProvider.System).Read();
+        if (identity.Outcome != FolderIdentityFile.Outcome.Identifier || identity.Identifier is not { } id)
+        {
+            swap();
+            return [];
+        }
+        var workingFolder = new UndoWorkingFolder(id, workingFolderRoot);
+        UndoListForARestore? list = null;
+        bool swapRan = false;
+        bool replacedFiles = false;
+        IReadOnlyList<long> setAside = [];
+        try
+        {
+            // Asked for inside the try: a list that cannot be made is a list
+            // that cannot be had, and the restore still runs (3b1's review, LOW 3).
+            list = theList();
+            list.Journal.WithLock(writer =>
+            {
+                swapRan = true;
+                replacedFiles = swap();
+                if (replacedFiles) setAside = SetAsideSteps(replacedPlaces, workingFolder, writer, list.Trail);
+            }, inShadow: list.Mode == UndoMode.Shadow, wait: list.FinishWait);
+        }
+        catch (UndoJournalException error) when (error.Failure == UndoJournalFailure.LockBusy && !swapRan)
+        {
+            throw new TheListIsBusy();
+        }
+        catch (Exception)
+        {
+            // The list could not be had or written: the restore still runs.
+            if (!swapRan) replacedFiles = swap();
+            if (replacedFiles)
+                list?.Trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoSetAsideByARestore, course, null,
+                                                     UndoTrail.ListNotReachedByARestoreWords));
+        }
+        return setAside;
+    }
+
     /// <summary>The reason word on the closing line and on the event (<c>undoJournal.eventKeys.reason</c>).</summary>
     internal const string Reason = "setAsideByARestore";
 
@@ -225,5 +297,20 @@ internal static class UndoRestoreSetAside
                                             UndoTrail.SetAsideByARestoreWords(phase, newlyInside.Count, stillJudged.Count)));
         }
         return touched;
+    }
+}
+
+/// <summary>
+/// The list a restore holds across its swap: its journal, its mode, where
+/// its trail lines go, and how long the lock is waited for (the door's own
+/// finish wait, <see cref="UndoDoor.FinishWait"/>, in the app).
+/// </summary>
+internal sealed record UndoListForARestore(UndoJournal Journal, UndoMode Mode, Action<UndoTrailLine>? Trail, TimeSpan FinishWait)
+{
+    /// <summary>This process's list (<see cref="UndoForThisProcess.Current"/>), asked for only when a restore needs it.</summary>
+    internal static UndoListForARestore OfThisProcess()
+    {
+        UndoForThisProcess process = UndoForThisProcess.Current;
+        return new UndoListForARestore(process.Journal, process.Mode, process.Trail, UndoDoor.FinishWait);
     }
 }

@@ -486,13 +486,20 @@ public sealed partial class CourseSettingsView : UserControl
             // links is not quick on a synced vault, and neither is the door's
             // check of every file in a moved folder. A rename found interrupted
             // (finishing) moves nothing: its folders already moved.
-            outcome = await Task.Run(() =>
+            //
+            // The course's ONE claim is taken here, at the click, and given
+            // back however the rename ends (#899 W8b-19a1): a second rename of
+            // it, from any window, is refused with renameFolderUnderWay, and
+            // its swap is refused while a whole-course restore holds it.
+            string workingFolder = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(courseDirectory)!)!;
+            outcome = await SpecialFolderRenamer.RenameHoldingTheCourse(workingFolder, _course.Code, claim => Task.Run(() =>
             {
                 // The curriculum folders are decided from their pages, so they
                 // are read BEFORE the move (#345).
                 var settings = SpecialFolderRenamer.RenamingTheSettings(configuration, configPath, oldName, newName, scope, courseDirectory);
-                return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections, settings, finishing);
-            });
+                return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections, settings, finishing,
+                                                   () => CourseActivity.RenameSwapBegins(claim));
+            }));
         }
         catch (SpecialFolderRenamer.RenameException error)
         {
@@ -1321,6 +1328,16 @@ public sealed partial class CourseSettingsView : UserControl
     {
         try
         {
+            // Never while a Rename folder of the course is under way, in any
+            // window (#899 W8b-19a2): refused at the click, said on Save's own
+            // line, nothing written and the edits left unsaved.
+            if (_window.Workspace.WorkspacePath is { } renamingIn
+                && CourseActivity.FolderRenameRefusal(renamingIn, _course.Code) is { } renaming)
+            {
+                SaveStatus.Text = renaming;
+                SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+                return;
+            }
             // Where the course deployed BEFORE this Save, off disk (#347): a
             // scheduled deploy goes where the course deploys when it RUNS, so a
             // Save that moves or breaks one is said now, while somebody is awake.
@@ -1470,6 +1487,22 @@ public sealed partial class CourseSettingsView : UserControl
             ActivityTrail.Note(ActivityTrail.Event.PreviewAgainAfterSettingsSaved,
                 "Preview Again pressed in Course Settings for " + _course.Code + ": no preview was still open");
             return;
+        }
+        // Never while a Rename folder of the course is under way, in any
+        // window (#899 W8b-19a2): refused at the press, before anything is
+        // said or stopped, under "Cannot Preview Yet" as #473's refusal is.
+        foreach (var lease in open)
+        {
+            if (CourseActivity.FolderRenameRefusal(lease.FolderPath, _course.Code) is { } renaming)
+            {
+                await ShowAlertSafelyAsync(new ContentDialog
+                {
+                    Title = "Cannot Preview Yet",
+                    Content = renaming,
+                    CloseButtonText = "OK",
+                });
+                return;
+            }
         }
         // #473: never stop a preview that could not be started again — asked
         // before anything is said or stopped, so the button and the trail

@@ -174,7 +174,7 @@ public partial class StartOfYearTests
     private void AnswerAsTheCaseSays(string name, string then, StartOfYearStoppedPartWay stop)
     {
         var recorder = new AnswersRecorder(this);
-        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        var offer = new StartOfYearRestoreOffer(stop, () => false, Path.GetTempPath());
         switch (then)
         {
             case "leaveAsItIs":
@@ -267,7 +267,7 @@ public partial class StartOfYearTests
     public void TheOfferSaysTheTwoSentencesInOrderAndNamesNoHiddenFile()
     {
         var stop = StopPartWay();
-        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        var offer = new StartOfYearRestoreOffer(stop, () => false, Path.GetTempPath());
         Assert.Equal(new[]
         {
             StartOfYearWording.Fill(StartOfYearWording.StoppedPartWay, ("section", "1"), ("course", Code)),
@@ -276,12 +276,36 @@ public partial class StartOfYearTests
         foreach (string sentence in offer.Sentences) Assert.DoesNotContain(".plantoir-undo", sentence, StringComparison.Ordinal);
     }
 
+    /// <summary>2b's review, LOW 2: a restore that throws still starts each stopped preview again once, and its error still reaches the caller.</summary>
+    [Fact]
+    public void ARestoreThatThrowsStillStartsEachStoppedPreviewOnce()
+    {
+        var stop = StopPartWay();
+        var recorder = new AnswersRecorder(this, sectionsAfter: new[] { 1 });
+        recorder.Previewing.Add(1);
+        StartOfYearRestoreAnswers answers = recorder.Answers with
+        {
+            RestoreWholeCourse = item =>
+            {
+                recorder.Calls.Add("restore");
+                throw new IOException("a test refused the restore");
+            },
+        };
+        var offer = new StartOfYearRestoreOffer(stop, () => false, Path.GetTempPath());
+        Assert.Equal(RestoreCoursePress.Closes, offer.RestoreCourseIsPressed());
+
+        var thrown = Assert.Throws<IOException>(() => offer.RestoreCourseAsync(answers).GetAwaiter().GetResult());
+
+        Assert.Equal("a test refused the restore", thrown.Message);
+        Assert.Equal(new[] { "stop 1", "restore", "start 1" }, recorder.Calls);
+    }
+
     [Fact]
     public void RestoreCourseRestoresTheBackupGoMadeWithNoSecondQuestion()
     {
         var stop = StopPartWay();
         var recorder = new AnswersRecorder(this);
-        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        var offer = new StartOfYearRestoreOffer(stop, () => false, Path.GetTempPath());
         int zipsBefore = Directory.EnumerateFiles(Path.Combine(_folder, "courses"), "*.zip", SearchOption.AllDirectories).Count();
         string trail = TrailWhile(() =>
         {
@@ -304,7 +328,7 @@ public partial class StartOfYearTests
         var recorder = new AnswersRecorder(this);
         recorder.Previewing.Add(1);
         bool deploying = true;
-        var offer = new StartOfYearRestoreOffer(stop, () => deploying);
+        var offer = new StartOfYearRestoreOffer(stop, () => deploying, Path.GetTempPath());
 
         Assert.Equal(RestoreCoursePress.HeldBackByADeploy, offer.RestoreCourseIsPressed());
         Assert.False(offer.IsAnswered);
@@ -325,7 +349,7 @@ public partial class StartOfYearTests
         var stop = StopPartWay();
         var before = EveryFileOf(Path.Combine(_folder, "courses", Code), stop.Backup.FilePath);
         var recorder = new AnswersRecorder(this);
-        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        var offer = new StartOfYearRestoreOffer(stop, () => false, Path.GetTempPath());
         string trail = TrailWhile(() => Assert.True(offer.LeaveAsItIs()));
         Assert.Equal("", trail);
         Assert.Equal(before, EveryFileOf(Path.Combine(_folder, "courses", Code), stop.Backup.FilePath));
@@ -339,7 +363,7 @@ public partial class StartOfYearTests
         var recorder = new AnswersRecorder(this, sectionsAfter: [1, 2]);
         recorder.Previewing.Add(1);
         recorder.Previewing.Add(2);
-        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        var offer = new StartOfYearRestoreOffer(stop, () => false, Path.GetTempPath());
 
         Assert.Equal(RestoreCoursePress.Closes, offer.RestoreCourseIsPressed());
         Assert.Equal(RestoreCoursePress.AlreadyAnswered, offer.RestoreCourseIsPressed());
@@ -357,7 +381,7 @@ public partial class StartOfYearTests
         var recorder = new AnswersRecorder(this, sectionsAfter: [1]);
         recorder.Previewing.Add(1);
         recorder.Previewing.Add(3);
-        var offer = new StartOfYearRestoreOffer(stop, () => false);
+        var offer = new StartOfYearRestoreOffer(stop, () => false, Path.GetTempPath());
         Assert.Equal(RestoreCoursePress.Closes, offer.RestoreCourseIsPressed());
         offer.RestoreCourseAsync(recorder.Answers).GetAwaiter().GetResult();
         Assert.Equal(new[] { "stop 1", "stop 3", "restore", "start 1" }, recorder.Calls);

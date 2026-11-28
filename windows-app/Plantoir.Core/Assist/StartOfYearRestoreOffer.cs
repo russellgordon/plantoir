@@ -8,6 +8,8 @@ public enum RestoreCoursePress
 {
     /// <summary>A deploy of the course is running: nothing is stopped or started, the offer stays open with both buttons and says the restore's busy sentence.</summary>
     HeldBackByADeploy,
+    /// <summary>A Rename folder of the course is under way: nothing is stopped or started, the offer stays open with both buttons and says <c>undo.wording.renameFolderUnderWay</c>.</summary>
+    HeldBackByARename,
     /// <summary>The offer is answered: the dialog closes, then <see cref="StartOfYearRestoreOffer.RestoreCourseAsync"/> runs.</summary>
     Closes,
     /// <summary>The offer was already answered: nothing happens.</summary>
@@ -44,6 +46,8 @@ public sealed class StartOfYearRestoreOffer
     // ---- Stored properties ---------------------------------------------------------
 
     private readonly Func<bool> _aDeployOfTheCourseRuns;
+    private readonly string _workingFolder;
+    private string? _heldBackByARename;
     private bool _answered;
     private bool _restoreChosen;
     private bool _restoreRan;
@@ -63,16 +67,18 @@ public sealed class StartOfYearRestoreOffer
         StartOfYearWording.Fill(StartOfYearWording.RestoreOffer, ("course", Stop.CourseCode), ("backup", Path.GetFileName(Stop.Backup.FilePath))),
     ];
 
-    /// <summary>The restore's own busy sentence, said while a deploy holds Restore Course back.</summary>
-    public string HeldBackSentence => CourseRestorer.BusyTitle(Stop.CourseCode) + "\n" + CourseRestorer.BusyMessage;
+    /// <summary>The sentence said while Restore Course is held back: the rename's, or the restore's own busy sentence while a deploy holds it.</summary>
+    public string HeldBackSentence => _heldBackByARename ?? CourseRestorer.BusyTitle(Stop.CourseCode) + "\n" + CourseRestorer.BusyMessage;
 
     // ---- Initializer -----------------------------------------------------------------
 
     /// <param name="aDeployOfTheCourseRuns">Asked in the press's own turn (<c>CourseActivity.IsPublishing</c>).</param>
-    public StartOfYearRestoreOffer(StartOfYearStoppedPartWay stop, Func<bool> aDeployOfTheCourseRuns)
+    /// <param name="workingFolder">The working folder the course is in, for the Rename folder refusal (#899 W8b-19a2).</param>
+    public StartOfYearRestoreOffer(StartOfYearStoppedPartWay stop, Func<bool> aDeployOfTheCourseRuns, string workingFolder)
     {
         Stop = stop;
         _aDeployOfTheCourseRuns = aDeployOfTheCourseRuns;
+        _workingFolder = workingFolder;
     }
 
     // ---- Functions -------------------------------------------------------------------
@@ -85,6 +91,10 @@ public sealed class StartOfYearRestoreOffer
     public RestoreCoursePress RestoreCourseIsPressed()
     {
         if (_answered) return RestoreCoursePress.AlreadyAnswered;
+        // A Rename folder of the course first, as the whole-course restore's
+        // first refusal is (#899 W8b-19a2): held back the same way.
+        _heldBackByARename = CourseActivity.FolderRenameRefusal(_workingFolder, Stop.CourseCode);
+        if (_heldBackByARename is not null) return RestoreCoursePress.HeldBackByARename;
         if (_aDeployOfTheCourseRuns()) return RestoreCoursePress.HeldBackByADeploy;
         _answered = true;
         _restoreChosen = true;
@@ -110,8 +120,24 @@ public sealed class StartOfYearRestoreOffer
     {
         if (!_restoreChosen || _restoreRan) return;
         _restoreRan = true;
-        IReadOnlyList<int> stopped = await answers.StopEveryPreviewOfTheCourse();
-        await answers.RestoreWholeCourse(Stop.Backup);
+        IReadOnlyList<int> stopped = [];
+        try
+        {
+            stopped = await answers.StopEveryPreviewOfTheCourse();
+            await answers.RestoreWholeCourse(Stop.Backup);
+        }
+        finally
+        {
+            // A stop or a restore that throws still starts each stopped
+            // preview again once; its error still reaches the caller.
+            StartTheStoppedPreviewsAgain(answers, stopped);
+        }
+    }
+
+    /// <summary>Starts each stopped preview again once, if the course now still has that section and it is not already running.</summary>
+    private static void StartTheStoppedPreviewsAgain(StartOfYearRestoreAnswers answers, IReadOnlyList<int> stopped)
+    {
+        if (stopped.Count == 0) return;
         IReadOnlyCollection<int> sectionsNow = answers.SectionsOfTheCourseNow();
         var started = new HashSet<int>();
         foreach (int section in stopped)
