@@ -139,7 +139,9 @@ internal sealed class UndoFolded
 /// <para><see cref="Moves"/> is the contract's <c>folding.moves</c> table, row
 /// for row, as text; <c>UndoFoldMovesContractTests</c> compares it with the
 /// JSON so a row added or changed on the mac is red here, and exercises every
-/// row against <see cref="Fold"/>. The fold itself is written as code beside
+/// row against <see cref="Fold"/>: the simple rows and the rules there, the
+/// restore's <c>in flight</c> rows in
+/// <c>UndoRestoreSetAsideTests.TheFoldRowAddsThePathsToAStepInFlightAndMovesNothing</c>. The fold itself is written as code beside
 /// it, one case per row, because four rows are rules rather than lookups (a
 /// clearing by seq, a step in flight marked, a note passed over, a restore's
 /// files set aside).</para>
