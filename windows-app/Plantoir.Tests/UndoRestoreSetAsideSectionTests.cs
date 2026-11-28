@@ -26,6 +26,8 @@ public sealed class UndoRestoreSetAsideSectionTests : IDisposable
     private const string DayTwo = "courses/TST1O/section1/All Classes/Unit 1, Day 2.md";
     private const string Syllabus = "courses/TST1O/Notes/Syllabus.md";
     private const string Timetable = "courses/TST1O/.internal/timetable/section1.json";
+    /// <summary>A file of Section 1 outside its folder that the restore leaves as it is (<c>leftAsItIs</c>).</summary>
+    private const string PublishState = "courses/TST1O/.publish_state/section1.json";
     private const string OtherOne = "courses/OTH1O/section1/All Classes/a.md";
     private const string OtherTwo = "courses/OTH1O/section1/All Classes/b.md";
 
@@ -56,7 +58,7 @@ public sealed class UndoRestoreSetAsideSectionTests : IDisposable
             }
             """);
         Directory.CreateDirectory(Path.Combine(courseDir, "section2", "All Classes"));
-        foreach (string path in new[] { DayOne, DayTwo, Syllabus, Timetable, OtherOne, OtherTwo }) _scribe.WritePage("A", path, Old(path));
+        foreach (string path in new[] { DayOne, DayTwo, Syllabus, Timetable, PublishState, OtherOne, OtherTwo }) _scribe.WritePage("A", path, Old(path));
     }
 
     public void Dispose()
@@ -163,7 +165,9 @@ public sealed class UndoRestoreSetAsideSectionTests : IDisposable
     public void AStepStoppedInTheSectionIsSetAsideAndRecoveryNeverWritesTheRestoredSection()
     {
         BackupItem backup = BackUpHoldingTheNewPages();
-        long seq = StopAStep([Syllabus, DayOne, DayTwo], stopBefore: 2);
+        // Its files outside the section are mixed (one made, one not), so
+        // recovery puts the made one back by content.
+        long seq = StopAStep([Syllabus, DayOne, PublishState, DayTwo], stopBefore: 2);
         Assert.True(Same(New(Syllabus), _scribe.Page("A", Syllabus)));
 
         Restore(backup);
@@ -179,6 +183,7 @@ public sealed class UndoRestoreSetAsideSectionTests : IDisposable
         Assert.Equal(restored, SectionSwapFixture.Snapshot(SectionOneDir));
         Assert.True(Same(New(DayOne), _scribe.Page("A", DayOne)), "recovery wrote into the restored section");
         Assert.True(Same(Old(Syllabus), _scribe.Page("A", Syllabus)), "the step's file outside the section was not settled");
+        Assert.True(Same(Old(PublishState), _scribe.Page("A", PublishState)));
     }
 
     // ---- 2. A step partly inside ---------------------------------------------
